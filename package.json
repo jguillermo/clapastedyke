@@ -11,7 +11,10 @@
     "logout": "clasp logout",
     "push": "cd src && clasp push",
     "pull": "cd src && clasp pull",
-    "open": "cd src && clasp open-script"
+    "open": "cd src && clasp open-script",
+    "test": "node test/unitarios/run.js",
+    "publish:test": "node test/e2e/publish.js test",
+    "publish:prod": "node test/e2e/publish.js prod"
   },
   "repository": {
     "type": "git",
