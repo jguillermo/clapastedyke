@@ -9,91 +9,136 @@
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Figtree:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
   :root{
-    --paper:#f7f1e8; --sheet:#fffdf9; --ink:#2a2420; --muted:#8c8278;
+    --paper:#f6efe5; --sheet:#fffdf9; --ink:#241d18; --muted:#8c8278;
     --line:#e7ddcf; --line-soft:#f0e8db;
-    --accent:#bb5530; --accent-deep:#9a4324; --accent-soft:#f6e3d6;
+    --accent:#bb5530; --accent-deep:#9a4324; --accent-soft:#f6e3d6; --accent-glow:#e08a52;
     --green:#4f8a5b; --green-soft:#e1efe2;
     --amber:#cf9a32; --amber-soft:#f7ecd1;
     --red:#bf412c; --red-soft:#f7ddd6;
-    --shadow:0 18px 44px -20px rgba(60,40,25,.4);
-    --shadow-sm:0 4px 14px -6px rgba(60,40,25,.28);
+    --shadow:0 22px 50px -22px rgba(60,40,25,.45);
+    --shadow-sm:0 6px 18px -8px rgba(60,40,25,.3);
   }
   *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
   body{
     margin:0; background:var(--paper); color:var(--ink);
     font-family:"Figtree",sans-serif; line-height:1.62; -webkit-font-smoothing:antialiased;
-    background-image:radial-gradient(circle at 1px 1px, rgba(155,67,36,.05) 1px, transparent 0);
-    background-size:22px 22px;
+    overflow-x:hidden;
   }
   .num{font-family:"Space Mono",monospace}
 
+  /* Fondo animado: degradados, sin imagenes */
+  .bg{position:fixed;inset:0;z-index:-1;overflow:hidden;pointer-events:none}
+  .blob{position:absolute;border-radius:50%;filter:blur(80px);opacity:.55;will-change:transform}
+  .b1{width:52vw;height:52vw;top:-14vw;left:-10vw;background:radial-gradient(circle,#f4cdab,transparent 68%)}
+  .b2{width:44vw;height:44vw;top:30vh;right:-14vw;background:radial-gradient(circle,#f3dcae,transparent 68%)}
+  .b3{width:40vw;height:40vw;bottom:-12vw;left:18vw;background:radial-gradient(circle,#d9ead9,transparent 70%)}
+  .grain{position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.5;
+    background-image:radial-gradient(circle at 1px 1px, rgba(155,67,36,.05) 1px, transparent 0);background-size:22px 22px}
+
   /* Barra superior */
-  .topbar{position:sticky;top:0;z-index:30;background:rgba(247,241,232,.86);
-    backdrop-filter:blur(8px);border-bottom:1px solid var(--line);
+  .topbar{position:sticky;top:0;z-index:40;background:rgba(246,239,229,.78);
+    backdrop-filter:saturate(160%) blur(12px);-webkit-backdrop-filter:saturate(160%) blur(12px);
+    border-bottom:1px solid rgba(231,221,207,.7);
     display:flex;align-items:center;justify-content:space-between;padding:13px 22px}
   .brand{display:flex;align-items:baseline;gap:10px}
   .brand b{font-family:"Fraunces",serif;font-size:18px;font-weight:600;color:var(--accent-deep)}
   .brand span{font-family:"Space Mono",monospace;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
   .back{font-family:"Figtree";font-size:13px;font-weight:600;color:var(--accent);background:none;border:1px solid var(--line);
-    border-radius:999px;padding:7px 15px;cursor:pointer;display:none}
+    border-radius:999px;padding:7px 15px;cursor:pointer;display:none;transition:background .2s,border-color .2s}
   .back:hover{background:var(--accent-soft);border-color:var(--accent)}
+  /* Barra de progreso de scroll */
+  .progress{position:absolute;left:0;bottom:-1px;height:3px;width:100%;transform:scaleX(0);transform-origin:0 50%;
+    background:linear-gradient(90deg,var(--accent),var(--accent-glow));border-radius:0 3px 3px 0}
 
-  .wrap{max-width:880px;margin:0 auto;padding:0 22px 80px}
+  .wrap{max-width:920px;margin:0 auto;padding:0 22px 90px}
 
   /* Vistas */
   .view{display:none}
-  .view.active{display:block;animation:rise .5s cubic-bezier(.2,.7,.2,1) both}
-  @keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+  .view.active{display:block}
 
-  /* Portada del menu */
-  .hero{padding:46px 0 10px;border-bottom:1px dashed var(--line);margin-bottom:32px}
-  .kick{font-family:"Space Mono",monospace;font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--accent);margin:0 0 10px}
-  .hero h1{font-family:"Fraunces",serif;font-weight:600;font-size:clamp(30px,6vw,46px);line-height:1.05;margin:0 0 14px}
-  .hero p{font-size:16px;color:#5d544b;max-width:60ch;margin:0}
-  .howto{margin-top:18px;background:var(--sheet);border:1px solid var(--line);border-radius:12px;padding:14px 16px;font-size:14px;color:#5d544b}
-  .howto b{color:var(--ink)}
+  /* HERO oscuro premium */
+  .hero{position:relative;overflow:hidden;border-radius:30px;margin:30px 0 10px;
+    padding:clamp(36px,5vw,62px) clamp(24px,4.2vw,54px);color:#f7e9da;
+    background:linear-gradient(148deg,#2b201a 0%,#3b2a1e 52%,#5a3320 100%);
+    box-shadow:0 34px 80px -34px rgba(60,28,8,.62)}
+  .hero::before{content:"";position:absolute;width:62%;height:130%;top:-32%;right:-12%;
+    background:radial-gradient(circle,rgba(224,138,82,.5),transparent 64%);filter:blur(14px);pointer-events:none}
+  .hero::after{content:"";position:absolute;inset:0;background:radial-gradient(circle at 12% 120%,rgba(120,170,120,.16),transparent 45%);pointer-events:none}
+  .hero>*{position:relative;z-index:1}
+  .kick{font-family:"Space Mono",monospace;font-size:12px;letter-spacing:.24em;text-transform:uppercase;color:#eaa97f;margin:0 0 14px}
+  .hero h1{font-family:"Fraunces",serif;font-weight:600;font-size:clamp(32px,6.4vw,58px);line-height:1.02;margin:0 0 16px;color:#fff;letter-spacing:-.01em}
+  .hero h1 .w{display:inline-block;overflow:hidden;vertical-align:top;padding-bottom:.06em}
+  .hero h1 .wi{display:inline-block;will-change:transform}
+  .hero .sub{font-size:clamp(15px,2.4vw,18px);color:#e8d4c3;max-width:62ch;margin:0}
 
-  /* Ruta de primera vez */
-  .route{margin-top:18px;background:linear-gradient(#fff,#fdf4ea);border:1px solid #eecdba;border-radius:14px;padding:17px 19px;box-shadow:var(--shadow-sm)}
-  .route .rt{font-family:"Fraunces",serif;font-size:18px;font-weight:600;color:var(--accent-deep);margin:0 0 4px}
-  .route p{margin:0 0 12px;font-size:14px;color:#5d544b;max-width:none}
-  .route .chips{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-  .route .chip{font-family:"Figtree";font-size:13px;font-weight:600;color:var(--accent);background:#fff;border:1px solid var(--line);
-    border-radius:999px;padding:6px 13px;cursor:pointer;transition:.16s}
-  .route .chip:hover{background:var(--accent-soft);border-color:var(--accent)}
-  .route .chip i{font-style:normal;color:var(--muted);font-family:"Space Mono",monospace;font-size:11px;margin-right:5px}
-  .route .sep{color:#cbb9a6;font-weight:700}
-  .route .done{margin-top:13px;padding-top:12px;border-top:1px dashed #eecdba;font-size:14px;color:#5d544b}
-  .route .done a{color:var(--accent);font-weight:700;cursor:pointer;text-decoration:none}
+  /* Ruta de primera vez (glass sobre oscuro) */
+  .route{margin-top:24px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.16);
+    border-radius:18px;padding:18px 20px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+  .route .rt{font-family:"Fraunces",serif;font-size:19px;font-weight:600;color:#ffd9bf;margin:0 0 5px}
+  .route p{margin:0 0 13px;font-size:14.5px;color:#e8d4c3}
+  .route .chips{display:flex;flex-wrap:wrap;gap:9px;align-items:center}
+  .route .chip{font-family:"Figtree";font-size:13px;font-weight:600;color:#fff;background:rgba(255,255,255,.1);
+    border:1px solid rgba(255,255,255,.22);border-radius:999px;padding:7px 14px;cursor:pointer;transition:transform .2s,background .2s,border-color .2s}
+  .route .chip:hover{background:var(--accent);border-color:var(--accent);transform:translateY(-2px)}
+  .route .chip i{font-style:normal;color:#eaa97f;font-family:"Space Mono",monospace;font-size:11px;margin-right:6px}
+  .route .sep{color:rgba(255,255,255,.4);font-weight:700}
+  .route .done{margin-top:14px;padding-top:13px;border-top:1px dashed rgba(255,255,255,.18);font-size:14.5px;color:#e8d4c3}
+  .route .done a{color:#ffce9e;font-weight:700;cursor:pointer;text-decoration:none}
   .route .done a:hover{text-decoration:underline}
 
+  .howto{margin-top:18px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);
+    border-radius:14px;padding:14px 17px;font-size:13.5px;color:#dfccbb}
+  .howto b{color:#fff}
+
+  /* Grupos de tarjetas */
   .grouplbl{font-family:"Space Mono",monospace;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);
-    margin:34px 0 14px;display:flex;align-items:center;gap:12px}
+    margin:60px 0 20px;display:flex;align-items:center;gap:12px}
   .grouplbl::after{content:"";flex:1;height:1px;background:var(--line)}
   .grouplbl em{font-style:normal;color:var(--accent);text-transform:none;letter-spacing:0;font-family:"Figtree";font-weight:600;font-size:12px}
 
-  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:18px}
   @media(max-width:620px){ .grid{grid-template-columns:1fr} }
-  .flowcard{position:relative;text-align:left;background:var(--sheet);border:1px solid var(--line);border-radius:14px;
-    padding:18px 18px 18px 18px;cursor:pointer;transition:.18s;box-shadow:var(--shadow-sm);font-family:inherit}
-  .flowcard:hover{border-color:var(--accent);transform:translateY(-3px);box-shadow:var(--shadow)}
-  .flowcard .idx{font-family:"Space Mono",monospace;font-size:11px;color:var(--accent);font-weight:700}
-  .flowcard .t{font-family:"Fraunces",serif;font-size:18px;font-weight:600;margin:6px 0 4px;color:var(--ink)}
-  .flowcard .s{font-size:13px;color:var(--muted);line-height:1.5}
-  .flowcard .arrow{position:absolute;right:16px;top:16px;color:var(--line);font-size:18px;transition:.18s}
-  .flowcard:hover .arrow{color:var(--accent);transform:translateX(3px)}
+  .flowcard{position:relative;overflow:hidden;text-align:left;background:var(--sheet);border:1px solid var(--line);border-radius:18px;
+    padding:24px 22px;cursor:pointer;box-shadow:var(--shadow-sm);font-family:inherit;transform-style:preserve-3d;
+    transition:border-color .25s,box-shadow .25s;will-change:transform}
+  .flowcard::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;opacity:0;transition:opacity .3s;
+    background:radial-gradient(130% 90% at 100% 0%, rgba(187,85,48,.1), transparent 58%)}
+  .flowcard:hover{border-color:var(--accent);box-shadow:var(--shadow)}
+  .flowcard:hover::after{opacity:1}
+  .cardicon{position:relative;z-index:1;display:grid;place-items:center;width:50px;height:50px;border-radius:14px;margin-bottom:16px;
+    background:linear-gradient(135deg,var(--accent-soft),#fffdfa);border:1px solid var(--line);color:var(--accent);
+    transition:background .28s,color .28s,border-color .28s,transform .28s}
+  .cardicon svg{width:27px;height:27px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+  .flowcard:hover .cardicon{background:linear-gradient(135deg,var(--accent),var(--accent-deep));color:#fff;border-color:var(--accent);transform:translateY(-2px)}
+  .flowcard .idx{position:relative;z-index:1;font-family:"Space Mono",monospace;font-size:11px;color:var(--accent);font-weight:700;letter-spacing:.06em}
+  .flowcard .t{position:relative;z-index:1;font-family:"Fraunces",serif;font-size:19.5px;font-weight:600;margin:6px 0 5px;color:var(--ink);transition:color .25s}
+  .flowcard:hover .t{color:var(--accent-deep)}
+  .flowcard .s{position:relative;z-index:1;font-size:13px;color:var(--muted);line-height:1.55;max-width:36ch}
+  .flowcard .arrow{position:absolute;right:18px;top:18px;color:var(--line);font-size:18px;transition:.22s;z-index:1}
+  .flowcard:hover .arrow{color:var(--accent);transform:translateX(4px)}
+  .ghostnum{position:absolute;right:14px;bottom:-8px;z-index:0;font-family:"Space Mono",monospace;font-weight:700;
+    font-size:64px;line-height:1;color:var(--accent);opacity:.06;pointer-events:none;letter-spacing:-.04em}
 
   /* Pagina de flujo */
-  .flowhead{padding:36px 0 8px}
+  .flowhead{position:relative;padding:48px 0 12px;will-change:transform}
+  .flowicon{width:66px;height:66px;border-radius:19px;display:grid;place-items:center;margin-bottom:20px;
+    background:linear-gradient(135deg,#fffdfa,#f7ebde);border:1px solid var(--line);box-shadow:var(--shadow-sm);color:var(--accent)}
+  .flowicon svg{width:34px;height:34px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+  .flowdeco{position:absolute;right:-4px;top:-12px;width:240px;height:240px;pointer-events:none;color:var(--accent);z-index:-1}
+  .flowdeco svg{width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:1;opacity:.16}
+  @media(max-width:680px){ .flowdeco{width:160px;height:160px;right:-34px} }
   .flowhead .idx{font-family:"Space Mono",monospace;font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent)}
-  .flowhead h2{font-family:"Fraunces",serif;font-weight:600;font-size:clamp(26px,5vw,38px);line-height:1.08;margin:10px 0 0}
-  .when{margin:18px 0 6px;background:var(--accent-soft);border:1px solid #eecdba;border-radius:12px;padding:13px 16px;font-size:14.5px;color:var(--accent-deep)}
+  .flowhead h2{font-family:"Fraunces",serif;font-weight:600;font-size:clamp(28px,5.2vw,42px);line-height:1.06;margin:10px 0 0;letter-spacing:-.01em}
+  .flowhead h2 .w{display:inline-block;overflow:hidden;vertical-align:top;padding-bottom:.06em}
+  .flowhead h2 .wi{display:inline-block;will-change:transform}
+  .when{margin:20px 0 6px;background:var(--accent-soft);border:1px solid #eecdba;border-radius:14px;padding:14px 17px;font-size:14.5px;color:var(--accent-deep)}
   .when b{font-family:"Space Mono",monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;display:block;margin-bottom:3px}
 
-  /* Dependencias del flujo */
-  .deps{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:14px 0 4px}
+  /* Dependencias */
+  .deps{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin:16px 0 4px}
   @media(max-width:620px){ .deps{grid-template-columns:1fr} }
-  .dep{border:1px solid var(--line);background:var(--sheet);border-radius:12px;padding:12px 14px;font-size:13.5px;color:#5d544b}
+  .dep{border:1px solid var(--line);background:var(--sheet);border-radius:14px;padding:13px 15px;font-size:13.5px;color:#5d544b;box-shadow:var(--shadow-sm)}
   .dep b{font-family:"Space Mono",monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:5px}
   .dep a{color:var(--accent);cursor:pointer;text-decoration:none;font-weight:600}
   .dep a:hover{text-decoration:underline}
@@ -104,24 +149,33 @@
 
   .secn{font-family:"Space Mono",monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:30px 0 14px}
 
-  /* Encabezado de sub-flujo */
-  .subflow{display:flex;align-items:center;gap:11px;margin:36px 0 14px;padding-top:22px;border-top:1px solid var(--line-soft)}
-  .subflow:first-of-type{border-top:0;padding-top:0;margin-top:26px}
-  .subflow .sfx{font-family:"Space Mono",monospace;font-size:13px;font-weight:700;color:#fff;background:var(--accent);
-    border-radius:8px;padding:3px 9px;flex:0 0 auto;box-shadow:0 3px 8px -3px rgba(155,67,36,.6)}
-  .subflow h3{font-family:"Fraunces",serif;font-weight:600;font-size:21px;margin:0;color:var(--ink)}
+  /* Sub-flujo */
+  .subflow{display:flex;align-items:center;gap:12px;margin:40px 0 16px;padding-top:24px;border-top:1px solid var(--line-soft)}
+  .subflow:first-of-type{border-top:0;padding-top:0;margin-top:28px}
+  .subflow .sfx{font-family:"Space Mono",monospace;font-size:13px;font-weight:700;color:#fff;
+    background:linear-gradient(135deg,var(--accent),var(--accent-deep));
+    border-radius:9px;padding:4px 10px;flex:0 0 auto;box-shadow:0 5px 12px -4px rgba(155,67,36,.6)}
+  .subflow h3{font-family:"Fraunces",serif;font-weight:600;font-size:22px;margin:0;color:var(--ink)}
 
   ol.steps{list-style:none;counter-reset:s;padding:0;margin:0}
-  ol.steps>li{counter-increment:s;position:relative;padding:0 0 20px 52px;margin:0}
-  ol.steps>li::before{content:counter(s);position:absolute;left:0;top:-2px;width:34px;height:34px;border-radius:50%;
-    background:var(--accent);color:#fff;font-family:"Space Mono",monospace;font-weight:700;font-size:14px;
-    display:grid;place-items:center;box-shadow:0 4px 10px -4px rgba(155,67,36,.6)}
-  ol.steps>li::after{content:"";position:absolute;left:16px;top:34px;bottom:2px;width:2px;background:var(--line-soft)}
+  ol.steps>li{counter-increment:s;position:relative;padding:0 0 22px 54px;margin:0}
+  ol.steps>li::before{content:counter(s);position:absolute;left:0;top:-2px;width:36px;height:36px;border-radius:50%;
+    background:linear-gradient(135deg,var(--accent),var(--accent-deep));color:#fff;font-family:"Space Mono",monospace;font-weight:700;font-size:14px;
+    display:grid;place-items:center;box-shadow:0 6px 14px -5px rgba(155,67,36,.65)}
+  ol.steps>li::after{content:"";position:absolute;left:17px;top:36px;bottom:2px;width:2px;background:var(--line-soft)}
   ol.steps>li:last-child::after{display:none}
   ol.steps>li b{font-weight:600}
   ol.steps>li .det{font-size:14px;color:#6f655b;margin-top:3px}
+  /* Pasos potenciados (cuando GSAP esta activo) */
+  body.fx ol.steps>li::before{display:none}
+  body.fx ol.steps>li::after{display:none}
+  .stepnum{position:absolute;left:0;top:-2px;width:36px;height:36px;border-radius:50%;
+    background:linear-gradient(135deg,var(--accent),var(--accent-deep));color:#fff;font-family:"Space Mono",monospace;font-weight:700;font-size:14px;
+    display:grid;place-items:center;box-shadow:0 6px 14px -5px rgba(155,67,36,.65);z-index:2}
+  .stepline{position:absolute;left:17px;top:8px;width:2px;height:calc(100% - 44px);
+    background:linear-gradient(var(--accent),var(--accent-soft));border-radius:2px;z-index:1}
 
-  .callout{border-radius:12px;padding:13px 16px;margin:18px 0;font-size:14px;display:flex;gap:11px;align-items:flex-start}
+  .callout{border-radius:14px;padding:14px 17px;margin:18px 0;font-size:14px;display:flex;gap:11px;align-items:flex-start}
   .callout .lbl{font-family:"Space Mono",monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;flex:0 0 auto;padding-top:1px}
   .callout.tip{background:var(--green-soft);border:1px solid #c4e0c8;color:#2f6b3c}
   .callout.tip .lbl{color:var(--green)}
@@ -133,10 +187,9 @@
   ul.plain{padding-left:18px;margin:10px 0}
   ul.plain li{margin-bottom:7px}
 
-  .footnav{margin-top:40px;padding-top:22px;border-top:1px dashed var(--line);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
-  .btnmenu{font-family:"Figtree";font-size:14px;font-weight:600;color:#fff;background:var(--accent);border:0;border-radius:10px;padding:11px 20px;cursor:pointer}
-  .btnmenu:hover{background:var(--accent-deep)}
-  /* Boton secundario (Volver al menu): version "fantasma" del primario */
+  .footnav{margin-top:44px;padding-top:24px;border-top:1px dashed var(--line);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+  .btnmenu{font-family:"Figtree";font-size:14px;font-weight:600;color:#fff;background:var(--accent);border:0;border-radius:11px;padding:12px 21px;cursor:pointer;transition:background .2s,transform .2s}
+  .btnmenu:hover{background:var(--accent-deep);transform:translateY(-2px)}
   .btnmenu.ghost{background:none;color:var(--accent);border:1px solid var(--line)}
   .btnmenu.ghost:hover{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
   .footnote{font-size:12.5px;color:var(--muted)}
@@ -145,13 +198,46 @@
 
   .tag{display:inline-block;font-family:"Space Mono",monospace;font-size:11px;background:#fff;border:1px solid var(--line);
     border-radius:6px;padding:1px 7px;color:var(--accent-deep)}
+
+  /* Encabezado de grupo (portada): cuenta por que estan juntos */
+  .grouphead{margin:78px 0 26px;position:relative;padding-top:24px;border-top:1px solid var(--line)}
+  .grouphead:first-of-type{border-top:0;padding-top:0;margin-top:16px}
+  .gh-freq{display:inline-block;font-family:"Space Mono",monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--accent-deep);background:var(--accent-soft);border:1px solid #eecdba;border-radius:999px;padding:4px 12px}
+  .gh-title{font-family:"Fraunces",serif;font-weight:600;font-size:clamp(23px,3.6vw,31px);line-height:1.12;margin:13px 0 7px;color:var(--ink);letter-spacing:-.01em}
+  .gh-desc{font-size:15px;color:var(--muted);max-width:62ch;margin:0;line-height:1.55}
+
+  /* Capa de transicion: panel del destino que se desliza desde el borde */
+  #xfade{position:fixed;inset:0;z-index:55;display:none;align-items:center;justify-content:center;pointer-events:none;
+    background:var(--paper);will-change:transform,opacity}
+  #xfade.show{display:flex}
+  .xf-card{position:relative;text-align:center;opacity:0;max-width:560px;padding:30px;will-change:transform,opacity}
+  .xf-grp{display:none}
+  #xfade.cross .xf-grp{display:block;font-family:"Space Mono",monospace;font-size:12px;letter-spacing:.3em;text-transform:uppercase;color:var(--accent);margin-bottom:18px}
+  .xf-ic{width:82px;height:82px;margin:0 auto 18px;display:grid;place-items:center;border-radius:23px;
+    background:rgba(255,255,255,.6);border:1px solid rgba(60,40,25,.08);color:var(--accent);box-shadow:var(--shadow-sm)}
+  .xf-ic svg{width:44px;height:44px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+  .xf-tt{font-family:"Fraunces",serif;font-weight:600;font-size:clamp(27px,5.4vw,46px);line-height:1.05;color:var(--ink);letter-spacing:-.01em}
+  .xf-ix{font-family:"Space Mono",monospace;font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-top:11px}
+
+  @media (prefers-reduced-motion: reduce){
+    .blob{display:none}
+  }
 </style>
 </head>
 <body>
 
+<div class="bg" aria-hidden="true">
+  <span class="blob b1"></span>
+  <span class="blob b2"></span>
+  <span class="blob b3"></span>
+</div>
+<div class="grain" aria-hidden="true"></div>
+
 <div class="topbar">
   <div class="brand"><b>Sistema de costeo</b><span>Manual de usuario</span></div>
   <button class="back" id="backbtn" onclick="show('home')">↑ Menú principal</button>
+  <div class="progress" id="progress"></div>
 </div>
 
 <div class="wrap">
@@ -160,8 +246,8 @@
 <section class="view active" id="home">
   <div class="hero">
     <p class="kick">Flujos del sistema</p>
-    <h1>¿Qué necesitas hacer hoy?</h1>
-    <p>El manual está hecho de <b>flujos separados</b>. Cada flujo es una tarea completa que se entiende sola, con todos sus pasos dentro y sus dependencias arriba. Los de <b>más arriba son los que más usarás</b>; los de abajo casi nunca. Si eres nuevo, sigue la ruta de aquí abajo.</p>
+    <h1 data-split>¿Qué necesitas hacer hoy?</h1>
+    <p class="sub">El manual está hecho de <b>flujos separados</b>. Cada flujo es una tarea completa que se entiende sola, con todos sus pasos dentro y sus dependencias arriba. Los de <b>más arriba son los que más usarás</b>; los de abajo casi nunca. Si eres nuevo, sigue la ruta de aquí abajo.</p>
 
     <div class="route">
       <p class="rt">¿Eres nuevo? Empieza por aquí 👇</p>
@@ -184,21 +270,33 @@
     <div class="howto">Todo el sistema se maneja desde el menú de arriba en tu hoja de Google Sheets, el que lleva <b>el nombre de tu negocio</b>. Si no lo ves, recarga la página y espera unos segundos. ¿Estás en el celular? Abre la hoja en el navegador con "Versión de escritorio".</div>
   </div>
 
-  <div class="grouplbl">Tomar y entregar un pedido <em>· todos los días</em></div>
+  <div class="grouphead">
+    <span class="gh-freq">Todos los días</span>
+    <h2 class="gh-title">Tomar y entregar un pedido</h2>
+    <p class="gh-desc">El ciclo que repites a diario: cotizas, cierras el trato y entregas. De principio a fin, aquí nace cada venta.</p>
+  </div>
   <div class="grid">
     <button class="flowcard" onclick="show('f01')"><span class="arrow">›</span><div class="idx">Flujo 01</div><div class="t">Hacer una cotización</div><div class="s">Pon precio a lo que te piden y guárdalo. Lo más usado.</div></button>
     <button class="flowcard" onclick="show('f02')"><span class="arrow">›</span><div class="idx">Flujo 02</div><div class="t">Aprobar o rechazar</div><div class="s">El cliente acepta: nace el pedido. O lo rechazas con motivo.</div></button>
     <button class="flowcard" onclick="show('f03')"><span class="arrow">›</span><div class="idx">Flujo 03</div><div class="t">Producir y entregar el pedido</div><div class="s">De producción a entregado: nace la venta. También cancelar.</div></button>
   </div>
 
-  <div class="grouplbl">Abastecimiento, inventario y control <em>· seguido</em></div>
+  <div class="grouphead">
+    <span class="gh-freq">Seguido</span>
+    <h2 class="gh-title">Abastecimiento, inventario y control</h2>
+    <p class="gh-desc">Mantén el stock al día y vigila el negocio: compra lo que falta, ajusta el inventario y revisa cómo vas.</p>
+  </div>
   <div class="grid">
     <button class="flowcard" onclick="show('f04')"><span class="arrow">›</span><div class="idx">Flujo 04</div><div class="t">Revisar el negocio</div><div class="s">El Resumen: qué necesita tu atención hoy.</div></button>
     <button class="flowcard" onclick="show('f05')"><span class="arrow">›</span><div class="idx">Flujo 05</div><div class="t">Comprar y registrar la compra</div><div class="s">Pide por WhatsApp lo que falta y sube el stock.</div></button>
     <button class="flowcard" onclick="show('f06')"><span class="arrow">›</span><div class="idx">Flujo 06</div><div class="t">Ajustar el inventario</div><div class="s">Mermas, daños, vencimientos y conteos.</div></button>
   </div>
 
-  <div class="grouplbl">Mantener tus datos <em>· de vez en cuando</em></div>
+  <div class="grouphead">
+    <span class="gh-freq">De vez en cuando</span>
+    <h2 class="gh-title">Mantener tus datos</h2>
+    <p class="gh-desc">Los catálogos que alimentan todo lo demás: clientes, insumos, proveedores, recetas y empaques.</p>
+  </div>
   <div class="grid">
     <button class="flowcard" onclick="show('f07')"><span class="arrow">›</span><div class="idx">Flujo 07</div><div class="t">Cliente</div><div class="s">Registrar o editar a quién le vendes.</div></button>
     <button class="flowcard" onclick="show('f08')"><span class="arrow">›</span><div class="idx">Flujo 08</div><div class="t">Insumo</div><div class="s">Ingredientes y empaques, con su precio y stock.</div></button>
@@ -207,18 +305,30 @@
     <button class="flowcard" onclick="show('f11')"><span class="arrow">›</span><div class="idx">Flujo 11</div><div class="t">Regla de empaque</div><div class="s">Qué caja sugerir según el tamaño.</div></button>
   </div>
 
-  <div class="grouplbl">Preparar el sistema <em>· una sola vez</em></div>
+  <div class="grouphead">
+    <span class="gh-freq">Una sola vez</span>
+    <h2 class="gh-title">Preparar el sistema</h2>
+    <p class="gh-desc">La puesta a punto inicial. Se hace una vez y deja todo listo para empezar a operar sin tropiezos.</p>
+  </div>
   <div class="grid">
     <button class="flowcard" onclick="show('f12')"><span class="arrow">›</span><div class="idx">Flujo 12</div><div class="t">Instalar o reparar</div><div class="s">Crea todas las hojas y fórmulas. El primer paso de todos.</div></button>
     <button class="flowcard" onclick="show('f13')"><span class="arrow">›</span><div class="idx">Flujo 13</div><div class="t">Configurar el negocio</div><div class="s">Tarifas, margen, IGV, redondeo y tamaños.</div></button>
   </div>
 
-  <div class="grouplbl">Técnico <em>· casi nunca</em></div>
+  <div class="grouphead">
+    <span class="gh-freq">Casi nunca</span>
+    <h2 class="gh-title">Técnico</h2>
+    <p class="gh-desc">Herramientas de reparación para cuando la instalación falla o algo se ve raro en las hojas.</p>
+  </div>
   <div class="grid">
     <button class="flowcard" onclick="show('f14')"><span class="arrow">›</span><div class="idx">Flujo 14</div><div class="t">Mantenimiento por partes</div><div class="s">Si la instalación se corta o algo se ve raro.</div></button>
   </div>
 
-  <div class="grouplbl">Conceptos <em>· para entender</em></div>
+  <div class="grouphead">
+    <span class="gh-freq">Para entender</span>
+    <h2 class="gh-title">Conceptos</h2>
+    <p class="gh-desc">Las ideas detrás del sistema, para que sepas por qué los números y el stock se comportan así.</p>
+  </div>
   <div class="grid">
     <button class="flowcard" onclick="show('precio')"><span class="arrow">›</span><div class="idx">Concepto</div><div class="t">Cómo se calcula el precio</div><div class="s">Entender de dónde sale el número.</div></button>
     <button class="flowcard" onclick="show('descuento')"><span class="arrow">›</span><div class="idx">Concepto</div><div class="t">Cuándo baja el stock</div><div class="s">Al aprobar o al iniciar producción.</div></button>
@@ -695,16 +805,395 @@
 
 </div>
 
+<!-- ===================== GSAP ===================== -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
 <script>
+(function(){
+  var REDUCE = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var FINE   = window.matchMedia('(pointer:fine)').matches;
+  var hasGSAP = (typeof window.gsap !== 'undefined');
   var views = document.querySelectorAll('.view');
-  function show(id){
-    var el = document.getElementById(id);
-    if(!el){ return; }
-    views.forEach(function(v){ v.classList.remove('active'); });
-    el.classList.add('active');
-    document.getElementById('backbtn').style.display = (id === 'home') ? 'none' : 'inline-flex';
-    window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
+  var backbtn = document.getElementById('backbtn');
+
+  // Elementos que se revelan al entrar en pantalla (hero, encabezado de flujo y pasos
+  // tienen su propia coreografia y NO van aqui)
+  var REVEAL = '.when,.deps .dep,.subflow,.callout,ul.plain>li,.secn,.footnav';
+
+  // --- Sin GSAP o con preferencia de movimiento reducido: experiencia simple ---
+  if(!hasGSAP || REDUCE){
+    window.show = function(id){
+      var el = document.getElementById(id); if(!el) return;
+      views.forEach(function(v){ v.classList.remove('active'); });
+      el.classList.add('active');
+      backbtn.style.display = (id === 'home') ? 'none' : 'inline-flex';
+      window.scrollTo(0,0);
+    };
+    return;
   }
+
+  gsap.registerPlugin(ScrollTrigger);
+  document.body.classList.add('fx');
+
+  /* ---------- Iconos SVG de linea, uno por flujo ---------- */
+  var ICONS = {
+    f01:'<svg viewBox="0 0 24 24"><path d="M20.5 13.5l-7 7-10-10V3.5h7z"/><circle cx="8" cy="8" r="1.6"/></svg>',
+    f02:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12.2l2.6 2.6L16 9.4"/></svg>',
+    f03:'<svg viewBox="0 0 24 24"><path d="M2.5 6.5h11v9h-11z"/><path d="M13.5 9.5h4l3.5 3.5v2.5h-7.5z"/><circle cx="6.5" cy="18" r="1.7"/><circle cx="17.5" cy="18" r="1.7"/></svg>',
+    f04:'<svg viewBox="0 0 24 24"><path d="M3 20.5h18"/><path d="M6 20.5v-7"/><path d="M11.5 20.5V5.5"/><path d="M17 20.5v-10"/></svg>',
+    f05:'<svg viewBox="0 0 24 24"><circle cx="9.5" cy="20" r="1.6"/><circle cx="17.5" cy="20" r="1.6"/><path d="M2.5 4h2.2l2.4 11.2h11l1.9-8.2H6"/></svg>',
+    f06:'<svg viewBox="0 0 24 24"><path d="M12 3l8.5 4.5v9L12 21l-8.5-4.5v-9z"/><path d="M3.6 7.6L12 12l8.4-4.4"/><path d="M12 12v9"/></svg>',
+    f07:'<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4.5 20c0-4.2 3.8-6.3 7.5-6.3s7.5 2.1 7.5 6.3"/></svg>',
+    f08:'<svg viewBox="0 0 24 24"><path d="M8 3.5h8l-1 4H9z"/><path d="M9 7.5h6l2 8a3 3 0 01-3 3.6H10a3 3 0 01-3-3.6z"/><path d="M9.5 13.5h5"/></svg>',
+    f09:'<svg viewBox="0 0 24 24"><path d="M4 9l1.2-4.5h13.6L20 9"/><path d="M4.5 9h15v10.5h-15z"/><path d="M4 9a2.4 2.4 0 004.8 0 2.4 2.4 0 004.8 0 2.4 2.4 0 004.8 0"/><path d="M9.5 19.5v-4.5h5v4.5"/></svg>',
+    f10:'<svg viewBox="0 0 24 24"><path d="M6 3.5h11a2 2 0 012 2v13a2 2 0 01-2 2H6z"/><path d="M6 3.5a2 2 0 00-2 2v13"/><path d="M9 8h7M9 12h7M9 16h4"/></svg>',
+    f11:'<svg viewBox="0 0 24 24"><path d="M12 3l8.5 4.5v9L12 21l-8.5-4.5v-9z"/><path d="M3.6 7.6L12 12l8.4-4.4"/><path d="M12 12v9"/><path d="M7.8 5.2l8.4 4.6"/></svg>',
+    f12:'<svg viewBox="0 0 24 24"><path d="M12 3.5v11"/><path d="M7.5 10.5l4.5 4.5 4.5-4.5"/><path d="M4 20.5h16"/></svg>',
+    f13:'<svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/><circle cx="9" cy="7" r="2.1"/><circle cx="15" cy="12" r="2.1"/><circle cx="8" cy="17" r="2.1"/></svg>',
+    f14:'<svg viewBox="0 0 24 24"><path d="M14.5 6.8a4 4 0 00-5.2 5.2l-6 6 2.7 2.7 6-6a4 4 0 005.2-5.2l-2.7 2.7-2.7-2.7z"/></svg>',
+    precio:'<svg viewBox="0 0 24 24"><circle cx="7.5" cy="7.5" r="2.4"/><circle cx="16.5" cy="16.5" r="2.4"/><path d="M6 18L18 6"/></svg>',
+    descuento:'<svg viewBox="0 0 24 24"><path d="M12 3l8.5 4.5v9L12 21l-8.5-4.5v-9z"/><path d="M12 8.5v6"/><path d="M9 11.5l3 3 3-3"/></svg>',
+    _def:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2"/></svg>'
+  };
+  var DECO = '<svg viewBox="0 0 200 200"><circle cx="100" cy="100" r="42"/><circle cx="100" cy="100" r="66"/><circle cx="100" cy="100" r="90"/><path d="M100 2v40M100 158v40M2 100h40M158 100h40"/></svg>';
+
+  /* ---------- Utilidades ---------- */
+  // Dibuja los trazos de un SVG (stroke-dashoffset), sin plugins de pago
+  function drawSVG(root, dur){
+    if(!root) return;
+    var shapes = root.querySelectorAll('path,line,circle,polyline,polygon,rect,ellipse');
+    shapes.forEach(function(s, i){
+      var len = 0; try{ len = s.getTotalLength(); }catch(e){}
+      if(!len) return;
+      gsap.set(s, {strokeDasharray:len, strokeDashoffset:len});
+      gsap.to(s, {strokeDashoffset:0, duration:dur||1.1, ease:'power2.inOut', delay:i*0.08});
+    });
+  }
+  // Parte un texto en palabras enmascaradas (una sola vez)
+  function ensureSplit(el){
+    if(!el) return [];
+    if(el.dataset.split) return el.querySelectorAll('.wi');
+    var words = el.textContent.trim().split(/\s+/);
+    el.innerHTML = words.map(function(w){ return '<span class="w"><span class="wi">'+w+'</span></span>'; }).join(' ');
+    el.dataset.split = '1';
+    return el.querySelectorAll('.wi');
+  }
+  // Inserta el icono y la decoracion en el encabezado del flujo (una sola vez)
+  function ensureCover(view){
+    var head = view.querySelector('.flowhead'); if(!head) return null;
+    if(!head.dataset.cover){
+      var ic = document.createElement('div'); ic.className = 'flowicon';
+      ic.innerHTML = ICONS[view.id] || ICONS._def;
+      head.insertBefore(ic, head.firstChild);
+      var deco = document.createElement('div'); deco.className = 'flowdeco'; deco.innerHTML = DECO;
+      head.appendChild(deco);
+      gsap.to(deco.querySelector('svg'), {rotation:360, transformOrigin:'50% 50%', duration:90, repeat:-1, ease:'none'});
+      head.dataset.cover = '1';
+    }
+    return head;
+  }
+  // Inyecta icono y numero marca de agua en cada tarjeta de la portada (una sola vez)
+  function ensureCardIcons(){
+    document.querySelectorAll('#home .flowcard').forEach(function(card){
+      if(card.dataset.deco) return;
+      card.dataset.deco = '1';
+      var m = (card.getAttribute('onclick')||'').match(/show\('([^']+)'\)/);
+      var id = m ? m[1] : null;
+      var box = document.createElement('span'); box.className = 'cardicon';
+      box.innerHTML = ICONS[id] || ICONS._def;
+      card.insertBefore(box, card.firstChild);
+      var idx = card.querySelector('.idx');
+      var nm = idx && idx.textContent.match(/(\d{2})/);
+      if(nm){ var g = document.createElement('span'); g.className = 'ghostnum'; g.textContent = nm[1]; card.appendChild(g); }
+    });
+  }
+  // Inyecta numeros y linea conectora en cada lista de pasos (una sola vez)
+  function ensureSteps(view){
+    view.querySelectorAll('ol.steps').forEach(function(ol){
+      if(ol.dataset.fx) return;
+      ol.dataset.fx = '1';
+      ol.style.position = 'relative';
+      var line = document.createElement('span'); line.className = 'stepline'; ol.appendChild(line);
+      ol.querySelectorAll(':scope > li').forEach(function(li, i){
+        var n = document.createElement('span'); n.className = 'stepnum'; n.textContent = (i+1);
+        li.insertBefore(n, li.firstChild);
+      });
+    });
+  }
+
+  // Titulo del hero (portada): partir una vez
+  var heroWords = ensureSplit(document.querySelector('h1[data-split]'));
+
+  /* ---------- Fondo y progreso (persistentes) ---------- */
+  gsap.to('.b1', {xPercent:14, yPercent:10, scale:1.12, duration:16, repeat:-1, yoyo:true, ease:'sine.inOut'});
+  gsap.to('.b2', {xPercent:-12, yPercent:16, scale:1.08, duration:20, repeat:-1, yoyo:true, ease:'sine.inOut'});
+  gsap.to('.b3', {xPercent:10, yPercent:-12, scale:1.15, duration:24, repeat:-1, yoyo:true, ease:'sine.inOut'});
+  gsap.to('#progress', {scaleX:1, ease:'none',
+    scrollTrigger:{ trigger:'.wrap', start:'top top', end:'bottom bottom', scrub:0.3, invalidateOnRefresh:true }});
+
+  /* ---------- ScrollTriggers de la vista activa ---------- */
+  var viewTriggers = [];
+  function clearViewTriggers(){
+    viewTriggers.forEach(function(t){ if(t && t.kill) t.kill(); });
+    viewTriggers = [];
+  }
+  function pushST(tw){ if(tw && tw.scrollTrigger) viewTriggers.push(tw.scrollTrigger); }
+
+  function animateView(view){
+    clearViewTriggers();
+
+    if(view.id === 'home'){
+      // Coreografia del hero (NO se toca: ya esta bien)
+      gsap.timeline()
+        .from('.hero .kick', {opacity:0, y:18, duration:.6, ease:'power3.out'})
+        .from(heroWords, {yPercent:118, duration:.95, ease:'power4.out', stagger:.07}, '-=.25')
+        .from('.hero .sub', {opacity:0, y:22, duration:.7, ease:'power3.out'}, '-=.55')
+        .from('.route', {opacity:0, y:30, scale:.985, duration:.75, ease:'power3.out'}, '-=.4')
+        .from('.route .chip', {opacity:0, y:14, duration:.5, ease:'power2.out', stagger:.045}, '-=.45')
+        .from('.howto', {opacity:0, y:20, duration:.6, ease:'power3.out'}, '-=.45');
+
+      ensureCardIcons();
+
+      // Encabezados de grupo: su contenido entra en cascada
+      var heads = view.querySelectorAll('.grouphead');
+      heads.forEach(function(h){ gsap.set(h.children, {opacity:0, y:24}); });
+      viewTriggers = viewTriggers.concat(ScrollTrigger.batch(heads, {start:'top 90%', once:true,
+        onEnter:function(b){ b.forEach(function(h){ gsap.to(h.children, {opacity:1, y:0, duration:.6, ease:'power3.out', stagger:.08}); }); }}));
+
+      // Tarjetas: suben con escala, en cascada por grupo, al entrar en pantalla
+      view.querySelectorAll('.grid').forEach(function(grid){
+        var cards = grid.querySelectorAll('.flowcard');
+        gsap.set(cards, {opacity:0, y:56, scale:.94});
+        viewTriggers = viewTriggers.concat(ScrollTrigger.batch(cards, {start:'top 94%', once:true,
+          onEnter:function(b){ gsap.to(b, {opacity:1, y:0, scale:1, duration:.7, ease:'power3.out', stagger:.09, overwrite:true}); }}));
+      });
+
+      // Parallax sutil de la marca de agua mientras te desplazas
+      view.querySelectorAll('.ghostnum').forEach(function(g){
+        pushST(gsap.fromTo(g, {yPercent:26}, {yPercent:-26, ease:'none',
+          scrollTrigger:{ trigger:g.closest('.flowcard'), start:'top bottom', end:'bottom top', scrub:true }}));
+      });
+    } else {
+      // Portada del flujo: icono que se dibuja + titulo enmascarado
+      var head = ensureCover(view);
+      ensureSteps(view);
+      var icon = head.querySelector('.flowicon');
+      var words = ensureSplit(head.querySelector('h2'));
+      gsap.timeline()
+        .from(icon, {scale:.4, opacity:0, rotate:-18, duration:.65, ease:'back.out(1.7)'})
+        .from(head.querySelector('.idx'), {opacity:0, y:14, duration:.5, ease:'power3.out'}, '-=.25')
+        .from(words, {yPercent:120, duration:.85, ease:'power4.out', stagger:.05}, '-=.3');
+      drawSVG(icon.querySelector('svg'), 1.2);
+
+      // Pasos: numero con rebote, texto que entra, linea que se dibuja con el scroll
+      view.querySelectorAll('ol.steps').forEach(function(ol){
+        var nums = ol.querySelectorAll('.stepnum');
+        var lis  = ol.querySelectorAll(':scope > li');
+        var line = ol.querySelector('.stepline');
+        gsap.set(nums, {scale:0, opacity:0});
+        gsap.set(lis,  {opacity:0, x:-16});
+        gsap.set(line, {scaleY:0, transformOrigin:'top center'});
+        var b1 = ScrollTrigger.batch(lis, {start:'top 88%', once:true,
+          onEnter:function(b){ gsap.to(b, {opacity:1, x:0, duration:.6, ease:'power3.out', stagger:.08, overwrite:true}); }});
+        var b2 = ScrollTrigger.batch(nums, {start:'top 88%', once:true,
+          onEnter:function(b){ gsap.to(b, {scale:1, opacity:1, duration:.55, ease:'back.out(2.2)', stagger:.08, overwrite:true}); }});
+        var lt = gsap.to(line, {scaleY:1, ease:'none',
+          scrollTrigger:{ trigger:ol, start:'top 80%', end:'bottom 62%', scrub:true }});
+        viewTriggers = viewTriggers.concat(b1, b2); pushST(lt);
+      });
+
+      // Parallax sutil del encabezado
+      pushST(gsap.to(head, {yPercent:-14, ease:'none',
+        scrollTrigger:{ trigger:head, start:'top top', end:'+=440', scrub:true }}));
+    }
+
+    // Revelado por scroll del resto del contenido
+    var els = view.querySelectorAll(REVEAL);
+    if(els.length){
+      gsap.set(els, {opacity:0, y:34});
+      var bt = ScrollTrigger.batch(els, {start:'top 90%', once:true,
+        onEnter:function(b){ gsap.to(b, {opacity:1, y:0, duration:.8, ease:'power3.out', stagger:.07, overwrite:true}); }});
+      viewTriggers = viewTriggers.concat(bt);
+    }
+
+    ScrollTrigger.refresh();
+  }
+
+  /* ---------- Cadena de flujos, grupos y metadatos ---------- */
+  var ORDER = ['home','f01','f02','f03','f04','f05','f06','f07','f08','f09','f10','f11','f12','f13','f14','precio','descuento'];
+  // A que grupo pertenece cada flujo (para decidir transicion moderada vs marcada)
+  var GROUP = {home:'h', f01:'g1',f02:'g1',f03:'g1', f04:'g2',f05:'g2',f06:'g2',
+    f07:'g3',f08:'g3',f09:'g3',f10:'g3',f11:'g3', f12:'g4',f13:'g4', f14:'g5', precio:'g6',descuento:'g6'};
+  var GROUPNAME = {h:'Menú', g1:'Tomar y entregar un pedido', g2:'Abastecimiento e inventario',
+    g3:'Mantener tus datos', g4:'Preparar el sistema', g5:'Técnico', g6:'Conceptos'};
+  var META = {};
+  ORDER.forEach(function(id){
+    var v = document.getElementById(id); if(!v) return;
+    var h = v.querySelector('h1,h2');
+    var ix = v.querySelector('.flowhead .idx');
+    META[id] = {
+      title: h ? h.textContent.trim() : '',
+      idx: ix ? ix.textContent.trim().split('·')[0].trim() : '',
+      icon: ICONS[id] || ICONS._def
+    };
+  });
+  META.home = {title:'Menú de flujos', idx:'Inicio',
+    icon:'<svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>'};
+
+  function idxOf(id){ return ORDER.indexOf(id); }
+  function curId(){ var a = document.querySelector('.view.active'); return a ? a.id : 'home'; }
+  function nextId(id){ var i = idxOf(id); if(i < 0) return null; return (i >= ORDER.length-1) ? 'home' : ORDER[i+1]; }
+  function prevId(id){ var i = idxOf(id); if(i <= 0) return null; return ORDER[i-1]; }
+  function atBottom(){ return (window.innerHeight + window.scrollY) >= (document.documentElement.scrollHeight - 4); }
+  function atTop(){ return window.scrollY <= 2; }
+
+  /* ---------- Transicion dirigida por scroll (sin cortes) ---------- */
+  // Capa de transicion: una tarjeta del destino + un velo (solo al cambiar de grupo)
+  var fade = document.createElement('div'); fade.id = 'xfade';
+  fade.innerHTML = '<div class="xf-card"><span class="xf-grp"></span><span class="xf-ic"></span>'
+    + '<div class="xf-tt"></div><div class="xf-ix"></div></div>';
+  document.body.appendChild(fade);
+  var fcard = fade.querySelector('.xf-card');
+  // Color de fondo por grupo: al cambiar de grupo cambia todo el fondo, suave y como parte del scroll
+  var GROUPBG = {h:'#f6efe5', g1:'#f6efe5', g2:'#edf1ec', g3:'#eceff3', g4:'#f5eedd', g5:'#eeecea', g6:'#f0ecf1'};
+  function bgOf(id){ return GROUPBG[GROUP[id]] || '#f6efe5'; }
+  document.documentElement.style.setProperty('--paper', bgOf(curId()));
+
+  var TRAVEL_IN = 480, TRAVEL_CROSS = 820;     // cuanto scroll cuesta completar (moderada vs marcada)
+  var T = { on:false, auto:false, committed:false, prog:0, dir:'down', from:'home', to:null, cross:false };
+  var settleTimer = null;
+
+  function setupT(to, dir){
+    if(!document.getElementById(to)) return false;
+    T.on = true; T.committed = false; T.auto = false; T.prog = 0; T.dir = dir;
+    T.from = curId(); T.to = to; T.cross = (GROUP[T.from] !== GROUP[to]);
+    var meta = META[to] || {};
+    fade.querySelector('.xf-ic').innerHTML = meta.icon || '';
+    fade.querySelector('.xf-tt').textContent = meta.title || '';
+    fade.querySelector('.xf-ix').textContent = (dir === 'up' ? 'Flujo anterior · ' : '') + (meta.idx || '');
+    fade.querySelector('.xf-grp').textContent = T.cross ? (GROUPNAME[GROUP[to]] || '') : '';
+    fade.classList.toggle('cross', T.cross);
+    fade.style.backgroundColor = bgOf(to);          // el panel trae el color del grupo destino
+    fade.style.opacity = '1';
+    fade.classList.add('show');
+    drawSVG(fade.querySelector('.xf-ic svg'), 0.9);
+    document.documentElement.style.overflow = 'hidden';   // el scroll ahora alimenta la transicion
+    renderT();
+    return true;
+  }
+  function beginT(dir){
+    var to = (dir === 'down') ? nextId(curId()) : prevId(curId());
+    if(!to) return false;
+    return setupT(to, dir);
+  }
+  function renderT(){
+    var p = T.prog, from = document.getElementById(T.from);
+    // El panel del destino entra desde el borde (abajo al avanzar, arriba al retroceder)
+    gsap.set(fade, {yPercent:(1 - p) * 100 * (T.dir === 'down' ? 1 : -1)});
+    // La vista actual se aleja apenas, dando profundidad
+    if(from) gsap.set(from, {scale:1 - p*0.03, opacity:1 - p*0.1});
+    var cp = Math.min(1, p*1.5);
+    gsap.set(fcard, {opacity:cp, y:(1-cp)*22});
+  }
+  function commitT(){
+    if(T.committed) return;
+    T.committed = true;
+    var from = document.getElementById(T.from), to = document.getElementById(T.to);
+    document.documentElement.style.setProperty('--paper', bgOf(to));   // cambio total de fondo
+    if(from){ from.classList.remove('active'); gsap.set(from, {clearProps:'all'}); }
+    to.classList.add('active');
+    backbtn.style.display = (T.to === 'home') ? 'none' : 'inline-flex';
+    window.scrollTo(0,0);
+    gsap.set(to, {opacity:1, y:0});
+    animateView(to);
+    // El panel (ya con el color del nuevo grupo) se desvanece revelando el flujo
+    gsap.set(fade, {yPercent:0});
+    gsap.to(fade, {opacity:0, duration:T.cross ? 0.45 : 0.3, ease:'power2.out', onComplete:endT });
+  }
+  function springBack(){
+    gsap.to(T, {prog:0, duration:0.42, ease:'power3.out', onUpdate:renderT, onComplete:endT });
+  }
+  function endT(){
+    fade.classList.remove('show');
+    gsap.set(fade, {opacity:1, yPercent:0});
+    var from = document.getElementById(T.from);
+    if(from && !T.committed) gsap.set(from, {clearProps:'all'});
+    document.documentElement.style.overflow = '';
+    T.on = false; T.auto = false; T.committed = false; T.prog = 0;
+    ScrollTrigger.refresh();
+  }
+  function settle(){
+    if(!T.on || T.committed || T.auto) return;
+    if(T.prog >= 0.45){
+      T.auto = true;
+      gsap.to(T, {prog:1, duration:0.26, ease:'power2.in', onUpdate:renderT, onComplete:commitT});
+    } else { springBack(); }
+  }
+  // Empuje del scroll: alimenta la transicion en proporcion a cuanto/que tan rapido scrolleas
+  function drive(dir, amount){
+    if(T.committed || T.auto) return;
+    var travel = T.cross ? TRAVEL_CROSS : TRAVEL_IN;
+    T.prog += (dir === T.dir ? amount : -amount) / travel;
+    T.prog = Math.max(0, Math.min(1, T.prog));
+    renderT();
+    if(settleTimer) clearTimeout(settleTimer);
+    if(T.prog >= 1){ commitT(); return; }
+    settleTimer = setTimeout(settle, 140);
+  }
+  function feed(dir, amount){
+    if(T.committed || T.auto) return;
+    if(!T.on){
+      var id = curId();
+      if(dir === 'down' && atBottom()){ if(!beginT('down')) return; }
+      else if(dir === 'up' && atTop()){ if(!beginT('up')) return; }
+      else return;
+    }
+    drive(dir, amount);
+  }
+
+  // API publica (tarjetas, enlaces, botones): transicion automatica corta hacia el destino
+  window.show = function(id){
+    if(T.on) return;
+    var cur = curId(); if(cur === id) return;
+    var dir = (idxOf(id) < idxOf(cur)) ? 'up' : 'down';
+    if(!setupT(id, dir)) return;
+    T.auto = true;
+    gsap.to(T, {prog:1, duration:T.cross ? 0.5 : 0.36, ease:'power2.inOut', onUpdate:renderT, onComplete:commitT});
+  };
+
+  /* ---------- Entradas de scroll: rueda y tactil ---------- */
+  window.addEventListener('wheel', function(e){
+    if(e.deltaY > 0) feed('down', e.deltaY);
+    else if(e.deltaY < 0) feed('up', -e.deltaY);
+  }, {passive:true});
+  var tY = null;
+  window.addEventListener('touchstart', function(e){ tY = e.touches[0].clientY; }, {passive:true});
+  window.addEventListener('touchmove', function(e){
+    if(tY === null) return;
+    var y = e.touches[0].clientY, dy = tY - y; tY = y;   // dy>0: dedo sube => avanzar
+    if(dy > 0) feed('down', dy*2.2);
+    else if(dy < 0) feed('up', -dy*2.2);
+  }, {passive:true});
+  window.addEventListener('touchend', function(){ tY = null; if(T.on && !T.committed && !T.auto){ if(settleTimer) clearTimeout(settleTimer); settle(); } }, {passive:true});
+
+  /* ---------- Tilt 3D sutil en las tarjetas (solo puntero fino) ---------- */
+  if(FINE){
+    document.querySelectorAll('.flowcard').forEach(function(card){
+      card.addEventListener('pointermove', function(e){
+        var r = card.getBoundingClientRect();
+        var px = (e.clientX - r.left)/r.width - .5;
+        var py = (e.clientY - r.top)/r.height - .5;
+        gsap.to(card, {rotateY:px*7, rotateX:-py*7, y:-6, duration:.4, ease:'power2.out', transformPerspective:760, transformOrigin:'center'});
+      });
+      card.addEventListener('pointerleave', function(){
+        gsap.to(card, {rotateY:0, rotateX:0, y:0, duration:.6, ease:'power3.out'});
+      });
+    });
+  }
+
+  window.addEventListener('load', function(){ ScrollTrigger.refresh(); });
+  animateView(document.querySelector('.view.active'));
+})();
 </script>
 </body>
 </html>
