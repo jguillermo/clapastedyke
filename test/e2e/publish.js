@@ -1,57 +1,25 @@
 #!/usr/bin/env node
-/**
- * publish.js — Despliega el código a un entorno (test o prod) con clasp.
- *
- *   node test/e2e/publish.js test    (o: npm run publish:test)
- *   node test/e2e/publish.js prod    (o: npm run publish:prod)
- *
- * Lee el scriptId del entorno desde test/e2e/targets.json, lo escribe en
- * src/.clasp.json (conservando la config de extensiones) y corre `clasp push`.
- * Así, con dos claves en targets.json, despliegas a producción o a un proyecto
- * de prueba (otra hoja) sin tocar nada a mano.
- */
-var fs = require('fs');
-var path = require('path');
-var cp = require('child_process');
+// Cambia el scriptId de src/.clasp.json. Argumentos:
+//   test | prod  -> pone el id del .env
+//   clear        -> vacía el id (se usa después del push)
+// El push va en medio, desde el script de npm.
+const fs = require('fs');
+const path = require('path');
 
-var entorno = (process.argv[2] || '').toLowerCase();
-if (entorno !== 'test' && entorno !== 'prod') {
-  console.error('Uso: node test/e2e/publish.js <test|prod>');
-  process.exit(2);
+const raiz = path.join(__dirname, '..', '..');
+const ruta = path.join(raiz, 'src', '.clasp.json');
+const clasp = JSON.parse(fs.readFileSync(ruta, 'utf8'));
+const arg = process.argv[2];
+
+if (arg === 'clear') {
+  clasp.scriptId = '';
+} else {
+  const campo = arg === 'prod' ? 'SCRIPT_ID_PROD' : 'SCRIPT_ID_TEST';
+  const env = fs.readFileSync(path.join(raiz, '.env'), 'utf8');
+  const id = ((env.match(new RegExp('^' + campo + '=(.*)$', 'm')) || [])[1] || '').trim();
+  if (!id || id.startsWith('PEGA_AQUI')) throw new Error('Falta ' + campo + ' en .env');
+  clasp.scriptId = id;
 }
 
-var raiz = path.join(__dirname, '..', '..');
-var targets = JSON.parse(fs.readFileSync(path.join(__dirname, 'targets.json'), 'utf8'));
-var scriptId = targets[entorno];
-
-if (!scriptId || /^PEGA_AQUI/.test(scriptId)) {
-  console.error('Falta el scriptId de "' + entorno + '" en test/e2e/targets.json.');
-  if (entorno === 'test') {
-    console.error('Crea un proyecto Apps Script de prueba (enlazado a otra hoja),');
-    console.error('copia su Script ID y pégalo en targets.json -> "test".');
-  }
-  process.exit(1);
-}
-
-var claspJson = {
-  scriptId: scriptId,
-  rootDir: '',
-  scriptExtensions: ['.js', '.gs'],
-  htmlExtensions: ['.html'],
-  jsonExtensions: ['.json'],
-  filePushOrder: [],
-  skipSubdirectories: false
-};
-
-var destino = path.join(raiz, 'src', '.clasp.json');
-fs.writeFileSync(destino, JSON.stringify(claspJson, null, 2) + '\n');
-console.log('[' + entorno + '] src/.clasp.json apunta a ' + scriptId);
-console.log('[' + entorno + '] clasp push ...');
-
-try {
-  cp.execSync('clasp push -f', { cwd: path.join(raiz, 'src'), stdio: 'inherit' });
-  console.log('\n[' + entorno + '] Listo. Abre la hoja del entorno y corre: Sistema > Mantenimiento > Instalar o reparar.');
-} catch (e) {
-  console.error('\nFalló el push. ¿Hiciste "clasp login"? ¿El scriptId es correcto?');
-  process.exit(1);
-}
+fs.writeFileSync(ruta, JSON.stringify(clasp, null, 2) + '\n');
+console.log('scriptId = ' + JSON.stringify(clasp.scriptId));

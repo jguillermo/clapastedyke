@@ -13,8 +13,8 @@
     "pull": "cd src && clasp pull",
     "open": "cd src && clasp open-script",
     "test": "node test/unitarios/run.js",
-    "publish:test": "node test/e2e/publish.js test",
-    "publish:prod": "node test/e2e/publish.js prod"
+    "publish:test": "node test/e2e/publish.js test && npm run push && node test/e2e/publish.js clear",
+    "publish:prod": "node test/e2e/publish.js prod && npm run push && node test/e2e/publish.js clear"
   },
   "repository": {
     "type": "git",

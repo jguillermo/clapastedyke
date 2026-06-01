@@ -21,57 +21,181 @@ var ALTO_CABECERA = 30;
 var ANCHO_MIN = 120;
 var ANCHO_MAX = 320;
 
-/** Punto de entrada llamado desde el menu. */
-function instalar() {
-  var ui = SpreadsheetApp.getUi();
-  try {
-    var resumen = conBloqueo(function () { return ejecutarInstalacion(); });
-    var msg = 'Listo.\n\n'
-      + 'Hojas creadas: ' + resumen.creadas.length
-      + (resumen.creadas.length ? '\n  ' + resumen.creadas.join(', ') : '') + '\n'
-      + 'Hojas revisadas: ' + resumen.revisadas + '\n\n'
-      + 'Las cabeceras, formatos y formulas se reaplicaron en todas.';
-    ui.alert(nombreNegocio() + ' - Instalar o reparar', msg, ui.ButtonSet.OK);
-  } catch (e) {
-    ui.alert('No se pudo instalar', String(e && e.message ? e.message : e), ui.ButtonSet.OK);
-    throw e;
-  }
+/**
+ * La instalacion se divide en pasos independientes para no superar el limite de
+ * tiempo de ejecucion de Apps Script (cada paso corre por separado desde el menu):
+ *   1. Crear tablas       -> hojas, titulos, cabeceras y siembra de Config (estructura)
+ *   2. Aplicar diseno     -> formatos, colores y anchos (el paso mas lento, aparte)
+ *   3. Agregar formulas   -> columnas calculadas + hoja Resumen
+ *   4. Validaciones       -> dropdowns de listas cerradas
+ *   5. Protecciones       -> proteger hojas + acabado (Resumen al frente, version)
+ * `instalar()` corre los cinco en orden (puede tardar); los pasos sueltos no.
+ */
+
+// ---------- Paso 1: crear tablas (estructura) ----------
+
+function instalarTablas() {
+  _correrPaso('1. Crear tablas', function () {
+    var r = ejecutarTablas();
+    return 'Listo.\n\n'
+      + 'Hojas creadas: ' + r.creadas.length
+      + (r.creadas.length ? '\n  ' + r.creadas.join(', ') : '') + '\n'
+      + 'Hojas revisadas: ' + r.revisadas;
+  });
 }
 
-function ejecutarInstalacion() {
+function ejecutarTablas() {
   var resumen = { creadas: [], revisadas: 0 };
   var ss = ssOperacion();
-  var defs = definicionEsquema();
 
-  defs.forEach(function (def) {
+  definicionEsquema().forEach(function (def) {
     var sheet = ss.getSheetByName(def.nombre);
     if (!sheet) { sheet = ss.insertSheet(def.nombre); resumen.creadas.push(def.nombre); }
     resumen.revisadas++;
 
     if (def.esConfig) {
       sembrarConfig(sheet, def);
-      // Config se edita a mano: sin proteccion.
-      quitarProteccion(sheet);
+      quitarProteccion(sheet); // Config se edita a mano: sin proteccion.
     } else if (def.esResumen) {
-      sembrarResumen(sheet, def);
-      protegerHoja(sheet); // solo lectura (formulas)
+      // El Resumen lo construye por completo el paso de formulas.
     } else {
       escribirTituloHoja(sheet, def, def.columnas.length);
       escribirHeaders(sheet, def);
-      formatearHoja(sheet, def);
-      aplicarValidaciones(sheet, def);
-      sembrarFormulas(sheet, def);   // reescribe formulas de columnas calculadas
-      protegerHoja(sheet);
     }
   });
 
   limpiarHojaSobrante(ss);
+  guardarVersion();
+  return resumen;
+}
+
+// ---------- Paso 2: aplicar diseno (lento) ----------
+
+function instalarDiseno() {
+  _correrPaso('2. Aplicar diseno', function () {
+    var n = ejecutarDiseno();
+    return 'Listo. Diseno reaplicado en ' + n + ' hoja(s) de datos.';
+  });
+}
+
+function ejecutarDiseno() {
+  var ss = ssOperacion();
+  var n = 0;
+  definicionEsquema().forEach(function (def) {
+    if (def.esConfig || def.esResumen) return;
+    var sheet = ss.getSheetByName(def.nombre);
+    if (!sheet) return;
+    formatearHoja(sheet, def);
+    n++;
+  });
+  return n;
+}
+
+// ---------- Paso 3: agregar formulas ----------
+
+function instalarFormulas() {
+  _correrPaso('3. Agregar formulas', function () {
+    var n = ejecutarFormulas();
+    return 'Listo. Formulas reescritas en ' + n + ' hoja(s).';
+  });
+}
+
+function ejecutarFormulas() {
+  var ss = ssOperacion();
+  var n = 0;
+  definicionEsquema().forEach(function (def) {
+    if (def.esConfig) return;
+    var sheet = ss.getSheetByName(def.nombre);
+    if (!sheet) return;
+    if (def.esResumen) sembrarResumen(sheet, def);
+    else sembrarFormulas(sheet, def); // reescribe formulas de columnas calculadas
+    n++;
+  });
+  return n;
+}
+
+// ---------- Paso 4: validaciones ----------
+
+function instalarValidaciones() {
+  _correrPaso('4. Validaciones', function () {
+    var n = ejecutarValidaciones();
+    return 'Listo. Validaciones aplicadas en ' + n + ' hoja(s).';
+  });
+}
+
+function ejecutarValidaciones() {
+  var ss = ssOperacion();
+  var n = 0;
+  definicionEsquema().forEach(function (def) {
+    if (def.esConfig || def.esResumen) return;
+    var sheet = ss.getSheetByName(def.nombre);
+    if (!sheet) return;
+    aplicarValidaciones(sheet, def);
+    n++;
+  });
+  return n;
+}
+
+// ---------- Paso 5: protecciones y acabado ----------
+
+function instalarProtecciones() {
+  _correrPaso('5. Protecciones', function () {
+    var n = ejecutarProtecciones();
+    return 'Listo. ' + n + ' hoja(s) protegidas y Resumen al frente.';
+  });
+}
+
+function ejecutarProtecciones() {
+  var ss = ssOperacion();
+  var n = 0;
+  definicionEsquema().forEach(function (def) {
+    var sheet = ss.getSheetByName(def.nombre);
+    if (!sheet) return;
+    if (def.esConfig) { quitarProteccion(sheet); return; }
+    protegerHoja(sheet); // datos y Resumen: solo lectura
+    n++;
+  });
   prepararResumen();
   guardarVersion();
+  return n;
+}
+
+// ---------- Todo en uno (puede superar el limite de tiempo) ----------
+
+/** Punto de entrada llamado desde el menu: corre los cinco pasos en orden. */
+function instalar() {
+  _correrPaso(nombreNegocio() + ' - Instalar o reparar', function () {
+    var resumen = ejecutarInstalacion();
+    return 'Listo.\n\n'
+      + 'Hojas creadas: ' + resumen.creadas.length
+      + (resumen.creadas.length ? '\n  ' + resumen.creadas.join(', ') : '') + '\n'
+      + 'Hojas revisadas: ' + resumen.revisadas + '\n\n'
+      + 'Cabeceras, diseno, formulas, validaciones y protecciones reaplicados.\n\n'
+      + 'Si tarda demasiado, usa los pasos sueltos del menu Mantenimiento.';
+  });
+}
+
+function ejecutarInstalacion() {
+  var resumen = ejecutarTablas();
+  ejecutarDiseno();
+  ejecutarFormulas();
+  ejecutarValidaciones();
+  ejecutarProtecciones();
   auditar('instalar', 'sistema', '', 'version', '', VERSION_SISTEMA,
     'creadas:' + resumen.creadas.length + ' revisadas:' + resumen.revisadas);
-
   return resumen;
+}
+
+/** Envuelve un paso con bloqueo y reporta el resultado por UI. */
+function _correrPaso(titulo, fn) {
+  var ui = SpreadsheetApp.getUi();
+  try {
+    var msg = conBloqueo(fn);
+    ui.alert(titulo, msg, ui.ButtonSet.OK);
+  } catch (e) {
+    ui.alert('No se pudo: ' + titulo, String(e && e.message ? e.message : e), ui.ButtonSet.OK);
+    throw e;
+  }
 }
 
 // ---------- Titulo y cabeceras ----------

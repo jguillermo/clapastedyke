@@ -7,7 +7,7 @@ hoja de cálculo de PRUEBA (la enlazada al proyecto Apps Script de "test"), por
 una persona o por Claude operando el navegador.
 
 CÓMO DESPLEGAR EL ENTORNO DE PRUEBA (una sola vez por cambio de código):
-  1) Asegúrate de tener el Script ID de prueba en test/e2e/targets.json -> "test".
+  1) Asegúrate de tener el Script ID de prueba en .env -> SCRIPT_ID_TEST.
   2) En la terminal:  npm run publish:test
   3) Abre la hoja de prueba en el navegador y recarga.
 

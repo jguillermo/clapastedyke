@@ -25,8 +25,10 @@ Cómo está armado:
 Para añadir un test: crea `algo.test.js` aquí; `run.js` lo toma solo.
 
 ## `e2e/` — despliegue a un proyecto de prueba + guion manual
-- `targets.json` — los Script ID de `prod` y `test` (NO está en .gitignore).
-- `publish.js` — copia el scriptId elegido a `src/.clasp.json` y hace `clasp push`.
+- `.env` (en la raíz, copiado de `.env.example`) — los Script ID por entorno:
+  `SCRIPT_ID_PROD` y `SCRIPT_ID_TEST`.
+- `publish.js` — lee el `.env`, escribe SOLO el `scriptId` en `src/.clasp.json`
+  (sin tocar lo demás) y corre `npm run push`.
 
 ```bash
 npm run publish:test   # despliega al proyecto/hoja de PRUEBA
@@ -39,4 +41,4 @@ npm run publish:prod   # despliega a PRODUCCIÓN
   e **Instalar o reparar**.
 
 > Requisito e2e: tener un proyecto Apps Script de prueba (enlazado a OTRA hoja),
-> con su Script ID en `targets.json -> "test"`, y haber hecho `clasp login`.
+> con su Script ID en `.env -> SCRIPT_ID_TEST`, y haber hecho `clasp login`.

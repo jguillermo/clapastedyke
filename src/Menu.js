@@ -26,20 +26,24 @@ function onOpen() {
   menu.addSeparator();
 
   // Fase 1 (catalogos): YA funcionan.
-  var catalogos = ui.createMenu('Catalogos')
-    .addItem('Clientes', 'abrirClientes')
-    .addItem('Recetas', 'abrirRecetas')
-    .addItem('Insumos', 'abrirInsumos')
-    .addItem('Proveedores', 'abrirProveedores')
-    .addItem('Reglas de empaque', 'abrirReglasEmpaque');
-  menu.addSubMenu(catalogos);
+  menu.addItem('Clientes', 'abrirClientes');
+  menu.addItem('Recetas', 'abrirRecetas');
+  menu.addItem('Insumos', 'abrirInsumos');
+  menu.addItem('Proveedores', 'abrirProveedores');
+  menu.addItem('Reglas de empaque', 'abrirReglasEmpaque');
   menu.addItem('Configuracion', 'abrirConfiguracion');
 
   menu.addSeparator();
   menu.addItem('Manual de usuario', 'abrirManualDeUsuario');
 
   var admin = ui.createMenu('Mantenimiento')
-    .addItem('Instalar o reparar', 'instalar');
+    .addItem('Instalar o reparar (todo)', 'instalar')
+    .addSeparator()
+    .addItem('1. Crear tablas', 'instalarTablas')
+    .addItem('2. Aplicar diseno', 'instalarDiseno')
+    .addItem('3. Agregar formulas', 'instalarFormulas')
+    .addItem('4. Validaciones', 'instalarValidaciones')
+    .addItem('5. Protecciones', 'instalarProtecciones');
   menu.addSubMenu(admin);
 
   menu.addToUi();

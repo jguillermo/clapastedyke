@@ -1,5 +1,0 @@
-{
-  "_ayuda": "scriptId de cada entorno. Este archivo NO está en .gitignore: aquí viven las dos claves. 'prod' es el proyecto real; 'test' es un proyecto Apps Script aparte, enlazado a OTRA hoja de cálculo de pruebas. publish.js copia el scriptId elegido a src/.clasp.json y hace clasp push.",
-  "prod": "id",
-  "test": "PEGA_AQUI_EL_SCRIPT_ID_DEL_PROYECTO_DE_PRUEBA"
-}
