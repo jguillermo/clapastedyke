@@ -52,15 +52,25 @@
   .hero p{font-size:16px;color:#5d544b;max-width:60ch;margin:0}
   .howto{margin-top:18px;background:var(--sheet);border:1px solid var(--line);border-radius:12px;padding:14px 16px;font-size:14px;color:#5d544b}
   .howto b{color:var(--ink)}
-  /* CTA: empezar el recorrido guiado */
-  .startcta{display:inline-flex;align-items:center;gap:8px;margin-top:18px;
-    font-family:"Figtree";font-size:15px;font-weight:600;color:#fff;background:var(--accent);
-    border:0;border-radius:12px;padding:13px 22px;cursor:pointer;box-shadow:var(--shadow-sm)}
-  .startcta:hover{background:var(--accent-deep)}
+
+  /* Ruta de primera vez */
+  .route{margin-top:18px;background:linear-gradient(#fff,#fdf4ea);border:1px solid #eecdba;border-radius:14px;padding:17px 19px;box-shadow:var(--shadow-sm)}
+  .route .rt{font-family:"Fraunces",serif;font-size:18px;font-weight:600;color:var(--accent-deep);margin:0 0 4px}
+  .route p{margin:0 0 12px;font-size:14px;color:#5d544b;max-width:none}
+  .route .chips{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .route .chip{font-family:"Figtree";font-size:13px;font-weight:600;color:var(--accent);background:#fff;border:1px solid var(--line);
+    border-radius:999px;padding:6px 13px;cursor:pointer;transition:.16s}
+  .route .chip:hover{background:var(--accent-soft);border-color:var(--accent)}
+  .route .chip i{font-style:normal;color:var(--muted);font-family:"Space Mono",monospace;font-size:11px;margin-right:5px}
+  .route .sep{color:#cbb9a6;font-weight:700}
+  .route .done{margin-top:13px;padding-top:12px;border-top:1px dashed #eecdba;font-size:14px;color:#5d544b}
+  .route .done a{color:var(--accent);font-weight:700;cursor:pointer;text-decoration:none}
+  .route .done a:hover{text-decoration:underline}
 
   .grouplbl{font-family:"Space Mono",monospace;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);
     margin:34px 0 14px;display:flex;align-items:center;gap:12px}
   .grouplbl::after{content:"";flex:1;height:1px;background:var(--line)}
+  .grouplbl em{font-style:normal;color:var(--accent);text-transform:none;letter-spacing:0;font-family:"Figtree";font-weight:600;font-size:12px}
 
   .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
   @media(max-width:620px){ .grid{grid-template-columns:1fr} }
@@ -80,7 +90,26 @@
   .when{margin:18px 0 6px;background:var(--accent-soft);border:1px solid #eecdba;border-radius:12px;padding:13px 16px;font-size:14.5px;color:var(--accent-deep)}
   .when b{font-family:"Space Mono",monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;display:block;margin-bottom:3px}
 
+  /* Dependencias del flujo */
+  .deps{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:14px 0 4px}
+  @media(max-width:620px){ .deps{grid-template-columns:1fr} }
+  .dep{border:1px solid var(--line);background:var(--sheet);border-radius:12px;padding:12px 14px;font-size:13.5px;color:#5d544b}
+  .dep b{font-family:"Space Mono",monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:5px}
+  .dep a{color:var(--accent);cursor:pointer;text-decoration:none;font-weight:600}
+  .dep a:hover{text-decoration:underline}
+  .dep.ok{border-color:#c4e0c8;background:var(--green-soft);color:#2f6b3c}
+  .dep.ok b{color:var(--green)}
+  .dep.ko{border-color:#e9c2b8;background:var(--red-soft);color:#8a3322}
+  .dep.ko b{color:var(--red)}
+
   .secn{font-family:"Space Mono",monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:30px 0 14px}
+
+  /* Encabezado de sub-flujo */
+  .subflow{display:flex;align-items:center;gap:11px;margin:36px 0 14px;padding-top:22px;border-top:1px solid var(--line-soft)}
+  .subflow:first-of-type{border-top:0;padding-top:0;margin-top:26px}
+  .subflow .sfx{font-family:"Space Mono",monospace;font-size:13px;font-weight:700;color:#fff;background:var(--accent);
+    border-radius:8px;padding:3px 9px;flex:0 0 auto;box-shadow:0 3px 8px -3px rgba(155,67,36,.6)}
+  .subflow h3{font-family:"Fraunces",serif;font-weight:600;font-size:21px;margin:0;color:var(--ink)}
 
   ol.steps{list-style:none;counter-reset:s;padding:0;margin:0}
   ol.steps>li{counter-increment:s;position:relative;padding:0 0 20px 52px;margin:0}
@@ -111,6 +140,8 @@
   .btnmenu.ghost{background:none;color:var(--accent);border:1px solid var(--line)}
   .btnmenu.ghost:hover{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
   .footnote{font-size:12.5px;color:var(--muted)}
+  .footnote a{color:var(--accent);cursor:pointer;text-decoration:none;font-weight:600}
+  .footnote a:hover{text-decoration:underline}
 
   .tag{display:inline-block;font-family:"Space Mono",monospace;font-size:11px;background:#fff;border:1px solid var(--line);
     border-radius:6px;padding:1px 7px;color:var(--accent-deep)}
@@ -128,301 +159,235 @@
 <!-- ===================== MENU PRINCIPAL ===================== -->
 <section class="view active" id="home">
   <div class="hero">
-    <p class="kick">Recorrido guiado</p>
-    <h1>Aprende el sistema siguiendo el camino</h1>
-    <p>Te llevo de la mano, en orden, desde instalar hasta ver tu primera venta en el Resumen. En cada paso te digo <b>por qué</b> lo haces, <b>qué datos</b> necesitas y <b>qué pasará</b> después. Usamos un ejemplo real de principio a fin: la torta de chocolate de Ana.</p>
-    <button class="startcta" onclick="show('instalar')">Empezar el recorrido guiado →</button>
+    <p class="kick">Flujos del sistema</p>
+    <h1>¿Qué necesitas hacer hoy?</h1>
+    <p>El manual está hecho de <b>flujos separados</b>. Cada flujo es una tarea completa que se entiende sola, con todos sus pasos dentro y sus dependencias arriba. Los de <b>más arriba son los que más usarás</b>; los de abajo casi nunca. Si eres nuevo, sigue la ruta de aquí abajo.</p>
+
+    <div class="route">
+      <p class="rt">¿Eres nuevo? Empieza por aquí 👇</p>
+      <p>El sistema se prepara <b>una sola vez</b>. Haz estos pasos en orden y no tendrás que repetirlos:</p>
+      <div class="chips">
+        <button class="chip" onclick="show('f12')"><i>1</i>Instalar</button>
+        <span class="sep">→</span>
+        <button class="chip" onclick="show('f13')"><i>2</i>Configurar</button>
+        <span class="sep">→</span>
+        <button class="chip" onclick="show('f09')"><i>3</i>Proveedor</button>
+        <button class="chip" onclick="show('f07')"><i>4</i>Cliente</button>
+        <button class="chip" onclick="show('f08')"><i>5</i>Insumos</button>
+        <span class="sep">→</span>
+        <button class="chip" onclick="show('f10')"><i>6</i>Receta</button>
+        <button class="chip" onclick="show('f11')"><i>7</i>Empaque</button>
+      </div>
+      <div class="done">Eso se hace <b>una sola vez</b>. Cuando termines, vuelve aquí y haz tu primera <a onclick="show('f01')">cotización (Flujo 01) →</a></div>
+    </div>
+
     <div class="howto">Todo el sistema se maneja desde el menú de arriba en tu hoja de Google Sheets, el que lleva <b>el nombre de tu negocio</b>. Si no lo ves, recarga la página y espera unos segundos. ¿Estás en el celular? Abre la hoja en el navegador con "Versión de escritorio".</div>
   </div>
 
-  <div class="grouplbl">Preparar el sistema</div>
+  <div class="grouplbl">Tomar y entregar un pedido <em>· todos los días</em></div>
   <div class="grid">
-    <button class="flowcard" onclick="show('instalar')"><span class="arrow">›</span><div class="idx">Paso 01</div><div class="t">Instalar o reparar</div><div class="s">Crea todas las hojas y fórmulas. El primer paso.</div></button>
-    <button class="flowcard" onclick="show('configurar')"><span class="arrow">›</span><div class="idx">Paso 02</div><div class="t">Configurar el negocio</div><div class="s">Tus tarifas, el margen, el IGV y el redondeo.</div></button>
+    <button class="flowcard" onclick="show('f01')"><span class="arrow">›</span><div class="idx">Flujo 01</div><div class="t">Hacer una cotización</div><div class="s">Pon precio a lo que te piden y guárdalo. Lo más usado.</div></button>
+    <button class="flowcard" onclick="show('f02')"><span class="arrow">›</span><div class="idx">Flujo 02</div><div class="t">Aprobar o rechazar</div><div class="s">El cliente acepta: nace el pedido. O lo rechazas con motivo.</div></button>
+    <button class="flowcard" onclick="show('f03')"><span class="arrow">›</span><div class="idx">Flujo 03</div><div class="t">Producir y entregar el pedido</div><div class="s">De producción a entregado: nace la venta. También cancelar.</div></button>
   </div>
 
-  <div class="grouplbl">Cargar los datos base</div>
+  <div class="grouplbl">Abastecimiento, inventario y control <em>· seguido</em></div>
   <div class="grid">
-    <button class="flowcard" onclick="show('proveedor')"><span class="arrow">›</span><div class="idx">Paso 03</div><div class="t">Registrar el proveedor</div><div class="s">Molinos SAC, con su WhatsApp para pedirle.</div></button>
-    <button class="flowcard" onclick="show('cliente')"><span class="arrow">›</span><div class="idx">Paso 04</div><div class="t">Registrar el cliente</div><div class="s">Ana Torres, para poder cotizarle.</div></button>
-    <button class="flowcard" onclick="show('insumo')"><span class="arrow">›</span><div class="idx">Paso 05</div><div class="t">Registrar los insumos</div><div class="s">Harina, huevo y caja, con su precio y stock.</div></button>
+    <button class="flowcard" onclick="show('f04')"><span class="arrow">›</span><div class="idx">Flujo 04</div><div class="t">Revisar el negocio</div><div class="s">El Resumen: qué necesita tu atención hoy.</div></button>
+    <button class="flowcard" onclick="show('f05')"><span class="arrow">›</span><div class="idx">Flujo 05</div><div class="t">Comprar y registrar la compra</div><div class="s">Pide por WhatsApp lo que falta y sube el stock.</div></button>
+    <button class="flowcard" onclick="show('f06')"><span class="arrow">›</span><div class="idx">Flujo 06</div><div class="t">Ajustar el inventario</div><div class="s">Mermas, daños, vencimientos y conteos.</div></button>
   </div>
 
-  <div class="grouplbl">Definir el producto</div>
+  <div class="grouplbl">Mantener tus datos <em>· de vez en cuando</em></div>
   <div class="grid">
-    <button class="flowcard" onclick="show('receta')"><span class="arrow">›</span><div class="idx">Paso 06</div><div class="t">Crear la receta</div><div class="s">Torta chocolate: qué lleva y para cuántos rinde.</div></button>
-    <button class="flowcard" onclick="show('empaque')"><span class="arrow">›</span><div class="idx">Paso 07</div><div class="t">Definir el empaque</div><div class="s">Qué caja sugerir para el tamaño grande.</div></button>
+    <button class="flowcard" onclick="show('f07')"><span class="arrow">›</span><div class="idx">Flujo 07</div><div class="t">Cliente</div><div class="s">Registrar o editar a quién le vendes.</div></button>
+    <button class="flowcard" onclick="show('f08')"><span class="arrow">›</span><div class="idx">Flujo 08</div><div class="t">Insumo</div><div class="s">Ingredientes y empaques, con su precio y stock.</div></button>
+    <button class="flowcard" onclick="show('f09')"><span class="arrow">›</span><div class="idx">Flujo 09</div><div class="t">Proveedor</div><div class="s">A quién le compras, con su WhatsApp.</div></button>
+    <button class="flowcard" onclick="show('f10')"><span class="arrow">›</span><div class="idx">Flujo 10</div><div class="t">Receta</div><div class="s">Qué lleva tu producto y para cuántos rinde.</div></button>
+    <button class="flowcard" onclick="show('f11')"><span class="arrow">›</span><div class="idx">Flujo 11</div><div class="t">Regla de empaque</div><div class="s">Qué caja sugerir según el tamaño.</div></button>
   </div>
 
-  <div class="grouplbl">Vender</div>
+  <div class="grouplbl">Preparar el sistema <em>· una sola vez</em></div>
   <div class="grid">
-    <button class="flowcard" onclick="show('presupuesto')"><span class="arrow">›</span><div class="idx">Paso 08</div><div class="t">Hacer el presupuesto</div><div class="s">Escalar la receta y sacar el precio de Ana.</div></button>
-    <button class="flowcard" onclick="show('revisar')"><span class="arrow">›</span><div class="idx">Paso 09</div><div class="t">Aprobar el presupuesto</div><div class="s">Nace el pedido y baja el stock.</div></button>
+    <button class="flowcard" onclick="show('f12')"><span class="arrow">›</span><div class="idx">Flujo 12</div><div class="t">Instalar o reparar</div><div class="s">Crea todas las hojas y fórmulas. El primer paso de todos.</div></button>
+    <button class="flowcard" onclick="show('f13')"><span class="arrow">›</span><div class="idx">Flujo 13</div><div class="t">Configurar el negocio</div><div class="s">Tarifas, margen, IGV, redondeo y tamaños.</div></button>
   </div>
 
-  <div class="grouplbl">Comprar y reponer</div>
+  <div class="grouplbl">Técnico <em>· casi nunca</em></div>
   <div class="grid">
-    <button class="flowcard" onclick="show('comprar')"><span class="arrow">›</span><div class="idx">Paso 10</div><div class="t">Comprar materiales</div><div class="s">La lista de lo que falta y el WhatsApp.</div></button>
-    <button class="flowcard" onclick="show('registrarCompra')"><span class="arrow">›</span><div class="idx">Paso 11</div><div class="t">Registrar la compra</div><div class="s">Recibir el material y subir el stock.</div></button>
+    <button class="flowcard" onclick="show('f14')"><span class="arrow">›</span><div class="idx">Flujo 14</div><div class="t">Mantenimiento por partes</div><div class="s">Si la instalación se corta o algo se ve raro.</div></button>
   </div>
 
-  <div class="grouplbl">Producir y entregar</div>
-  <div class="grid">
-    <button class="flowcard" onclick="show('pedido')"><span class="arrow">›</span><div class="idx">Paso 12</div><div class="t">Producir y entregar</div><div class="s">De producción a entregado: nace la venta.</div></button>
-  </div>
-
-  <div class="grouplbl">Inventario y tablero</div>
-  <div class="grid">
-    <button class="flowcard" onclick="show('inicio')"><span class="arrow">›</span><div class="idx">Paso 13</div><div class="t">Leer el Resumen</div><div class="s">El cierre: qué necesita tu atención hoy.</div></button>
-    <button class="flowcard" onclick="show('ajustar')"><span class="arrow">›</span><div class="idx">Complemento</div><div class="t">Ajustar inventario</div><div class="s">Mermas, daños, vencimientos y conteos.</div></button>
-  </div>
-
-  <div class="grouplbl">Conceptos</div>
+  <div class="grouplbl">Conceptos <em>· para entender</em></div>
   <div class="grid">
     <button class="flowcard" onclick="show('precio')"><span class="arrow">›</span><div class="idx">Concepto</div><div class="t">Cómo se calcula el precio</div><div class="s">Entender de dónde sale el número.</div></button>
+    <button class="flowcard" onclick="show('descuento')"><span class="arrow">›</span><div class="idx">Concepto</div><div class="t">Cuándo baja el stock</div><div class="s">Al aprobar o al iniciar producción.</div></button>
   </div>
 </section>
 
-<!-- ===================== 01 INSTALAR ===================== -->
-<section class="view" id="instalar">
-  <div class="flowhead"><div class="idx">Paso 01</div><h2>Instalar o reparar el sistema</h2></div>
-  <div class="when"><b>Por qué ahora</b>Es el primer paso, sobre una hoja en blanco. Crea todas las pestañas, cabeceras y fórmulas que el resto del recorrido va a necesitar. Sin esto, no hay dónde guardar nada.</div>
-  <div class="secn">Paso a paso</div>
-  <ol class="steps">
-    <li>Abre el menú de arriba, entra a <span class="tag">Mantenimiento</span> y luego a <span class="tag">Instalar o reparar (todo)</span>.</li>
-    <li><b>Espera el aviso "Listo"</b> con el número de hojas creadas y revisadas.<div class="det">La primera vez puede tardar, porque crea todas las hojas. Si se corta, corre los pasos sueltos: 1. Crear tablas, 2. Aplicar diseño, 3-5. Fórmulas, validaciones y protecciones.</div></li>
-    <li><b>Confirma que aparece la pestaña Resumen</b> como primera, y las demás hojas (Config, Insumos, Presupuestos, Pedidos, Clientes, Proveedores, Recetas…).</li>
-  </ol>
-  <div class="callout note"><span class="lbl">Qué pasa</span><div>Quedan creadas todas las hojas con sus cabeceras y fórmulas. Las columnas que se calculan solas (como "Precio por unidad base" y "Semáforo") salen con cabecera <b>verde</b>. Es seguro repetirlo: nunca borra tus datos, solo repara lo que falte.</div></div>
-  <div class="footnav">
-    <button class="btnmenu ghost" onclick="show('home')">Volver al menú</button>
-    <button class="btnmenu" onclick="show('configurar')">Siguiente: configurar el negocio →</button>
-    <span class="footnote">Paso 01 de 13</span>
+<!-- ===================== F01 · HACER UNA COTIZACIÓN ===================== -->
+<section class="view" id="f01">
+  <div class="flowhead"><div class="idx">Flujo 01 · todos los días</div><h2>Hacer una cotización</h2></div>
+  <div class="when"><b>Para qué</b>Es lo que más harás: poner precio a lo que te piden. Eliges cliente y receta, la escalas a la cantidad pedida, y el sistema saca el precio y lo guarda congelado.</div>
+  <div class="deps">
+    <div class="dep"><b>Necesitas antes</b><a onclick="show('f07')">Un cliente</a> y <a onclick="show('f10')">una receta</a> (con sus <a onclick="show('f08')">insumos</a>). El sistema ya <a onclick="show('f13')">configurado</a>.</div>
+    <div class="dep ok"><b>¿Puedo entrar directo?</b><b style="display:inline">Sí</b>, si ya tienes una receta y un cliente. ¿Eres nuevo? Haz primero la ruta de preparación de la portada.</div>
   </div>
-</section>
 
-<!-- ===================== 02 CONFIGURAR ===================== -->
-<section class="view" id="configurar">
-  <div class="flowhead"><div class="idx">Paso 02</div><h2>Configurar el negocio</h2></div>
-  <div class="when"><b>Por qué ahora</b>Antes de cotizar, defines las reglas con las que se arma el precio (margen, IGV, redondeo) y las listas que usarán los formularios (tamaños, tipos de ajuste). Todo lo que cotices después usa estos valores.</div>
-  <div class="secn">Paso a paso</div>
-  <ol class="steps">
-    <li>Abre el menú y entra a <span class="tag">Configuración</span>.</li>
-    <li><b>Tarifa de mano de obra por hora.</b><div class="det">Cuánto vale una hora de tu trabajo. Alimenta el costo de cada presupuesto.</div></li>
-    <li><b>Costo indirecto y depreciación por pedido.</b><div class="det">Montos fijos por luz, gas o desgaste de equipos.</div></li>
-    <li><b>Margen por defecto, en porcentaje.</b><div class="det">Tu ganancia sobre la venta. Cada presupuesto lo trae puesto y lo puedes cambiar caso por caso.</div></li>
-    <li><b>Aplicar IGV y su tasa.</b><div class="det">Si lo dejas en Sí, el sistema lo suma al final del precio.</div></li>
-    <li><b>Redondeo del precio.</b><div class="det">Múltiplo de 5 hacia arriba deja precios redonditos.</div></li>
-    <li><b>Días de vencimiento y momento de descuento de stock.</b><div class="det">Cuántos días vale el presupuesto, y si el stock baja al aprobar o al iniciar producción.</div></li>
-    <li><b>Lista de tamaños.</b><div class="det">Por ejemplo chico, mediano, grande. En el bloque "Tamaños" de la hoja Config llevan su factor: chico 0.5, mediano 1, grande 2.</div></li>
-    <li><b>Nombre del negocio,</b> y <b>Guarda</b>.<div class="det">El nombre aparece en el menú la próxima vez que abras el archivo.</div></li>
-  </ol>
-  <div class="callout note"><span class="lbl">Qué pasa</span><div>Al guardar caes en la hoja Config, con 4 bloques editables a mano: Parámetros generales, Factores de escalado, Tamaños y Tipos de ajuste. Lo que cambies afecta los presupuestos <b>nuevos</b>, nunca los ya guardados.</div></div>
-  <div class="footnav">
-    <button class="btnmenu ghost" onclick="show('home')">Volver al menú</button>
-    <button class="btnmenu" onclick="show('proveedor')">Siguiente: registrar tu proveedor →</button>
-    <span class="footnote">Paso 02 de 13</span>
-  </div>
-</section>
-
-<!-- ===================== 03 PROVEEDOR ===================== -->
-<section class="view" id="proveedor">
-  <div class="flowhead"><div class="idx">Paso 03</div><h2>Registrar el proveedor</h2></div>
-  <div class="when"><b>Por qué ahora</b>Lo registras antes que los insumos porque cada insumo puede llevar su "proveedor recomendado". Además, su WhatsApp es lo que luego te deja pedirle con un clic desde "Comprar materiales".</div>
-  <div class="secn">Paso a paso</div>
-  <ol class="steps">
-    <li>Menú, <span class="tag">Proveedores</span>. Toca <b>Nuevo proveedor</b>.</li>
-    <li><b>Nombre:</b> <b>Molinos SAC</b>.<div class="det">Es obligatorio y no se puede repetir exacto.</div></li>
-    <li><b>WhatsApp con código de país:</b> <b>51999111222</b>.<div class="det">Sin espacios ni signos. Es lo que arma el enlace para pedirle.</div></li>
-    <li>Notas opcionales y <b>Guarda</b>.</li>
-  </ol>
-  <div class="callout note"><span class="lbl">Qué pasa</span><div>Aparece la fila <b>PR-0001</b> en la hoja Proveedores. Su WhatsApp habilita el "Comprar materiales", y el proveedor queda disponible como recomendado al crear insumos.</div></div>
-  <div class="footnav">
-    <button class="btnmenu ghost" onclick="show('home')">Volver al menú</button>
-    <button class="btnmenu" onclick="show('cliente')">Siguiente: registrar tu cliente →</button>
-    <span class="footnote">Paso 03 de 13</span>
-  </div>
-</section>
-
-<!-- ===================== 04 CLIENTE ===================== -->
-<section class="view" id="cliente">
-  <div class="flowhead"><div class="idx">Paso 04</div><h2>Registrar el cliente</h2></div>
-  <div class="when"><b>Por qué ahora</b>Lo necesitas para poder cotizar: todo presupuesto va a nombre de un cliente. Registramos a Ana antes de hacerle su presupuesto.</div>
-  <div class="secn">Paso a paso</div>
-  <ol class="steps">
-    <li>Menú, <span class="tag">Clientes</span>. Toca <b>Nuevo cliente</b>.</li>
-    <li><b>Nombre:</b> <b>Ana Torres</b>.<div class="det">Es obligatorio y no se puede repetir exacto.</div></li>
-    <li><b>Teléfono:</b> <b>999000111</b>, y notas si quieres. Son opcionales.</li>
-    <li><b>Guarda.</b> Aparece en la lista.</li>
-  </ol>
-  <div class="callout note"><span class="lbl">Qué pasa</span><div>Queda la fila <b>CL-0001</b>. Lo elegirás al hacer el presupuesto (Paso 08). Para cambiarlo, usa <b>Editar</b> en su fila.</div></div>
-  <div class="footnav">
-    <button class="btnmenu ghost" onclick="show('home')">Volver al menú</button>
-    <button class="btnmenu" onclick="show('insumo')">Siguiente: registrar tus insumos →</button>
-    <span class="footnote">Paso 04 de 13</span>
-  </div>
-</section>
-
-<!-- ===================== 05 INSUMO ===================== -->
-<section class="view" id="insumo">
-  <div class="flowhead"><div class="idx">Paso 05</div><h2>Registrar los insumos</h2></div>
-  <div class="when"><b>Por qué ahora</b>Los insumos son la base de todos los costos. Sin ellos no hay recetas ni precios. Aquí vive el precio y el stock de cada ingrediente y empaque.</div>
-  <div class="secn">Necesitas</div>
-  <ul class="plain">
-    <li>(Opcional) el proveedor <b>Molinos SAC</b> (Paso 03), para asociarlo como recomendado.</li>
-  </ul>
-  <div class="secn">Paso a paso</div>
-  <ol class="steps">
-    <li>Menú, <span class="tag">Insumos</span>. Toca <b>Nuevo insumo</b>.</li>
-    <li><b>Harina:</b> tipo ingrediente, unidad gramos, presentación 1000, precio S/5, stock inicial 0, mínimo 2000, proveedor recomendado Molinos SAC. Guarda.<div class="det">Verás "Precio por unidad base" = 0.005 (5÷1000) y "Semáforo" en rojo (stock 0).</div></li>
-    <li><b>Huevo:</b> ingrediente, unidad, presentación 30, precio S/15, stock 0, mínimo 30. Guarda.<div class="det">"Precio por unidad base" = 0.5 (15÷30), semáforo rojo.</div></li>
-    <li><b>Caja torta:</b> tipo empaque, unidad, presentación 25, precio S/25, stock 50, mínimo 10. Guarda.<div class="det">"Precio por unidad base" = 1 (25÷25), semáforo verde (50 &gt; 10).</div></li>
-    <li><b>No edites</b> las columnas calculadas.<div class="det">"Precio por unidad base" y "Semáforo" se actualizan solos cuando cambia el precio o el stock.</div></li>
-  </ol>
-  <div class="callout note"><span class="lbl">Qué pasa</span><div>El "Precio por unidad base" alimenta el costo de las recetas. El semáforo en rojo será tu aviso de qué comprar más adelante.</div></div>
-  <div class="footnav">
-    <button class="btnmenu ghost" onclick="show('home')">Volver al menú</button>
-    <button class="btnmenu" onclick="show('receta')">Siguiente: crear la receta →</button>
-    <span class="footnote">Paso 05 de 13</span>
-  </div>
-</section>
-
-<!-- ===================== 06 RECETA ===================== -->
-<section class="view" id="receta">
-  <div class="flowhead"><div class="idx">Paso 06</div><h2>Crear la receta</h2></div>
-  <div class="when"><b>Por qué ahora</b>La receta define qué lleva tu producto y para cuántas raciones rinde. Es justo lo que el presupuesto va a escalar para cualquier cantidad.</div>
-  <div class="secn">Necesitas</div>
-  <ul class="plain">
-    <li>Los insumos <b>Harina</b> y <b>Huevo</b> ya creados (Paso 05).</li>
-  </ul>
-  <div class="secn">Paso a paso</div>
-  <ol class="steps">
-    <li>Menú, <span class="tag">Recetas</span>. Toca <b>Nueva receta</b>.</li>
-    <li><b>Nombre</b> <b>Torta chocolate</b>, categoría <b>tortas</b>.</li>
-    <li><b>Tipo de base</b> "Por personas", <b>base 10</b>.<div class="det">Es la clave del escalado: si luego pides 20, el sistema multiplica todo por 2.</div></li>
-    <li><b>Mano de obra:</b> 2 horas.</li>
-    <li><b>Agrega los ingredientes:</b> Harina 300 (la unidad sale sola: g), Huevo 4 (u).</li>
-    <li><b>Guarda.</b> Pide al menos un ingrediente.</li>
-  </ol>
-  <div class="callout note"><span class="lbl">Qué pasa</span><div>Queda la receta <b>RC-0001</b> con tipo de base "personas". Escribe la receta para una base cómoda; el sistema la escala sola al cotizar.</div></div>
-  <div class="footnav">
-    <button class="btnmenu ghost" onclick="show('home')">Volver al menú</button>
-    <button class="btnmenu" onclick="show('empaque')">Siguiente: definir el empaque →</button>
-    <span class="footnote">Paso 06 de 13</span>
-  </div>
-</section>
-
-<!-- ===================== 07 EMPAQUE ===================== -->
-<section class="view" id="empaque">
-  <div class="flowhead"><div class="idx">Paso 07</div><h2>Definir la regla de empaque</h2></div>
-  <div class="when"><b>Por qué ahora</b>Para que el presupuesto te sugiera solo el empaque correcto según el tamaño que pida el cliente, sin que tengas que acordarte cada vez.</div>
-  <div class="secn">Necesitas</div>
-  <ul class="plain">
-    <li>La receta <b>Torta chocolate</b> (Paso 06).</li>
-    <li>El insumo de empaque <b>Caja torta</b> (Paso 05).</li>
-    <li>El tamaño <b>grande</b> en Configuración (Paso 02).</li>
-  </ul>
-  <div class="secn">Paso a paso</div>
-  <ol class="steps">
-    <li>Menú, <span class="tag">Reglas de empaque</span>. Toca <b>Nueva regla</b>.</li>
-    <li><b>Receta:</b> Torta chocolate.</li>
-    <li><b>Tamaño:</b> grande.<div class="det">El desplegable solo muestra los tamaños definidos en Configuración.</div></li>
-    <li><b>Empaque:</b> Caja torta. <b>Cantidad:</b> 1. <b>Guarda.</b></li>
-  </ol>
-  <div class="callout note"><span class="lbl">Qué pasa</span><div>Queda la regla <b>RL-0001</b>. Al cotizar Torta chocolate en tamaño grande, el sistema propondrá <b>1 Caja torta</b> automáticamente (con una casilla que puedes desmarcar).</div></div>
-  <div class="footnav">
-    <button class="btnmenu ghost" onclick="show('home')">Volver al menú</button>
-    <button class="btnmenu" onclick="show('presupuesto')">Siguiente: hacer el presupuesto →</button>
-    <span class="footnote">Paso 07 de 13</span>
-  </div>
-</section>
-
-<!-- ===================== 08 PRESUPUESTO ===================== -->
-<section class="view" id="presupuesto">
-  <div class="flowhead"><div class="idx">Paso 08</div><h2>Hacer el presupuesto de Ana</h2></div>
-  <div class="when"><b>Por qué ahora</b>Ya tienes todo lo que un presupuesto necesita: el cliente, la receta con sus ingredientes y costos, y la regla de empaque. Recién con esas piezas el sistema puede escalar la receta, sumar costos y sacar un precio.</div>
-  <div class="secn">Necesitas</div>
-  <ul class="plain">
-    <li>Configuración guardada: margen, IGV y redondeo (Paso 02).</li>
-    <li>Cliente <b>Ana Torres</b> (Paso 04).</li>
-    <li>Receta <b>Torta chocolate</b>, base 10 personas (Paso 06).</li>
-    <li>Insumos con precio (Paso 05) y la regla de empaque "grande" (Paso 07).</li>
-  </ul>
-  <div class="secn">Paso a paso</div>
+  <div class="subflow"><span class="sfx">1.1</span><h3>Crear un presupuesto</h3></div>
   <ol class="steps">
     <li>Menú, <span class="tag">Nuevo presupuesto</span>.</li>
-    <li><b>Cliente:</b> elige <b>Ana Torres</b>.<div class="det">Si no existiera, podrías crearla aquí mismo sin salir de la pantalla.</div></li>
+    <li><b>Cliente:</b> elige <b>Ana Torres</b>.</li>
     <li><b>Receta:</b> elige <b>Torta chocolate</b>.<div class="det">El modo de escalado se pone solo en "Por personas" y la tabla trae Harina y Huevo con su precio.</div></li>
     <li><b>Escala a 20 personas.</b><div class="det">La base es 10, así que el factor es 2: Harina pasa a 600 g y Huevo a 8 u. El costo se recalcula al instante.</div></li>
     <li><b>Cambia el modo a "Por tamaño" y elige "grande".</b><div class="det">El factor de "grande" también es 2, y aparece el empaque sugerido Caja torta con su casilla marcada. Desmárcala y verás bajar el costo; vuelve a marcarla.</div></li>
     <li><b>Revisa la tabla escalada</b> y los otros costos: mano de obra (2 h), indirecto y depreciación.</li>
-    <li><b>Ajusta el margen y marca Aplicar IGV.</b><div class="det">El precio final se actualiza solo y se redondea hacia arriba al múltiplo de 5.</div></li>
+    <li><b>Ajusta el margen y marca Aplicar IGV.</b><div class="det">El precio final se actualiza solo y se redondea hacia arriba al múltiplo de 5. ¿Quieres entender el cálculo? Mira <a onclick="show('precio')" style="color:var(--accent);font-weight:600;cursor:pointer">Cómo se calcula el precio</a>.</div></li>
     <li>Escribe notas si hace falta, y <b>Guarda</b>.</li>
   </ol>
-  <div class="callout note"><span class="lbl">Qué pasa</span><div>Nace el presupuesto <b>P-0001</b> en estado <b>Pendiente</b>, con emisión hoy y vencimiento a los días que pusiste en Configuración. Sus precios quedan <b>congelados</b>: aunque cambies tus costos después, este no se mueve. Todavía no toca el inventario; eso ocurre al aprobarlo.</div></div>
+  <div class="callout note"><span class="lbl">Qué pasa</span><div>Nace el presupuesto <b>P-0001</b> en estado <b>Pendiente</b>, con emisión hoy y vencimiento a los días que pusiste en Configuración. Sus precios quedan <b>congelados</b>: aunque cambies tus costos después, este no se mueve. Todavía no toca el inventario.</div></div>
+
+  <div class="subflow"><span class="sfx">1.2</span><h3>Crear un cliente rápido (sin salir del formulario)</h3></div>
+  <ol class="steps">
+    <li>En el formulario de presupuesto, junto a Cliente, toca <b>+</b> (nuevo).</li>
+    <li>Escribe el <b>nombre</b> y confirma.</li>
+    <li>El cliente se crea y queda <b>elegido</b> al instante; sigues cotizando sin perder lo que llevas.</li>
+  </ol>
+  <div class="callout tip"><span class="lbl">Útil</span><div>Ideal cuando llega un cliente nuevo en plena cotización. Luego puedes completar su teléfono en el <a onclick="show('f07')" style="color:inherit;font-weight:700;cursor:pointer">Flujo 07</a>.</div></div>
+
+  <div class="subflow"><span class="sfx">1.3</span><h3>Ver y filtrar tus cotizaciones</h3></div>
+  <ol class="steps">
+    <li>Menú, <span class="tag">Ver presupuestos</span>.</li>
+    <li><b>Filtra</b> por cliente, estado o fechas si la lista es larga.<div class="det">Un presupuesto Pendiente cuya fecha ya pasó se muestra como <b>Vencido</b>, aunque por dentro siga Pendiente.</div></li>
+    <li>Toca <b>Ver</b> en una fila para abrir su detalle congelado, con todos los costos y, si está Pendiente, los botones Aprobar y Rechazar.</li>
+  </ol>
+
   <div class="footnav">
     <button class="btnmenu ghost" onclick="show('home')">Volver al menú</button>
-    <button class="btnmenu" onclick="show('revisar')">Siguiente: aprobar el presupuesto →</button>
-    <span class="footnote">Paso 08 de 13</span>
+    <span class="footnote">Después: <a onclick="show('f02')">Aprobar o rechazar →</a></span>
   </div>
 </section>
 
-<!-- ===================== 09 REVISAR ===================== -->
-<section class="view" id="revisar">
-  <div class="flowhead"><div class="idx">Paso 09</div><h2>Aprobar el presupuesto de Ana</h2></div>
-  <div class="when"><b>Por qué ahora</b>Ana aceptó. Al aprobar, nace el pedido y baja el stock; por eso, justo después, tendrás que comprar lo que falte. Aprobar es lo que pone en marcha la producción.</div>
-  <div class="secn">Necesitas</div>
-  <ul class="plain">
-    <li>El presupuesto <b>P-0001</b> en estado Pendiente (Paso 08).</li>
-  </ul>
-  <div class="secn">Paso a paso</div>
+<!-- ===================== F02 · APROBAR O RECHAZAR ===================== -->
+<section class="view" id="f02">
+  <div class="flowhead"><div class="idx">Flujo 02 · todos los días</div><h2>Aprobar o rechazar una cotización</h2></div>
+  <div class="when"><b>Para qué</b>El momento de decidir. Si el cliente acepta, apruebas y nace el pedido con su lista de materiales. Si no, la rechazas dejando el motivo.</div>
+  <div class="deps">
+    <div class="dep"><b>Necesitas antes</b><a onclick="show('f01')">Una cotización en estado Pendiente</a>.</div>
+    <div class="dep ko"><b>¿Puedo entrar directo?</b><b style="display:inline">No</b>: primero tiene que existir la cotización. Créala en el Flujo 01.</div>
+  </div>
+
+  <div class="subflow"><span class="sfx">2.1</span><h3>Aprobar (nace el pedido)</h3></div>
   <ol class="steps">
-    <li>Menú, <span class="tag">Ver presupuestos</span>.<div class="det">Puedes filtrar por cliente "Ana Torres" si la lista es larga.</div></li>
-    <li>Sobre <b>P-0001</b> (Pendiente), toca <b>Ver</b> para abrir el detalle congelado.</li>
-    <li><b>Lee el aviso de faltantes.</b><div class="det">Arriba del botón Aprobar verás que Harina y Huevo quedarán en negativo, porque su stock es 0. Es informativo, no impide aprobar.</div></li>
+    <li>Menú, <span class="tag">Ver presupuestos</span>, y abre el detalle de <b>P-0001</b>.</li>
+    <li><b>Lee el aviso de faltantes.</b><div class="det">Verás que Harina y Huevo quedarán en negativo, porque su stock es 0. Es informativo, no impide aprobar.</div></li>
     <li><b>Toca Aprobar</b> y confirma.</li>
   </ol>
-  <div class="callout note"><span class="lbl">Qué pasa</span><div>P-0001 pasa a <b>Aprobado</b>; nace el pedido <b>PD-0001</b> (Pendiente) y se arma la lista de requerimientos con los faltantes. El stock de Harina y Huevo baja (queda negativo). Eso es justo lo que vas a comprar ahora.</div></div>
+  <div class="callout note"><span class="lbl">Qué pasa</span><div>P-0001 pasa a <b>Aprobado</b> y nace el pedido <b>PD-0001</b> (Pendiente) con su lista de requerimientos. Si tu configuración descuenta el stock al aprobar, baja ahora; si no, bajará en producción. Mira <a onclick="show('descuento')" style="color:inherit;font-weight:700;cursor:pointer">Cuándo baja el stock</a>.</div></div>
+
+  <div class="subflow"><span class="sfx">2.2</span><h3>Rechazar con motivo</h3></div>
+  <ol class="steps">
+    <li>En el detalle de un presupuesto Pendiente, toca <b>Rechazar</b>.</li>
+    <li>Escribe el <b>motivo</b> (por ejemplo "el cliente desistió") y confirma.</li>
+  </ol>
+  <div class="callout warn"><span class="lbl">Ojo</span><div>El presupuesto pasa a <b>Rechazado</b> y guarda el motivo. No nace ningún pedido ni se toca el stock. Solo se puede rechazar mientras está Pendiente.</div></div>
+
   <div class="footnav">
     <button class="btnmenu ghost" onclick="show('home')">Volver al menú</button>
-    <button class="btnmenu" onclick="show('comprar')">Siguiente: comprar lo que falta →</button>
-    <span class="footnote">Paso 09 de 13</span>
+    <span class="footnote">Después: <a onclick="show('f03')">Producir y entregar →</a> · si faltan materiales, <a onclick="show('f05')">Comprar</a></span>
   </div>
 </section>
 
-<!-- ===================== 10 COMPRAR ===================== -->
-<section class="view" id="comprar">
-  <div class="flowhead"><div class="idx">Paso 10</div><h2>Comprar los materiales que faltan</h2></div>
-  <div class="when"><b>Por qué ahora</b>El pedido dejó el stock en negativo. Aquí armas la lista de lo que hay que comprar y le escribes al proveedor por WhatsApp, sin salir del sistema.</div>
-  <div class="secn">Necesitas</div>
+<!-- ===================== F03 · PRODUCIR Y ENTREGAR ===================== -->
+<section class="view" id="f03">
+  <div class="flowhead"><div class="idx">Flujo 03 · todos los días</div><h2>Producir y entregar el pedido</h2></div>
+  <div class="when"><b>Para qué</b>Llevar el pedido de Pendiente a Producción y luego a Entregado. Al entregar, el sistema registra la venta solo.</div>
+  <div class="deps">
+    <div class="dep"><b>Necesitas antes</b><a onclick="show('f02')">Un pedido aprobado</a>. Y stock suficiente (repón en el <a onclick="show('f05')">Flujo 05</a>) si tu config descuenta en producción.</div>
+    <div class="dep ko"><b>¿Puedo entrar directo?</b><b style="display:inline">No</b>: el pedido nace al aprobar una cotización (Flujo 02). Sin eso no hay nada que producir.</div>
+  </div>
+
+  <div class="subflow"><span class="sfx">3.1</span><h3>Ver pedidos</h3></div>
+  <ol class="steps">
+    <li>Menú, <span class="tag">Ver pedidos</span>.</li>
+    <li><b>Filtra</b> por cliente, estado o fechas. Toca <b>Ver</b> para abrir el detalle, con la lista de requerimientos y los botones según el estado.</li>
+  </ol>
+
+  <div class="subflow"><span class="sfx">3.2</span><h3>Iniciar producción</h3></div>
+  <ol class="steps">
+    <li>Sobre <b>PD-0001</b> (Pendiente), toca <b>Producción</b> y confirma.<div class="det">Si tu sistema descuenta el stock al iniciar producción, aquí es donde baja. Mira <a onclick="show('descuento')" style="color:var(--accent);font-weight:600;cursor:pointer">Cuándo baja el stock</a>.</div></li>
+  </ol>
+  <div class="callout note"><span class="lbl">Qué pasa</span><div>El pedido pasa a <b>Producción</b>. A partir de aquí ya estás trabajando el encargo.</div></div>
+
+  <div class="subflow"><span class="sfx">3.3</span><h3>Marcar entregado (nace la venta)</h3></div>
+  <ol class="steps">
+    <li>Al terminar, sobre el pedido en Producción toca <b>Entregar</b> y confirma.</li>
+  </ol>
+  <div class="callout note"><span class="lbl">Qué pasa</span><div>Se registra la fecha de entrega y nace la venta <b>VT-0001</b> con el precio final del presupuesto. Has cerrado el ciclo: de cotizar a vender. El Resumen contará un pedido entregado.</div></div>
+
+  <div class="subflow"><span class="sfx">3.4</span><h3>Cancelar (devuelve el stock)</h3></div>
+  <ol class="steps">
+    <li>Si el pedido se cae, sobre un pedido Pendiente o en Producción toca <b>Cancelar</b>.</li>
+    <li>Escribe el <b>motivo</b> y confirma.</li>
+  </ol>
+  <div class="callout warn"><span class="lbl">Ojo</span><div>El stock que se había consumido <b>se devuelve solo</b>. Un pedido ya <b>Entregado no se puede cancelar</b>.</div></div>
+
+  <div class="footnav">
+    <button class="btnmenu ghost" onclick="show('home')">Volver al menú</button>
+    <span class="footnote">Después: <a onclick="show('f04')">Revisar el negocio →</a></span>
+  </div>
+</section>
+
+<!-- ===================== F04 · REVISAR EL NEGOCIO ===================== -->
+<section class="view" id="f04">
+  <div class="flowhead"><div class="idx">Flujo 04 · seguido</div><h2>Revisar el negocio (Resumen)</h2></div>
+  <div class="when"><b>Para qué</b>Tu tablero del día a día. De un vistazo ves qué necesita tu atención, todo calculado por fórmulas, sin tocar nada.</div>
+  <div class="deps">
+    <div class="dep"><b>Necesitas antes</b>Nada en especial. Tiene sentido cuando ya hay cotizaciones, pedidos o insumos cargados.</div>
+    <div class="dep ok"><b>¿Puedo entrar directo?</b><b style="display:inline">Sí</b>, siempre. Es solo mirar; no escribe nada.</div>
+  </div>
+
+  <div class="subflow"><span class="sfx">4.1</span><h3>Qué muestra el Resumen</h3></div>
   <ul class="plain">
-    <li>El pedido <b>PD-0001</b> con sus faltantes (Paso 09).</li>
-    <li>El proveedor con WhatsApp (Paso 03).</li>
+    <li>Presupuestos <b>pendientes</b>, <b>por vencer</b> y <b>vencidos</b>.</li>
+    <li>Pedidos <b>pendientes</b>, <b>en producción</b> y <b>entregados</b>.</li>
+    <li>Insumos <b>agotados</b> y <b>bajo el mínimo</b>.</li>
+    <li>Una lista de <b>alertas</b>: qué vence pronto y qué se agotó, por nombre.</li>
   </ul>
-  <div class="secn">Paso a paso</div>
+
+  <div class="subflow"><span class="sfx">4.2</span><h3>Cómo se actualiza solo</h3></div>
+  <ol class="steps">
+    <li>Solo, <b>al abrir el archivo</b>.</li>
+    <li>Solo, <b>después de cada acción</b> que mueva algo, como aprobar o entregar.</li>
+    <li>Cuando quieras, con <span class="tag">Ir al Resumen</span> en el menú.</li>
+  </ol>
+  <div class="callout note"><span class="lbl">Qué pasa</span><div>El panel es de solo lectura y se vuelve a dibujar solo; no escribas sobre él. Crea otro presupuesto y vuelve aquí: el contador de pendientes sube solo, sin refrescar.</div></div>
+
+  <div class="footnav">
+    <button class="btnmenu ghost" onclick="show('home')">Volver al menú</button>
+    <span class="footnote">Relacionado: <a onclick="show('f05')">Comprar y reponer</a> · <a onclick="show('f01')">Hacer una cotización</a></span>
+  </div>
+</section>
+
+<!-- ===================== F05 · COMPRAR Y REGISTRAR ===================== -->
+<section class="view" id="f05">
+  <div class="flowhead"><div class="idx">Flujo 05 · seguido</div><h2>Comprar y registrar la compra</h2></div>
+  <div class="when"><b>Para qué</b>Reponer el stock. Primero armas el pedido al proveedor por WhatsApp; después, cuando llega el material, registras la compra para subir el stock y dejar tus precios al día.</div>
+  <div class="deps">
+    <div class="dep"><b>Necesitas antes</b><a onclick="show('f09')">Un proveedor con WhatsApp</a> y los <a onclick="show('f08')">insumos</a> creados.</div>
+    <div class="dep"><b>¿Puedo entrar directo?</b><b style="display:inline;color:var(--accent-deep)">Sí, pero…</b> la lista de faltantes solo aparece si ya <a onclick="show('f02')">aprobaste un pedido</a>. Si no, úsalo para reponer lo que está bajo el mínimo.</div>
+  </div>
+
+  <div class="subflow"><span class="sfx">5.1</span><h3>Comprar materiales (pedir al proveedor)</h3></div>
   <ol class="steps">
     <li>Menú, <span class="tag">Comprar materiales</span>.</li>
     <li><b>Modo automático:</b> elige el pedido <b>PD-0001</b>.<div class="det">Aparecen los faltantes (Harina, Huevo) agrupados por proveedor, con el último precio que pagaste y un botón de WhatsApp por proveedor.</div></li>
     <li><b>Modo manual</b> (alternativa).<div class="det">Lista todos los insumos con casillas; los que están bajo el mínimo vienen ya marcados, con cantidad editable.</div></li>
     <li><b>Toca WhatsApp</b> en Molinos SAC.<div class="det">Se abre el chat con el mensaje ya escrito para preguntar disponibilidad y precio.</div></li>
   </ol>
-  <div class="callout note"><span class="lbl">Qué pasa</span><div>Esto todavía <b>no</b> cambia el stock: solo arma el pedido al proveedor. El stock sube cuando registres la compra recibida, en el siguiente paso.</div></div>
-  <div class="footnav">
-    <button class="btnmenu ghost" onclick="show('home')">Volver al menú</button>
-    <button class="btnmenu" onclick="show('registrarCompra')">Siguiente: registrar la compra →</button>
-    <span class="footnote">Paso 10 de 13</span>
-  </div>
-</section>
+  <div class="callout note"><span class="lbl">Qué pasa</span><div>Esto todavía <b>no</b> cambia el stock: solo arma el pedido al proveedor. El stock sube cuando registres la compra recibida (abajo).</div></div>
 
-<!-- ===================== 11 REGISTRAR COMPRA ===================== -->
-<section class="view" id="registrarCompra">
-  <div class="flowhead"><div class="idx">Paso 11</div><h2>Registrar la compra recibida</h2></div>
-  <div class="when"><b>Por qué ahora</b>Llegó el material. Este paso sube el stock y deja tus costos al día. Recién con stock suficiente podrás producir el pedido.</div>
-  <div class="secn">Necesitas</div>
-  <ul class="plain">
-    <li>El proveedor <b>Molinos SAC</b> (Paso 03) y los insumos (Paso 05).</li>
-  </ul>
-  <div class="secn">Paso a paso</div>
+  <div class="subflow"><span class="sfx">5.2</span><h3>Registrar la compra recibida</h3></div>
   <ol class="steps">
     <li>Menú, <span class="tag">Registrar compra</span>.</li>
     <li><b>Proveedor</b> Molinos SAC, <b>fecha</b> hoy.</li>
@@ -430,74 +395,24 @@
     <li><b>Línea Huevo:</b> cantidad 2, precio 15.</li>
     <li><b>Guarda</b> y confirma.</li>
   </ol>
-  <div class="callout note"><span class="lbl">Qué pasa</span><div>Queda la compra <b>CMP-0001</b>. En Insumos, la Harina sube su "Precio presentación" a 5.50 y su "Precio por unidad base" se recalcula a 0.0055; el stock sube 5×1000 = 5000 g y el semáforo deja de estar rojo. Tus costos quedan al día y los faltantes, cubiertos.</div></div>
+  <div class="callout note"><span class="lbl">Qué pasa</span><div>Queda la compra <b>CMP-0001</b>. La Harina sube su "Precio presentación" a 5.50 y su "Precio por unidad base" se recalcula a 0.0055; el stock sube 5×1000 = 5000 g y el semáforo deja de estar rojo. Tus costos quedan al día y los faltantes, cubiertos.</div></div>
+
   <div class="footnav">
     <button class="btnmenu ghost" onclick="show('home')">Volver al menú</button>
-    <button class="btnmenu" onclick="show('pedido')">Siguiente: producir y entregar →</button>
-    <span class="footnote">Paso 11 de 13</span>
+    <span class="footnote">Después: <a onclick="show('f03')">Producir y entregar →</a></span>
   </div>
 </section>
 
-<!-- ===================== 12 PEDIDO ===================== -->
-<section class="view" id="pedido">
-  <div class="flowhead"><div class="idx">Paso 12</div><h2>Producir y entregar el pedido</h2></div>
-  <div class="when"><b>Por qué ahora</b>Ya tienes el material. Ahora llevas el pedido de Pendiente a Producción y luego a Entregado. Al entregar, el sistema registra la venta solo.</div>
-  <div class="secn">Necesitas</div>
-  <ul class="plain">
-    <li>El pedido <b>PD-0001</b> (Paso 09) y stock suficiente (Paso 11).</li>
-  </ul>
-  <div class="secn">Paso a paso</div>
-  <ol class="steps">
-    <li>Menú, <span class="tag">Ver pedidos</span>.</li>
-    <li>Sobre <b>PD-0001</b> (Pendiente), toca <b>Producción</b> y confirma.<div class="det">Si tu sistema descuenta el stock al iniciar producción, aquí es donde baja.</div></li>
-    <li>Al terminar, toca <b>Entregar</b> y confirma.<div class="det">Se registra la fecha de entrega y nace la venta VT-0001 con el precio final del presupuesto.</div></li>
-    <li><b>(Si el pedido se cae)</b> toca <b>Cancelar</b> y pon el motivo.<div class="det">El stock consumido se devuelve solo. Un pedido ya entregado no se puede cancelar.</div></li>
-  </ol>
-  <div class="callout note"><span class="lbl">Qué pasa</span><div>Nace la venta <b>VT-0001</b> por el precio final, y el Resumen contará un pedido entregado. Has cerrado el ciclo completo: de cotizar a vender.</div></div>
-  <div class="callout tip"><span class="lbl">Complemento</span><div>¿Algo se dañó, venció o el conteo no cuadra? Eso se arregla en <b>Ajustar inventario</b>, fuera de este ciclo.</div></div>
-  <div class="footnav">
-    <button class="btnmenu ghost" onclick="show('home')">Volver al menú</button>
-    <button class="btnmenu" onclick="show('inicio')">Siguiente: leer el Resumen →</button>
-    <span class="footnote">Paso 12 de 13</span>
+<!-- ===================== F06 · AJUSTAR INVENTARIO ===================== -->
+<section class="view" id="f06">
+  <div class="flowhead"><div class="idx">Flujo 06 · seguido</div><h2>Ajustar el inventario</h2></div>
+  <div class="when"><b>Para qué</b>Cuando algo se echa a perder, se rompe, vence, o el conteo real no cuadra con el sistema. Es un movimiento fuera del ciclo de compras y pedidos.</div>
+  <div class="deps">
+    <div class="dep"><b>Necesitas antes</b>Tener <a onclick="show('f08')">insumos</a> creados y los tipos de ajuste de <a onclick="show('f13')">Configuración</a>.</div>
+    <div class="dep ok"><b>¿Puedo entrar directo?</b><b style="display:inline">Sí</b>, si ya tienes insumos cargados. Úsalo en cualquier momento.</div>
   </div>
-</section>
 
-<!-- ===================== 13 RESUMEN ===================== -->
-<section class="view" id="inicio">
-  <div class="flowhead"><div class="idx">Paso 13</div><h2>Leer el Resumen</h2></div>
-  <div class="when"><b>Por qué ahora</b>Es el cierre del recorrido y tu tablero del día a día. Aquí ves de un vistazo qué necesita tu atención, todo calculado por fórmulas, sin tocar nada.</div>
-  <div class="secn">Qué muestra</div>
-  <ul class="plain">
-    <li>Presupuestos <b>pendientes</b>, <b>por vencer</b> y <b>vencidos</b>.</li>
-    <li>Pedidos <b>pendientes</b>, <b>en producción</b> y <b>entregados</b> (verás 1 tras entregar el de Ana).</li>
-    <li>Insumos <b>agotados</b> y <b>bajo el mínimo</b>.</li>
-    <li>Una lista de <b>alertas</b>: qué vence pronto y qué se agotó, por nombre.</li>
-  </ul>
-  <div class="secn">Cómo se actualiza</div>
-  <ol class="steps">
-    <li>Solo, <b>al abrir el archivo</b>.</li>
-    <li>Solo, <b>después de cada acción</b> que mueva algo, como aprobar o entregar.</li>
-    <li>Cuando quieras, con <span class="tag">Ir al Resumen</span> en el menú.</li>
-  </ol>
-  <div class="callout note"><span class="lbl">Qué pasa</span><div>El panel es de solo lectura y se vuelve a dibujar solo; no escribas sobre él. Crea otro presupuesto y vuelve aquí: el contador de pendientes sube solo, sin refrescar.</div></div>
-  <div class="callout tip"><span class="lbl">Concepto</span><div>¿Quieres entender de dónde sale el precio? Mira <b>Cómo se calcula el precio</b>.</div></div>
-  <div class="footnav">
-    <button class="btnmenu ghost" onclick="show('home')">Volver al menú</button>
-    <button class="btnmenu" onclick="show('configurar')">Empezar de nuevo →</button>
-    <span class="footnote">Paso 13 de 13 · ¡Completaste el recorrido!</span>
-  </div>
-</section>
-
-<!-- ===================== AJUSTAR (complemento) ===================== -->
-<section class="view" id="ajustar">
-  <div class="flowhead"><div class="idx">Complemento</div><h2>Ajustar inventario</h2></div>
-  <div class="when"><b>Cuándo</b>Cuando algo se echa a perder, se rompe, vence, o el conteo real no cuadra con el sistema. Es un movimiento fuera del ciclo normal de compras y pedidos; puedes usarlo en cualquier momento después de tener insumos.</div>
-  <div class="secn">Necesitas</div>
-  <ul class="plain">
-    <li>El insumo a ajustar (Paso 05).</li>
-    <li>Los tipos de ajuste, que viven en Configuración (Paso 02).</li>
-  </ul>
-  <div class="secn">Paso a paso</div>
+  <div class="subflow"><span class="sfx">6.1</span><h3>Ajustar inventario</h3></div>
   <ol class="steps">
     <li>Menú, <span class="tag">Ajustar inventario</span>.</li>
     <li><b>Busca el insumo:</b> Caja torta.</li>
@@ -506,13 +421,245 @@
     <li><b>Guarda</b> y confirma.</li>
   </ol>
   <div class="callout note"><span class="lbl">Qué pasa</span><div>Queda registrado en Movimientos con su fecha, tipo y motivo, y el stock de Caja torta baja 5. Así siempre puedes rastrear por qué el inventario está como está.</div></div>
+
   <div class="footnav">
     <button class="btnmenu ghost" onclick="show('home')">Volver al menú</button>
-    <span class="footnote">Complemento del recorrido</span>
+    <span class="footnote">Relacionado: <a onclick="show('f05')">Comprar y reponer</a></span>
   </div>
 </section>
 
-<!-- ===================== PRECIO (concepto) ===================== -->
+<!-- ===================== F07 · CLIENTE ===================== -->
+<section class="view" id="f07">
+  <div class="flowhead"><div class="idx">Flujo 07 · de vez en cuando</div><h2>Registrar o editar un cliente</h2></div>
+  <div class="when"><b>Para qué</b>Para poder cotizarle: todo presupuesto va a nombre de un cliente. Lo registras cuando llega uno nuevo.</div>
+  <div class="deps">
+    <div class="dep"><b>Necesitas antes</b>Nada.</div>
+    <div class="dep ok"><b>¿Puedo entrar directo?</b><b style="display:inline">Sí</b>. También puedes crearlo al vuelo desde el formulario de cotización (<a onclick="show('f01')">Flujo 01</a>).</div>
+  </div>
+
+  <div class="subflow"><span class="sfx">7.1</span><h3>Nuevo cliente</h3></div>
+  <ol class="steps">
+    <li>Menú, <span class="tag">Clientes</span>. Toca <b>Nuevo cliente</b>.</li>
+    <li><b>Nombre:</b> <b>Ana Torres</b>.<div class="det">Es obligatorio y no se puede repetir exacto.</div></li>
+    <li><b>Teléfono:</b> <b>999000111</b>, y notas si quieres. Son opcionales.</li>
+    <li><b>Guarda.</b> Aparece la fila <b>CL-0001</b>.</li>
+  </ol>
+
+  <div class="subflow"><span class="sfx">7.2</span><h3>Editar un cliente</h3></div>
+  <ol class="steps">
+    <li>En la lista de clientes, toca <b>Editar</b> en su fila.</li>
+    <li>Corrige nombre, teléfono o notas y <b>Guarda</b>.<div class="det">El nombre sigue sin poder repetirse con el de otro cliente.</div></li>
+  </ol>
+
+  <div class="footnav">
+    <button class="btnmenu ghost" onclick="show('home')">Volver al menú</button>
+    <span class="footnote">Se usa al <a onclick="show('f01')">cotizar</a></span>
+  </div>
+</section>
+
+<!-- ===================== F08 · INSUMO ===================== -->
+<section class="view" id="f08">
+  <div class="flowhead"><div class="idx">Flujo 08 · de vez en cuando</div><h2>Registrar o editar un insumo</h2></div>
+  <div class="when"><b>Para qué</b>Los insumos (ingredientes y empaques) son la base de todos los costos. Aquí vive su precio y su stock. Lo usas al dar de alta un material nuevo o cuando cambia su precio.</div>
+  <div class="deps">
+    <div class="dep"><b>Necesitas antes</b>(Opcional) un <a onclick="show('f09')">proveedor</a>, para asociarlo como recomendado.</div>
+    <div class="dep ok"><b>¿Puedo entrar directo?</b><b style="display:inline">Sí</b>. Es de los primeros datos que cargas; las recetas dependen de esto.</div>
+  </div>
+
+  <div class="subflow"><span class="sfx">8.1</span><h3>Nuevo insumo (ingrediente y empaque)</h3></div>
+  <ol class="steps">
+    <li>Menú, <span class="tag">Insumos</span>. Toca <b>Nuevo insumo</b>.</li>
+    <li><b>Harina:</b> tipo ingrediente, unidad gramos, presentación 1000, precio S/5, stock inicial 0, mínimo 2000, proveedor recomendado Molinos SAC. Guarda.<div class="det">Verás "Precio por unidad base" = 0.005 (5÷1000) y "Semáforo" en rojo (stock 0).</div></li>
+    <li><b>Huevo:</b> ingrediente, unidad, presentación 30, precio S/15, stock 0, mínimo 30. Guarda.<div class="det">"Precio por unidad base" = 0.5 (15÷30), semáforo rojo.</div></li>
+    <li><b>Caja torta:</b> tipo empaque, unidad, presentación 25, precio S/25, stock 50, mínimo 10. Guarda.<div class="det">"Precio por unidad base" = 1 (25÷25), semáforo verde (50 &gt; 10).</div></li>
+  </ol>
+  <div class="callout warn"><span class="lbl">No edites</span><div>Las columnas calculadas ("Precio por unidad base" y "Semáforo") se actualizan solas cuando cambia el precio o el stock. No las toques a mano.</div></div>
+
+  <div class="subflow"><span class="sfx">8.2</span><h3>Editar un insumo</h3></div>
+  <ol class="steps">
+    <li>En la lista, toca <b>Editar</b> en la fila del insumo.</li>
+    <li>Cambia precio, presentación o mínimo y <b>Guarda</b>.<div class="det">El stock no se toca aquí: sube con compras (<a onclick="show('f05')" style="color:var(--accent);font-weight:600;cursor:pointer">Flujo 05</a>) y se ajusta con inventario (<a onclick="show('f06')" style="color:var(--accent);font-weight:600;cursor:pointer">Flujo 06</a>).</div></li>
+  </ol>
+
+  <div class="footnav">
+    <button class="btnmenu ghost" onclick="show('home')">Volver al menú</button>
+    <span class="footnote">Se usa en <a onclick="show('f10')">las recetas</a></span>
+  </div>
+</section>
+
+<!-- ===================== F09 · PROVEEDOR ===================== -->
+<section class="view" id="f09">
+  <div class="flowhead"><div class="idx">Flujo 09 · de vez en cuando</div><h2>Registrar o editar un proveedor</h2></div>
+  <div class="when"><b>Para qué</b>Su WhatsApp es lo que luego te deja pedirle con un clic desde "Comprar materiales". Además, cada insumo puede llevar su "proveedor recomendado".</div>
+  <div class="deps">
+    <div class="dep"><b>Necesitas antes</b>Nada.</div>
+    <div class="dep ok"><b>¿Puedo entrar directo?</b><b style="display:inline">Sí</b>. Conviene tenerlo antes de los insumos y antes de comprar.</div>
+  </div>
+
+  <div class="subflow"><span class="sfx">9.1</span><h3>Nuevo proveedor</h3></div>
+  <ol class="steps">
+    <li>Menú, <span class="tag">Proveedores</span>. Toca <b>Nuevo proveedor</b>.</li>
+    <li><b>Nombre:</b> <b>Molinos SAC</b>.<div class="det">Es obligatorio y no se puede repetir exacto.</div></li>
+    <li><b>WhatsApp con código de país:</b> <b>51999111222</b>.<div class="det">Sin espacios ni signos. Es lo que arma el enlace para pedirle.</div></li>
+    <li>Notas opcionales y <b>Guarda</b>. Aparece la fila <b>PR-0001</b>.</li>
+  </ol>
+
+  <div class="subflow"><span class="sfx">9.2</span><h3>Editar un proveedor</h3></div>
+  <ol class="steps">
+    <li>En la lista, toca <b>Editar</b> en su fila.</li>
+    <li>Corrige nombre, WhatsApp o notas y <b>Guarda</b>.</li>
+  </ol>
+
+  <div class="footnav">
+    <button class="btnmenu ghost" onclick="show('home')">Volver al menú</button>
+    <span class="footnote">Se usa al <a onclick="show('f05')">comprar</a></span>
+  </div>
+</section>
+
+<!-- ===================== F10 · RECETA ===================== -->
+<section class="view" id="f10">
+  <div class="flowhead"><div class="idx">Flujo 10 · de vez en cuando</div><h2>Crear o editar una receta</h2></div>
+  <div class="when"><b>Para qué</b>La receta define qué lleva tu producto y para cuántas raciones rinde. Es lo que el presupuesto escala para cualquier cantidad. Se define una vez por producto.</div>
+  <div class="deps">
+    <div class="dep"><b>Necesitas antes</b>Los <a onclick="show('f08')">insumos</a> que lleva la receta (Harina, Huevo).</div>
+    <div class="dep ko"><b>¿Puedo entrar directo?</b><b style="display:inline">No del todo</b>: sin insumos no hay ingredientes que agregar. Créalos primero en el Flujo 08.</div>
+  </div>
+
+  <div class="subflow"><span class="sfx">10.1</span><h3>Crear una receta</h3></div>
+  <ol class="steps">
+    <li>Menú, <span class="tag">Recetas</span>. Toca <b>Nueva receta</b>.</li>
+    <li><b>Nombre</b> <b>Torta chocolate</b>, categoría <b>tortas</b>.</li>
+    <li><b>Tipo de base</b> "Por personas", <b>base 10</b>.<div class="det">Es la clave del escalado: si luego pides 20, el sistema multiplica todo por 2.</div></li>
+    <li><b>Mano de obra:</b> 2 horas.</li>
+    <li><b>Agrega los ingredientes:</b> Harina 300 (la unidad sale sola: g), Huevo 4 (u).</li>
+    <li><b>Guarda.</b> Pide al menos un ingrediente. Queda la receta <b>RC-0001</b>.</li>
+  </ol>
+
+  <div class="subflow"><span class="sfx">10.2</span><h3>Editar una receta</h3></div>
+  <ol class="steps">
+    <li>En la lista, toca <b>Editar</b> en su fila.</li>
+    <li>Cambia la base, la mano de obra o la lista de ingredientes: agregar líneas nuevas, cambiar cantidades o quitar las que ya no van. <b>Guarda</b>.</li>
+  </ol>
+  <div class="callout note"><span class="lbl">Qué pasa</span><div>Escribe la receta para una base cómoda; el sistema la escala sola al cotizar. Cambiar la receta no afecta los presupuestos ya guardados.</div></div>
+
+  <div class="footnav">
+    <button class="btnmenu ghost" onclick="show('home')">Volver al menú</button>
+    <span class="footnote">Después: <a onclick="show('f11')">Definir su regla de empaque →</a></span>
+  </div>
+</section>
+
+<!-- ===================== F11 · REGLA DE EMPAQUE ===================== -->
+<section class="view" id="f11">
+  <div class="flowhead"><div class="idx">Flujo 11 · de vez en cuando</div><h2>Definir reglas de empaque</h2></div>
+  <div class="when"><b>Para qué</b>Para que el presupuesto te sugiera solo el empaque correcto según el tamaño que pida el cliente, sin que tengas que acordarte cada vez.</div>
+  <div class="deps">
+    <div class="dep"><b>Necesitas antes</b>Una <a onclick="show('f10')">receta</a>, un <a onclick="show('f08')">insumo de empaque</a> y el tamaño en <a onclick="show('f13')">Configuración</a>.</div>
+    <div class="dep ko"><b>¿Puedo entrar directo?</b><b style="display:inline">No del todo</b>: el formulario te pide elegir una receta y un empaque que ya existan.</div>
+  </div>
+
+  <div class="subflow"><span class="sfx">11.1</span><h3>Nueva regla</h3></div>
+  <ol class="steps">
+    <li>Menú, <span class="tag">Reglas de empaque</span>. Toca <b>Nueva regla</b>.</li>
+    <li><b>Receta:</b> Torta chocolate.</li>
+    <li><b>Tamaño:</b> grande.<div class="det">El desplegable solo muestra los tamaños definidos en Configuración.</div></li>
+    <li><b>Empaque:</b> Caja torta. <b>Cantidad:</b> 1. <b>Guarda.</b> Queda la regla <b>RL-0001</b>.</li>
+  </ol>
+
+  <div class="subflow"><span class="sfx">11.2</span><h3>Editar una regla</h3></div>
+  <ol class="steps">
+    <li>En la lista, toca <b>Editar</b> en la fila de la regla.</li>
+    <li>Cambia el empaque o la cantidad sugerida y <b>Guarda</b>.</li>
+  </ol>
+  <div class="callout note"><span class="lbl">Qué pasa</span><div>Al cotizar Torta chocolate en tamaño grande, el sistema propondrá <b>1 Caja torta</b> automáticamente (con una casilla que puedes desmarcar).</div></div>
+
+  <div class="footnav">
+    <button class="btnmenu ghost" onclick="show('home')">Volver al menú</button>
+    <span class="footnote">Se usa al <a onclick="show('f01')">cotizar</a></span>
+  </div>
+</section>
+
+<!-- ===================== F12 · INSTALAR O REPARAR ===================== -->
+<section class="view" id="f12">
+  <div class="flowhead"><div class="idx">Flujo 12 · una sola vez</div><h2>Instalar o reparar el sistema</h2></div>
+  <div class="when"><b>Para qué</b>Es el primer paso de todos, sobre una hoja en blanco. Crea todas las pestañas, cabeceras y fórmulas que el resto necesita. Sin esto, no hay dónde guardar nada.</div>
+  <div class="deps">
+    <div class="dep"><b>Necesitas antes</b>Nada. Es el punto de partida de todo el sistema.</div>
+    <div class="dep ok"><b>¿Puedo entrar directo?</b><b style="display:inline">Sí</b>. Es justo por donde debe empezar un usuario nuevo.</div>
+  </div>
+
+  <div class="subflow"><span class="sfx">12.1</span><h3>Instalar o reparar (todo)</h3></div>
+  <ol class="steps">
+    <li>Abre el menú de arriba, entra a <span class="tag">Mantenimiento</span> y luego a <span class="tag">Instalar o reparar (todo)</span>.</li>
+    <li><b>Espera el aviso "Listo"</b> con el número de hojas creadas y revisadas.<div class="det">La primera vez puede tardar, porque crea todas las hojas. Si se corta, usa los pasos sueltos del <a onclick="show('f14')" style="color:var(--accent);font-weight:600;cursor:pointer">Flujo 14</a>.</div></li>
+    <li><b>Confirma que aparece la pestaña Resumen</b> como primera, y las demás (Config, Insumos, Presupuestos, Pedidos, Clientes, Proveedores, Recetas…).</li>
+  </ol>
+  <div class="callout note"><span class="lbl">Qué pasa</span><div>Quedan creadas todas las hojas con sus cabeceras y fórmulas. Las columnas que se calculan solas salen con cabecera <b>verde</b>. Es seguro repetirlo: nunca borra tus datos, solo repara lo que falte.</div></div>
+
+  <div class="footnav">
+    <button class="btnmenu ghost" onclick="show('home')">Volver al menú</button>
+    <span class="footnote">Después: <a onclick="show('f13')">Configurar el negocio →</a></span>
+  </div>
+</section>
+
+<!-- ===================== F13 · CONFIGURAR ===================== -->
+<section class="view" id="f13">
+  <div class="flowhead"><div class="idx">Flujo 13 · una sola vez</div><h2>Configurar el negocio</h2></div>
+  <div class="when"><b>Para qué</b>Defines las reglas con las que se arma el precio (margen, IGV, redondeo) y las listas que usarán los formularios (tamaños, tipos de ajuste). Todo lo que cotices después usa estos valores.</div>
+  <div class="deps">
+    <div class="dep"><b>Necesitas antes</b>El sistema <a onclick="show('f12')">instalado</a> (Flujo 12).</div>
+    <div class="dep ok"><b>¿Puedo entrar directo?</b><b style="display:inline">Sí</b>, una vez instalado. Es el segundo paso de la preparación.</div>
+  </div>
+
+  <div class="subflow"><span class="sfx">13.1</span><h3>Configurar los parámetros</h3></div>
+  <ol class="steps">
+    <li>Abre el menú y entra a <span class="tag">Configuración</span>.</li>
+    <li><b>Tarifa de mano de obra por hora.</b><div class="det">Cuánto vale una hora de tu trabajo. Alimenta el costo de cada presupuesto.</div></li>
+    <li><b>Costo indirecto y depreciación por pedido.</b><div class="det">Montos fijos por luz, gas o desgaste de equipos.</div></li>
+    <li><b>Margen por defecto, en porcentaje.</b><div class="det">Tu ganancia sobre la venta. Cada presupuesto lo trae puesto y lo puedes cambiar caso por caso.</div></li>
+    <li><b>Aplicar IGV y su tasa.</b><div class="det">Si lo dejas en Sí, el sistema lo suma al final del precio.</div></li>
+    <li><b>Redondeo del precio.</b><div class="det">Múltiplo de 5 hacia arriba deja precios redonditos.</div></li>
+    <li><b>Días de vencimiento y momento de descuento de stock.</b><div class="det">Cuántos días vale el presupuesto, y si el stock baja al aprobar o al iniciar producción. Mira <a onclick="show('descuento')" style="color:var(--accent);font-weight:600;cursor:pointer">Cuándo baja el stock</a>.</div></li>
+    <li><b>Lista de tamaños.</b><div class="det">Por ejemplo chico, mediano, grande. Llevan su factor: chico 0.5, mediano 1, grande 2.</div></li>
+    <li><b>Nombre del negocio,</b> y <b>Guarda</b>.<div class="det">El nombre aparece en el menú la próxima vez que abras el archivo.</div></li>
+  </ol>
+  <div class="callout note"><span class="lbl">Qué pasa</span><div>Al guardar caes en la hoja Config, con 4 bloques editables a mano: Parámetros generales, Factores de escalado, Tamaños y Tipos de ajuste. Lo que cambies afecta los presupuestos <b>nuevos</b>, nunca los ya guardados.</div></div>
+
+  <div class="footnav">
+    <button class="btnmenu ghost" onclick="show('home')">Volver al menú</button>
+    <span class="footnote">Después: carga tus datos (<a onclick="show('f09')">proveedor</a>, <a onclick="show('f08')">insumos</a>, <a onclick="show('f10')">receta</a>)</span>
+  </div>
+</section>
+
+<!-- ===================== F14 · MANTENIMIENTO POR PARTES ===================== -->
+<section class="view" id="f14">
+  <div class="flowhead"><div class="idx">Flujo 14 · casi nunca</div><h2>Mantenimiento por partes</h2></div>
+  <div class="when"><b>Para qué</b>Solo si "Instalar o reparar (todo)" se corta por tiempo, o si algo se ve raro. Todo es seguro de repetir: nunca borra tus datos.</div>
+  <div class="deps">
+    <div class="dep"><b>Necesitas antes</b>Nada. Son utilidades del menú <span class="tag">Mantenimiento</span>.</div>
+    <div class="dep"><b>¿Puedo entrar directo?</b><b style="display:inline;color:var(--accent-deep)">Sí</b>, pero normalmente basta con el <a onclick="show('f12')">Flujo 12</a>. Usa esto solo si aquello falló.</div>
+  </div>
+
+  <div class="subflow"><span class="sfx">14.1</span><h3>Pasos sueltos (si "todo" se corta)</h3></div>
+  <ol class="steps">
+    <li><span class="tag">1. Crear tablas</span><div class="det">Crea las hojas y cabeceras que falten.</div></li>
+    <li><span class="tag">2. Aplicar diseño</span><div class="det">Reaplica colores, fuentes y anchos. Es lento.</div></li>
+    <li><span class="tag">3-5. Fórmulas, validaciones y protecciones</span><div class="det">Escribe las fórmulas, las listas desplegables y protege las hojas de datos.</div></li>
+  </ol>
+  <div class="callout note"><span class="lbl">Qué pasa</span><div>Córrelos en orden y vuelve a abrir el archivo al terminar. Equivalen a hacer "Instalar o reparar (todo)" por etapas.</div></div>
+
+  <div class="subflow"><span class="sfx">14.2</span><h3>Ajustar ancho de columnas</h3></div>
+  <ol class="steps">
+    <li>Menú, <span class="tag">Mantenimiento</span> ▸ <span class="tag">Ajustar ancho de columnas al texto</span>.</li>
+  </ol>
+  <div class="callout warn"><span class="lbl">Ojo</span><div>Es <b>lento</b> y puede tomar varios minutos. Úsalo solo cuando el texto de las columnas se vea cortado.</div></div>
+
+  <div class="footnav">
+    <button class="btnmenu ghost" onclick="show('home')">Volver al menú</button>
+    <span class="footnote">Relacionado: <a onclick="show('f12')">Instalar o reparar</a></span>
+  </div>
+</section>
+
+<!-- ===================== CONCEPTO · PRECIO ===================== -->
 <section class="view" id="precio">
   <div class="flowhead"><div class="idx">Concepto</div><h2>Cómo se calcula el precio</h2></div>
   <div class="when"><b>Para qué</b>Para que entiendas de dónde sale el número y puedas explicarlo con confianza.</div>
@@ -526,7 +673,23 @@
   <div class="callout tip"><span class="lbl">La clave</span><div>El margen es sobre lo que cobras, no sobre lo que gastas. Por eso se divide entre uno menos el margen. Así tu ganancia real es el porcentaje que pusiste.</div></div>
   <div class="footnav">
     <button class="btnmenu ghost" onclick="show('home')">Volver al menú</button>
-    <span class="footnote">Concepto del sistema</span>
+    <span class="footnote">Se usa al <a onclick="show('f01')">cotizar</a></span>
+  </div>
+</section>
+
+<!-- ===================== CONCEPTO · DESCUENTO DE STOCK ===================== -->
+<section class="view" id="descuento">
+  <div class="flowhead"><div class="idx">Concepto</div><h2>Cuándo baja el stock</h2></div>
+  <div class="when"><b>Para qué</b>El sistema puede descontar los insumos de un pedido en dos momentos distintos. Tú eliges cuál en <a onclick="show('f13')" style="color:inherit;font-weight:700;cursor:pointer">Configuración</a>, con el parámetro <b>momento de descuento de stock</b>.</div>
+  <div class="secn">Las dos opciones</div>
+  <ol class="steps">
+    <li><b>APROBAR.</b><div class="det">El stock baja apenas apruebas la cotización (<a onclick="show('f02')" style="color:var(--accent);font-weight:600;cursor:pointer">Flujo 02</a>). Útil si reservas el material en cuanto el cliente acepta.</div></li>
+    <li><b>PRODUCCIÓN.</b><div class="det">El stock baja cuando inicias producción del pedido (<a onclick="show('f03')" style="color:var(--accent);font-weight:600;cursor:pointer">Flujo 03</a>). Útil si el material recién se usa al ponerte a trabajar.</div></li>
+  </ol>
+  <div class="callout tip"><span class="lbl">En ambos casos</span><div>Si cancelas el pedido, lo que se consumió <b>se devuelve solo</b>. Y si no tienes stock suficiente, el sistema te deja seguir y marca el faltante para que lo compres (<a onclick="show('f05')" style="color:inherit;font-weight:700;cursor:pointer">Flujo 05</a>).</div></div>
+  <div class="footnav">
+    <button class="btnmenu ghost" onclick="show('home')">Volver al menú</button>
+    <span class="footnote">Se configura en <a onclick="show('f13')">Configurar el negocio</a></span>
   </div>
 </section>
 
