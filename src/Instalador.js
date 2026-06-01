@@ -175,6 +175,37 @@ function instalarRapidos() {
   });
 }
 
+// ---------- Ajuste de anchos al texto (accion suelta, lenta) ----------
+
+/**
+ * Ajusta el ancho de cada columna a su contenido (autoResizeColumns). Es lento
+ * porque mide celda por celda, por eso NO va en el instalador normal: se corre
+ * a mano desde el menu cuando se quiere el ancho perfecto.
+ */
+function ajustarAnchos() {
+  _correrPaso('Ajustar ancho de columnas al texto', function () {
+    var ss = ssOperacion();
+    var n = 0;
+    definicionEsquema().forEach(function (def) {
+      if (def.esConfig || def.esResumen) return;
+      var sheet = ss.getSheetByName(def.nombre);
+      if (!sheet) return;
+      var nCols = Math.max(1, columnasDe(def).length);
+      try {
+        sheet.autoResizeColumns(1, nCols);
+        for (var k = 1; k <= nCols; k++) {
+          var w = sheet.getColumnWidth(k);
+          if (w < ANCHO_MIN) sheet.setColumnWidth(k, ANCHO_MIN);
+          else if (w > ANCHO_MAX) sheet.setColumnWidth(k, ANCHO_MAX);
+        }
+      } catch (e) {}
+      n++;
+    });
+    return 'Listo. Ancho ajustado al texto en ' + n + ' hoja(s).\n\n'
+      + 'Esta accion es lenta; corre solo cuando lo necesites.';
+  });
+}
+
 // ---------- Todo en uno (puede superar el limite de tiempo) ----------
 
 /** Punto de entrada llamado desde el menu: corre los cinco pasos en orden. */
