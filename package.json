@@ -1,0 +1,27 @@
+{
+  "name": "clapastedyke",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "directories": {
+    "doc": "doc"
+  },
+  "scripts": {
+    "login": "clasp login",
+    "logout": "clasp logout",
+    "push": "cd src && clasp push",
+    "pull": "cd src && clasp pull",
+    "open": "cd src && clasp open-script"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jguillermo/clapastedyke.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/jguillermo/clapastedyke/issues"
+  },
+  "homepage": "https://github.com/jguillermo/clapastedyke#readme"
+}
