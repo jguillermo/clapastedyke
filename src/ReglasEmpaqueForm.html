@@ -116,7 +116,7 @@
     S.call('guardarReglaEmpaque',{
       id_regla:document.getElementById('id_regla').value, receta_id:rid.value,
       tamano:document.getElementById('tamano').value, insumo_empaque_id:eid.value, cantidad:cant.value
-    }, function(r){ btn.disabled=false; S.flash(r.mensaje,'ok'); nuevo(); cargar(); },
+    }, function(r){ S.cerrar(); },
        function(e){ btn.disabled=false; S.flash(e.message||String(e),'err'); });
   }
   cargar();

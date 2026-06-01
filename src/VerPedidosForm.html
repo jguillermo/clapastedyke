@@ -32,9 +32,10 @@
           <option>Entregado</option><option>Cancelado</option>
         </select>
       </div>
-      <div class="field" style="margin:0">
+      <div class="field ac" style="margin:0">
         <div class="lab"><b>Cliente</b></div>
-        <input id="f_cliente" placeholder="Nombre..." oninput="pintar()">
+        <input id="f_cliente" placeholder="Buscar cliente..." oninput="pintar()">
+        <input type="hidden" id="f_cliente_id">
       </div>
     </div>
   </div>
@@ -45,7 +46,13 @@
 
 <script>
   var datos=[];
-  function cargar(){ S.call('listarPedidos', null, function(r){ datos=r||[]; pintar(); }); }
+  function cargar(){
+    S.call('listarPedidos', null, function(r){ datos=r||[]; pintar(); });
+    S.call('catalogoClientes', null, function(cs){
+      S.autocomplete(document.getElementById('f_cliente'), document.getElementById('f_cliente_id'),
+                     (cs||[]).map(function(c){ return {id:c.id,nombre:c.nombre}; }), function(){ pintar(); });
+    });
+  }
   function pintar(){
     var fe=document.getElementById('f_estado').value;
     var fc=document.getElementById('f_cliente').value.toLowerCase().trim();

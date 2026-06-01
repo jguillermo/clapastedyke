@@ -31,13 +31,7 @@
     <div class="two">
       <div class="field">
         <div class="lab"><b>Tipo de ajuste</b><span class="req">*</span><span class="typetag">Dropdown</span></div>
-        <select id="tipo" onchange="prev()">
-          <option value="merma">Merma (sale)</option>
-          <option value="dano">Daño (sale)</option>
-          <option value="vencimiento">Vencimiento (sale)</option>
-          <option value="conteo">Ajuste por conteo (con signo)</option>
-          <option value="devolucion">Devolución a stock (entra)</option>
-        </select>
+        <select id="tipo" onchange="prev()"></select>
       </div>
       <div class="field">
         <div class="lab"><b>Cantidad</b><span class="req">*</span><span class="typetag">Número</span></div>
@@ -67,6 +61,8 @@
   function cargar(){
     S.call('datosAjustarInventario', null, function(d){
       insumos=d.insumos||[];
+      document.getElementById('tipo').innerHTML=(d.tipos||[]).map(function(t){
+        return '<option value="'+S.esc(t)+'">'+S.esc(t)+'</option>'; }).join('');
       S.autocomplete(document.getElementById('ins_nombre'), document.getElementById('insumo_id'),
                      insumos.map(function(i){ return {id:i.id,nombre:i.nombre}; }), function(){ prev(); });
     });
@@ -91,12 +87,12 @@
     if(!id){ S.bad(document.getElementById('ins_nombre'),true); S.flash('Elige un insumo.','err'); return; }
     S.bad(document.getElementById('ins_nombre'),false);
     if(!(Number(cant)!==0)){ S.flash('La cantidad no puede ser cero.','err'); return; }
+    if(!S.confirmar('¿Guardar este ajuste de inventario? Moverá el stock del insumo.')) return;
     var btn=document.getElementById('btnGuardar'); btn.disabled=true;
     S.call('ajustarInventario', {
       insumo_id:id, tipo:document.getElementById('tipo').value, cantidad:cant,
       motivo:document.getElementById('motivo').value, fecha:document.getElementById('fecha').value
-    }, function(r){ btn.disabled=false; S.flash(r.mensaje,'ok');
-        document.getElementById('cantidad').value=''; document.getElementById('motivo').value=''; prev(); },
+    }, function(r){ S.cerrar(); },
        function(e){ btn.disabled=false; S.flash(e.message||String(e),'err'); });
   }
 

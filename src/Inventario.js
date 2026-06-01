@@ -40,6 +40,7 @@ function abrirAjustarInventario() {
 
 function datosAjustarInventario() {
   return {
+    tipos: tiposAjusteConfig().map(function (t) { return t.nombre; }),
     insumos: leerHoja(HOJA.INSUMOS).filas.map(function (i) {
       return { id: i.id, nombre: i.nombre, unidad_base: i.unidad_base,
                stock_actual: numero(i.stock_actual), stock_minimo: numero(i.stock_minimo) };
@@ -47,16 +48,18 @@ function datosAjustarInventario() {
   };
 }
 
-/** Tipos válidos de ajuste y su efecto sobre el signo. */
+/** Tipos válidos de ajuste, leídos del bloque Tipos de ajuste de Config. */
 function tiposAjuste() {
-  return ['merma', 'dano', 'vencimiento', 'conteo', 'devolucion'];
+  return tiposAjusteConfig().map(function (t) { return t.nombre; });
 }
 
+/** Aplica el signo del tipo (de Config) a la cantidad. signo 0 = usa el signo del número. */
 function signoAjuste(tipo, cantidad) {
   var c = Math.abs(numero(cantidad));
-  if (tipo === 'conteo') return numero(cantidad); // tal cual, el usuario pone el signo
-  if (tipo === 'devolucion') return c;            // entra al stock
-  return -c;                                       // merma, daño, vencimiento: sale
+  var t = tiposAjusteConfig().filter(function (x) { return x.nombre === limpiar(tipo); })[0];
+  var signo = t ? t.signo : -1;
+  if (signo === 0) return numero(cantidad); // conteo: el usuario pone el signo
+  return signo > 0 ? c : -c;
 }
 
 /** Vista previa del efecto, para que el usuario vea antes de guardar. */
@@ -82,7 +85,7 @@ function ajustarInventario(payload) {
     var delta = signoAjuste(payload.tipo, payload.cantidad);
     var nuevo = moverStock(insumoId, delta, payload.tipo, '', limpiar(payload.motivo));
     auditar('ajuste', 'insumo', insumoId, 'stock', '', nuevo, payload.tipo + ' ' + delta);
-    refrescarInicioSeguro();
+    irAHojaDelDato(HOJA.MOVIMIENTOS);
     return { ok: true, stock: nuevo, mensaje: 'Ajuste aplicado. Nuevo stock: ' + nuevo + '.' };
   });
 }

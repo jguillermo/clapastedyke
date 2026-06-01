@@ -45,6 +45,7 @@ function guardarCliente(datos) {
         nombre: nombre, telefono: limpiar(datos.telefono), notas: limpiar(datos.notas)
       });
       auditar('editar', 'cliente', datos.id, '', '', nombre, '');
+      if (!datos.silencioso) irAHojaDelDato(HOJA.CLIENTES);
       return { ok: true, id: datos.id, mensaje: 'Cliente actualizado.' };
     } else {
       var id = siguienteId(HOJA.CLIENTES);
@@ -53,6 +54,7 @@ function guardarCliente(datos) {
         notas: limpiar(datos.notas), creado_en: new Date()
       });
       auditar('crear', 'cliente', id, '', '', nombre, '');
+      if (!datos.silencioso) irAHojaDelDato(HOJA.CLIENTES);
       return { ok: true, id: id, mensaje: 'Cliente creado.' };
     }
   });

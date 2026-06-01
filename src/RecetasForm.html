@@ -38,13 +38,20 @@
     </div>
     <div class="two">
       <div class="field">
-        <div class="lab"><b>Raciones base</b><span class="req">*</span><span class="typetag">Numero</span></div>
-        <input id="raciones_base" type="number" min="0" step="any" placeholder="Para cuantas raciones rinde tal cual">
+        <div class="lab"><b>Tipo de base</b><span class="req">*</span><span class="typetag">Dropdown</span></div>
+        <select id="tipo_base" onchange="actualizarLabelBase()">
+          <option value="personas">Por personas</option>
+          <option value="tamano">Por tamano</option>
+        </select>
       </div>
       <div class="field">
-        <div class="lab"><b>Tiempo mano de obra</b><span class="req">*</span><span class="typetag">Numero (horas)</span></div>
-        <input id="tiempo" type="number" min="0" step="any" placeholder="Ej. 1.5">
+        <div class="lab"><b id="labBase">Valor de la base</b><span class="req">*</span><span class="typetag">Numero</span></div>
+        <input id="raciones_base" type="number" min="0" step="any" placeholder="Personas que rinde tal cual">
       </div>
+    </div>
+    <div class="field">
+      <div class="lab"><b>Tiempo mano de obra</b><span class="req">*</span><span class="typetag">Numero (horas)</span></div>
+      <input id="tiempo" type="number" min="0" step="any" placeholder="Ej. 1.5">
     </div>
 
     <div class="grp-title" style="margin-top:18px;border-top:1px dashed var(--line);padding-top:16px">Ingredientes</div>
@@ -61,6 +68,13 @@
 
 <script>
   var datos=[], insumos=[], rowId=0;
+
+  function actualizarLabelBase(){
+    var tipo=document.getElementById('tipo_base').value;
+    var lab=document.getElementById('labBase'), inp=document.getElementById('raciones_base');
+    if(tipo==='tamano'){ lab.textContent='Tamano base (referencia)'; inp.placeholder='Valor de referencia del tamano base'; }
+    else { lab.textContent='Personas base'; inp.placeholder='Personas que rinde tal cual'; }
+  }
 
   function cargar(){
     S.call('catalogoInsumos','ingrediente',function(r){
@@ -108,6 +122,7 @@
   function nuevo(){
     document.getElementById('id').value='';
     ['nombre','categoria','raciones_base','tiempo'].forEach(function(k){ document.getElementById(k).value=''; });
+    document.getElementById('tipo_base').value='personas'; actualizarLabelBase();
     document.getElementById('ings').innerHTML=''; addRow();
     document.getElementById('formTitulo').textContent='Nueva receta';
     document.getElementById('nombre').focus();
@@ -117,6 +132,7 @@
     document.getElementById('id').value=d.id;
     document.getElementById('nombre').value=d.nombre||'';
     document.getElementById('categoria').value=d.categoria||'';
+    document.getElementById('tipo_base').value=d.tipo_base||'personas'; actualizarLabelBase();
     document.getElementById('raciones_base').value=d.raciones_base||'';
     document.getElementById('tiempo').value=d.tiempo_mano_obra_horas||'';
     document.getElementById('ings').innerHTML='';
@@ -148,11 +164,12 @@
     S.call('guardarReceta',{
       id:document.getElementById('id').value, nombre:n.value,
       categoria:document.getElementById('categoria').value,
+      tipo_base:document.getElementById('tipo_base').value,
       raciones_base:rb.value, tiempo_mano_obra_horas:tm.value, ingredientes:ings
-    }, function(r){ btn.disabled=false; S.flash(r.mensaje,'ok'); nuevo(); cargar(); },
+    }, function(r){ S.cerrar(); },
        function(e){ btn.disabled=false; S.flash(e.message||String(e),'err'); });
   }
-  cargar(); addRow();
+  cargar(); addRow(); actualizarLabelBase();
 </script>
 </body>
 </html>

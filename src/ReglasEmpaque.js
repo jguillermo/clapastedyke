@@ -8,11 +8,9 @@ function abrirReglasEmpaque() {
   abrirModal('ReglasEmpaqueForm', 'Reglas de empaque', 860, 720);
 }
 
-/** Tamanos validos, leidos de Config (lista separada por coma). */
+/** Tamanos validos, leidos del bloque Tamanos de Config. */
 function listaTamanos() {
-  var v = limpiar(getConfigValor('lista_tamanos'));
-  if (!v) return [];
-  return v.split(',').map(function (t) { return limpiar(t); }).filter(function (t) { return t; });
+  return tamanosConfig().map(function (t) { return t.nombre; });
 }
 
 function listarReglasEmpaque() {
@@ -62,6 +60,7 @@ function guardarReglaEmpaque(datos) {
         receta_id: recetaId, tamano: tamano, insumo_empaque_id: empaqueId, cantidad: cantidad
       });
       auditar('editar', 'regla_empaque', datos.id_regla, '', '', tamano, '');
+      irAHojaDelDato(HOJA.REGLAS_EMPAQUE);
       return { ok: true, id: datos.id_regla, mensaje: 'Regla actualizada.' };
     } else {
       // Evita duplicar la misma combinacion exacta de receta, tamano y empaque.
@@ -77,6 +76,7 @@ function guardarReglaEmpaque(datos) {
         insumo_empaque_id: empaqueId, cantidad: cantidad
       });
       auditar('crear', 'regla_empaque', id, '', '', tamano, '');
+      irAHojaDelDato(HOJA.REGLAS_EMPAQUE);
       return { ok: true, id: id, mensaje: 'Regla creada.' };
     }
   });

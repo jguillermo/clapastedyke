@@ -408,3 +408,91 @@ Hoja INICIO (panel + botones + alertas)
 
 Cada ventana se cierra y devuelve al INICIO.
 ```
+# Adición al plan
+## Más lógica en las hojas, menos en las funciones
+
+Esta adición se pega después del plan actual y lo complementa. No reemplaza lo ya definido, salvo en los puntos donde se dice de forma explícita. La idea de fondo es aprovechar Google Sheets como lo que es, una hoja de cálculo, y no usarla solo como bodega de datos. Donde una fórmula puede resolver algo, lo resuelve la fórmula, no el código. El instalador es quien siembra esas fórmulas, y al reparar las vuelve a poner todas, existan o no.
+
+## 10. Principio rector
+
+Una regla simple para decidir dónde vive cada cosa.
+
+Lo que es un cálculo de referencia, que mira datos actuales y los muestra, va en una fórmula dentro de la hoja. Por ejemplo el precio por gramo de un insumo, el semáforo de stock, los contadores del resumen, o traer el nombre de un cliente a partir de su código. Eso son fórmulas.
+
+Lo que es una transacción, que escribe un hecho del negocio que debe quedar fijo en el tiempo, lo hace el código. Por ejemplo guardar un presupuesto con su precio congelado, descontar stock al aprobar, registrar una venta al entregar. Eso son funciones.
+
+La frontera entre ambos mundos es esta. Si el valor debe quedar congelado tal como estaba el día que se guardó, lo escribe el código como número fijo. Si el valor debe reflejar siempre el estado actual, es una fórmula. Los presupuestos y los pedidos quedan congelados, por eso siguen siendo del código. Los catálogos, las listas y el resumen son vivos, por eso son fórmulas.
+
+## 11. El instalador siembra y repara las fórmulas
+
+El instalador deja de ser solo el que crea hojas y columnas. Ahora también es el dueño de todas las fórmulas del sistema. Su comportamiento se amplía así.
+
+Al instalar por primera vez, además de crear las hojas, escribe en cada hoja que lo necesite sus fórmulas de cabecera, las que calculan columnas enteras, y las referencias entre hojas.
+
+Al reparar, vuelve a escribir todas las fórmulas desde cero, pisando las que hubiera. Esto es a propósito. Si alguien borró o ensució una fórmula, reparar la deja como debe estar. Las fórmulas no son datos del usuario, son estructura, así que reescribirlas no pierde nada.
+
+Las fórmulas que calculan una columna entera se siembran una sola vez, en la fila de cabecera o en la primera fila de datos, usando ARRAYFORMULA, de modo que cubren todas las filas presentes y las que el código agregue después. El código nunca escribe en esas columnas calculadas, solo escribe en las columnas base. Así no pelean la fórmula y la función por la misma celda.
+
+Para que quede claro qué celdas son territorio de la fórmula y cuáles del código, en cada hoja las columnas calculadas van agrupadas a la derecha, después de las columnas base. El instalador las marca con un color de cabecera distinto, para que se note de un vistazo que esas no se tocan a mano.
+
+## 12. Nombres de columnas legibles
+
+Las columnas dejan de usar guion bajo. Se escriben como texto normal, con espacios y mayúscula inicial, para que se lean fácil en la hoja. Por ejemplo, "Precio presentacion" en vez de "precio_presentacion", "Stock actual" en vez de "stock_actual", "Cliente nombre" en vez de "cliente_nombre".
+
+El código sigue ubicando cada columna por su nombre exacto de cabecera, así que el cambio es solo de cómo se escribe el encabezado. La fuente única de la verdad sobre los nombres sigue siendo el esquema, que ahora lista los nombres legibles.
+
+Una nota para las fórmulas. Cuando una columna tiene espacios en el nombre, las referencias por nombre dentro de la hoja deben manejarlo. Por eso las fórmulas del sistema referencian por rango de columna, no por el texto del encabezado, para no depender de cómo esté escrito el nombre.
+
+## 13. Menos hojas, y las listas salen de Configuración
+
+Se reduce el número de hojas. El criterio es que las listas pequeñas y los catálogos menores no merecen una hoja propia. En vez de eso, viven dentro de la hoja Configuración y se mantienen desde ahí.
+
+Qué se va a Configuración. Los factores de escalado, que antes eran su propia hoja Factores, pasan a ser una sección de Configuración. Los tipos de ajuste de inventario, que estaban escritos en el código, pasan a ser una lista en Configuración. Los tamaños, que ya estaban en Configuración como texto separado por coma, se mantienen ahí, y se pueden mostrar como una lista más clara.
+
+Cómo queda Configuración. Deja de ser una sola tabla de parámetro y valor. Pasa a tener varios bloques, uno debajo de otro, cada uno con su pequeña tabla. Un bloque de parámetros generales, las tarifas, el margen, el IGV, el redondeo. Un bloque de factores de escalado. Un bloque de tamaños. Un bloque de tipos de ajuste. El mantenimiento de cada lista se hace escribiendo en su bloque, y como Configuración es la hoja de ajustes del sistema, aquí sí se permite editar a mano dentro de esos bloques. Los dropdowns de los formularios y las validaciones de las otras hojas leen sus opciones desde estos bloques.
+
+Qué hojas se mantienen aparte. Las que guardan transacciones o catálogos grandes que crecen fila a fila siguen siendo hojas propias, porque no son listas cortas. Clientes, Proveedores, Recetas, Insumos, Presupuestos, Pedidos, Movimientos, Compras, Ventas y Auditoría siguen como hojas. Lo que se elimina o se absorbe son las listas chicas de apoyo.
+
+## 14. Se elimina la hoja Inicio, entra la hoja Resumen
+
+La hoja Inicio desaparece por completo, y con ella la idea de un panel que una función dibuja. En su lugar hay una hoja Resumen cuyo contenido es por completo fórmulas. Ninguna función la calcula ni la refresca. El instalador la crea y le siembra las fórmulas, y de ahí en adelante la hoja se actualiza sola, porque las fórmulas leen las otras hojas en vivo.
+
+Qué muestra Resumen, todo por fórmula. Contadores de presupuestos por estado, contando con COUNTIF sobre la hoja de Presupuestos. Contadores de pedidos por estado, igual sobre Pedidos. Conteo de insumos en rojo y en amarillo, comparando stock contra mínimo con fórmulas sobre Insumos. Una lista de alertas armada con QUERY o FILTER, por ejemplo los presupuestos que vencen pronto o los insumos agotados, jalando las filas que cumplen la condición.
+
+Qué cambia respecto al plan viejo. El plan original decía que Inicio se refresca al abrir el archivo y al volver a ella, mediante código. Eso se elimina. No hay refresco por función, porque las fórmulas ya están vivas y no necesitan que nadie las recalcule. Tampoco hay botones grandes dibujados en la hoja, la navegación queda solo en el menú Sistema, que se mantiene igual. El recorrido de uso y el mapa de navegación del plan se ajustan para que, donde decían Inicio, ahora no haya una parada de panel, sino que la navegación es directa desde el menú, y Resumen es una hoja más que puedes mirar cuando quieras.
+
+## 15. Al cerrar un formulario, ir a la hoja del dato guardado
+
+Cambia el comportamiento posterior al guardado. Antes, tras guardar, la ventana se cerraba y volvías al Inicio. Ahora, tras guardar con éxito, la ventana se cierra y el sistema te lleva a la hoja donde se guardó el dato, con el foco puesto en esa hoja, para que confirmes con tus propios ojos que la fila entró bien.
+
+Ejemplos. Guardas un empleado y al cerrar caes en la hoja de empleados. Guardas un cliente y caes en Clientes. Guardas un insumo y caes en Insumos. Registras una compra y caes en Compras. Ajustas inventario y caes en Movimientos, que es donde quedó el rastro.
+
+Cómo se siente. Guardar dejará de ser un acto a ciegas. Cada vez que completes algo, el sistema te muestra la bodega donde quedó, y como esa hoja puede tener columnas calculadas por fórmula, de paso ves el precio por gramo, el semáforo o lo que corresponda ya resuelto en la fila nueva. Si la hoja del dato no existiera por algún motivo, el sistema avisa en vez de fallar.
+
+Una salvedad. Para las listas con acciones, como Ver presupuestos o Ver pedidos, el comportamiento de cerrar no cambia, porque ahí no estás guardando un dato nuevo sino operando sobre uno existente. Esto aplica a los formularios de alta y edición.
+
+## 16. Qué de esto es fórmula y qué sigue siendo código
+
+Un resumen para que no quede duda, dado lo que se decidió.
+
+Es fórmula, sembrada por el instalador. El precio por gramo o unidad en Insumos. El semáforo de stock en Insumos. Todos los contadores y listas de la hoja Resumen. Las búsquedas que traen un nombre a partir de un código dentro de una hoja, para que las hojas se lean solas sin depender de que el código copie nombres.
+
+Sigue siendo código, porque debe quedar congelado o porque mueve stock o dinero. Guardar un presupuesto con su precio fijo del día. Crear el pedido al aprobar. Descontar stock. Devolver stock al cancelar. Registrar la venta al entregar. Subir stock al registrar una compra. Escribir la auditoría. Estas no se pueden volver fórmula, porque una fórmula recalcularía y eso rompería el congelado y la trazabilidad.
+
+El punto de equilibrio. Las hojas de catálogo y la de Resumen se vuelven inteligentes, se calculan solas y se leen sin ayuda del código. Las hojas de transacción siguen siendo un registro histórico fiel, escrito por el código y nunca recalculado. Cada parte hace lo que mejor sabe hacer.
+
+## 17. Ajustes que esto provoca en el resto del plan
+
+Para que la adición sea coherente con lo ya escrito, estos puntos del plan original quedan modificados.
+
+La sección 3, La hoja Inicio, se elimina y se reemplaza por la idea de la hoja Resumen descrita aquí en el punto 14.
+
+En la sección 2, El menú principal, el ítem Ir al Inicio pasa a llamarse Ir al Resumen y lleva a la hoja Resumen. Lo demás del menú se mantiene.
+
+En la sección 5, Reglas generales, donde dice que tras guardar la ventana se cierra y vuelve al Inicio, ahora dice que vuelve a la hoja del dato guardado, según el punto 15.
+
+La hoja Factores deja de existir como hoja y pasa a ser un bloque dentro de Configuración, según el punto 13. Donde el plan o el escalado mencionen la hoja Factores, ahora se entiende el bloque de factores de Configuración.
+
+El campo Tipo de ajuste de la pantalla 6.7 toma sus opciones del bloque de tipos de ajuste de Configuración, en vez de tenerlas fijas en el código.
+
+Todo lo demás del plan, las pantallas, los campos, las validaciones, el cálculo del precio y el recorrido de uso, se mantiene tal como está.

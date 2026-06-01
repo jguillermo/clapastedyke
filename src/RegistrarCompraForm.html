@@ -94,11 +94,12 @@
     S.bad(document.getElementById('prov_nombre'),false);
     var lineas=recoger();
     if(!lineas.length){ S.flash('Agrega al menos una línea con cantidad y precio.','err'); return; }
+    if(!S.confirmar('¿Guardar esta compra? Subirá el stock y actualizará los precios de los insumos.')) return;
     var btn=document.getElementById('btnGuardar'); btn.disabled=true;
     S.call('registrarCompra', {
       proveedor_id: pid, proveedor_nombre: document.getElementById('prov_nombre').value,
       fecha: document.getElementById('fecha').value, lineas: lineas
-    }, function(r){ btn.disabled=false; S.flash(r.mensaje,'ok'); limpiar(); },
+    }, function(r){ S.cerrar(); },
        function(e){ btn.disabled=false; S.flash(e.message||String(e),'err'); });
   }
 

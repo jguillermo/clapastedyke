@@ -47,6 +47,7 @@ function guardarProveedor(datos) {
         nombre: nombre, whatsapp: wa, notas: limpiar(datos.notas)
       });
       auditar('editar', 'proveedor', datos.id, '', '', nombre, '');
+      irAHojaDelDato(HOJA.PROVEEDORES);
       return { ok: true, id: datos.id, mensaje: 'Proveedor actualizado.' };
     } else {
       var id = siguienteId(HOJA.PROVEEDORES);
@@ -54,6 +55,7 @@ function guardarProveedor(datos) {
         id: id, nombre: nombre, whatsapp: wa, notas: limpiar(datos.notas), creado_en: new Date()
       });
       auditar('crear', 'proveedor', id, '', '', nombre, '');
+      irAHojaDelDato(HOJA.PROVEEDORES);
       return { ok: true, id: id, mensaje: 'Proveedor creado.' };
     }
   });

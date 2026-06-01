@@ -1,7 +1,7 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
+<!--<!DOCTYPE html>-->
+<!--<html lang="es">-->
+<!--<head>-->
+<!--<meta charset="UTF-8">-->
 <base target="_top">
 <?!= include('Estilos'); ?>
 </head>
@@ -90,7 +90,7 @@
       id: document.getElementById('id').value,
       nombre: nombre.value, telefono: document.getElementById('telefono').value,
       notas: document.getElementById('notas').value
-    }, function(r){ btn.disabled=false; S.flash(r.mensaje,'ok'); nuevo(); cargar(); },
+    }, function(r){ S.cerrar(); },
        function(e){ btn.disabled=false; S.flash(e.message||String(e),'err'); });
   }
   cargar();

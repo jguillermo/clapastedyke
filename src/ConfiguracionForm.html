@@ -41,8 +41,11 @@
     </div>
     <div class="two">
       <div class="field">
-        <div class="lab"><b>Aplicar IGV</b><span class="req">*</span><span class="typetag">Casilla</span></div>
-        <select id="aplicar_igv"><option value="SI">Si</option><option value="NO">No</option></select>
+        <div class="lab"><b>Aplicar IGV</b><span class="typetag">Casilla</span></div>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#5d544b">
+          <input type="checkbox" id="aplicar_igv" style="width:auto">
+          <span>Aplicar IGV por defecto en los presupuestos nuevos</span>
+        </label>
       </div>
       <div class="field">
         <div class="lab"><b>Tasa de IGV</b><span class="req">*</span><span class="typetag">Numero %</span></div>
@@ -75,11 +78,7 @@
         <input id="nombre_negocio" placeholder="Aparece en el menu">
       </div>
     </div>
-    <div class="field">
-      <div class="lab"><b>Lista de tamanos</b><span class="req">*</span><span class="typetag">Texto</span></div>
-      <input id="lista_tamanos" placeholder="chico, mediano, grande">
-    </div>
-    <div class="note">El nombre del negocio se aplica al menu la proxima vez que abras el archivo.</div>
+    <div class="note">Los tamaños, sus factores, los factores de escalado y los tipos de ajuste se editan directamente en la hoja Config, en sus bloques. El nombre del negocio se aplica al menu la proxima vez que abras el archivo.</div>
   </div>
 </div>
 
@@ -89,22 +88,23 @@
 </div>
 
 <script>
+  // 'aplicar_igv' es una casilla, se trata aparte.
   var campos=['tarifa_mano_obra_hora','costo_indirecto_pedido','depreciacion_pedido','margen_defecto',
-              'aplicar_igv','tasa_igv','redondeo','dias_vencimiento','momento_descuento_stock',
-              'lista_tamanos','nombre_negocio'];
+              'tasa_igv','redondeo','dias_vencimiento','momento_descuento_stock','nombre_negocio'];
 
   function cargar(){
     S.call('obtenerConfiguracion',null,function(cfg){
       campos.forEach(function(k){ if(document.getElementById(k)!=null && cfg[k]!=null) document.getElementById(k).value=cfg[k]; });
+      document.getElementById('aplicar_igv').checked = (String(cfg.aplicar_igv)==='SI');
     });
   }
   function guardar(){
     var datos={}; campos.forEach(function(k){ datos[k]=document.getElementById(k).value; });
-    if(!datos.lista_tamanos.trim()){ S.bad(document.getElementById('lista_tamanos'),true); S.flash('La lista de tamanos no puede quedar vacia.','err'); return; }
+    datos.aplicar_igv = document.getElementById('aplicar_igv').checked ? 'SI' : 'NO';
     if(!datos.nombre_negocio.trim()){ S.bad(document.getElementById('nombre_negocio'),true); S.flash('El nombre del negocio no puede quedar vacio.','err'); return; }
     var btn=document.getElementById('btnGuardar'); btn.disabled=true;
     S.call('guardarConfiguracion',datos,
-      function(r){ btn.disabled=false; S.flash(r.mensaje,'ok'); },
+      function(r){ S.cerrar(); },
       function(e){ btn.disabled=false; S.flash(e.message||String(e),'err'); });
   }
   cargar();

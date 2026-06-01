@@ -43,9 +43,7 @@ function datosNuevoPresupuesto() {
   return {
     clientes: catalogoClientes(),
     recetas: catalogoRecetas(),
-    factores: leerHoja(HOJA.FACTORES).filas
-      .sort(function (a, b) { return numero(a.orden) - numero(b.orden); })
-      .map(function (f) { return { codigo: numero(f.codigo), label: f.label }; }),
+    factores: factoresDeConfig().map(function (f) { return { codigo: f.codigo, label: f.label }; }),
     tamanos: listaTamanos(),
     config: {
       margen_defecto: numero(cfg.margen_defecto),
@@ -90,15 +88,21 @@ function calcularPresupuesto(payload) {
   var racionesBase = numero(receta.raciones_base);
   if (racionesBase <= 0) throw new Error('La receta no tiene raciones base válidas.');
 
-  // Factor según el modo.
+  // Factor según el modo de escalado.
   var valor = numero(payload.valor_escalado);
   var factor, racionesResultantes;
   if (payload.modo_escalado === 'factor') {
     if (valor <= 0) throw new Error('Elige un factor.');
     factor = valor;
     racionesResultantes = racionesBase * factor;
-  } else { // 'raciones'
-    if (valor <= 0) throw new Error('Indica cuántas raciones quieres.');
+  } else if (payload.modo_escalado === 'tamano') {
+    var tamano = limpiar(payload.tamano);
+    if (!tamano) throw new Error('Elige un tamaño.');
+    factor = factorDeTamano(tamano);
+    if (factor <= 0) throw new Error('Define un factor para el tamaño "' + tamano + '" en Configuración.');
+    racionesResultantes = racionesBase * factor;
+  } else { // 'cantidad' o 'personas': misma matemática, distinta etiqueta
+    if (valor <= 0) throw new Error('Indica la cantidad o el número de personas.');
     factor = valor / racionesBase;
     racionesResultantes = valor;
   }
@@ -212,6 +216,7 @@ function guardarPresupuesto(payload) {
     });
 
     auditar('crear', 'presupuesto', id, '', '', 'Pendiente', 'precio:' + calc.precio_final);
+    irAHojaDelDato(HOJA.PRESUPUESTOS);
     return { ok: true, id: id, precio_final: calc.precio_final, mensaje: 'Presupuesto ' + id + ' guardado.' };
   });
 }
@@ -285,7 +290,6 @@ function aprobarPresupuesto(id) {
 
     actualizarFila(HOJA.PRESUPUESTOS, p._fila, { estado: 'Aprobado', pedido_id: res.pedidoId });
     auditar('aprobar', 'presupuesto', id, 'estado', 'Pendiente', 'Aprobado', 'pedido:' + res.pedidoId);
-    refrescarInicioSeguro();
 
     var msg = 'Presupuesto ' + id + ' aprobado. Se creó el pedido ' + res.pedidoId + '.';
     if (descontarAhora && res.faltantes.length) {
@@ -311,6 +315,7 @@ function rechazarPresupuesto(id, motivo) {
 
 /** Alta rápida de cliente desde la ventana de presupuesto. */
 function crearClienteRapido(nombre) {
-  var r = guardarCliente({ nombre: nombre });
+  // silencioso: no navega a la hoja Clientes (seguimos en el presupuesto).
+  var r = guardarCliente({ nombre: nombre, silencioso: true });
   return { id: r.id, nombre: limpiar(nombre) };
 }

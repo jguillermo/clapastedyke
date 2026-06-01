@@ -1,7 +1,9 @@
 /**
  * Insumos.gs  (Archivo 1)
  * Ventana 6.10. Aqui vive el costo base de todo y el stock.
- * El precio por unidad base se calcula y se guarda: precio_presentacion / tamano_presentacion.
+ * El precio por unidad base y el semaforo son COLUMNAS CALCULADAS por formula
+ * (las siembra el instalador); el codigo no las escribe, solo escribe las
+ * columnas base (precio_presentacion, tamano_presentacion, stock).
  * Al crear, el stock inicial entra como un movimiento "inicial". Al editar, el stock
  * NO se toca desde este formulario, lo mueven las funciones de compra y ajuste.
  */
@@ -76,6 +78,7 @@ function guardarInsumo(datos) {
         actualizado_en: new Date()
       });
       auditar('editar', 'insumo', datos.id, 'precio_por_unidad_base', f.precio_por_unidad_base, ppu, nombre);
+      irAHojaDelDato(HOJA.INSUMOS);
       return { ok: true, id: datos.id, mensaje: 'Insumo actualizado.' };
     } else {
       // Alta: el stock inicial entra como movimiento.
@@ -98,6 +101,7 @@ function guardarInsumo(datos) {
         });
       }
       auditar('crear', 'insumo', id, '', '', nombre, 'ppu:' + ppu + ' stock_ini:' + stockIni);
+      irAHojaDelDato(HOJA.INSUMOS);
       return { ok: true, id: id, mensaje: 'Insumo creado.' };
     }
   });

@@ -15,6 +15,10 @@
   .st-Pendiente{background:#f0ece4;color:#7a7166}
   .st-Aprobado{background:var(--green-soft);color:var(--green)}
   .st-Rechazado{background:var(--red-soft);color:var(--red)}
+  .aviso{border-radius:11px;padding:13px 15px;font-size:13px;margin-bottom:14px}
+  .aviso.warn{background:var(--amber-soft);border:1px solid #e7cf9a;color:#8a6a1f}
+  .aviso.ok{background:var(--green-soft);border:1px solid #c4e0c8;color:var(--green)}
+  .aviso b{display:block;margin-bottom:4px}
 </style>
 </head>
 <body>
@@ -58,6 +62,8 @@
       + (d.motivo_rechazo?'<div class="note">Motivo de rechazo: '+S.esc(d.motivo_rechazo)+'</div>':'')
       + '</div>';
 
+    if(d.estado==='Pendiente') h+='<div id="avisoFaltantes"></div>';
+
     h+='<div class="card"><div class="grp-title">Ingredientes</div>'+tabla(ing)+'</div>';
     if(mat.length) h+='<div class="card"><div class="grp-title">Empaque y materiales</div>'+tabla(mat)+'</div>';
 
@@ -86,6 +92,22 @@
           + '<button class="btn primary" onclick="aprobar()">Aprobar</button>';
     }
     pie.innerHTML='<button class="btn" onclick="volver()">Volver a la lista</button>'+extra;
+
+    // Aviso de stock que quedaría en falta si se aprueba.
+    if(d.estado==='Pendiente') cargarFaltantes();
+  }
+
+  function cargarFaltantes(){
+    S.call('faltantesDePresupuesto', ID, function(f){
+      var box=document.getElementById('avisoFaltantes'); if(!box) return;
+      if(!f || !f.length){
+        box.className='aviso ok'; box.innerHTML='<b>Hay stock suficiente.</b>Aprobar no dejará insumos en negativo.';
+        return;
+      }
+      var lista=f.map(function(x){ return S.esc(x.nombre)+' (faltan '+S.num4(x.faltante)+' '+'; tienes '+S.num4(x.disponible)+')'; }).join(', ');
+      box.className='aviso warn';
+      box.innerHTML='<b>Al aprobar, quedará stock en falta:</b>'+lista+'. Tendrás que comprarlo (revísalo en Comprar materiales).';
+    }, function(e){ /* si falla, no bloquea la pantalla */ });
   }
 
   function tabla(arr){

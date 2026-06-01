@@ -85,7 +85,7 @@
     S.call('guardarProveedor',{
       id:document.getElementById('id').value, nombre:nombre.value,
       whatsapp:wa.value, notas:document.getElementById('notas').value
-    }, function(r){ btn.disabled=false; S.flash(r.mensaje,'ok'); nuevo(); cargar(); },
+    }, function(r){ S.cerrar(); },
        function(e){ btn.disabled=false; S.flash(e.message||String(e),'err'); });
   }
   cargar();

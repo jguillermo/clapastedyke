@@ -9,7 +9,7 @@ function onOpen() {
   var ui = SpreadsheetApp.getUi();
   var menu = ui.createMenu(nombreNegocio());
 
-  menu.addItem('Ir al Inicio', 'irAlInicio');
+  menu.addItem('Ir al Resumen', 'irAlResumen');
   menu.addSeparator();
 
   // Fase 2 (presupuestos): YA funcionan.
@@ -43,20 +43,7 @@ function onOpen() {
   menu.addSubMenu(admin);
 
   menu.addToUi();
-
-  // Refresca el panel de Inicio al abrir, sin romper el menú si algo falla.
-  if (typeof refrescarInicioSeguro === 'function') refrescarInicioSeguro();
-}
-
-/** Lleva el foco a la hoja Inicio y la refresca. */
-function irAlInicio() {
-  var h = hoja(HOJA.INICIO);
-  if (h) {
-    if (typeof refrescarInicioSeguro === 'function') refrescarInicioSeguro();
-    ssOperacion().setActiveSheet(h);
-  } else {
-    toast('Aun no esta instalado. Usa Mantenimiento > Instalar o reparar.');
-  }
+  // La hoja Resumen es 100% fórmulas: no necesita refresco al abrir.
 }
 
 function abrirManualDeUsuario() {

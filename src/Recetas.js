@@ -12,7 +12,8 @@ function abrirRecetas() {
 
 function catalogoRecetas() {
   return leerHoja(HOJA.RECETAS).filas.map(function (r) {
-    return { id: r.id, nombre: r.nombre, raciones_base: numero(r.raciones_base) };
+    return { id: r.id, nombre: r.nombre, raciones_base: numero(r.raciones_base),
+             tipo_base: limpiar(r.tipo_base) || 'personas' };
   });
 }
 
@@ -37,6 +38,7 @@ function listarRecetas() {
       });
     return {
       id: r.id, nombre: r.nombre, categoria: r.categoria,
+      tipo_base: limpiar(r.tipo_base) || 'personas',
       raciones_base: numero(r.raciones_base),
       tiempo_mano_obra_horas: numero(r.tiempo_mano_obra_horas),
       ingredientes: ings, _fila: r._fila
@@ -64,9 +66,11 @@ function guardarReceta(datos) {
     var nombre = limpiar(datos.nombre);
     if (!nombre) throw new Error('El nombre es obligatorio.');
     var raciones = numero(datos.raciones_base);
-    if (raciones <= 0) throw new Error('Las raciones base deben ser mayor que cero.');
+    if (raciones <= 0) throw new Error('El valor de la base debe ser mayor que cero.');
     var tiempo = numero(datos.tiempo_mano_obra_horas);
     if (tiempo < 0) throw new Error('El tiempo de mano de obra no puede ser negativo.');
+    var tipoBase = limpiar(datos.tipo_base) || 'personas';
+    if (['personas', 'tamano'].indexOf(tipoBase) < 0) throw new Error('El tipo de base debe ser personas o tamano.');
 
     var ings = (datos.ingredientes || []).filter(function (g) {
       return limpiar(g.insumo_id) && numero(g.cantidad_base) > 0;
@@ -86,7 +90,7 @@ function guardarReceta(datos) {
       if (!f) throw new Error('No se encontro la receta para editar.');
       recetaId = datos.id;
       actualizarFila(HOJA.RECETAS, f._fila, {
-        nombre: nombre, categoria: limpiar(datos.categoria),
+        nombre: nombre, categoria: limpiar(datos.categoria), tipo_base: tipoBase,
         raciones_base: raciones, tiempo_mano_obra_horas: tiempo
       });
       eliminarIngredientesDe(recetaId);
@@ -94,7 +98,7 @@ function guardarReceta(datos) {
     } else {
       recetaId = siguienteId(HOJA.RECETAS);
       agregarFila(HOJA.RECETAS, {
-        id: recetaId, nombre: nombre, categoria: limpiar(datos.categoria),
+        id: recetaId, nombre: nombre, categoria: limpiar(datos.categoria), tipo_base: tipoBase,
         raciones_base: raciones, tiempo_mano_obra_horas: tiempo, creado_en: new Date()
       });
       auditar('crear', 'receta', recetaId, '', '', nombre, ings.length + ' ingredientes');
@@ -107,6 +111,7 @@ function guardarReceta(datos) {
       });
     });
 
+    irAHojaDelDato(HOJA.RECETAS);
     return { ok: true, id: recetaId, mensaje: 'Receta guardada.' };
   });
 }

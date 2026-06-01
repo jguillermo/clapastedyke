@@ -64,6 +64,37 @@ function crearPedidoDesdePresupuesto(presupuestoId, descontarAhora) {
   return { pedidoId: pedidoId, faltantes: faltantes };
 }
 
+/**
+ * Calcula, SIN escribir nada, qué insumos quedarían en falta si se aprueba este
+ * presupuesto. Agrega por insumo las líneas del detalle y las compara con el stock.
+ * Devuelve solo los que faltan: [{ nombre, necesaria, disponible, faltante }].
+ */
+function faltantesDePresupuesto(presupuestoId) {
+  var stockPorInsumo = {};
+  leerHoja(HOJA.INSUMOS).filas.forEach(function (i) { stockPorInsumo[i.id] = numero(i.stock_actual); });
+
+  var agregados = {};
+  leerHoja(HOJA.PRESUPUESTO_DETALLE).filas
+    .filter(function (l) { return String(l.presupuesto_id) === String(presupuestoId); })
+    .forEach(function (l) {
+      if (!limpiar(l.insumo_id)) return;
+      if (!agregados[l.insumo_id]) agregados[l.insumo_id] = { nombre: l.nombre, cantidad: 0 };
+      agregados[l.insumo_id].cantidad += numero(l.cantidad);
+    });
+
+  var faltantes = [];
+  Object.keys(agregados).forEach(function (insumoId) {
+    var necesaria = agregados[insumoId].cantidad;
+    var disponible = numero(stockPorInsumo[insumoId]);
+    var faltante = necesaria - disponible;
+    if (faltante > 0) {
+      faltantes.push({ nombre: agregados[insumoId].nombre, necesaria: necesaria,
+                       disponible: disponible, faltante: faltante });
+    }
+  });
+  return faltantes;
+}
+
 /** Descuenta el stock del pedido una sola vez. Si ya se hizo, no repite. */
 function descontarPedidoSiHaceFalta(pedidoId) {
   var yaHecho = leerHoja(HOJA.MOVIMIENTOS).filas.some(function (m) {
@@ -114,7 +145,6 @@ function iniciarProduccion(id) {
     descontarPedidoSiHaceFalta(id);
     actualizarFila(HOJA.PEDIDOS, p._fila, { estado: 'Producción' });
     auditar('produccion', 'pedido', id, 'estado', 'Pendiente', 'Producción', '');
-    refrescarInicioSeguro();
     return { ok: true, mensaje: 'Pedido ' + id + ' en producción.' };
   });
 }
@@ -136,7 +166,6 @@ function marcarEntregado(id) {
       cliente_nombre: p.cliente_nombre, monto: monto, fecha: new Date()
     });
     auditar('entregar', 'pedido', id, 'estado', 'Producción', 'Entregado', 'venta:' + monto);
-    refrescarInicioSeguro();
     return { ok: true, mensaje: 'Pedido ' + id + ' entregado. Venta por ' + monto + ' registrada.' };
   });
 }
@@ -158,7 +187,6 @@ function cancelarPedido(id, motivo) {
       });
     actualizarFila(HOJA.PEDIDOS, p._fila, { estado: 'Cancelado', motivo_cancelacion: limpiar(motivo) });
     auditar('cancelar', 'pedido', id, 'estado', estado, 'Cancelado', limpiar(motivo));
-    refrescarInicioSeguro();
     return { ok: true, mensaje: 'Pedido ' + id + ' cancelado y stock devuelto.' };
   });
 }

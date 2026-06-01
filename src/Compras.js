@@ -111,13 +111,14 @@ function registrarCompra(payload) {
       var present = numero(l.cantidad_recibida_present);
       var precioPagado = numero(l.precio_presentacion_pagado);
       var cantidadBase = present * tamano;          // a unidad base (g o u)
-      var ppu = precioPagado / tamano;              // nuevo precio por unidad base
+      var ppu = precioPagado / tamano;              // precio por unidad base (para el historial de la compra)
       var nuevoStock = numero(insumo.stock_actual) + cantidadBase;
 
-      // Sube stock y actualiza precios en una sola escritura del insumo.
+      // Sube stock y actualiza el precio de presentacion (columna base). El
+      // "precio por unidad base" del insumo es una formula: se recalcula solo.
       actualizarFila(HOJA.INSUMOS, insumo._fila, {
         stock_actual: nuevoStock, precio_presentacion: precioPagado,
-        precio_por_unidad_base: ppu, actualizado_en: new Date()
+        actualizado_en: new Date()
       });
       agregarFila(HOJA.MOVIMIENTOS, {
         id: siguienteId(HOJA.MOVIMIENTOS), fecha: fecha, insumo_id: insumo.id,
@@ -134,7 +135,7 @@ function registrarCompra(payload) {
     });
 
     auditar('compra', 'compra', compraId, '', '', payload.proveedor_nombre, lineas.length + ' líneas');
-    refrescarInicioSeguro();
+    irAHojaDelDato(HOJA.COMPRAS);
     return { ok: true, id: compraId, mensaje: 'Compra ' + compraId + ' registrada. Stock y precios actualizados.' };
   });
 }

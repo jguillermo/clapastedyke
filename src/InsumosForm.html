@@ -167,7 +167,7 @@
       tamano_presentacion:t.value, precio_presentacion:p.value,
       stock_inicial:document.getElementById('stock_inicial').value, stock_minimo:m.value,
       proveedor_recomendado_id:document.getElementById('proveedor_recomendado_id').value
-    }, function(r){ btn.disabled=false; S.flash(r.mensaje,'ok'); nuevo(); cargar(); },
+    }, function(r){ S.cerrar(); },
        function(e){ btn.disabled=false; S.flash(e.message||String(e),'err'); });
   }
   cargar(); recalc();
