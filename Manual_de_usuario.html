@@ -53,9 +53,9 @@
 
   .wrap{max-width:920px;margin:0 auto;padding:0 22px 90px}
 
-  /* Vistas */
-  .view{display:none}
-  .view.active{display:block}
+  /* Todo en un solo scroll continuo */
+  .view{display:block}
+  .view + .view{border-top:1px solid var(--line-soft)}
 
   /* HERO oscuro premium */
   .hero{position:relative;overflow:hidden;border-radius:30px;margin:30px 0 10px;
@@ -207,18 +207,12 @@
   .gh-title{font-family:"Fraunces",serif;font-weight:600;font-size:clamp(23px,3.6vw,31px);line-height:1.12;margin:13px 0 7px;color:var(--ink);letter-spacing:-.01em}
   .gh-desc{font-size:15px;color:var(--muted);max-width:62ch;margin:0;line-height:1.55}
 
-  /* Capa de transicion: panel del destino que se desliza desde el borde */
-  #xfade{position:fixed;inset:0;z-index:55;display:none;align-items:center;justify-content:center;pointer-events:none;
-    background:var(--paper);will-change:transform,opacity}
-  #xfade.show{display:flex}
-  .xf-card{position:relative;text-align:center;opacity:0;max-width:560px;padding:30px;will-change:transform,opacity}
-  .xf-grp{display:none}
-  #xfade.cross .xf-grp{display:block;font-family:"Space Mono",monospace;font-size:12px;letter-spacing:.3em;text-transform:uppercase;color:var(--accent);margin-bottom:18px}
-  .xf-ic{width:82px;height:82px;margin:0 auto 18px;display:grid;place-items:center;border-radius:23px;
-    background:rgba(255,255,255,.6);border:1px solid rgba(60,40,25,.08);color:var(--accent);box-shadow:var(--shadow-sm)}
-  .xf-ic svg{width:44px;height:44px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
-  .xf-tt{font-family:"Fraunces",serif;font-weight:600;font-size:clamp(27px,5.4vw,46px);line-height:1.05;color:var(--ink);letter-spacing:-.01em}
-  .xf-ix{font-family:"Space Mono",monospace;font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-top:11px}
+  /* Indicador de fase (grupo actual) en la barra superior */
+  #phase{display:none;font-family:"Space Mono",monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;
+    color:var(--accent-deep);background:var(--accent-soft);border:1px solid #eecdba;border-radius:999px;padding:3px 10px;margin-left:6px;
+    max-width:46vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #phase.on{display:inline-block}
+  @media(max-width:560px){ #phase{display:none !important} }
 
   @media (prefers-reduced-motion: reduce){
     .blob{display:none}
@@ -824,10 +818,9 @@
   if(!hasGSAP || REDUCE){
     window.show = function(id){
       var el = document.getElementById(id); if(!el) return;
-      views.forEach(function(v){ v.classList.remove('active'); });
-      el.classList.add('active');
-      backbtn.style.display = (id === 'home') ? 'none' : 'inline-flex';
-      window.scrollTo(0,0);
+      if(id === 'home'){ window.scrollTo({top:0, behavior:'smooth'}); return; }
+      var top = el.getBoundingClientRect().top + window.scrollY - 64;
+      window.scrollTo({ top:Math.max(0, top), behavior:'smooth' });
     };
     return;
   }
@@ -940,8 +933,6 @@
   function pushST(tw){ if(tw && tw.scrollTrigger) viewTriggers.push(tw.scrollTrigger); }
 
   function animateView(view){
-    clearViewTriggers();
-
     if(view.id === 'home'){
       // Coreografia del hero (NO se toca: ya esta bien)
       gsap.timeline()
@@ -979,11 +970,16 @@
       ensureSteps(view);
       var icon = head.querySelector('.flowicon');
       var words = ensureSplit(head.querySelector('h2'));
-      gsap.timeline()
-        .from(icon, {scale:.4, opacity:0, rotate:-18, duration:.65, ease:'back.out(1.7)'})
-        .from(head.querySelector('.idx'), {opacity:0, y:14, duration:.5, ease:'power3.out'}, '-=.25')
-        .from(words, {yPercent:120, duration:.85, ease:'power4.out', stagger:.05}, '-=.3');
-      drawSVG(icon.querySelector('svg'), 1.2);
+      gsap.set(icon, {scale:.4, opacity:0, rotate:-18});
+      gsap.set(head.querySelector('.idx'), {opacity:0, y:14});
+      gsap.set(words, {yPercent:120});
+      ScrollTrigger.create({trigger:head, start:'top 82%', once:true, onEnter:function(){
+        gsap.timeline()
+          .to(icon, {scale:1, opacity:1, rotate:0, duration:.65, ease:'back.out(1.7)'})
+          .to(head.querySelector('.idx'), {opacity:1, y:0, duration:.5, ease:'power3.out'}, '-=.25')
+          .to(words, {yPercent:0, duration:.85, ease:'power4.out', stagger:.05}, '-=.3');
+        drawSVG(icon.querySelector('svg'), 1.2);
+      }});
 
       // Pasos: numero con rebote, texto que entra, linea que se dibuja con el scroll
       view.querySelectorAll('ol.steps').forEach(function(ol){
@@ -1019,162 +1015,37 @@
     ScrollTrigger.refresh();
   }
 
-  /* ---------- Cadena de flujos, grupos y metadatos ---------- */
-  var ORDER = ['home','f01','f02','f03','f04','f05','f06','f07','f08','f09','f10','f11','f12','f13','f14','precio','descuento'];
-  // A que grupo pertenece cada flujo (para decidir transicion moderada vs marcada)
+  /* ---------- Grupos: color de fondo por fase (parte del scroll) ---------- */
   var GROUP = {home:'h', f01:'g1',f02:'g1',f03:'g1', f04:'g2',f05:'g2',f06:'g2',
     f07:'g3',f08:'g3',f09:'g3',f10:'g3',f11:'g3', f12:'g4',f13:'g4', f14:'g5', precio:'g6',descuento:'g6'};
-  var GROUPNAME = {h:'Menú', g1:'Tomar y entregar un pedido', g2:'Abastecimiento e inventario',
+  var GROUPNAME = {h:'Inicio', g1:'Tomar y entregar un pedido', g2:'Abastecimiento e inventario',
     g3:'Mantener tus datos', g4:'Preparar el sistema', g5:'Técnico', g6:'Conceptos'};
-  var META = {};
-  ORDER.forEach(function(id){
-    var v = document.getElementById(id); if(!v) return;
-    var h = v.querySelector('h1,h2');
-    var ix = v.querySelector('.flowhead .idx');
-    META[id] = {
-      title: h ? h.textContent.trim() : '',
-      idx: ix ? ix.textContent.trim().split('·')[0].trim() : '',
-      icon: ICONS[id] || ICONS._def
-    };
-  });
-  META.home = {title:'Menú de flujos', idx:'Inicio',
-    icon:'<svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>'};
-
-  function idxOf(id){ return ORDER.indexOf(id); }
-  function curId(){ var a = document.querySelector('.view.active'); return a ? a.id : 'home'; }
-  function nextId(id){ var i = idxOf(id); if(i < 0) return null; return (i >= ORDER.length-1) ? 'home' : ORDER[i+1]; }
-  function prevId(id){ var i = idxOf(id); if(i <= 0) return null; return ORDER[i-1]; }
-  function atBottom(){ return (window.innerHeight + window.scrollY) >= (document.documentElement.scrollHeight - 4); }
-  function atTop(){ return window.scrollY <= 2; }
-
-  /* ---------- Transicion dirigida por scroll (sin cortes) ---------- */
-  // Capa de transicion: una tarjeta del destino + un velo (solo al cambiar de grupo)
-  var fade = document.createElement('div'); fade.id = 'xfade';
-  fade.innerHTML = '<div class="xf-card"><span class="xf-grp"></span><span class="xf-ic"></span>'
-    + '<div class="xf-tt"></div><div class="xf-ix"></div></div>';
-  document.body.appendChild(fade);
-  var fcard = fade.querySelector('.xf-card');
-  // Color de fondo por grupo: al cambiar de grupo cambia todo el fondo, suave y como parte del scroll
   var GROUPBG = {h:'#f6efe5', g1:'#f6efe5', g2:'#edf1ec', g3:'#eceff3', g4:'#f5eedd', g5:'#eeecea', g6:'#f0ecf1'};
-  function bgOf(id){ return GROUPBG[GROUP[id]] || '#f6efe5'; }
-  document.documentElement.style.setProperty('--paper', bgOf(curId()));
 
-  var TRAVEL_IN = 480, TRAVEL_CROSS = 820;     // cuanto scroll cuesta completar (moderada vs marcada)
-  var T = { on:false, auto:false, committed:false, prog:0, dir:'down', from:'home', to:null, cross:false };
-  var settleTimer = null;
+  // Indicador de fase en la barra superior
+  var phase = document.createElement('span'); phase.id = 'phase';
+  document.querySelector('.brand').appendChild(phase);
+  function setPhase(g){
+    gsap.to(document.body, {backgroundColor:GROUPBG[g] || '#f6efe5', duration:0.6, ease:'power2.out', overwrite:'auto'});
+    if(g === 'h'){ phase.classList.remove('on'); }
+    else { phase.textContent = GROUPNAME[g]; phase.classList.add('on'); }
+  }
+  gsap.set(document.body, {backgroundColor:GROUPBG.h});
+  // Al entrar al primer flujo de cada grupo, cambia el color de fondo (suave, con el scroll)
+  [['f01','g1','h'],['f04','g2','g1'],['f07','g3','g2'],['f12','g4','g3'],['f14','g5','g4'],['precio','g6','g5']].forEach(function(p){
+    var el = document.getElementById(p[0]); if(!el) return;
+    ScrollTrigger.create({ trigger:el, start:'top 55%',
+      onEnter:function(){ setPhase(p[1]); }, onLeaveBack:function(){ setPhase(p[2]); } });
+  });
 
-  function setupT(to, dir){
-    if(!document.getElementById(to)) return false;
-    T.on = true; T.committed = false; T.auto = false; T.prog = 0; T.dir = dir;
-    T.from = curId(); T.to = to; T.cross = (GROUP[T.from] !== GROUP[to]);
-    var meta = META[to] || {};
-    fade.querySelector('.xf-ic').innerHTML = meta.icon || '';
-    fade.querySelector('.xf-tt').textContent = meta.title || '';
-    fade.querySelector('.xf-ix').textContent = (dir === 'up' ? 'Flujo anterior · ' : '') + (meta.idx || '');
-    fade.querySelector('.xf-grp').textContent = T.cross ? (GROUPNAME[GROUP[to]] || '') : '';
-    fade.classList.toggle('cross', T.cross);
-    fade.style.backgroundColor = bgOf(to);          // el panel trae el color del grupo destino
-    fade.style.opacity = '1';
-    fade.classList.add('show');
-    drawSVG(fade.querySelector('.xf-ic svg'), 0.9);
-    document.documentElement.style.overflow = 'hidden';   // el scroll ahora alimenta la transicion
-    renderT();
-    return true;
-  }
-  function beginT(dir){
-    var to = (dir === 'down') ? nextId(curId()) : prevId(curId());
-    if(!to) return false;
-    return setupT(to, dir);
-  }
-  function renderT(){
-    var p = T.prog, from = document.getElementById(T.from);
-    // El panel del destino entra desde el borde (abajo al avanzar, arriba al retroceder)
-    gsap.set(fade, {yPercent:(1 - p) * 100 * (T.dir === 'down' ? 1 : -1)});
-    // La vista actual se aleja apenas, dando profundidad
-    if(from) gsap.set(from, {scale:1 - p*0.03, opacity:1 - p*0.1});
-    var cp = Math.min(1, p*1.5);
-    gsap.set(fcard, {opacity:cp, y:(1-cp)*22});
-  }
-  function commitT(){
-    if(T.committed) return;
-    T.committed = true;
-    var from = document.getElementById(T.from), to = document.getElementById(T.to);
-    document.documentElement.style.setProperty('--paper', bgOf(to));   // cambio total de fondo
-    if(from){ from.classList.remove('active'); gsap.set(from, {clearProps:'all'}); }
-    to.classList.add('active');
-    backbtn.style.display = (T.to === 'home') ? 'none' : 'inline-flex';
-    window.scrollTo(0,0);
-    gsap.set(to, {opacity:1, y:0});
-    animateView(to);
-    // El panel (ya con el color del nuevo grupo) se desvanece revelando el flujo
-    gsap.set(fade, {yPercent:0});
-    gsap.to(fade, {opacity:0, duration:T.cross ? 0.45 : 0.3, ease:'power2.out', onComplete:endT });
-  }
-  function springBack(){
-    gsap.to(T, {prog:0, duration:0.42, ease:'power3.out', onUpdate:renderT, onComplete:endT });
-  }
-  function endT(){
-    fade.classList.remove('show');
-    gsap.set(fade, {opacity:1, yPercent:0});
-    var from = document.getElementById(T.from);
-    if(from && !T.committed) gsap.set(from, {clearProps:'all'});
-    document.documentElement.style.overflow = '';
-    T.on = false; T.auto = false; T.committed = false; T.prog = 0;
-    ScrollTrigger.refresh();
-  }
-  function settle(){
-    if(!T.on || T.committed || T.auto) return;
-    if(T.prog >= 0.45){
-      T.auto = true;
-      gsap.to(T, {prog:1, duration:0.26, ease:'power2.in', onUpdate:renderT, onComplete:commitT});
-    } else { springBack(); }
-  }
-  // Empuje del scroll: alimenta la transicion en proporcion a cuanto/que tan rapido scrolleas
-  function drive(dir, amount){
-    if(T.committed || T.auto) return;
-    var travel = T.cross ? TRAVEL_CROSS : TRAVEL_IN;
-    T.prog += (dir === T.dir ? amount : -amount) / travel;
-    T.prog = Math.max(0, Math.min(1, T.prog));
-    renderT();
-    if(settleTimer) clearTimeout(settleTimer);
-    if(T.prog >= 1){ commitT(); return; }
-    settleTimer = setTimeout(settle, 140);
-  }
-  function feed(dir, amount){
-    if(T.committed || T.auto) return;
-    if(!T.on){
-      var id = curId();
-      if(dir === 'down' && atBottom()){ if(!beginT('down')) return; }
-      else if(dir === 'up' && atTop()){ if(!beginT('up')) return; }
-      else return;
-    }
-    drive(dir, amount);
-  }
-
-  // API publica (tarjetas, enlaces, botones): transicion automatica corta hacia el destino
+  /* ---------- Navegacion: scroll suave dentro del mismo documento ---------- */
   window.show = function(id){
-    if(T.on) return;
-    var cur = curId(); if(cur === id) return;
-    var dir = (idxOf(id) < idxOf(cur)) ? 'up' : 'down';
-    if(!setupT(id, dir)) return;
-    T.auto = true;
-    gsap.to(T, {prog:1, duration:T.cross ? 0.5 : 0.36, ease:'power2.inOut', onUpdate:renderT, onComplete:commitT});
+    var el = document.getElementById(id); if(!el) return;
+    var top = (id === 'home') ? 0 : (el.getBoundingClientRect().top + window.scrollY - 64);
+    window.scrollTo({ top:Math.max(0, top), behavior:'smooth' });
   };
-
-  /* ---------- Entradas de scroll: rueda y tactil ---------- */
-  window.addEventListener('wheel', function(e){
-    if(e.deltaY > 0) feed('down', e.deltaY);
-    else if(e.deltaY < 0) feed('up', -e.deltaY);
-  }, {passive:true});
-  var tY = null;
-  window.addEventListener('touchstart', function(e){ tY = e.touches[0].clientY; }, {passive:true});
-  window.addEventListener('touchmove', function(e){
-    if(tY === null) return;
-    var y = e.touches[0].clientY, dy = tY - y; tY = y;   // dy>0: dedo sube => avanzar
-    if(dy > 0) feed('down', dy*2.2);
-    else if(dy < 0) feed('up', -dy*2.2);
-  }, {passive:true});
-  window.addEventListener('touchend', function(){ tY = null; if(T.on && !T.committed && !T.auto){ if(settleTimer) clearTimeout(settleTimer); settle(); } }, {passive:true});
+  function onScroll(){ backbtn.style.display = (window.scrollY > window.innerHeight * 0.7) ? 'inline-flex' : 'none'; }
+  window.addEventListener('scroll', onScroll, {passive:true}); onScroll();
 
   /* ---------- Tilt 3D sutil en las tarjetas (solo puntero fino) ---------- */
   if(FINE){
@@ -1192,7 +1063,10 @@
   }
 
   window.addEventListener('load', function(){ ScrollTrigger.refresh(); });
-  animateView(document.querySelector('.view.active'));
+  // Scroll continuo: se prepara la portada y CADA flujo una sola vez
+  ['home','f01','f02','f03','f04','f05','f06','f07','f08','f09','f10','f11','f12','f13','f14','precio','descuento']
+    .forEach(function(id){ var v = document.getElementById(id); if(v) animateView(v); });
+  ScrollTrigger.refresh();
 })();
 </script>
 </body>
