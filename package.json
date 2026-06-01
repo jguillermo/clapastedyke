@@ -1,6 +1,7 @@
 {
   "name": "clapastedyke",
   "version": "1.0.0",
+  "appVersion": 2,
   "description": "",
   "main": "index.js",
   "directories": {

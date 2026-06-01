@@ -46,6 +46,10 @@ function onOpen() {
     .addItem('5. Protecciones', 'instalarProtecciones');
   menu.addSubMenu(admin);
 
+  // Ultimo item: version de la app (se incrementa en cada deploy).
+  menu.addSeparator();
+  menu.addItem('Version ' + (typeof VERSION_APP !== 'undefined' ? VERSION_APP : 0), 'acercaDe');
+
   menu.addToUi();
   // La hoja Resumen es 100% fórmulas: no necesita refresco al abrir.
 }
@@ -58,6 +62,12 @@ function abrirManualDeUsuario() {
     '<script>window.open("' + url + '","_blank");setTimeout(function(){google.script.host.close();},1500);</script>'
   ).setWidth(320).setHeight(80);
   SpreadsheetApp.getUi().showModalDialog(html, 'Manual de usuario');
+}
+
+/** Muestra la version de la app (se incrementa en cada deploy). */
+function acercaDe() {
+  var v = (typeof VERSION_APP !== 'undefined') ? VERSION_APP : 0;
+  SpreadsheetApp.getUi().alert(nombreNegocio(), 'Version ' + v, SpreadsheetApp.getUi().ButtonSet.OK);
 }
 
 /** Aviso para las pantallas que llegan en fases siguientes. */

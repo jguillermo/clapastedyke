@@ -354,6 +354,8 @@ function sembrarResumen(sheet, def) {
   var Pr = HOJA.PRESUPUESTOS, Pe = HOJA.PEDIDOS, In = HOJA.INSUMOS;
   function rng(hojaNom, letra) { return "'" + hojaNom + "'!" + letra + FILA_DATOS + ":" + letra; }
 
+  var url = sheet.getParent().getUrl();
+
   var filas = [
     ['RESUMEN', ''],
     ['Presupuestos pendientes', '=COUNTIF(' + rng(Pr, P.estado) + ',"Pendiente")'],
@@ -368,14 +370,24 @@ function sembrarResumen(sheet, def) {
     ['ALERTAS', ''],
     ['Insumos agotados', '=IFERROR(TEXTJOIN(", ",TRUE,FILTER(' + rng(In, I.nombre) + ',' + rng(In, I.semaforo) + '="rojo")),"Ninguno")'],
     ['Insumos bajo mínimo', '=IFERROR(TEXTJOIN(", ",TRUE,FILTER(' + rng(In, I.nombre) + ',' + rng(In, I.semaforo) + '="amarillo")),"Ninguno")'],
-    ['Presupuestos por vencer', '=IFERROR(TEXTJOIN(", ",TRUE,FILTER(' + rng(Pr, P.id) + ',' + rng(Pr, P.estado) + '="Pendiente",' + rng(Pr, P.fecha_vencimiento) + '<=(TODAY()+3))),"Ninguno")']
+    ['Presupuestos por vencer', '=IFERROR(TEXTJOIN(", ",TRUE,FILTER(' + rng(Pr, P.id) + ',' + rng(Pr, P.estado) + '="Pendiente",' + rng(Pr, P.fecha_vencimiento) + '<=(TODAY()+3))),"Ninguno")'],
+    ['', ''],
+    ['¿LO VES DESDE EL CELULAR?', ''],
+    ['En el celular la app no muestra el menu del sistema. Para usarlo:', ''],
+    ['1) Toca el enlace de abajo para abrir esta hoja en el navegador.', ''],
+    ['2) En el navegador abre su menu (los 3 puntos arriba en Chrome, o "aA" en Safari).', ''],
+    ['3) Elige "Version para computadora" o "Sitio de escritorio".', ''],
+    ['4) Espera unos segundos: arriba sale el menu con el nombre de tu negocio.', ''],
+    ['=HYPERLINK("' + url + '","► Abrir el sistema en el navegador")', '']
   ];
+  var filaAyuda = FILA_HEADER + filas.length - 7; // fila del titulo "¿LO VES DESDE EL CELULAR?"
 
   sheet.getRange(FILA_HEADER, 1, 80, 2).clearContent();
   sheet.getRange(FILA_HEADER, 1, filas.length, 2).setValues(filas);
   // Estilo de los titulos de seccion.
   sheet.getRange(FILA_HEADER, 1).setFontWeight('bold').setFontColor(COLOR_HEADER_FG);
   sheet.getRange(FILA_HEADER + 10, 1).setFontWeight('bold').setFontColor(COLOR_HEADER_FG);
+  sheet.getRange(filaAyuda, 1).setFontWeight('bold').setFontColor(COLOR_HEADER_FG);
   sheet.getRange(FILA_DATOS, 2, 8, 1).setFontFamily('Courier New').setFontWeight('bold');
   try { sheet.setColumnWidth(1, 230); sheet.setColumnWidth(2, 360); } catch (e) {}
 }
