@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Manual de usuario · Sistema de costeo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Figtree:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#f7f1e8; --sheet:#fffdf9; --ink:#2a2420; --muted:#8c8278;
+    --line:#e7ddcf; --line-soft:#f0e8db;
+    --accent:#bb5530; --accent-deep:#9a4324; --accent-soft:#f6e3d6;
+    --green:#4f8a5b; --green-soft:#e1efe2;
+    --amber:#cf9a32; --amber-soft:#f7ecd1;
+    --red:#bf412c; --red-soft:#f7ddd6;
+    --shadow:0 18px 44px -20px rgba(60,40,25,.4);
+    --shadow-sm:0 4px 14px -6px rgba(60,40,25,.28);
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:"Figtree",sans-serif; line-height:1.62; -webkit-font-smoothing:antialiased;
+    background-image:radial-gradient(circle at 1px 1px, rgba(155,67,36,.05) 1px, transparent 0);
+    background-size:22px 22px;
+  }
+  .num{font-family:"Space Mono",monospace}
+
+  /* Barra superior */
+  .topbar{position:sticky;top:0;z-index:30;background:rgba(247,241,232,.86);
+    backdrop-filter:blur(8px);border-bottom:1px solid var(--line);
+    display:flex;align-items:center;justify-content:space-between;padding:13px 22px}
+  .brand{display:flex;align-items:baseline;gap:10px}
+  .brand b{font-family:"Fraunces",serif;font-size:18px;font-weight:600;color:var(--accent-deep)}
+  .brand span{font-family:"Space Mono",monospace;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+  .back{font-family:"Figtree";font-size:13px;font-weight:600;color:var(--accent);background:none;border:1px solid var(--line);
+    border-radius:999px;padding:7px 15px;cursor:pointer;display:none}
+  .back:hover{background:var(--accent-soft);border-color:var(--accent)}
+
+  .wrap{max-width:880px;margin:0 auto;padding:0 22px 80px}
+
+  /* Vistas */
+  .view{display:none}
+  .view.active{display:block;animation:rise .5s cubic-bezier(.2,.7,.2,1) both}
+  @keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+
+  /* Portada del menu */
+  .hero{padding:46px 0 10px;border-bottom:1px dashed var(--line);margin-bottom:32px}
+  .kick{font-family:"Space Mono",monospace;font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--accent);margin:0 0 10px}
+  .hero h1{font-family:"Fraunces",serif;font-weight:600;font-size:clamp(30px,6vw,46px);line-height:1.05;margin:0 0 14px}
+  .hero p{font-size:16px;color:#5d544b;max-width:60ch;margin:0}
+  .howto{margin-top:18px;background:var(--sheet);border:1px solid var(--line);border-radius:12px;padding:14px 16px;font-size:14px;color:#5d544b}
+  .howto b{color:var(--ink)}
+
+  .grouplbl{font-family:"Space Mono",monospace;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);
+    margin:34px 0 14px;display:flex;align-items:center;gap:12px}
+  .grouplbl::after{content:"";flex:1;height:1px;background:var(--line)}
+
+  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+  @media(max-width:620px){ .grid{grid-template-columns:1fr} }
+  .flowcard{position:relative;text-align:left;background:var(--sheet);border:1px solid var(--line);border-radius:14px;
+    padding:18px 18px 18px 18px;cursor:pointer;transition:.18s;box-shadow:var(--shadow-sm);font-family:inherit}
+  .flowcard:hover{border-color:var(--accent);transform:translateY(-3px);box-shadow:var(--shadow)}
+  .flowcard .idx{font-family:"Space Mono",monospace;font-size:11px;color:var(--accent);font-weight:700}
+  .flowcard .t{font-family:"Fraunces",serif;font-size:18px;font-weight:600;margin:6px 0 4px;color:var(--ink)}
+  .flowcard .s{font-size:13px;color:var(--muted);line-height:1.5}
+  .flowcard .arrow{position:absolute;right:16px;top:16px;color:var(--line);font-size:18px;transition:.18s}
+  .flowcard:hover .arrow{color:var(--accent);transform:translateX(3px)}
+
+  /* Pagina de flujo */
+  .flowhead{padding:36px 0 8px}
+  .flowhead .idx{font-family:"Space Mono",monospace;font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent)}
+  .flowhead h2{font-family:"Fraunces",serif;font-weight:600;font-size:clamp(26px,5vw,38px);line-height:1.08;margin:10px 0 0}
+  .when{margin:18px 0 6px;background:var(--accent-soft);border:1px solid #eecdba;border-radius:12px;padding:13px 16px;font-size:14.5px;color:var(--accent-deep)}
+  .when b{font-family:"Space Mono",monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;display:block;margin-bottom:3px}
+
+  .secn{font-family:"Space Mono",monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:30px 0 14px}
+
+  ol.steps{list-style:none;counter-reset:s;padding:0;margin:0}
+  ol.steps>li{counter-increment:s;position:relative;padding:0 0 20px 52px;margin:0}
+  ol.steps>li::before{content:counter(s);position:absolute;left:0;top:-2px;width:34px;height:34px;border-radius:50%;
+    background:var(--accent);color:#fff;font-family:"Space Mono",monospace;font-weight:700;font-size:14px;
+    display:grid;place-items:center;box-shadow:0 4px 10px -4px rgba(155,67,36,.6)}
+  ol.steps>li::after{content:"";position:absolute;left:16px;top:34px;bottom:2px;width:2px;background:var(--line-soft)}
+  ol.steps>li:last-child::after{display:none}
+  ol.steps>li b{font-weight:600}
+  ol.steps>li .det{font-size:14px;color:#6f655b;margin-top:3px}
+
+  .callout{border-radius:12px;padding:13px 16px;margin:18px 0;font-size:14px;display:flex;gap:11px;align-items:flex-start}
+  .callout .lbl{font-family:"Space Mono",monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;flex:0 0 auto;padding-top:1px}
+  .callout.tip{background:var(--green-soft);border:1px solid #c4e0c8;color:#2f6b3c}
+  .callout.tip .lbl{color:var(--green)}
+  .callout.warn{background:var(--red-soft);border:1px solid #e9c2b8;color:#8a3322}
+  .callout.warn .lbl{color:var(--red)}
+  .callout.note{background:var(--amber-soft);border:1px solid #ecd9a6;color:#7a5b16}
+  .callout.note .lbl{color:#9c7415}
+
+  ul.plain{padding-left:18px;margin:10px 0}
+  ul.plain li{margin-bottom:7px}
+
+  .footnav{margin-top:40px;padding-top:22px;border-top:1px dashed var(--line);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+  .btnmenu{font-family:"Figtree";font-size:14px;font-weight:600;color:#fff;background:var(--accent);border:0;border-radius:10px;padding:11px 20px;cursor:pointer}
+  .btnmenu:hover{background:var(--accent-deep)}
+  .footnote{font-size:12.5px;color:var(--muted)}
+
+  .tag{display:inline-block;font-family:"Space Mono",monospace;font-size:11px;background:#fff;border:1px solid var(--line);
+    border-radius:6px;padding:1px 7px;color:var(--accent-deep)}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand"><b>Sistema de costeo</b><span>Manual de usuario</span></div>
+  <button class="back" id="backbtn" onclick="show('home')">↑ Menú principal</button>
+</div>
+
+<div class="wrap">
+
+<!-- ===================== MENU PRINCIPAL ===================== -->
+<section class="view active" id="home">
+  <div class="hero">
+    <p class="kick">Guía paso a paso</p>
+    <h1>¿Qué quieres hacer hoy?</h1>
+    <p>Elige un flujo y te llevo de la mano, paso por paso, desde el primer clic hasta terminar. No necesitas saber nada de antemano.</p>
+    <div class="howto">Todo el sistema se maneja desde el menú de arriba en tu hoja de Google Sheets, el que lleva <b>el nombre de tu negocio</b>. Si no lo ves, recarga la página y espera unos segundos.</div>
+  </div>
+
+  <div class="grouplbl">Preparar el sistema</div>
+  <div class="grid">
+    <button class="flowcard" onclick="show('configurar')"><span class="arrow">›</span><div class="idx">01</div><div class="t">Configurar el negocio</div><div class="s">Tus tarifas, el margen, el IGV y el redondeo.</div></button>
+    <button class="flowcard" onclick="show('cliente')"><span class="arrow">›</span><div class="idx">02</div><div class="t">Registrar un cliente</div><div class="s">Para poder cotizarle.</div></button>
+    <button class="flowcard" onclick="show('proveedor')"><span class="arrow">›</span><div class="idx">03</div><div class="t">Registrar un proveedor</div><div class="s">Con su WhatsApp para pedirle.</div></button>
+    <button class="flowcard" onclick="show('insumo')"><span class="arrow">›</span><div class="idx">04</div><div class="t">Registrar un insumo</div><div class="s">Ingredientes y empaques, con su precio y stock.</div></button>
+    <button class="flowcard" onclick="show('receta')"><span class="arrow">›</span><div class="idx">05</div><div class="t">Crear una receta</div><div class="s">Sus ingredientes y para cuántas raciones rinde.</div></button>
+    <button class="flowcard" onclick="show('empaque')"><span class="arrow">›</span><div class="idx">06</div><div class="t">Definir reglas de empaque</div><div class="s">Qué empaque sugerir por tamaño.</div></button>
+  </div>
+
+  <div class="grouplbl">Vender</div>
+  <div class="grid">
+    <button class="flowcard" onclick="show('presupuesto')"><span class="arrow">›</span><div class="idx">07</div><div class="t">Hacer un presupuesto</div><div class="s">Escalar la receta y sacar el precio.</div></button>
+    <button class="flowcard" onclick="show('revisar')"><span class="arrow">›</span><div class="idx">08</div><div class="t">Aprobar o rechazar</div><div class="s">Cuando el cliente responde.</div></button>
+  </div>
+
+  <div class="grouplbl">Producir y entregar</div>
+  <div class="grid">
+    <button class="flowcard" onclick="show('pedido')"><span class="arrow">›</span><div class="idx">09</div><div class="t">Gestionar un pedido</div><div class="s">Producción, entrega y cancelación.</div></button>
+  </div>
+
+  <div class="grouplbl">Inventario y compras</div>
+  <div class="grid">
+    <button class="flowcard" onclick="show('comprar')"><span class="arrow">›</span><div class="idx">10</div><div class="t">Comprar materiales</div><div class="s">La lista de lo que falta y el WhatsApp.</div></button>
+    <button class="flowcard" onclick="show('registrarCompra')"><span class="arrow">›</span><div class="idx">11</div><div class="t">Registrar una compra</div><div class="s">Recibir el material y subir el stock.</div></button>
+    <button class="flowcard" onclick="show('ajustar')"><span class="arrow">›</span><div class="idx">12</div><div class="t">Ajustar inventario</div><div class="s">Mermas, daños y conteos.</div></button>
+  </div>
+
+  <div class="grouplbl">Tablero y conceptos</div>
+  <div class="grid">
+    <button class="flowcard" onclick="show('inicio')"><span class="arrow">›</span><div class="idx">13</div><div class="t">Leer el panel de Inicio</div><div class="s">Qué necesita tu atención hoy.</div></button>
+    <button class="flowcard" onclick="show('precio')"><span class="arrow">›</span><div class="idx">14</div><div class="t">Cómo se calcula el precio</div><div class="s">Entender de dónde sale el número.</div></button>
+  </div>
+</section>
+
+<!-- ===================== 01 CONFIGURAR ===================== -->
+<section class="view" id="configurar">
+  <div class="flowhead"><div class="idx">Flujo 01</div><h2>Configurar el negocio</h2></div>
+  <div class="when"><b>Cuándo</b>La primera vez que usas el sistema, y cada vez que cambien tus costos base, tu margen o el IGV.</div>
+  <div class="secn">Paso a paso</div>
+  <ol class="steps">
+    <li><b>Abre el menú de arriba</b> y entra a <span class="tag">Configuración</span>.</li>
+    <li><b>Tarifa de mano de obra por hora.</b><div class="det">Cuánto vale una hora de tu trabajo. Alimenta el costo de cada presupuesto.</div></li>
+    <li><b>Costo indirecto y depreciación por pedido.</b><div class="det">Montos fijos que se suman a cada pedido, por luz, gas o desgaste de equipos.</div></li>
+    <li><b>Margen por defecto, en porcentaje.</b><div class="det">Tu ganancia sobre la venta. Cada presupuesto lo trae puesto y lo puedes cambiar caso por caso.</div></li>
+    <li><b>Aplicar IGV y su tasa.</b><div class="det">Si lo dejas en Sí, el sistema lo suma al final del precio.</div></li>
+    <li><b>Redondeo del precio.</b><div class="det">Múltiplo de 5 hacia arriba deja precios redonditos. O ninguno, si prefieres el exacto.</div></li>
+    <li><b>Días de vencimiento y momento de descuento de stock.</b><div class="det">Cuántos días vale el presupuesto, y si el stock baja al aprobar o al iniciar producción.</div></li>
+    <li><b>Lista de tamaños.</b><div class="det">Separados por coma, por ejemplo chico, mediano, grande. De ahí salen los tamaños de las reglas de empaque.</div></li>
+    <li><b>Nombre del negocio.</b><div class="det">Aparece en el menú la próxima vez que abras el archivo.</div></li>
+    <li><b>Guarda.</b></li>
+  </ol>
+  <div class="callout note"><span class="lbl">Ojo</span><div>Lo que cambies aquí afecta los presupuestos <b>nuevos</b>, nunca los que ya guardaste. Esos quedan congelados con sus valores.</div></div>
+  <div class="footnav"><button class="btnmenu" onclick="show('home')">Volver al menú</button><span class="footnote">Flujo 01 de 14</span></div>
+</section>
+
+<!-- ===================== 02 CLIENTE ===================== -->
+<section class="view" id="cliente">
+  <div class="flowhead"><div class="idx">Flujo 02</div><h2>Registrar un cliente</h2></div>
+  <div class="when"><b>Cuándo</b>Antes de cotizarle a alguien nuevo. También puedes crearlo al vuelo desde el presupuesto.</div>
+  <div class="secn">Paso a paso</div>
+  <ol class="steps">
+    <li>Abre el menú, entra a <span class="tag">Catálogos</span> y luego a <span class="tag">Clientes</span>.</li>
+    <li>Toca <b>Nuevo cliente</b>.</li>
+    <li><b>Escribe el nombre.</b><div class="det">Es obligatorio y no se puede repetir exacto.</div></li>
+    <li>Agrega <b>teléfono</b> y <b>notas</b> si quieres. Son opcionales.</li>
+    <li><b>Guarda.</b> Aparece en la lista de arriba.</li>
+  </ol>
+  <div class="callout tip"><span class="lbl">Tip</span><div>Para cambiar un cliente, toca <b>Editar</b> en su fila. Se carga en el formulario y vuelves a guardar.</div></div>
+  <div class="footnav"><button class="btnmenu" onclick="show('home')">Volver al menú</button><span class="footnote">Flujo 02 de 14</span></div>
+</section>
+
+<!-- ===================== 03 PROVEEDOR ===================== -->
+<section class="view" id="proveedor">
+  <div class="flowhead"><div class="idx">Flujo 03</div><h2>Registrar un proveedor</h2></div>
+  <div class="when"><b>Cuándo</b>Antes de comprarle a alguien, para tener su WhatsApp listo y pedirle con un clic.</div>
+  <div class="secn">Paso a paso</div>
+  <ol class="steps">
+    <li>Menú, <span class="tag">Catálogos</span>, <span class="tag">Proveedores</span>.</li>
+    <li>Toca <b>Nuevo proveedor</b>.</li>
+    <li><b>Nombre.</b> Obligatorio.</li>
+    <li><b>WhatsApp con código de país.</b><div class="det">Sin espacios ni signos. Por ejemplo 51999888777. Es lo que arma el enlace para pedirle.</div></li>
+    <li>Notas opcionales y <b>Guarda</b>.</li>
+  </ol>
+  <div class="callout note"><span class="lbl">Ojo</span><div>Si el número está incompleto o sin código de país, el sistema no te deja guardar, porque el enlace de WhatsApp no funcionaría.</div></div>
+  <div class="footnav"><button class="btnmenu" onclick="show('home')">Volver al menú</button><span class="footnote">Flujo 03 de 14</span></div>
+</section>
+
+<!-- ===================== 04 INSUMO ===================== -->
+<section class="view" id="insumo">
+  <div class="flowhead"><div class="idx">Flujo 04</div><h2>Registrar un insumo</h2></div>
+  <div class="when"><b>Cuándo</b>Para todo lo que compras y usas, tanto ingredientes como empaques. Es donde vive el costo base de todo.</div>
+  <div class="secn">Paso a paso</div>
+  <ol class="steps">
+    <li>Menú, <span class="tag">Catálogos</span>, <span class="tag">Insumos</span>. Toca <b>Nuevo insumo</b>.</li>
+    <li><b>Nombre.</b></li>
+    <li><b>Tipo:</b> ingrediente o empaque.</li>
+    <li><b>Unidad base:</b> gramos o unidad. Define si se pesa o se cuenta.</li>
+    <li><b>Tamaño de la presentación.</b><div class="det">Cuánto trae el empaque que compras. Por ejemplo 1000 si la bolsa es de 1000 g, o 16 si el cartón trae 16 unidades.</div></li>
+    <li><b>Precio de la presentación.</b><div class="det">Lo que pagas por ese empaque completo. El precio por gramo o unidad se calcula solo y lo ves al lado.</div></li>
+    <li><b>Stock inicial.</b><div class="det">Solo al crear. Cuánto tienes hoy.</div></li>
+    <li><b>Stock mínimo.</b><div class="det">El umbral del semáforo. Por debajo, el insumo se pinta de amarillo, y en cero o menos, de rojo.</div></li>
+    <li><b>Proveedor recomendado,</b> opcional. <b>Guarda.</b></li>
+  </ol>
+  <div class="callout warn"><span class="lbl">Importante</span><div>Cuando <b>edites</b> un insumo más adelante, el stock no se toca desde aquí. El stock lo mueven solo las compras y los ajustes de inventario.</div></div>
+  <div class="footnav"><button class="btnmenu" onclick="show('home')">Volver al menú</button><span class="footnote">Flujo 04 de 14</span></div>
+</section>
+
+<!-- ===================== 05 RECETA ===================== -->
+<section class="view" id="receta">
+  <div class="flowhead"><div class="idx">Flujo 05</div><h2>Crear una receta</h2></div>
+  <div class="when"><b>Cuándo</b>Para cada producto que vendes. La receta define qué lleva y para cuántas raciones rinde.</div>
+  <div class="secn">Paso a paso</div>
+  <ol class="steps">
+    <li>Menú, <span class="tag">Catálogos</span>, <span class="tag">Recetas</span>. Toca <b>Nueva receta</b>.</li>
+    <li><b>Nombre</b> y, si quieres, <b>categoría</b>.</li>
+    <li><b>Raciones base.</b><div class="det">Para cuántas raciones rinde tal como la escribes. Es la clave del escalado. Si pones 5 y luego pides 20, el sistema multiplica todo por 4.</div></li>
+    <li><b>Tiempo de mano de obra, en horas.</b><div class="det">Cuánto te toma hacerla. Alimenta el costo de tu trabajo.</div></li>
+    <li><b>Agrega los ingredientes.</b><div class="det">Por cada uno, busca el insumo y pon la cantidad para esa base. La unidad sale sola del insumo.</div></li>
+    <li>Suma los que necesites con <b>Agregar ingrediente</b>, o quita con <b>Quitar</b>.</li>
+    <li><b>Guarda.</b> Pide al menos un ingrediente.</li>
+  </ol>
+  <div class="callout tip"><span class="lbl">Tip</span><div>No te preocupes por las cantidades grandes. Escribe la receta para una base cómoda, por ejemplo 5 o 10 raciones, y el sistema la escala sola al cotizar.</div></div>
+  <div class="footnav"><button class="btnmenu" onclick="show('home')">Volver al menú</button><span class="footnote">Flujo 05 de 14</span></div>
+</section>
+
+<!-- ===================== 06 EMPAQUE ===================== -->
+<section class="view" id="empaque">
+  <div class="flowhead"><div class="idx">Flujo 06</div><h2>Definir reglas de empaque</h2></div>
+  <div class="when"><b>Cuándo</b>Para que el presupuesto te sugiera el empaque correcto según el tamaño que pida el cliente.</div>
+  <div class="secn">Paso a paso</div>
+  <ol class="steps">
+    <li>Menú, <span class="tag">Catálogos</span>, <span class="tag">Reglas de empaque</span>. Toca <b>Nueva regla</b>.</li>
+    <li><b>Elige la receta.</b></li>
+    <li><b>Elige el tamaño,</b> de tu lista de Configuración.</li>
+    <li><b>Elige el empaque.</b><div class="det">Es un insumo de tipo empaque. Si no aparece, créalo primero en Insumos.</div></li>
+    <li><b>Pon la cantidad</b> y <b>Guarda</b>.</li>
+  </ol>
+  <div class="callout tip"><span class="lbl">Tip</span><div>Una misma receta y tamaño puede tener varias reglas. Por ejemplo, una torta grande puede sugerir caja y moño a la vez. Crea una regla por cada empaque.</div></div>
+  <div class="footnav"><button class="btnmenu" onclick="show('home')">Volver al menú</button><span class="footnote">Flujo 06 de 14</span></div>
+</section>
+
+<!-- ===================== 07 PRESUPUESTO ===================== -->
+<section class="view" id="presupuesto">
+  <div class="flowhead"><div class="idx">Flujo 07</div><h2>Hacer un presupuesto</h2></div>
+  <div class="when"><b>Cuándo</b>Cada vez que un cliente te pide una cotización. Es la pantalla principal del sistema.</div>
+  <div class="secn">Paso a paso</div>
+  <ol class="steps">
+    <li>Menú, <span class="tag">Nuevo presupuesto</span>.</li>
+    <li><b>Elige el cliente.</b><div class="det">Si no existe, toca Cliente nuevo y créalo sin salir de la pantalla.</div></li>
+    <li><b>Elige la receta.</b><div class="det">El sistema trae sus ingredientes solo.</div></li>
+    <li><b>Elige el modo de escalado.</b><div class="det">Por raciones, escribes cuántas quieres, por ejemplo 20. Por factor, eliges de la lista, por ejemplo 1/2. Todo se recalcula al instante.</div></li>
+    <li><b>Elige el tamaño,</b> si quieres que sugiera empaque.<div class="det">Se prellena el empaque con cantidad editable. Puedes agregar más abajo.</div></li>
+    <li><b>Revisa la tabla de ingredientes,</b> ya escalada, con su subtotal.</li>
+    <li><b>Mira los otros costos:</b> mano de obra, indirecto y depreciación.</li>
+    <li><b>Ajusta el margen</b> si quieres, y decide el <b>IGV</b>.<div class="det">El precio final se actualiza solo, ya redondeado.</div></li>
+    <li>Escribe <b>notas</b> si hace falta, y <b>Guarda</b>.</li>
+  </ol>
+  <div class="callout note"><span class="lbl">Qué pasa</span><div>El presupuesto queda <b>Pendiente</b>, con su fecha de emisión y de vencimiento, y todos los precios congelados. Aunque cambies tus costos después, este no se mueve.</div></div>
+  <div class="footnav"><button class="btnmenu" onclick="show('home')">Volver al menú</button><span class="footnote">Flujo 07 de 14</span></div>
+</section>
+
+<!-- ===================== 08 REVISAR ===================== -->
+<section class="view" id="revisar">
+  <div class="flowhead"><div class="idx">Flujo 08</div><h2>Aprobar o rechazar un presupuesto</h2></div>
+  <div class="when"><b>Cuándo</b>Cuando el cliente responde si acepta o no la cotización.</div>
+  <div class="secn">Paso a paso</div>
+  <ol class="steps">
+    <li>Menú, <span class="tag">Ver presupuestos</span>.</li>
+    <li><b>Filtra</b> por estado, cliente o fechas si la lista es larga.</li>
+    <li>Toca <b>Ver</b> para abrir el detalle congelado, tal como se guardó.</li>
+    <li><b>Si el cliente aceptó, toca Aprobar.</b><div class="det">Confirma. Nace el pedido y, según tu configuración, baja el stock. Si algo no alcanzaba, un aviso te dice qué falta comprar.</div></li>
+    <li><b>Si no aceptó, toca Rechazar</b> y escribe el motivo.<div class="det">No toca el inventario.</div></li>
+  </ol>
+  <div class="callout note"><span class="lbl">Ojo</span><div>Solo se puede aprobar o rechazar mientras está <b>Pendiente</b>. Un presupuesto vencido aparece marcado para que lo notes.</div></div>
+  <div class="footnav"><button class="btnmenu" onclick="show('home')">Volver al menú</button><span class="footnote">Flujo 08 de 14</span></div>
+</section>
+
+<!-- ===================== 09 PEDIDO ===================== -->
+<section class="view" id="pedido">
+  <div class="flowhead"><div class="idx">Flujo 09</div><h2>Gestionar un pedido</h2></div>
+  <div class="when"><b>Cuándo</b>Para llevar un pedido aprobado desde que empiezas a hacerlo hasta que lo entregas.</div>
+  <div class="secn">Paso a paso</div>
+  <ol class="steps">
+    <li>Menú, <span class="tag">Ver pedidos</span>.</li>
+    <li>Toca <b>Ver</b> para revisar qué materiales necesita y cuánto faltaba.</li>
+    <li><b>Cuando empieces a hacerlo, toca Iniciar producción.</b><div class="det">Confirma. Si tu sistema descuenta el stock al iniciar producción, aquí es donde baja.</div></li>
+    <li><b>Al terminar y entregar, toca Marcar entregado.</b><div class="det">Confirma. Se registra la venta sola, con el precio final del presupuesto.</div></li>
+    <li><b>Si el pedido se cae, toca Cancelar</b> y pon el motivo.<div class="det">El stock que se había consumido se devuelve solo.</div></li>
+  </ol>
+  <div class="callout warn"><span class="lbl">Importante</span><div>Un pedido ya entregado no se puede cancelar. La cancelación solo está disponible mientras está Pendiente o en Producción.</div></div>
+  <div class="footnav"><button class="btnmenu" onclick="show('home')">Volver al menú</button><span class="footnote">Flujo 09 de 14</span></div>
+</section>
+
+<!-- ===================== 10 COMPRAR ===================== -->
+<section class="view" id="comprar">
+  <div class="flowhead"><div class="idx">Flujo 10</div><h2>Comprar materiales</h2></div>
+  <div class="when"><b>Cuándo</b>Cuando te falta material, sea por un pedido aprobado o porque algo está bajo el mínimo.</div>
+  <div class="secn">Paso a paso</div>
+  <ol class="steps">
+    <li>Menú, <span class="tag">Comprar materiales</span>.</li>
+    <li><b>Elige el modo.</b><div class="det">Desde un pedido, eliges el pedido y aparece lo que falta. Manual, marcas insumos a mano. Los que están bajo el mínimo vienen ya marcados.</div></li>
+    <li>Si es manual, <b>pon la cantidad</b> de cada insumo marcado y toca Generar lista.</li>
+    <li><b>Mira la lista, agrupada por proveedor.</b><div class="det">Por cada producto ves cuánto pedir y el último precio que pagaste.</div></li>
+    <li><b>Toca WhatsApp</b> en un proveedor.<div class="det">Se abre el chat con el mensaje ya escrito para preguntar disponibilidad y precio.</div></li>
+  </ol>
+  <div class="callout tip"><span class="lbl">Siguiente paso</span><div>Cuando el proveedor confirme y te llegue el material, ve al flujo <b>Registrar una compra</b> para que suba el stock.</div></div>
+  <div class="footnav"><button class="btnmenu" onclick="show('home')">Volver al menú</button><span class="footnote">Flujo 10 de 14</span></div>
+</section>
+
+<!-- ===================== 11 REGISTRAR COMPRA ===================== -->
+<section class="view" id="registrarCompra">
+  <div class="flowhead"><div class="idx">Flujo 11</div><h2>Registrar una compra recibida</h2></div>
+  <div class="when"><b>Cuándo</b>Cuando recibes lo que compraste. Este paso sube el stock y actualiza los precios.</div>
+  <div class="secn">Paso a paso</div>
+  <ol class="steps">
+    <li>Menú, <span class="tag">Registrar compra</span>.</li>
+    <li><b>Elige el proveedor</b> y la <b>fecha</b>, que viene con hoy puesto.</li>
+    <li><b>Agrega una línea por producto.</b><div class="det">Busca el insumo, pon la cantidad recibida en presentaciones, no en gramos, y el precio que pagaste por la presentación.</div></li>
+    <li><b>Ejemplo:</b> si recibes 1 bolsa de 1000 g, escribe 1.<div class="det">El sistema suma 1000 g al stock.</div></li>
+    <li>Suma las líneas que necesites y <b>Guarda</b>.</li>
+  </ol>
+  <div class="callout note"><span class="lbl">Qué pasa</span><div>Por cada línea, el stock sube, se actualiza el precio de la presentación y se recalcula el precio por gramo con lo que pagaste. Así tus costos quedan siempre al día.</div></div>
+  <div class="footnav"><button class="btnmenu" onclick="show('home')">Volver al menú</button><span class="footnote">Flujo 11 de 14</span></div>
+</section>
+
+<!-- ===================== 12 AJUSTAR ===================== -->
+<section class="view" id="ajustar">
+  <div class="flowhead"><div class="idx">Flujo 12</div><h2>Ajustar inventario</h2></div>
+  <div class="when"><b>Cuándo</b>Cuando algo se echa a perder, se rompe, vence, o el conteo real no cuadra con el sistema.</div>
+  <div class="secn">Paso a paso</div>
+  <ol class="steps">
+    <li>Menú, <span class="tag">Ajustar inventario</span>.</li>
+    <li><b>Busca el insumo.</b></li>
+    <li><b>Elige el tipo de ajuste.</b><div class="det">Merma, daño y vencimiento sacan stock. Devolución lo regresa. Ajuste por conteo lo escribes con signo, un menos para quitar.</div></li>
+    <li><b>Pon la cantidad.</b></li>
+    <li><b>Mira la vista previa.</b><div class="det">Te dice cómo queda el stock y de qué color queda el semáforo, antes de confirmar.</div></li>
+    <li>Escribe el <b>motivo</b>, sobre todo en mermas grandes, y <b>Guarda</b>.</li>
+  </ol>
+  <div class="callout tip"><span class="lbl">Tip</span><div>Cada ajuste queda registrado con su fecha, su tipo y su motivo, así siempre puedes rastrear por qué el inventario está como está.</div></div>
+  <div class="footnav"><button class="btnmenu" onclick="show('home')">Volver al menú</button><span class="footnote">Flujo 12 de 14</span></div>
+</section>
+
+<!-- ===================== 13 INICIO ===================== -->
+<section class="view" id="inicio">
+  <div class="flowhead"><div class="idx">Flujo 13</div><h2>Leer el panel de Inicio</h2></div>
+  <div class="when"><b>Cuándo</b>Al abrir el archivo, para ver de un vistazo qué necesita tu atención.</div>
+  <div class="secn">Qué muestra</div>
+  <ul class="plain">
+    <li>Presupuestos <b>pendientes</b>, <b>por vencer</b> y <b>vencidos</b>.</li>
+    <li>Pedidos <b>pendientes</b> y <b>en producción</b>.</li>
+    <li>Insumos <b>agotados</b> y <b>bajo el mínimo</b>.</li>
+    <li>Una lista de <b>alertas</b>: qué vence pronto, qué está por entregar y qué se agotó.</li>
+  </ul>
+  <div class="secn">Cómo se actualiza</div>
+  <ol class="steps">
+    <li>Solo, <b>al abrir el archivo</b>.</li>
+    <li>Solo, <b>después de cada acción</b> que mueva algo, como aprobar, entregar o registrar una compra.</li>
+    <li>Cuando quieras, con <b>Ir al Inicio</b> en el menú.</li>
+  </ol>
+  <div class="callout note"><span class="lbl">Ojo</span><div>El panel es de solo lectura. No escribas sobre él, se vuelve a dibujar solo.</div></div>
+  <div class="footnav"><button class="btnmenu" onclick="show('home')">Volver al menú</button><span class="footnote">Flujo 13 de 14</span></div>
+</section>
+
+<!-- ===================== 14 PRECIO ===================== -->
+<section class="view" id="precio">
+  <div class="flowhead"><div class="idx">Flujo 14</div><h2>Cómo se calcula el precio</h2></div>
+  <div class="when"><b>Para qué</b>Para que entiendas de dónde sale el número y puedas explicarlo con confianza.</div>
+  <div class="secn">El orden, con un ejemplo</div>
+  <ol class="steps">
+    <li><b>Se suma el costo total.</b><div class="det">Ingredientes escalados, empaque, mano de obra, costo indirecto y depreciación. Digamos que da 56.70.</div></li>
+    <li><b>Se aplica tu margen, sobre la venta.</b><div class="det">Con 35 por ciento, el precio sube a 87.23. Es el costo dividido entre uno menos el margen, no el costo más un 35 por ciento.</div></li>
+    <li><b>Se suma el IGV,</b> si está activo.<div class="det">18 por ciento sobre 87.23 son 15.70. Subtotal, 102.93.</div></li>
+    <li><b>Se redondea hacia arriba al múltiplo de 5.</b><div class="det">Los 102.93 quedan en 105.</div></li>
+  </ol>
+  <div class="callout tip"><span class="lbl">La clave</span><div>El margen es sobre lo que cobras, no sobre lo que gastas. Por eso se divide entre uno menos el margen. Así tu ganancia real es el porcentaje que pusiste.</div></div>
+  <div class="footnav"><button class="btnmenu" onclick="show('home')">Volver al menú</button><span class="footnote">Flujo 14 de 14</span></div>
+</section>
+
+</div>
+
+<script>
+  var views = document.querySelectorAll('.view');
+  function show(id){
+    views.forEach(function(v){ v.classList.remove('active'); });
+    var el = document.getElementById(id);
+    el.classList.add('active');
+    document.getElementById('backbtn').style.display = (id === 'home') ? 'none' : 'inline-flex';
+    window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
+  }
+</script>
+</body>
+</html>
