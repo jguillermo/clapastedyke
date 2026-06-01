@@ -60,7 +60,13 @@ function irAlInicio() {
 }
 
 function abrirManualDeUsuario() {
-  abrirModal('Manual_de_usuario', 'Manual de usuario', 900, 600);
+  var url = 'https://jguillermo.github.io/clapastedyke/Manual_de_usuario.html';
+  var html = HtmlService.createHtmlOutput(
+    '<p style="font-family:sans-serif;padding:12px">Abriendo el manual...<br>' +
+    '<a href="' + url + '" target="_blank">Haz clic aquí si no abre</a></p>' +
+    '<script>window.open("' + url + '","_blank");setTimeout(function(){google.script.host.close();},1500);</script>'
+  ).setWidth(320).setHeight(80);
+  SpreadsheetApp.getUi().showModalDialog(html, 'Manual de usuario');
 }
 
 /** Aviso para las pantallas que llegan en fases siguientes. */

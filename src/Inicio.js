@@ -81,6 +81,12 @@ function refrescarInicio() {
   sheet.getRange(inicioAlertas, 1, matriz.length, 1).setValues(matriz);
   sheet.getRange(inicioAlertas, 1, matriz.length, 1).setFontColor('#5d544b');
 
+  // Sección AYUDA con link al manual.
+  var filaAyuda = inicioAlertas + matriz.length + 1;
+  sheet.getRange(filaAyuda, 1).setValue('AYUDA').setFontWeight('bold').setFontColor('#bb5530');
+  sheet.getRange(filaAyuda + 1, 1).setFormula('=HYPERLINK("https://jguillermo.github.io/clapastedyke/Manual_de_usuario.html","Manual de usuario")');
+  sheet.getRange(filaAyuda + 1, 1).setFontColor('#1155cc').setFontWeight('normal');
+
   try {
     sheet.setColumnWidth(1, 320);
     sheet.setColumnWidth(2, 180);
