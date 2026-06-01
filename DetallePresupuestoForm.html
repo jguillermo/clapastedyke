@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<base target="_top">
+<?!= include('Estilos'); ?>
+<style>
+  .totbox{background:#fbf6ef;border:1px solid var(--line);border-radius:11px;padding:14px 16px;margin-top:6px}
+  .totline{display:flex;justify-content:space-between;font-size:13px;padding:5px 0;color:#5d544b}
+  .totline .num{font-family:"Space Mono",monospace}
+  .totline.grand{border-top:2px solid var(--ink);margin-top:8px;padding-top:10px;font-weight:700;font-size:17px;color:var(--ink)}
+  .meta{display:grid;grid-template-columns:1fr 1fr;gap:6px 18px;font-size:13px;margin-bottom:4px}
+  .meta b{font-family:"Space Mono",monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);display:block}
+  .stbadge{font-family:"Space Mono",monospace;font-size:11px;text-transform:uppercase;padding:3px 10px;border-radius:999px}
+  .st-Pendiente{background:#f0ece4;color:#7a7166}
+  .st-Aprobado{background:var(--green-soft);color:var(--green)}
+  .st-Rechazado{background:var(--red-soft);color:var(--red)}
+</style>
+</head>
+<body>
+
+<div class="dlg-head">
+  <h3 id="titulo">Detalle</h3>
+  <button class="x" onclick="S.cerrar()" title="Cerrar">&times;</button>
+</div>
+
+<div class="dlg-body">
+  <div id="flash" class="flash"></div>
+  <div id="cuerpo"><div class="empty">Cargando...</div></div>
+</div>
+
+<div class="dlg-foot" id="pie">
+  <button class="btn" onclick="volver()">Volver a la lista</button>
+</div>
+
+<script>
+  var ID = "<?= presupuestoId ?>";
+  var P = null;
+
+  function cargar(){
+    S.call('detallePresupuesto', ID, function(d){ P=d; render(d); },
+       function(e){ document.getElementById('cuerpo').innerHTML='<div class="empty">'+S.esc(e.message||String(e))+'</div>'; });
+  }
+
+  function render(d){
+    document.getElementById('titulo').textContent='Presupuesto '+d.id;
+    var ing=d.lineas.filter(function(l){ return l.tipo==='ingrediente'; });
+    var mat=d.lineas.filter(function(l){ return l.tipo==='material'; });
+
+    var h='<div class="card"><div class="meta">'
+      + '<div><b>Cliente</b>'+S.esc(d.cliente_nombre)+'</div>'
+      + '<div><b>Producto</b>'+S.esc(d.receta_nombre)+'</div>'
+      + '<div><b>Escalado</b>'+S.esc(d.modo_escalado)+' = '+S.num4(d.valor_escalado)+' (factor '+S.num4(d.factor_aplicado)+')</div>'
+      + '<div><b>Raciones</b>'+S.num4(d.raciones_resultantes)+'</div>'
+      + '<div><b>Emisión</b>'+S.esc(d.fecha_emision)+'</div>'
+      + '<div><b>Vence</b>'+S.esc(d.fecha_vencimiento)+'</div>'
+      + '<div><b>Estado</b><span class="stbadge st-'+S.esc(d.estado)+'">'+S.esc(d.estado)+'</span></div></div>'
+      + (d.motivo_rechazo?'<div class="note">Motivo de rechazo: '+S.esc(d.motivo_rechazo)+'</div>':'')
+      + '</div>';
+
+    h+='<div class="card"><div class="grp-title">Ingredientes</div>'+tabla(ing)+'</div>';
+    if(mat.length) h+='<div class="card"><div class="grp-title">Empaque y materiales</div>'+tabla(mat)+'</div>';
+
+    h+='<div class="card"><div class="grp-title">Costos y precio</div><div class="totbox">'
+      + linea('Costo de ingredientes', d.costo_ingredientes)
+      + linea('Costo de materiales', d.costo_materiales)
+      + linea('Mano de obra', d.costo_mano_obra)
+      + linea('Costo indirecto', d.costo_indirecto)
+      + linea('Depreciación', d.costo_depreciacion)
+      + linea('Costo total', d.costo_total)
+      + linea('Precio con ganancia ('+S.num4(d.margen)+'%)', d.precio_con_margen)
+      + (d.aplica_igv==='SI'?linea('IGV ('+S.num4(d.tasa_igv)+'%)', d.monto_igv):'')
+      + linea('Redondeo', d.redondeo_aplicado)
+      + '<div class="totline grand"><span>Precio final</span><span class="num">'+S.money(d.precio_final)+'</span></div>'
+      + '</div>'
+      + (d.notas?'<div class="note">Notas: '+S.esc(d.notas)+'</div>':'')
+      + '</div>';
+
+    document.getElementById('cuerpo').innerHTML=h;
+
+    // Botones según estado.
+    var pie=document.getElementById('pie');
+    var extra='';
+    if(d.estado==='Pendiente'){
+      extra='<button class="btn mini no" style="font-size:13.5px;padding:9px 18px" onclick="rechazar()">Rechazar</button>'
+          + '<button class="btn primary" onclick="aprobar()">Aprobar</button>';
+    }
+    pie.innerHTML='<button class="btn" onclick="volver()">Volver a la lista</button>'+extra;
+  }
+
+  function tabla(arr){
+    var t='<table class="t"><tr><th>Detalle</th><th class="n">Cantidad</th><th class="n">P. unit.</th><th class="n">Subtotal</th></tr>';
+    if(!arr.length) t+='<tr><td colspan="4" class="empty">Sin líneas</td></tr>';
+    arr.forEach(function(l){
+      t+='<tr><td>'+S.esc(l.nombre)+'</td><td class="n">'+S.num4(l.cantidad)+' '+S.esc(l.unidad)+'</td>'
+       + '<td class="n">'+S.num4(l.precio_unitario)+'</td><td class="n">'+S.money(l.subtotal)+'</td></tr>';
+    });
+    return t+'</table>';
+  }
+  function linea(lbl,val){ return '<div class="totline"><span>'+S.esc(lbl)+'</span><span class="num">'+S.money(val)+'</span></div>'; }
+
+  function aprobar(){
+    if(!S.confirmar('¿Aprobar el presupuesto '+ID+'?')) return;
+    S.call('aprobarPresupuesto', ID, function(r){ S.flash(r.mensaje,'ok'); cargar(); });
+  }
+  function rechazar(){
+    var motivo=window.prompt('Motivo del rechazo (opcional):',''); if(motivo===null) return;
+    google.script.run.withSuccessHandler(function(r){ S.flash(r.mensaje,'ok'); cargar(); })
+      .withFailureHandler(function(e){ S.flash(e.message||String(e),'err'); })
+      .rechazarPresupuesto(ID, motivo);
+  }
+  function volver(){ google.script.run.abrirVerPresupuestos(); }
+
+  cargar();
+</script>
+</body>
+</html>

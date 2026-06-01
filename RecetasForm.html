@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<base target="_top">
+<?!= include('Estilos'); ?>
+</head>
+<body>
+
+<div class="dlg-head">
+  <h3>Recetas</h3>
+  <button class="x" onclick="S.cerrar()" title="Cerrar">&times;</button>
+</div>
+
+<div class="dlg-body">
+  <div id="flash" class="flash"></div>
+
+  <div class="card">
+    <div class="toolbar">
+      <h4>Lista de recetas</h4>
+      <button class="btn mini" onclick="nuevo()">+ Nueva receta</button>
+    </div>
+    <div id="lista"><div class="empty">Cargando...</div></div>
+  </div>
+
+  <div class="card">
+    <div class="grp-title" id="formTitulo">Nueva receta</div>
+    <input type="hidden" id="id">
+    <div class="two">
+      <div class="field">
+        <div class="lab"><b>Nombre</b><span class="req">*</span><span class="typetag">Texto</span></div>
+        <input id="nombre" placeholder="Ej. Torta de chocolate">
+      </div>
+      <div class="field">
+        <div class="lab"><b>Categoria</b><span class="opt">opcional</span><span class="typetag">Texto</span></div>
+        <input id="categoria" placeholder="Tortas, bocaditos...">
+      </div>
+    </div>
+    <div class="two">
+      <div class="field">
+        <div class="lab"><b>Raciones base</b><span class="req">*</span><span class="typetag">Numero</span></div>
+        <input id="raciones_base" type="number" min="0" step="any" placeholder="Para cuantas raciones rinde tal cual">
+      </div>
+      <div class="field">
+        <div class="lab"><b>Tiempo mano de obra</b><span class="req">*</span><span class="typetag">Numero (horas)</span></div>
+        <input id="tiempo" type="number" min="0" step="any" placeholder="Ej. 1.5">
+      </div>
+    </div>
+
+    <div class="grp-title" style="margin-top:18px;border-top:1px dashed var(--line);padding-top:16px">Ingredientes</div>
+    <div id="ings"></div>
+    <button class="btn mini" onclick="addRow()">+ Agregar ingrediente</button>
+    <div class="note">La unidad se toma sola del insumo. Las cantidades son para la base de la receta.</div>
+  </div>
+</div>
+
+<div class="dlg-foot">
+  <button class="btn" onclick="nuevo()">Limpiar</button>
+  <button class="btn primary" id="btnGuardar" onclick="guardar()">Guardar receta</button>
+</div>
+
+<script>
+  var datos=[], insumos=[], rowId=0;
+
+  function cargar(){
+    S.call('catalogoInsumos','ingrediente',function(r){
+      // se permiten todos los insumos como ingrediente, no solo tipo ingrediente
+      S.call('catalogoInsumos',null,function(all){ insumos=all||[]; });
+    });
+    S.call('listarRecetas',null,function(r){ datos=r||[]; pintar(); });
+  }
+  function pintar(){
+    var c=document.getElementById('lista');
+    if(!datos.length){ c.innerHTML='<div class="empty">Aun no hay recetas.</div>'; return; }
+    var f='<table class="t"><tr><th>Receta</th><th>Categoria</th><th class="n">Raciones</th>'
+        + '<th class="n">Ingred.</th><th></th></tr>';
+    datos.forEach(function(d){
+      f+='<tr><td>'+S.esc(d.nombre)+'</td><td>'+S.esc(d.categoria)+'</td>'
+       + '<td class="n">'+d.raciones_base+'</td><td class="n">'+d.ingredientes.length+'</td>'
+       + '<td class="n"><button class="btn mini" onclick="editar(\''+d.id+'\')">Editar</button></td></tr>';
+    });
+    c.innerHTML=f+'</table>';
+  }
+  function addRow(ing){
+    rowId++;
+    var wrap=document.createElement('div');
+    wrap.className='row-add'; wrap.style.gridTemplateColumns='1.6fr .9fr .6fr auto';
+    wrap.id='row'+rowId;
+    wrap.innerHTML=
+      '<div class="ac"><input placeholder="Buscar insumo..." id="in'+rowId+'">'
+      + '<input type="hidden" id="inid'+rowId+'"></div>'
+      + '<input type="number" min="0" step="any" placeholder="Cantidad" id="cant'+rowId+'">'
+      + '<input class="ro" readonly placeholder="unidad" id="uni'+rowId+'">'
+      + '<button class="btn mini no" onclick="this.parentNode.remove()">Quitar</button>';
+    document.getElementById('ings').appendChild(wrap);
+    var input=document.getElementById('in'+rowId), hid=document.getElementById('inid'+rowId),
+        uni=document.getElementById('uni'+rowId);
+    S.autocomplete(input,hid,insumos.map(function(i){ return {id:i.id,nombre:i.nombre}; }),function(it){
+      var full=insumos.filter(function(x){ return String(x.id)===String(it.id); })[0];
+      uni.value=full?(full.unidad_base==='u'?'unidad':'gramo'):'';
+    });
+    if(ing){
+      input.value=ing.insumo_nombre||''; hid.value=ing.insumo_id||'';
+      document.getElementById('cant'+rowId).value=ing.cantidad_base||'';
+      uni.value=(ing.unidad==='u'?'unidad':(ing.unidad?'gramo':''));
+    }
+  }
+  function nuevo(){
+    document.getElementById('id').value='';
+    ['nombre','categoria','raciones_base','tiempo'].forEach(function(k){ document.getElementById(k).value=''; });
+    document.getElementById('ings').innerHTML=''; addRow();
+    document.getElementById('formTitulo').textContent='Nueva receta';
+    document.getElementById('nombre').focus();
+  }
+  function editar(id){
+    var d=datos.filter(function(x){ return String(x.id)===String(id); })[0]; if(!d) return;
+    document.getElementById('id').value=d.id;
+    document.getElementById('nombre').value=d.nombre||'';
+    document.getElementById('categoria').value=d.categoria||'';
+    document.getElementById('raciones_base').value=d.raciones_base||'';
+    document.getElementById('tiempo').value=d.tiempo_mano_obra_horas||'';
+    document.getElementById('ings').innerHTML='';
+    (d.ingredientes||[]).forEach(function(g){ addRow(g); });
+    if(!d.ingredientes||!d.ingredientes.length) addRow();
+    document.getElementById('formTitulo').textContent='Editar receta';
+    window.scrollTo(0,document.body.scrollHeight);
+  }
+  function recogerIngredientes(){
+    var res=[];
+    Array.prototype.forEach.call(document.querySelectorAll('#ings .row-add'),function(row){
+      var idn=row.querySelector('input[type=hidden]').value;
+      var cant=row.querySelector('input[type=number]').value;
+      if(idn && Number(cant)>0) res.push({insumo_id:idn, cantidad_base:cant});
+    });
+    return res;
+  }
+  function guardar(){
+    var n=document.getElementById('nombre'), rb=document.getElementById('raciones_base'),
+        tm=document.getElementById('tiempo');
+    var ok=true;
+    S.bad(n,!n.value.trim()); if(!n.value.trim()) ok=false;
+    S.bad(rb,!(Number(rb.value)>0)); if(!(Number(rb.value)>0)) ok=false;
+    S.bad(tm,!(tm.value!==''&&Number(tm.value)>=0)); if(!(tm.value!==''&&Number(tm.value)>=0)) ok=false;
+    var ings=recogerIngredientes();
+    if(!ings.length){ ok=false; S.flash('Agrega al menos un ingrediente con cantidad.','err'); }
+    if(!ok){ if(n.value.trim()&&Number(rb.value)>0) {} else S.flash('Revisa los campos marcados.','err'); return; }
+    var btn=document.getElementById('btnGuardar'); btn.disabled=true;
+    S.call('guardarReceta',{
+      id:document.getElementById('id').value, nombre:n.value,
+      categoria:document.getElementById('categoria').value,
+      raciones_base:rb.value, tiempo_mano_obra_horas:tm.value, ingredientes:ings
+    }, function(r){ btn.disabled=false; S.flash(r.mensaje,'ok'); nuevo(); cargar(); },
+       function(e){ btn.disabled=false; S.flash(e.message||String(e),'err'); });
+  }
+  cargar(); addRow();
+</script>
+</body>
+</html>

@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<base target="_top">
+<?!= include('Estilos'); ?>
+<style>
+  .stbadge{font-family:"Space Mono",monospace;font-size:10px;text-transform:uppercase;padding:2px 8px;border-radius:999px}
+  .st-Pendiente{background:#f0ece4;color:#7a7166}
+  .st-Producción{background:var(--accent-soft);color:var(--accent-deep)}
+  .st-Entregado{background:var(--green-soft);color:var(--green)}
+  .st-Cancelado{background:var(--red-soft);color:var(--red)}
+  .filtros{display:grid;grid-template-columns:1fr 2fr;gap:10px}
+</style>
+</head>
+<body>
+
+<div class="dlg-head">
+  <h3>Ver pedidos</h3>
+  <button class="x" onclick="S.cerrar()" title="Cerrar">&times;</button>
+</div>
+
+<div class="dlg-body">
+  <div id="flash" class="flash"></div>
+  <div class="card">
+    <div class="grp-title">Filtros</div>
+    <div class="filtros">
+      <div class="field" style="margin:0">
+        <div class="lab"><b>Estado</b></div>
+        <select id="f_estado" onchange="pintar()">
+          <option value="">Todos</option><option>Pendiente</option><option>Producción</option>
+          <option>Entregado</option><option>Cancelado</option>
+        </select>
+      </div>
+      <div class="field" style="margin:0">
+        <div class="lab"><b>Cliente</b></div>
+        <input id="f_cliente" placeholder="Nombre..." oninput="pintar()">
+      </div>
+    </div>
+  </div>
+  <div class="card"><div id="lista"><div class="empty">Cargando...</div></div></div>
+</div>
+
+<div class="dlg-foot"><button class="btn" onclick="S.cerrar()">Cerrar</button></div>
+
+<script>
+  var datos=[];
+  function cargar(){ S.call('listarPedidos', null, function(r){ datos=r||[]; pintar(); }); }
+  function pintar(){
+    var fe=document.getElementById('f_estado').value;
+    var fc=document.getElementById('f_cliente').value.toLowerCase().trim();
+    var rows=datos.filter(function(d){
+      if(fe && d.estado!==fe) return false;
+      if(fc && String(d.cliente_nombre).toLowerCase().indexOf(fc)<0) return false;
+      return true;
+    });
+    var c=document.getElementById('lista');
+    if(!rows.length){ c.innerHTML='<div class="empty">No hay pedidos con esos filtros.</div>'; return; }
+    var t='<table class="t"><tr><th>N°</th><th>Presup.</th><th>Cliente</th><th>Producto</th><th>Creado</th><th>Estado</th><th></th></tr>';
+    rows.forEach(function(d){
+      var a='<button class="btn mini" onclick="ver(\''+d.id+'\')">Ver</button>';
+      if(d.estado==='Pendiente') a+=' <button class="btn mini ok" onclick="prod(\''+d.id+'\')">Producción</button>';
+      if(d.estado==='Producción') a+=' <button class="btn mini ok" onclick="entregar(\''+d.id+'\')">Entregar</button>';
+      if(d.estado==='Pendiente'||d.estado==='Producción') a+=' <button class="btn mini no" onclick="cancelar(\''+d.id+'\')">Cancelar</button>';
+      t+='<tr><td class="num">'+S.esc(d.id)+'</td><td class="num">'+S.esc(d.presupuesto_id)+'</td>'
+       + '<td>'+S.esc(d.cliente_nombre)+'</td><td>'+S.esc(d.receta_nombre)+'</td>'
+       + '<td>'+S.esc(d.fecha_creacion)+'</td>'
+       + '<td><span class="stbadge st-'+S.esc(d.estado)+'">'+S.esc(d.estado)+'</span></td>'
+       + '<td class="n rowact">'+a+'</td></tr>';
+    });
+    c.innerHTML=t+'</table>';
+  }
+  function ver(id){ google.script.run.abrirDetallePedido(id); }
+  function prod(id){
+    if(!S.confirmar('¿Pasar el pedido '+id+' a Producción? Esto puede descontar stock.')) return;
+    S.call('iniciarProduccion', id, function(r){ S.flash(r.mensaje,'ok'); cargar(); });
+  }
+  function entregar(id){
+    if(!S.confirmar('¿Marcar el pedido '+id+' como entregado? Se registrará la venta.')) return;
+    S.call('marcarEntregado', id, function(r){ S.flash(r.mensaje,'ok'); cargar(); });
+  }
+  function cancelar(id){
+    var m=window.prompt('Motivo de la cancelación (opcional):',''); if(m===null) return;
+    google.script.run.withSuccessHandler(function(r){ S.flash(r.mensaje,'ok'); cargar(); })
+      .withFailureHandler(function(e){ S.flash(e.message||String(e),'err'); })
+      .cancelarPedido(id, m);
+  }
+  cargar();
+</script>
+</body>
+</html>

@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<base target="_top">
+<?!= include('Estilos'); ?>
+</head>
+<body>
+
+<div class="dlg-head">
+  <h3>Configuracion</h3>
+  <button class="x" onclick="S.cerrar()" title="Cerrar">&times;</button>
+</div>
+
+<div class="dlg-body">
+  <div id="flash" class="flash"></div>
+
+  <div class="card">
+    <div class="grp-title">Parametros del negocio</div>
+    <p class="sub">Lo que cambies aqui afecta los presupuestos nuevos, nunca los ya guardados.</p>
+
+    <div class="two">
+      <div class="field">
+        <div class="lab"><b>Tarifa mano de obra / hora</b><span class="req">*</span><span class="typetag">Numero</span></div>
+        <input id="tarifa_mano_obra_hora" type="number" min="0" step="any">
+      </div>
+      <div class="field">
+        <div class="lab"><b>Costo indirecto / pedido</b><span class="req">*</span><span class="typetag">Numero</span></div>
+        <input id="costo_indirecto_pedido" type="number" min="0" step="any">
+      </div>
+    </div>
+    <div class="two">
+      <div class="field">
+        <div class="lab"><b>Depreciacion / pedido</b><span class="req">*</span><span class="typetag">Numero</span></div>
+        <input id="depreciacion_pedido" type="number" min="0" step="any">
+      </div>
+      <div class="field">
+        <div class="lab"><b>Margen por defecto</b><span class="req">*</span><span class="typetag">Numero %</span></div>
+        <input id="margen_defecto" type="number" min="0" step="any">
+      </div>
+    </div>
+    <div class="two">
+      <div class="field">
+        <div class="lab"><b>Aplicar IGV</b><span class="req">*</span><span class="typetag">Casilla</span></div>
+        <select id="aplicar_igv"><option value="SI">Si</option><option value="NO">No</option></select>
+      </div>
+      <div class="field">
+        <div class="lab"><b>Tasa de IGV</b><span class="req">*</span><span class="typetag">Numero %</span></div>
+        <input id="tasa_igv" type="number" min="0" step="any">
+      </div>
+    </div>
+    <div class="two">
+      <div class="field">
+        <div class="lab"><b>Redondeo del precio</b><span class="req">*</span><span class="typetag">Dropdown</span></div>
+        <select id="redondeo">
+          <option value="MULTIPLO_5">Multiplo de 5 hacia arriba</option>
+          <option value="NINGUNO">Ninguno</option>
+        </select>
+      </div>
+      <div class="field">
+        <div class="lab"><b>Dias de vencimiento</b><span class="req">*</span><span class="typetag">Numero</span></div>
+        <input id="dias_vencimiento" type="number" min="1" step="1">
+      </div>
+    </div>
+    <div class="two">
+      <div class="field">
+        <div class="lab"><b>Descuento de stock</b><span class="req">*</span><span class="typetag">Dropdown</span></div>
+        <select id="momento_descuento_stock">
+          <option value="APROBAR">Al aprobar el pedido</option>
+          <option value="PRODUCCION">Al iniciar produccion</option>
+        </select>
+      </div>
+      <div class="field">
+        <div class="lab"><b>Nombre del negocio</b><span class="req">*</span><span class="typetag">Texto</span></div>
+        <input id="nombre_negocio" placeholder="Aparece en el menu">
+      </div>
+    </div>
+    <div class="field">
+      <div class="lab"><b>Lista de tamanos</b><span class="req">*</span><span class="typetag">Texto</span></div>
+      <input id="lista_tamanos" placeholder="chico, mediano, grande">
+    </div>
+    <div class="note">El nombre del negocio se aplica al menu la proxima vez que abras el archivo.</div>
+  </div>
+</div>
+
+<div class="dlg-foot">
+  <button class="btn" onclick="S.cerrar()">Cancelar</button>
+  <button class="btn primary" id="btnGuardar" onclick="guardar()">Guardar configuracion</button>
+</div>
+
+<script>
+  var campos=['tarifa_mano_obra_hora','costo_indirecto_pedido','depreciacion_pedido','margen_defecto',
+              'aplicar_igv','tasa_igv','redondeo','dias_vencimiento','momento_descuento_stock',
+              'lista_tamanos','nombre_negocio'];
+
+  function cargar(){
+    S.call('obtenerConfiguracion',null,function(cfg){
+      campos.forEach(function(k){ if(document.getElementById(k)!=null && cfg[k]!=null) document.getElementById(k).value=cfg[k]; });
+    });
+  }
+  function guardar(){
+    var datos={}; campos.forEach(function(k){ datos[k]=document.getElementById(k).value; });
+    if(!datos.lista_tamanos.trim()){ S.bad(document.getElementById('lista_tamanos'),true); S.flash('La lista de tamanos no puede quedar vacia.','err'); return; }
+    if(!datos.nombre_negocio.trim()){ S.bad(document.getElementById('nombre_negocio'),true); S.flash('El nombre del negocio no puede quedar vacio.','err'); return; }
+    var btn=document.getElementById('btnGuardar'); btn.disabled=true;
+    S.call('guardarConfiguracion',datos,
+      function(r){ btn.disabled=false; S.flash(r.mensaje,'ok'); },
+      function(e){ btn.disabled=false; S.flash(e.message||String(e),'err'); });
+  }
+  cargar();
+</script>
+</body>
+</html>

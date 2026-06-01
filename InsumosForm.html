@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<base target="_top">
+<?!= include('Estilos'); ?>
+</head>
+<body>
+
+<div class="dlg-head">
+  <h3>Insumos</h3>
+  <button class="x" onclick="S.cerrar()" title="Cerrar">&times;</button>
+</div>
+
+<div class="dlg-body">
+  <div id="flash" class="flash"></div>
+
+  <div class="card">
+    <div class="toolbar">
+      <h4>Lista de insumos</h4>
+      <button class="btn mini" onclick="nuevo()">+ Nuevo insumo</button>
+    </div>
+    <div id="lista"><div class="empty">Cargando...</div></div>
+  </div>
+
+  <div class="card">
+    <div class="grp-title" id="formTitulo">Nuevo insumo</div>
+    <input type="hidden" id="id">
+    <div class="two">
+      <div class="field">
+        <div class="lab"><b>Nombre</b><span class="req">*</span><span class="typetag">Texto</span></div>
+        <input id="nombre" placeholder="Ej. Harina">
+      </div>
+      <div class="field">
+        <div class="lab"><b>Tipo</b><span class="req">*</span><span class="typetag">Dropdown</span></div>
+        <select id="tipo">
+          <option value="ingrediente">Ingrediente</option>
+          <option value="empaque">Empaque</option>
+        </select>
+      </div>
+    </div>
+    <div class="two">
+      <div class="field">
+        <div class="lab"><b>Unidad base</b><span class="req">*</span><span class="typetag">Dropdown</span></div>
+        <select id="unidad_base" onchange="recalc()">
+          <option value="g">Gramos</option>
+          <option value="u">Unidad</option>
+        </select>
+      </div>
+      <div class="field">
+        <div class="lab"><b>Tamano presentacion</b><span class="req">*</span><span class="typetag">Numero</span></div>
+        <input id="tamano_presentacion" type="number" min="0" step="any" placeholder="Ej. 1000" oninput="recalc()">
+      </div>
+    </div>
+    <div class="two">
+      <div class="field">
+        <div class="lab"><b>Precio presentacion</b><span class="req">*</span><span class="typetag">Numero</span></div>
+        <input id="precio_presentacion" type="number" min="0" step="any" placeholder="Ej. 3.20" oninput="recalc()">
+      </div>
+      <div class="field">
+        <div class="lab"><b>Precio por <span id="uLbl">gramo</span></b><span class="typetag">Solo lectura</span></div>
+        <input id="ppu" class="calc" readonly value="0.0000">
+      </div>
+    </div>
+    <div class="three">
+      <div class="field" id="boxStockIni">
+        <div class="lab"><b>Stock inicial</b><span class="opt">al crear</span><span class="typetag">Numero</span></div>
+        <input id="stock_inicial" type="number" min="0" step="any" placeholder="0">
+      </div>
+      <div class="field">
+        <div class="lab"><b>Stock minimo</b><span class="req">*</span><span class="typetag">Numero</span></div>
+        <input id="stock_minimo" type="number" min="0" step="any" placeholder="0">
+      </div>
+      <div class="field ac">
+        <div class="lab"><b>Proveedor rec.</b><span class="opt">opcional</span><span class="typetag">Autocompletado</span></div>
+        <input id="prov_nombre" placeholder="Buscar proveedor...">
+        <input type="hidden" id="proveedor_recomendado_id">
+      </div>
+    </div>
+    <div class="note" id="notaEdicion" style="display:none">
+      En edicion el stock no se toca desde aqui. El stock lo mueven las compras y los ajustes de inventario.
+    </div>
+  </div>
+</div>
+
+<div class="dlg-foot">
+  <button class="btn" onclick="nuevo()">Limpiar</button>
+  <button class="btn primary" id="btnGuardar" onclick="guardar()">Guardar insumo</button>
+</div>
+
+<script>
+  var datos=[], proveedores=[];
+
+  function recalc(){
+    var t=Number(document.getElementById('tamano_presentacion').value)||0;
+    var p=Number(document.getElementById('precio_presentacion').value)||0;
+    document.getElementById('ppu').value = S.num4(t>0?p/t:0);
+    document.getElementById('uLbl').textContent = (document.getElementById('unidad_base').value==='u')?'unidad':'gramo';
+  }
+  function cargar(){
+    S.call('listarInsumos',null,function(r){ datos=r||[]; pintar(); });
+    S.call('catalogoProveedores',null,function(r){
+      proveedores=(r||[]).map(function(p){ return {id:p.id,nombre:p.nombre}; });
+      S.autocomplete(document.getElementById('prov_nombre'),
+                     document.getElementById('proveedor_recomendado_id'), proveedores);
+    });
+  }
+  function pintar(){
+    var c=document.getElementById('lista');
+    if(!datos.length){ c.innerHTML='<div class="empty">Aun no hay insumos.</div>'; return; }
+    var f='<table class="t"><tr><th>Insumo</th><th>Tipo</th><th class="n">P. unitario</th>'
+        + '<th class="n">Stock</th><th class="n">Minimo</th><th></th></tr>';
+    datos.forEach(function(d){
+      f+='<tr><td><span class="dot '+d.semaforo+'"></span>'+S.esc(d.nombre)+'</td>'
+       + '<td>'+S.esc(d.tipo)+'</td>'
+       + '<td class="n">'+S.num4(d.precio_por_unidad_base)+'</td>'
+       + '<td class="n">'+d.stock_actual+' '+S.esc(d.unidad_base)+'</td>'
+       + '<td class="n">'+d.stock_minimo+'</td>'
+       + '<td class="n"><button class="btn mini" onclick="editar(\''+d.id+'\')">Editar</button></td></tr>';
+    });
+    c.innerHTML=f+'</table>';
+  }
+  function nuevo(){
+    document.getElementById('id').value='';
+    document.getElementById('nombre').value='';
+    document.getElementById('tipo').value='ingrediente';
+    document.getElementById('unidad_base').value='g';
+    document.getElementById('tamano_presentacion').value='';
+    document.getElementById('precio_presentacion').value='';
+    document.getElementById('stock_inicial').value='';
+    document.getElementById('stock_minimo').value='';
+    document.getElementById('prov_nombre').value='';
+    document.getElementById('proveedor_recomendado_id').value='';
+    document.getElementById('formTitulo').textContent='Nuevo insumo';
+    document.getElementById('boxStockIni').style.display='';
+    document.getElementById('notaEdicion').style.display='none';
+    recalc(); document.getElementById('nombre').focus();
+  }
+  function editar(id){
+    var d=datos.filter(function(x){ return String(x.id)===String(id); })[0]; if(!d) return;
+    document.getElementById('id').value=d.id;
+    document.getElementById('nombre').value=d.nombre||'';
+    document.getElementById('tipo').value=d.tipo||'ingrediente';
+    document.getElementById('unidad_base').value=d.unidad_base||'g';
+    document.getElementById('tamano_presentacion').value=d.tamano_presentacion||'';
+    document.getElementById('precio_presentacion').value=d.precio_presentacion||'';
+    document.getElementById('stock_minimo').value=d.stock_minimo||'';
+    document.getElementById('proveedor_recomendado_id').value=d.proveedor_recomendado_id||'';
+    var prov=proveedores.filter(function(p){ return String(p.id)===String(d.proveedor_recomendado_id); })[0];
+    document.getElementById('prov_nombre').value=prov?prov.nombre:'';
+    document.getElementById('formTitulo').textContent='Editar insumo';
+    document.getElementById('boxStockIni').style.display='none';
+    document.getElementById('notaEdicion').style.display='';
+    recalc(); window.scrollTo(0,document.body.scrollHeight);
+  }
+  function guardar(){
+    var n=document.getElementById('nombre'), t=document.getElementById('tamano_presentacion'),
+        p=document.getElementById('precio_presentacion'), m=document.getElementById('stock_minimo');
+    var ok=true;
+    [[n,!n.value.trim()],[t,!(Number(t.value)>0)],[p,!(Number(p.value)>0)],[m,!(m.value!==''&&Number(m.value)>=0)]]
+      .forEach(function(par){ S.bad(par[0],par[1]); if(par[1]) ok=false; });
+    if(!ok){ S.flash('Revisa los campos marcados. Tamano y precio deben ser mayor que cero.','err'); return; }
+    var btn=document.getElementById('btnGuardar'); btn.disabled=true;
+    S.call('guardarInsumo',{
+      id:document.getElementById('id').value, nombre:n.value,
+      tipo:document.getElementById('tipo').value, unidad_base:document.getElementById('unidad_base').value,
+      tamano_presentacion:t.value, precio_presentacion:p.value,
+      stock_inicial:document.getElementById('stock_inicial').value, stock_minimo:m.value,
+      proveedor_recomendado_id:document.getElementById('proveedor_recomendado_id').value
+    }, function(r){ btn.disabled=false; S.flash(r.mensaje,'ok'); nuevo(); cargar(); },
+       function(e){ btn.disabled=false; S.flash(e.message||String(e),'err'); });
+  }
+  cargar(); recalc();
+</script>
+</body>
+</html>
