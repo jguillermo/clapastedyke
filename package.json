@@ -1,7 +1,7 @@
 {
   "name": "clapastedyke",
   "version": "1.0.0",
-  "appVersion": 2,
+  "appVersion": 3,
   "description": "",
   "main": "index.js",
   "directories": {
@@ -14,8 +14,8 @@
     "pull": "cd src && clasp pull",
     "open": "cd src && clasp open-script",
     "test": "node test/unitarios/run.js",
-    "publish:test": "node test/e2e/publish.js test && npm run push && node test/e2e/publish.js clear",
-    "publish:prod": "node test/e2e/publish.js prod && npm run push && node test/e2e/publish.js clear"
+    "publish:test": "npm test && node test/e2e/publish.js test && npm run push && node test/e2e/publish.js clear",
+    "publish:prod": "npm test && node test/e2e/publish.js prod && npm run push && node test/e2e/publish.js clear"
   },
   "repository": {
     "type": "git",

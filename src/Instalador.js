@@ -59,7 +59,8 @@ function ejecutarTablas() {
     } else if (def.esResumen) {
       // El Resumen lo construye por completo el paso de formulas.
     } else {
-      escribirTituloHoja(sheet, def, def.columnas.length);
+      // Solo el texto (estructura). El estilo del titulo va en el paso de diseno.
+      sheet.getRange(FILA_TITULO, 1).setValue(def.titulo_hoja || def.nombre);
       escribirHeaders(sheet, def);
     }
   });
@@ -160,6 +161,20 @@ function ejecutarProtecciones() {
   return n;
 }
 
+// ---------- Pasos 3-5 juntos (son rapidos) ----------
+
+function instalarRapidos() {
+  _correrPaso('3-5. Formulas, validaciones y protecciones', function () {
+    var f = ejecutarFormulas();
+    var v = ejecutarValidaciones();
+    var p = ejecutarProtecciones();
+    return 'Listo.\n\n'
+      + 'Formulas: ' + f + ' hoja(s)\n'
+      + 'Validaciones: ' + v + ' hoja(s)\n'
+      + 'Protecciones: ' + p + ' hoja(s)';
+  });
+}
+
 // ---------- Todo en uno (puede superar el limite de tiempo) ----------
 
 /** Punto de entrada llamado desde el menu: corre los cinco pasos en orden. */
@@ -221,6 +236,9 @@ function escribirHeaders(sheet, def) {
 function formatearHoja(sheet, def) {
   var cols = columnasDe(def);
   var nCols = Math.max(1, cols.length);
+
+  escribirTituloHoja(sheet, def, nCols); // estilo del titulo (el texto ya esta)
+
   var headerRange = sheet.getRange(FILA_HEADER, 1, 1, nCols);
 
   headerRange.setFontWeight('bold').setFontSize(11)
@@ -245,14 +263,14 @@ function formatearHoja(sheet, def) {
     if (fmt) sheet.getRange(FILA_DATOS, i + 1, filas, 1).setNumberFormat(fmt);
   });
 
-  try {
-    sheet.autoResizeColumns(1, nCols);
-    for (var k = 1; k <= nCols; k++) {
-      var w = sheet.getColumnWidth(k);
-      if (w < ANCHO_MIN) sheet.setColumnWidth(k, ANCHO_MIN);
-      else if (w > ANCHO_MAX) sheet.setColumnWidth(k, ANCHO_MAX);
-    }
-  } catch (e) {}
+  // Ancho por columna estimado del titulo. Evitamos autoResizeColumns(), que
+  // mide el contenido celda por celda y es lo mas lento del instalador.
+  var titulos = titulosDe(def);
+  cols.forEach(function (c, i) {
+    var largo = String(titulos[i] || '').length * 8 + 28;
+    var w = Math.max(ANCHO_MIN, Math.min(ANCHO_MAX, largo));
+    try { sheet.setColumnWidth(i + 1, w); } catch (e) {}
+  });
 }
 
 /** Dropdowns por celda para columnas con lista cerrada (por slug). */

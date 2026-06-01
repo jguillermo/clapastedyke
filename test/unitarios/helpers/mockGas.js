@@ -24,6 +24,7 @@ Hoja.prototype._ensure = function (r, c) {
   for (var i = 0; i < r; i++) { while (this.cells[i].length < c) this.cells[i].push(''); }
 };
 Hoja.prototype.getName = function () { return this.nombre; };
+Hoja.prototype.getParent = function () { return this.parent || null; };
 Hoja.prototype.getLastRow = function () {
   var last = 0;
   for (var r = 0; r < this.cells.length; r++) {
@@ -141,7 +142,8 @@ function Spreadsheet() { this.sheets = []; this.active = null; this.toasts = [];
 Spreadsheet.prototype.getSheetByName = function (n) {
   return this.sheets.filter(function (s) { return s.getName() === n; })[0] || null;
 };
-Spreadsheet.prototype.insertSheet = function (n) { var s = new Hoja(n); this.sheets.push(s); return s; };
+Spreadsheet.prototype.insertSheet = function (n) { var s = new Hoja(n); s.parent = this; this.sheets.push(s); return s; };
+Spreadsheet.prototype.getUrl = function () { return 'https://docs.google.com/spreadsheets/d/MOCK_ID/edit'; };
 Spreadsheet.prototype.getSheets = function () { return this.sheets.slice(); };
 Spreadsheet.prototype.deleteSheet = function (s) {
   this.sheets = this.sheets.filter(function (x) { return x !== s; });

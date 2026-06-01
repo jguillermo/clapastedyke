@@ -41,9 +41,7 @@ function onOpen() {
     .addSeparator()
     .addItem('1. Crear tablas', 'instalarTablas')
     .addItem('2. Aplicar diseno', 'instalarDiseno')
-    .addItem('3. Agregar formulas', 'instalarFormulas')
-    .addItem('4. Validaciones', 'instalarValidaciones')
-    .addItem('5. Protecciones', 'instalarProtecciones');
+    .addItem('3-5. Formulas, validaciones y protecciones', 'instalarRapidos');
   menu.addSubMenu(admin);
 
   // Ultimo item: version de la app (se incrementa en cada deploy).
