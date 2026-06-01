@@ -36,6 +36,8 @@ function onOpen() {
   menu.addItem('Configuracion', 'abrirConfiguracion');
 
   menu.addSeparator();
+  menu.addItem('Manual de usuario', 'abrirManualDeUsuario');
+
   var admin = ui.createMenu('Mantenimiento')
     .addItem('Instalar o reparar', 'instalar');
   menu.addSubMenu(admin);
@@ -55,6 +57,10 @@ function irAlInicio() {
   } else {
     toast('Aun no esta instalado. Usa Mantenimiento > Instalar o reparar.');
   }
+}
+
+function abrirManualDeUsuario() {
+  abrirModal('Manual_de_usuario', 'Manual de usuario', 900, 600);
 }
 
 /** Aviso para las pantallas que llegan en fases siguientes. */
