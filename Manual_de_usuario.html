@@ -215,15 +215,24 @@
   @media(max-width:560px){ #phase{display:none !important} }
 
   /* Intro de grupo: portada de fase a pantalla casi completa */
-  .gintro{position:relative;overflow:hidden;min-height:78vh;display:flex;flex-direction:column;align-items:center;justify-content:center;
-    text-align:center;padding:70px 22px;border-top:1px solid var(--line)}
-  .gintro-deco{position:absolute;width:min(440px,82vw);color:var(--accent);opacity:.06;pointer-events:none;z-index:0;will-change:transform}
+  .gintro{position:relative;overflow:hidden;min-height:62vh;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    text-align:center;padding:54px 22px;border-top:1px solid var(--line)}
+  .gi-stage{position:relative;width:100%;max-width:560px;height:clamp(180px,30vh,300px);display:flex;align-items:center;justify-content:center;margin-bottom:6px}
+  .gi-orbit{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none}
+  .gi-chip{position:absolute;left:50%;top:50%;width:56px;height:56px;margin:-28px 0 0 -28px;display:grid;place-items:center;border-radius:16px;
+    background:rgba(255,255,255,.72);border:1px solid rgba(60,40,25,.08);color:var(--accent);box-shadow:var(--shadow-sm);will-change:transform}
+  .gi-chip svg{width:29px;height:29px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+  .gintro-ring.r2{border-color:var(--accent-glow)}
+  .gintro-deco{position:absolute;width:min(500px,88vw);color:var(--accent);opacity:.09;pointer-events:none;z-index:0;will-change:transform}
   .gintro-deco svg{width:100%;height:auto;fill:none;stroke:currentColor;stroke-width:1;stroke-linecap:round;stroke-linejoin:round}
   .gintro > *{position:relative;z-index:1}
   .gintro .gh-freq{margin-bottom:6px}
-  .gintro-ic{width:100px;height:100px;display:grid;place-items:center;border-radius:28px;margin:18px 0 6px;
+  .gintro-ic{position:relative;width:100px;height:100px;display:grid;place-items:center;border-radius:28px;margin:18px 0 6px;
     background:rgba(255,255,255,.62);border:1px solid rgba(60,40,25,.08);color:var(--accent);box-shadow:var(--shadow)}
-  .gintro-ic svg{width:54px;height:54px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+  .gi-stage .gintro-ic{margin:0}
+  .gintro-ic svg{position:relative;z-index:1;width:54px;height:54px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+  .gintro-ring{position:absolute;inset:0;border-radius:28px;border:2px solid var(--accent);opacity:0;pointer-events:none}
+  .gintro-rule{display:block;width:66px;height:3px;border-radius:3px;background:linear-gradient(90deg,var(--accent),var(--accent-glow));margin:0 auto 18px}
   .gintro-title{font-family:"Fraunces",serif;font-weight:600;font-size:clamp(34px,7.2vw,66px);line-height:1.02;margin:14px 0 14px;letter-spacing:-.02em;color:var(--ink)}
   .gintro-title .w{display:inline-block;overflow:hidden;vertical-align:top;padding-bottom:.06em}
   .gintro-title .wi{display:inline-block;will-change:transform}
@@ -1066,36 +1075,125 @@
     g5:'<svg viewBox="0 0 48 48"><path d="M33 10a8 8 0 00-10.6 10.6L9 34l5 5 13.4-13.4A8 8 0 0038 15l-6.4 6.4-5-5z"/></svg>',
     g6:'<svg viewBox="0 0 48 48"><path d="M24 6a13 13 0 00-8 23.3c1.4 1.1 2 2.6 2 4.2V36h12v-2.5c0-1.6.6-3.1 2-4.2A13 13 0 0024 6z"/><path d="M19 41h10M21 45h6"/></svg>'
   };
+  // Iconos de los flujos que pertenecen a cada grupo (para el enjambre)
+  var GFLOWS = {};
+  Object.keys(GROUP).forEach(function(k){ if(k==='home') return; (GFLOWS[GROUP[k]] = GFLOWS[GROUP[k]] || []).push(k); });
+
+  // Cada grupo tiene su propia coreografia (iconos) y su propio revelado de titulo
+  var STYLE = {
+    g1:{chips:'orbit',   title:'mask',     deco: 24},
+    g2:{chips:'cascade', title:'drop',     deco:-18},
+    g3:{chips:'fan',     title:'slide',    deco: 16},
+    g4:{chips:'spiral',  title:'zoom',     deco: 300},
+    g5:{chips:'burst',   title:'maskover', deco:-26},
+    g6:{chips:'sides',   title:'fade',     deco: 20}
+  };
+
   [['f01','g1','h'],['f04','g2','g1'],['f07','g3','g2'],['f12','g4','g3'],['f14','g5','g4'],['precio','g6','g5']].forEach(function(p){
     var first = document.getElementById(p[0]); if(!first) return;
-    var g = p[1];
+    var g = p[1], st = STYLE[g];
+    var svgs = (GFLOWS[g] || []).map(function(id){ return ICONS[id] || ICONS._def; });
+    while(svgs.length < 4){ svgs.push(GROUPICON[g]); }
+    var chipsHTML = svgs.map(function(s){ return '<span class="gi-chip">'+s+'</span>'; }).join('');
+
     var gi = document.createElement('section'); gi.className = 'gintro';
     gi.innerHTML = '<div class="gintro-deco">'+GROUPICON[g]+'</div>'
+      + '<div class="gi-stage"><div class="gi-orbit">'+chipsHTML+'</div>'
+      + '<div class="gintro-ic"><span class="gintro-ring"></span><span class="gintro-ring r2"></span>'+GROUPICON[g]+'</div></div>'
       + '<span class="gh-freq">'+FREQ[g]+'</span>'
-      + '<div class="gintro-ic">'+GROUPICON[g]+'</div>'
       + '<h2 class="gintro-title">'+GROUPNAME[g]+'</h2>'
+      + '<span class="gintro-rule"></span>'
       + '<p class="gintro-desc">'+GROUPDESC[g]+'</p>';
     first.parentNode.insertBefore(gi, first);
 
-    var icBox = gi.querySelector('.gintro-ic'), ic = gi.querySelector('.gintro-ic svg');
+    var icBox = gi.querySelector('.gintro-ic');
+    var rings = gi.querySelectorAll('.gintro-ring');
     var deco = gi.querySelector('.gintro-deco svg');
+    var titleEl = gi.querySelector('.gintro-title');
+    var rule = gi.querySelector('.gintro-rule');
     var freq = gi.querySelector('.gh-freq'), desc = gi.querySelector('.gintro-desc');
-    var words = ensureSplit(gi.querySelector('.gintro-title'));
-    gsap.set(icBox, {opacity:0, y:30, scale:.6});
-    gsap.set([freq, desc], {opacity:0, y:24});
-    gsap.set(words, {yPercent:120});
-    ScrollTrigger.create({trigger:gi, start:'top 68%', once:true, onEnter:function(){
-      gsap.timeline()
-        .to(icBox, {opacity:1, y:0, scale:1, duration:.75, ease:'back.out(1.6)'})
-        .to(freq, {opacity:1, y:0, duration:.5, ease:'power3.out'}, '-=.45')
-        .to(words, {yPercent:0, duration:.9, ease:'power4.out', stagger:.06}, '-=.4')
-        .to(desc, {opacity:1, y:0, duration:.6, ease:'power3.out'}, '-=.55');
-      drawSVG(ic, 1.3);
-    }});
-    // Animacion durante el scroll: la imagen grande de fondo se desplaza y gira
-    gsap.fromTo(deco, {yPercent:-12, rotate:-7}, {yPercent:12, rotate:7, ease:'none',
-      scrollTrigger:{ trigger:gi, start:'top bottom', end:'bottom top', scrub:true }});
-    // El fondo cambia de color al entrar a la fase
+    var words = ensureSplit(titleEl);
+    var chips = gi.querySelectorAll('.gi-chip');
+    var orbit = gi.querySelector('.gi-orbit');
+    var N = chips.length, W = window.innerWidth, H = window.innerHeight;
+    var R = Math.min(210, Math.max(120, W * 0.30));
+    chips.forEach(function(c, i){ var a = (i/N)*Math.PI*2 - Math.PI/2; c._a = a; c._ox = Math.cos(a)*R; c._oy = Math.sin(a)*R; });
+
+    // Estados comunes
+    gsap.set(icBox, {opacity:0, scale:0});
+    gsap.set(rings, {opacity:0, scale:1});
+    gsap.set(rule, {scaleX:0, transformOrigin:'50% 50%'});
+    gsap.set([freq, desc], {opacity:0, y:30});
+    gsap.set(deco, {transformOrigin:'50% 50%'});
+    // El icono grande de fondo se mueve y gira durante TODO el paso de la fase (reversible)
+    var sgn = st.deco < 0 ? -1 : 1;
+    gsap.fromTo(deco, {yPercent:-34, rotate:-28*sgn, scale:.82},
+      {yPercent:34, rotate:28*sgn, scale:1.18, ease:'none',
+       scrollTrigger:{ trigger:gi, start:'top bottom', end:'bottom top', scrub:true }});
+
+    // Timeline ligada al scroll: fluida y reversible, SIN fijar la vista
+    var tl = gsap.timeline({ scrollTrigger:{ trigger:gi, start:'top 80%', end:'bottom 25%', scrub:0.8 } });
+
+    // FASE 1 — entrada y separacion de iconos (distinta por grupo)
+    chips.forEach(function(c, i){
+      var rowx = (i - (N-1)/2) * 74;
+      if(st.chips === 'orbit'){
+        gsap.set(c, {x:Math.cos(c._a)*R*2.6, y:Math.sin(c._a)*R*2.6, opacity:0, scale:.3, rotation:-140});
+        tl.to(c, {x:c._ox, y:c._oy, opacity:1, scale:1, rotation:0, ease:'power2.out'}, i*0.04);
+      } else if(st.chips === 'cascade'){
+        gsap.set(c, {x:rowx, y:-H*0.55, opacity:0, scale:.6, rotation:0});
+        tl.to(c, {y:0, opacity:1, scale:1, ease:'bounce.out'}, i*0.06);
+      } else if(st.chips === 'fan'){
+        gsap.set(c, {x:0, y:0, opacity:0, scale:.35, rotation:0});
+        tl.to(c, {x:rowx, opacity:1, scale:1, ease:'power3.out'}, i*0.04);
+      } else if(st.chips === 'spiral'){
+        gsap.set(c, {x:Math.cos(c._a)*R*2.4, y:Math.sin(c._a)*R*2.4, opacity:0, scale:.3, rotation:-220});
+        tl.to(c, {x:c._ox, y:c._oy, opacity:1, scale:1, rotation:0, ease:'power2.out'}, i*0.03);
+      } else if(st.chips === 'burst'){
+        gsap.set(c, {x:0, y:0, opacity:0, scale:.2, rotation:0});
+        tl.to(c, {x:c._ox*1.15, y:c._oy*1.15, opacity:1, scale:1, rotation:200, ease:'power3.out'}, i*0.03);
+      } else { // sides
+        gsap.set(c, {x:(i%2?1:-1)*W*0.55, y:(i-(N-1)/2)*44, opacity:0, scale:.6, rotation:0});
+        tl.to(c, {x:rowx, y:0, opacity:1, scale:1, ease:'power3.out'}, i*0.05);
+      }
+    });
+    if(st.chips === 'orbit' || st.chips === 'spiral'){ tl.to(orbit, {rotation:(st.chips==='spiral'?320:120), ease:'none'}, 0); }
+
+    // FASE 2 — los iconos se unen al centro y nace el icono del grupo
+    tl.addLabel('m', 0.46);
+    chips.forEach(function(c, i){
+      tl.to(c, {x:0, y:0, scale:.12, opacity:0, rotation:(st.chips==='burst'?0:70),
+        ease:(st.chips==='burst'?'back.in(1.4)':'power2.in')}, 'm+=' + (i*0.02));
+    });
+    tl.to(icBox, {opacity:1, scale:1, ease:'back.out(1.9)'}, 'm+=0.12');
+    tl.fromTo(rings[0], {opacity:.6, scale:1}, {opacity:0, scale:2.6, ease:'power2.out'}, 'm+=0.18');
+    tl.fromTo(rings[1], {opacity:.4, scale:1}, {opacity:0, scale:3.5, ease:'power2.out'}, 'm+=0.28');
+
+    // FASE 3 — revelado del titulo (distinto por grupo) + regla + texto
+    if(st.title === 'mask'){
+      gsap.set(titleEl, {scale:1.12}); gsap.set(words, {yPercent:130});
+      tl.to(words, {yPercent:0, stagger:0.05, ease:'power3.out'}, 0.66).to(titleEl, {scale:1, ease:'power3.out'}, 0.66);
+    } else if(st.title === 'drop'){
+      gsap.set(words, {yPercent:-150, opacity:0});
+      tl.to(words, {yPercent:0, opacity:1, stagger:0.05, ease:'back.out(1.5)'}, 0.64);
+    } else if(st.title === 'slide'){
+      gsap.set(words, {xPercent:-130, opacity:0});
+      tl.to(words, {xPercent:0, opacity:1, stagger:0.06, ease:'power3.out'}, 0.62);
+    } else if(st.title === 'zoom'){
+      gsap.set(titleEl, {scale:.5, opacity:0}); gsap.set(words, {yPercent:0});
+      tl.to(titleEl, {scale:1, opacity:1, ease:'back.out(1.5)'}, 0.64);
+    } else if(st.title === 'maskover'){
+      gsap.set(titleEl, {scale:1.1}); gsap.set(words, {yPercent:150});
+      tl.to(words, {yPercent:0, stagger:0.06, ease:'back.out(2)'}, 0.64).to(titleEl, {scale:1, ease:'power3.out'}, 0.64);
+    } else { // fade
+      gsap.set(titleEl, {scale:.85, opacity:0}); gsap.set(words, {yPercent:0});
+      tl.to(titleEl, {scale:1, opacity:1, ease:'power2.out'}, 0.64);
+    }
+    tl.to(freq, {opacity:1, y:0, ease:'power3.out'}, 0.6);
+    tl.to(rule, {scaleX:1, ease:'power3.inOut'}, 0.84);
+    tl.to(desc, {opacity:1, y:0, ease:'power3.out'}, 0.9);
+
+    // Color de fondo por fase (reversible, sin fijar)
     ScrollTrigger.create({trigger:gi, start:'top 55%',
       onEnter:function(){ setPhase(g); }, onLeaveBack:function(){ setPhase(p[2]); } });
   });
