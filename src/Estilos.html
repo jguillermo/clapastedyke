@@ -273,9 +273,12 @@
     // el failsafe quita fx-anim y todo queda visible.
     fx: function(){
       if(S._fx) return; S._fx=true;
+      var root=document.documentElement;
+      // Sin DOM real (p. ej. tests bajo Node): no hace nada.
+      if(!root || !document.body || typeof document.body.insertBefore!=='function') return;
       var body=document.querySelector('.dlg-body');
       // anim solo si html.fx-anim fue activado en <head> (false con reduce-motion / sin JS)
-      var anim = document.documentElement.className.indexOf('fx-anim')>=0;
+      var anim = (root.className||'').indexOf('fx-anim')>=0;
 
       // Barra de progreso ligada al scroll del cuerpo (solo si hay desbordamiento)
       var bar=document.createElement('div'); bar.className='dlg-progress';
