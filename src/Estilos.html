@@ -115,6 +115,77 @@
   .toolbar h4{margin:0;font-family:"Fraunces",serif;font-size:16px}
 
   @media(max-width:620px){ .two,.three{grid-template-columns:1fr} }
+
+  /* ===== Fluidez en el modal (ver doc/web_fuida.md) =====
+     Regla de oro del fallback: NADA se oculta salvo cuando el JS marca body.fx.
+     Sin JS o con prefers-reduced-motion, todo queda visible e instantaneo. */
+
+  /* Barra de progreso del scroll del cuerpo (dentro del modal, no fixed global) */
+  .dlg-progress{flex:0 0 auto;height:3px;background:var(--line-soft);display:none}
+  .dlg-progress.on{display:block}
+  .dlg-progress i{display:block;height:100%;width:0;
+    background:linear-gradient(90deg,var(--accent),var(--accent-deep));transition:width .08s linear}
+
+  /* Entrada del modal: fade + leve elevacion, una sola vez */
+  @keyframes modalIn{from{opacity:0;transform:translateY(8px) scale(.992)} to{opacity:1;transform:none}}
+  body.fx{animation:modalIn .26s cubic-bezier(.2,.7,.2,1) both}
+
+  /* Encabezado con icono + titulo revelado palabra por palabra (enmascarado) */
+  .dlg-title{display:flex;align-items:center;gap:10px;min-width:0}
+  .dlg-title h3{min-width:0}
+  .dlg-ico{flex:0 0 auto;width:20px;height:20px;color:var(--accent)}
+  .dlg-head h3 .w{display:inline-block;overflow:hidden;vertical-align:top}
+  .dlg-head h3 .wi{display:inline-block;transform:translateY(110%);
+    transition:transform .5s cubic-bezier(.2,.7,.2,1)}
+  .dlg-head h3 .w.in .wi{transform:none}
+
+  /* Revelado de tarjetas/secciones al entrar en vista (reversible, con stagger) */
+  body.fx .reveal{opacity:0;transform:translateY(14px);
+    transition:opacity .5s ease, transform .5s cubic-bezier(.2,.7,.2,1);
+    transition-delay:calc(var(--i,0) * 60ms)}
+  body.fx .reveal.is-in{opacity:1;transform:none}
+
+  /* Icono SVG de linea que se dibuja solo (sin plugins) */
+  .draw{stroke-dasharray:var(--len,260)}
+  @keyframes draw{from{stroke-dashoffset:var(--len,260)} to{stroke-dashoffset:0}}
+  body.fx .dlg-head .draw{animation:draw .9s ease .2s both}
+  body.fx .draw.is-in{animation:draw .9s ease both}
+
+  /* Pasos numerados con rebote + linea conectora (clase .steps opcional) */
+  .steps{list-style:none;margin:0;padding:0}
+  .steps li{position:relative;padding:0 0 14px 34px}
+  .steps li::before{content:attr(data-n);position:absolute;left:0;top:0;width:22px;height:22px;
+    border-radius:50%;background:var(--accent);color:#fff;font-family:"Space Mono",monospace;
+    font-size:11px;display:flex;align-items:center;justify-content:center}
+  .steps li::after{content:"";position:absolute;left:10px;top:24px;bottom:0;width:2px;background:var(--line)}
+  .steps li:last-child::after{display:none}
+  body.fx .steps li::before{transform:scale(.2);opacity:0}
+  body.fx .steps li::after{transform:scaleY(0);transform-origin:top;transition:transform .5s ease}
+  body.fx .steps li.is-in::before{animation:pop .5s cubic-bezier(.34,1.56,.64,1) forwards}
+  body.fx .steps li.is-in::after{transform:scaleY(1)}
+  @keyframes pop{to{transform:scale(1);opacity:1}}
+
+  /* Microinteracciones de formulario */
+  input,select,textarea{transition:border-color .18s ease,background-color .18s ease,box-shadow .18s ease}
+  input:focus,select:focus,textarea:focus{box-shadow:0 0 0 3px var(--accent-soft)}
+  .btn{transition:background-color .18s ease,border-color .18s ease,transform .12s ease}
+  .btn:active{transform:translateY(1px)}
+  @keyframes shake{10%,90%{transform:translateX(-1px)}30%,70%{transform:translateX(2px)}50%{transform:translateX(-3px)}}
+  input.bad,select.bad,textarea.bad{animation:shake .4s ease}
+  .flash.show{animation:flashIn .32s cubic-bezier(.2,.7,.2,1)}
+  @keyframes flashIn{from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:none}}
+
+  /* Puntero grueso (movil/tactil): atenua los hover finos */
+  @media(hover:none){ .btn:hover{border-color:var(--line)} }
+
+  /* Accesibilidad: sin movimiento => todo visible e instantaneo */
+  @media(prefers-reduced-motion:reduce){
+    body.fx, body.fx .reveal, .dlg-head h3 .wi, .draw,
+    body.fx .steps li::before, body.fx .steps li::after{
+      animation:none!important;transition:none!important;opacity:1!important;
+      transform:none!important;stroke-dashoffset:0!important}
+    .dlg-progress{display:none!important}
+  }
 </style>
 
 <script>
@@ -161,6 +232,59 @@
       input.addEventListener('focus',function(){ render(input.value); });
       input.addEventListener('input',function(){ if(hidden) hidden.value=''; render(input.value); });
       input.addEventListener('blur',function(){ setTimeout(function(){ box.classList.remove('show'); },180); });
+    },
+    // Motor de fluidez: entrada del modal, revelados al scrollear, barra de progreso.
+    // Reversible y seguro: si esto no corre, body.fx nunca se aplica y todo queda visible.
+    fx: function(){
+      if(S._fx) return; S._fx=true;
+      var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      document.body.classList.add('fx');
+      var body=document.querySelector('.dlg-body');
+
+      // Barra de progreso ligada al scroll del cuerpo (solo si hay desbordamiento)
+      var bar=document.createElement('div'); bar.className='dlg-progress';
+      var fill=document.createElement('i'); bar.appendChild(fill);
+      document.body.insertBefore(bar, document.body.firstChild);
+      function prog(){
+        if(!body) return;
+        var max=body.scrollHeight-body.clientHeight;
+        if(max>4){ bar.classList.add('on'); fill.style.width=(body.scrollTop/max*100)+'%'; }
+        else bar.classList.remove('on');
+      }
+      if(body) body.addEventListener('scroll',prog);
+      window.addEventListener('resize',prog);
+      setTimeout(prog,80);
+
+      // Titulo del encabezado: revelado palabra por palabra
+      var h3=document.querySelector('.dlg-head h3');
+      if(h3 && !reduce){
+        var words=(h3.textContent||'').split(/\s+/).filter(Boolean);
+        h3.innerHTML=words.map(function(w){ return '<span class="w"><span class="wi">'+S.esc(w)+'</span></span>'; }).join(' ');
+        Array.prototype.forEach.call(h3.querySelectorAll('.w'),function(w,i){
+          setTimeout(function(){ w.classList.add('in'); }, 90+i*55);
+        });
+      }
+
+      if(reduce || !body) return; // CSS ya deja todo visible
+
+      // Auto-marca tarjetas como reveal con stagger si no se hizo a mano
+      var i=0;
+      Array.prototype.forEach.call(body.querySelectorAll('.card'),function(el){
+        if(!el.classList.contains('reveal')){ el.classList.add('reveal'); }
+        if(!el.style.getPropertyValue('--i')) el.style.setProperty('--i', Math.min(i++,4));
+      });
+
+      // Observer reversible sobre el cuerpo del modal
+      if(!('IntersectionObserver' in window)){
+        Array.prototype.forEach.call(body.querySelectorAll('.reveal,.steps li'),function(el){ el.classList.add('is-in'); });
+        return;
+      }
+      var io=new IntersectionObserver(function(ents){
+        ents.forEach(function(e){ e.target.classList.toggle('is-in', e.isIntersecting); });
+      }, { root: body, rootMargin:'0px 0px -8% 0px', threshold:.06 });
+      Array.prototype.forEach.call(body.querySelectorAll('.reveal, .steps li, .draw.draw-scroll'),function(el){ io.observe(el); });
     }
   };
+  if(document.readyState!=='loading'){ S.fx(); }
+  else document.addEventListener('DOMContentLoaded', function(){ S.fx(); });
 </script>

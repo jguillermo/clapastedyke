@@ -13,6 +13,7 @@
     "push": "cd src && clasp push",
     "pull": "cd src && clasp pull",
     "open": "cd src && clasp open-script",
+    "preview": "node scripts/render-preview.js",
     "test": "node test/unitarios/run.js",
     "publish:test": "npm test && node test/e2e/publish.js test && npm run push && node test/e2e/publish.js clear",
     "publish:prod": "npm test && node test/e2e/publish.js prod && npm run push && node test/e2e/publish.js clear"
