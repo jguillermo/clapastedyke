@@ -3,7 +3,7 @@
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Figtree:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Figtree:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=optional" rel="stylesheet">
 
 <style>
   :root{
@@ -117,8 +117,9 @@
   @media(max-width:620px){ .two,.three{grid-template-columns:1fr} }
 
   /* ===== Fluidez en el modal (ver doc/web_fuida.md) =====
-     Regla de oro del fallback: NADA se oculta salvo cuando el JS marca body.fx.
-     Sin JS o con prefers-reduced-motion, todo queda visible e instantaneo. */
+     Para evitar parpadeo (FOUC) los estados ocultos se activan ANTES de pintar,
+     via la clase html.fx-anim que el script anade de forma sincrona en <head>.
+     Sin JS o con prefers-reduced-motion, fx-anim no se anade => todo visible. */
 
   /* Barra de progreso del scroll del cuerpo (dentro del modal, no fixed global) */
   .dlg-progress{flex:0 0 auto;height:3px;background:var(--line-soft);display:none}
@@ -126,30 +127,23 @@
   .dlg-progress i{display:block;height:100%;width:0;
     background:linear-gradient(90deg,var(--accent),var(--accent-deep));transition:width .08s linear}
 
-  /* Entrada del modal: fade + leve elevacion, una sola vez */
-  @keyframes modalIn{from{opacity:0;transform:translateY(8px) scale(.992)} to{opacity:1;transform:none}}
-  body.fx{animation:modalIn .26s cubic-bezier(.2,.7,.2,1) both}
-
-  /* Encabezado con icono + titulo revelado palabra por palabra (enmascarado) */
+  /* Encabezado: icono + titulo */
   .dlg-title{display:flex;align-items:center;gap:10px;min-width:0}
   .dlg-title h3{min-width:0}
   .dlg-ico{flex:0 0 auto;width:20px;height:20px;color:var(--accent)}
-  .dlg-head h3 .w{display:inline-block;overflow:hidden;vertical-align:top}
-  .dlg-head h3 .wi{display:inline-block;transform:translateY(110%);
-    transition:transform .5s cubic-bezier(.2,.7,.2,1)}
-  .dlg-head h3 .w.in .wi{transform:none}
 
-  /* Revelado de tarjetas/secciones al entrar en vista (reversible, con stagger) */
-  body.fx .reveal{opacity:0;transform:translateY(14px);
-    transition:opacity .5s ease, transform .5s cubic-bezier(.2,.7,.2,1);
-    transition-delay:calc(var(--i,0) * 60ms)}
-  body.fx .reveal.is-in{opacity:1;transform:none}
+  /* Revelado de tarjetas/secciones (una sola vez, stagger suave).
+     Se ocultan .card y .reveal ANTES de pintar => nunca se ven y luego desaparecen. */
+  html.fx-anim .card, html.fx-anim .reveal{opacity:0;transform:translateY(16px);
+    transition:opacity .5s ease, transform .55s cubic-bezier(.16,.84,.24,1);
+    transition-delay:calc(var(--i,0) * 70ms)}
+  html.fx-anim .card.is-in, html.fx-anim .reveal.is-in{opacity:1;transform:none}
 
-  /* Icono SVG de linea que se dibuja solo (sin plugins) */
+  /* Icono SVG de linea que se dibuja solo (oculto antes de pintar via fx-anim) */
   .draw{stroke-dasharray:var(--len,260)}
   @keyframes draw{from{stroke-dashoffset:var(--len,260)} to{stroke-dashoffset:0}}
-  body.fx .dlg-head .draw{animation:draw .9s ease .2s both}
-  body.fx .draw.is-in{animation:draw .9s ease both}
+  html.fx-anim .dlg-head .draw{animation:draw 1s ease .25s both}
+  html.fx-anim .draw.is-in{animation:draw .9s ease both}
 
   /* Pasos numerados con rebote + linea conectora (clase .steps opcional) */
   .steps{list-style:none;margin:0;padding:0}
@@ -159,10 +153,10 @@
     font-size:11px;display:flex;align-items:center;justify-content:center}
   .steps li::after{content:"";position:absolute;left:10px;top:24px;bottom:0;width:2px;background:var(--line)}
   .steps li:last-child::after{display:none}
-  body.fx .steps li::before{transform:scale(.2);opacity:0}
-  body.fx .steps li::after{transform:scaleY(0);transform-origin:top;transition:transform .5s ease}
-  body.fx .steps li.is-in::before{animation:pop .5s cubic-bezier(.34,1.56,.64,1) forwards}
-  body.fx .steps li.is-in::after{transform:scaleY(1)}
+  html.fx-anim .steps li::before{transform:scale(.2);opacity:0}
+  html.fx-anim .steps li::after{transform:scaleY(0);transform-origin:top;transition:transform .5s ease}
+  html.fx-anim .steps li.is-in::before{animation:pop .5s cubic-bezier(.34,1.56,.64,1) forwards}
+  html.fx-anim .steps li.is-in::after{transform:scaleY(1)}
   @keyframes pop{to{transform:scale(1);opacity:1}}
 
   /* Microinteracciones de formulario */
@@ -175,20 +169,61 @@
   .flash.show{animation:flashIn .32s cubic-bezier(.2,.7,.2,1)}
   @keyframes flashIn{from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:none}}
 
+  /* Vida ambiental: reaccion al hover y micro-movimiento continuo */
+  .card{transition:transform .28s cubic-bezier(.16,.84,.24,1),box-shadow .28s ease}
+  table.t td{transition:background-color .2s ease}
+  @media(hover:hover){
+    .card:hover{box-shadow:var(--shadow)}
+    html.fx-anim .card.is-in:hover, html.fx-anim .reveal.is-in:hover{transform:translateY(-4px)}
+    .btn:hover{transform:translateY(-1px)}
+    .btn.primary:hover{box-shadow:0 9px 20px -8px var(--accent)}
+    table.t tr:hover td{background:var(--accent-soft)}
+  }
+  /* Brillo que recorre el boton primario al pasar el cursor */
+  .btn.primary{position:relative;overflow:hidden}
+  .btn.primary::after{content:"";position:absolute;top:0;left:-70%;width:45%;height:100%;
+    background:linear-gradient(100deg,transparent,rgba(255,255,255,.4),transparent);
+    transform:skewX(-18deg);pointer-events:none}
+  @media(hover:hover){ .btn.primary:hover::after{animation:sheen .75s ease} }
+  @keyframes sheen{from{left:-70%}to{left:150%}}
+  /* Punto de acento que respira (titulos de grupo) */
+  @keyframes breathe{0%,100%{opacity:.35} 50%{opacity:1}}
+  html.fx-anim .grp-title::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;
+    background:var(--accent);margin-right:8px;vertical-align:middle;animation:breathe 2.8s ease-in-out infinite}
+
   /* Puntero grueso (movil/tactil): atenua los hover finos */
-  @media(hover:none){ .btn:hover{border-color:var(--line)} }
+  @media(hover:none){ .btn:hover{border-color:var(--line);transform:none} }
 
   /* Accesibilidad: sin movimiento => todo visible e instantaneo */
   @media(prefers-reduced-motion:reduce){
-    body.fx, body.fx .reveal, .dlg-head h3 .wi, .draw,
-    body.fx .steps li::before, body.fx .steps li::after{
-      animation:none!important;transition:none!important;opacity:1!important;
-      transform:none!important;stroke-dashoffset:0!important}
+    *, *::before, *::after{animation:none!important;transition:none!important}
+    html.fx-anim .card, html.fx-anim .reveal, .draw,
+    html.fx-anim .steps li::before, html.fx-anim .steps li::after{
+      opacity:1!important;transform:none!important;stroke-dashoffset:0!important}
+    html.fx-anim .grp-title::before{display:none!important}
     .dlg-progress{display:none!important}
   }
 </style>
 
 <script>
+  // Oculta los estados iniciales ANTES de pintar (evita el parpadeo desaparecer/reaparecer).
+  // Sincrono y en <head>: corre antes de que el cuerpo se pinte. Solo si hay movimiento permitido.
+  (function(){
+    try{
+      var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if(!reduce){
+        document.documentElement.className += ' fx-anim';
+        // Failsafe: si el motor no corre en 4s, no dejes nada oculto.
+        setTimeout(function(){
+          if(!(window.S && S._fx)){
+            document.documentElement.className =
+              document.documentElement.className.replace(/\s*\bfx-anim\b/,'');
+          }
+        }, 4000);
+      }
+    }catch(e){}
+  })();
+
   // Ayudantes compartidos.
   var S = {
     esc: function(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){
@@ -233,13 +268,14 @@
       input.addEventListener('input',function(){ if(hidden) hidden.value=''; render(input.value); });
       input.addEventListener('blur',function(){ setTimeout(function(){ box.classList.remove('show'); },180); });
     },
-    // Motor de fluidez: entrada del modal, revelados al scrollear, barra de progreso.
-    // Reversible y seguro: si esto no corre, body.fx nunca se aplica y todo queda visible.
+    // Motor de fluidez: revelado de tarjetas (una sola vez) y barra de progreso.
+    // El ocultado inicial lo hizo html.fx-anim antes de pintar; si esto no corre,
+    // el failsafe quita fx-anim y todo queda visible.
     fx: function(){
       if(S._fx) return; S._fx=true;
-      var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      document.body.classList.add('fx');
       var body=document.querySelector('.dlg-body');
+      // anim solo si html.fx-anim fue activado en <head> (false con reduce-motion / sin JS)
+      var anim = document.documentElement.className.indexOf('fx-anim')>=0;
 
       // Barra de progreso ligada al scroll del cuerpo (solo si hay desbordamiento)
       var bar=document.createElement('div'); bar.className='dlg-progress';
@@ -255,34 +291,24 @@
       window.addEventListener('resize',prog);
       setTimeout(prog,80);
 
-      // Titulo del encabezado: revelado palabra por palabra
-      var h3=document.querySelector('.dlg-head h3');
-      if(h3 && !reduce){
-        var words=(h3.textContent||'').split(/\s+/).filter(Boolean);
-        h3.innerHTML=words.map(function(w){ return '<span class="w"><span class="wi">'+S.esc(w)+'</span></span>'; }).join(' ');
-        Array.prototype.forEach.call(h3.querySelectorAll('.w'),function(w,i){
-          setTimeout(function(){ w.classList.add('in'); }, 90+i*55);
-        });
-      }
+      if(!anim || !body) return; // sin animacion: todo ya visible
 
-      if(reduce || !body) return; // CSS ya deja todo visible
-
-      // Auto-marca tarjetas como reveal con stagger si no se hizo a mano
+      // Marca de stagger en las tarjetas (el ocultado ya lo puso html.fx-anim antes de pintar)
       var i=0;
       Array.prototype.forEach.call(body.querySelectorAll('.card'),function(el){
-        if(!el.classList.contains('reveal')){ el.classList.add('reveal'); }
         if(!el.style.getPropertyValue('--i')) el.style.setProperty('--i', Math.min(i++,4));
       });
 
-      // Observer reversible sobre el cuerpo del modal
+      // Revela UNA sola vez al entrar en vista (no se repite tras reflujos de fuentes)
+      var sel='.card, .reveal, .steps li';
       if(!('IntersectionObserver' in window)){
-        Array.prototype.forEach.call(body.querySelectorAll('.reveal,.steps li'),function(el){ el.classList.add('is-in'); });
+        Array.prototype.forEach.call(body.querySelectorAll(sel),function(el){ el.classList.add('is-in'); });
         return;
       }
       var io=new IntersectionObserver(function(ents){
-        ents.forEach(function(e){ e.target.classList.toggle('is-in', e.isIntersecting); });
-      }, { root: body, rootMargin:'0px 0px -8% 0px', threshold:.06 });
-      Array.prototype.forEach.call(body.querySelectorAll('.reveal, .steps li, .draw.draw-scroll'),function(el){ io.observe(el); });
+        ents.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('is-in'); io.unobserve(e.target); } });
+      }, { root: body, rootMargin:'0px 0px -8% 0px', threshold:.02 });
+      Array.prototype.forEach.call(body.querySelectorAll(sel),function(el){ io.observe(el); });
     }
   };
   if(document.readyState!=='loading'){ S.fx(); }
