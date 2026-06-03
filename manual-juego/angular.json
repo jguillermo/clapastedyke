@@ -30,8 +30,8 @@
               }
             ],
             "styles": [
-              "src/styles.scss",
-              "src/styles/forms-tokens.css"
+              "src/app/platform/styles/global.scss",
+              "src/app/platform/styles/tailwind.css"
             ]
           },
           "configurations": {
