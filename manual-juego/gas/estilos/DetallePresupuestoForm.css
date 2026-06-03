@@ -1,0 +1,14 @@
+  .totbox{background:#fbf6ef;border:1px solid var(--line);border-radius:11px;padding:14px 16px;margin-top:6px}
+  .totline{display:flex;justify-content:space-between;font-size:13px;padding:5px 0;color:#5d544b}
+  .totline .num{font-family:"Space Mono",monospace}
+  .totline.grand{border-top:2px solid var(--ink);margin-top:8px;padding-top:10px;font-weight:700;font-size:17px;color:var(--ink)}
+  .meta{display:grid;grid-template-columns:1fr 1fr;gap:6px 18px;font-size:13px;margin-bottom:4px}
+  .meta b{font-family:"Space Mono",monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);display:block}
+  .stbadge{font-family:"Space Mono",monospace;font-size:11px;text-transform:uppercase;padding:3px 10px;border-radius:999px}
+  .st-Pendiente{background:#f0ece4;color:#7a7166}
+  .st-Aprobado{background:var(--green-soft);color:var(--green)}
+  .st-Rechazado{background:var(--red-soft);color:var(--red)}
+  .aviso{border-radius:11px;padding:13px 15px;font-size:13px;margin-bottom:14px}
+  .aviso.warn{background:var(--amber-soft);border:1px solid #e7cf9a;color:#8a6a1f}
+  .aviso.ok{background:var(--green-soft);border:1px solid #c4e0c8;color:var(--green)}
+  .aviso b{display:block;margin-bottom:4px}

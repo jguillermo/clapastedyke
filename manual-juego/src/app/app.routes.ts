@@ -25,5 +25,15 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./componentes/nivel-completado/nivel-completado').then(m => m.NivelCompletado),
   },
+  {
+    path: 'formularios',
+    loadComponent: () =>
+      import('./formularios/galeria/galeria').then(m => m.GaleriaFormularios),
+  },
+  {
+    path: 'formularios/:id',
+    loadComponent: () =>
+      import('./formularios/visor/visor').then(m => m.VisorFormulario),
+  },
   { path: '**', redirectTo: 'mapa' },
 ];

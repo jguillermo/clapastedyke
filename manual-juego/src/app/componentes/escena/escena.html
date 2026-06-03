@@ -63,8 +63,22 @@
       </span>
     }
 
-    <!-- ====== TIPO FORMULARIO: diálogo modal del add-on ====== -->
-    @if (escena().tipo === 'formulario') {
+    <!-- ====== TIPO FORMULARIO con componente REAL migrado ====== -->
+    @if (escena().tipo === 'formulario' && componenteFormulario(); as comp) {
+      <div class="modal real gas-form">
+        <ng-container *ngComponentOutlet="comp; inputs: entradasFormulario()" />
+      </div>
+
+      @if (escena().boton === 'guardar') {
+        <span class="cursor viaja-guardar" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M5 3l14 9-6.5 1L9 19z"/></svg>
+          <span class="halo"></span>
+        </span>
+      }
+    }
+
+    <!-- ====== TIPO FORMULARIO: maqueta sintética (fallback) ====== -->
+    @if (escena().tipo === 'formulario' && !componenteFormulario()) {
       <div class="modal">
         <div class="modal-barra">
           <span class="modal-titulo">{{ escena().titulo }}</span>

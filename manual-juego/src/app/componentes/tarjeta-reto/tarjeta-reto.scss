@@ -5,6 +5,111 @@
   padding: 26px 18px 70px;
 }
 
+/* Modo formulario real: ocupa toda la página */
+:host(.full) {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+
+.reto-full {
+  position: fixed;
+  inset: 57px 0 0; /* bajo el HUD */
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+  animation: entra .35s ease-out both;
+}
+
+.form-zona {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  border-bottom: 1px solid var(--line);
+}
+
+/* Barra inferior de acciones del reto */
+.barra {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 18px;
+  background: rgba(246, 239, 229, .94);
+  backdrop-filter: saturate(160%) blur(10px);
+  -webkit-backdrop-filter: saturate(160%) blur(10px);
+}
+
+.contexto-mini {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.mision-mini {
+  font-size: 13.5px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+
+  b { color: var(--ink); }
+}
+
+.hecho-mini {
+  font-style: normal;
+  font-family: var(--fuente-mono);
+  font-size: 11px;
+  color: var(--green);
+  margin-left: 6px;
+}
+
+.acciones {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex: 0 0 auto;
+}
+
+.boton:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* El botón se enciende y pulsa cuando todo está correcto */
+.boton.late:not(:disabled) {
+  animation: boton-late 1.4s ease-in-out infinite;
+}
+
+@keyframes boton-late {
+  50% { box-shadow: 0 0 0 9px rgba(187, 85, 48, .22); transform: translateY(-2px) scale(1.03); }
+}
+
+.pista-flotante {
+  position: fixed;
+  left: 18px;
+  bottom: 86px;
+  z-index: 45;
+  max-width: 340px;
+  margin: 0;
+  font-size: 13.5px;
+  background: #fdf6e8;
+  border: 1px dashed var(--amber);
+  border-radius: 12px;
+  padding: 10px 14px;
+  box-shadow: var(--shadow-sm);
+  animation: entra .3s ease-out both;
+}
+
+@media (max-width: 720px) {
+  .contexto-mini .nivel-chip { display: none; }
+  .barra { flex-wrap: wrap; }
+}
+
 .reto { display: flex; flex-direction: column; gap: 14px; }
 
 /* ---------- Contexto: nivel, misión y puntos de progreso ---------- */

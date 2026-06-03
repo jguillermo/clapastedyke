@@ -1,0 +1,44 @@
+<!-- Markup fiel a src/AjustarInventarioForm.html: mismos ids y clases.
+     data-onclick/data-onchange/data-oninput → on* en el export. [class.resaltado]/[value] solo actúan en el juego. -->
+<app-marco-dialogo titulo="Ajustar inventario" [icono]="icono">
+
+  <div class="card">
+    <div class="grp-title">Mermas y ajustes</div>
+    <div class="field ac">
+      <div class="lab"><b>Insumo</b><span class="req">*</span><span class="typetag">Autocompletado</span></div>
+      <input id="ins_nombre" placeholder="Buscar insumo..."
+        [class.resaltado]="marcas().has('ins_nombre')" [value]="valor('ins_nombre')">
+      <input type="hidden" id="insumo_id">
+    </div>
+    <div class="two">
+      <div class="field">
+        <div class="lab"><b>Tipo de ajuste</b><span class="req">*</span><span class="typetag">Dropdown</span></div>
+        <select id="tipo" data-onchange="prev()" [class.resaltado]="marcas().has('tipo')"></select>
+      </div>
+      <div class="field">
+        <div class="lab"><b>Cantidad</b><span class="req">*</span><span class="typetag">Número</span></div>
+        <input id="cantidad" type="number" step="any" placeholder="Ej. 200" data-oninput="prev()"
+          [class.resaltado]="marcas().has('cantidad')" [value]="valor('cantidad')">
+      </div>
+    </div>
+    <div class="field">
+      <div class="lab"><b>Motivo</b><span class="opt">recomendado en mermas</span><span class="typetag">Texto</span></div>
+      <input id="motivo" placeholder="Qué pasó..."
+        [class.resaltado]="marcas().has('motivo')" [value]="valor('motivo')">
+    </div>
+    <div class="field">
+      <div class="lab"><b>Fecha</b><span class="typetag">Fecha</span></div>
+      <input id="fecha" type="date"
+        [class.resaltado]="marcas().has('fecha')" [value]="valor('fecha')">
+    </div>
+    <div class="prev" id="preview">Elige un insumo y una cantidad para ver el efecto.</div>
+    <div class="sub" style="margin-top:8px">En conteo, escribe la diferencia con signo. Por ejemplo, -3 quita 3 y 3 suma 3.</div>
+  </div>
+
+  <ng-container pie>
+    <button class="btn" data-onclick="S.cerrar()">Cancelar</button>
+    <button class="btn primary" id="btnGuardar" data-onclick="guardar()"
+      [class.resaltado]="marcas().has('btnGuardar')">Guardar ajuste</button>
+  </ng-container>
+
+</app-marco-dialogo>

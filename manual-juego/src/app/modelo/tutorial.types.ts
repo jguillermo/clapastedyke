@@ -17,6 +17,12 @@ export interface EscenaSvg {
   tipo: EscenaTipo;
   /** Camino de menú a recorrer, p.ej. ['Sistema', 'Mantenimiento', 'Instalar o reparar (todo)']. */
   ruta?: string[];
+  /** Id del formulario REAL (registro-formularios) a renderizar en vez de la maqueta. */
+  formulario?: string;
+  /** Ids del DOM real a resaltar en el formulario. */
+  resaltarIds?: string[];
+  /** Valores de ejemplo a pintar en el formulario real, por id de campo. */
+  valoresEjemplo?: Record<string, string>;
   /** Título del formulario modal (tipo 'formulario') o de la lista (tipo 'lista'). */
   titulo?: string;
   campos?: CampoSvg[];

@@ -1,0 +1,35 @@
+<!-- Markup fiel a src/RegistrarCompraForm.html: mismos ids y clases.
+     data-onclick → onclick en el export. [class.resaltado]/[value] solo actúan en el juego. -->
+<app-marco-dialogo titulo="Registrar compra" [icono]="icono">
+
+  <div class="card">
+    <div class="grp-title">Datos de la compra</div>
+    <div class="two">
+      <div class="field ac">
+        <div class="lab"><b>Proveedor</b><span class="req">*</span><span class="typetag">Autocompletado</span></div>
+        <input id="prov_nombre" placeholder="Buscar proveedor..."
+          [class.resaltado]="marcas().has('prov_nombre')" [value]="valor('prov_nombre')">
+        <input type="hidden" id="proveedor_id">
+      </div>
+      <div class="field">
+        <div class="lab"><b>Fecha</b><span class="req">*</span><span class="typetag">Fecha</span></div>
+        <input id="fecha" type="date"
+          [class.resaltado]="marcas().has('fecha')" [value]="valor('fecha')">
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="grp-title">Líneas de la compra</div>
+    <p class="sub">La cantidad va en presentaciones. Por ejemplo, 1 caja de 500 g se escribe como 1.</p>
+    <div id="lineas"></div>
+    <button class="btn mini" data-onclick="addLinea()">+ Agregar línea</button>
+  </div>
+
+  <ng-container pie>
+    <button class="btn" data-onclick="S.cerrar()">Cancelar</button>
+    <button class="btn primary" id="btnGuardar" data-onclick="guardar()"
+      [class.resaltado]="marcas().has('btnGuardar')">Guardar compra</button>
+  </ng-container>
+
+</app-marco-dialogo>

@@ -1,0 +1,41 @@
+<!-- Markup fiel a src/ClientesForm.html: mismos ids y clases.
+     data-onclick → onclick en el export. [class.resaltado]/[value] solo actúan en el juego. -->
+<app-marco-dialogo titulo="Clientes" [icono]="icono">
+
+  <div class="card">
+    <div class="toolbar">
+      <h4>Lista de clientes</h4>
+      <button class="btn mini" data-onclick="nuevo()" [class.resaltado]="marcas().has('btnNuevo')">+ Nuevo cliente</button>
+    </div>
+    <div id="lista"><div class="empty">Cargando...</div></div>
+  </div>
+
+  <div class="card">
+    <div class="grp-title" id="formTitulo">Nuevo cliente</div>
+    <input type="hidden" id="id">
+    <div class="field">
+      <div class="lab"><b>Nombre</b><span class="req">*</span><span class="typetag">Texto</span></div>
+      <input id="nombre" placeholder="Nombre del cliente"
+        [class.resaltado]="marcas().has('nombre')" [value]="valor('nombre')">
+    </div>
+    <div class="two">
+      <div class="field">
+        <div class="lab"><b>Telefono o contacto</b><span class="opt">opcional</span><span class="typetag">Texto</span></div>
+        <input id="telefono" placeholder="Ej. 999 888 777"
+          [class.resaltado]="marcas().has('telefono')" [value]="valor('telefono')">
+      </div>
+      <div class="field">
+        <div class="lab"><b>Notas</b><span class="opt">opcional</span><span class="typetag">Texto</span></div>
+        <input id="notas" placeholder="Referencia, direccion..."
+          [class.resaltado]="marcas().has('notas')" [value]="valor('notas')">
+      </div>
+    </div>
+  </div>
+
+  <ng-container pie>
+    <button class="btn" data-onclick="nuevo()">Limpiar</button>
+    <button class="btn primary" id="btnGuardar" data-onclick="guardar()"
+      [class.resaltado]="marcas().has('btnGuardar')">Guardar cliente</button>
+  </ng-container>
+
+</app-marco-dialogo>

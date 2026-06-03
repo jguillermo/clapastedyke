@@ -1,0 +1,40 @@
+<!-- Markup fiel a src/ProveedoresForm.html: mismos ids y clases.
+     data-onclick → onclick en el export. [class.resaltado]/[value] solo actúan en el juego. -->
+<app-marco-dialogo titulo="Proveedores" [icono]="icono">
+
+  <div class="card">
+    <div class="toolbar">
+      <h4>Lista de proveedores</h4>
+      <button class="btn mini" data-onclick="nuevo()" [class.resaltado]="marcas().has('btnNuevo')">+ Nuevo proveedor</button>
+    </div>
+    <div id="lista"><div class="empty">Cargando...</div></div>
+  </div>
+
+  <div class="card">
+    <div class="grp-title" id="formTitulo">Nuevo proveedor</div>
+    <input type="hidden" id="id">
+    <div class="two">
+      <div class="field">
+        <div class="lab"><b>Nombre</b><span class="req">*</span><span class="typetag">Texto</span></div>
+        <input id="nombre" placeholder="Nombre del proveedor"
+          [class.resaltado]="marcas().has('nombre')" [value]="valor('nombre')">
+      </div>
+      <div class="field">
+        <div class="lab"><b>WhatsApp</b><span class="req">*</span><span class="typetag">Numero</span></div>
+        <input id="whatsapp" placeholder="51999888777 (con codigo de pais)"
+          [class.resaltado]="marcas().has('whatsapp')" [value]="valor('whatsapp')">
+      </div>
+    </div>
+    <div class="field">
+      <div class="lab"><b>Notas</b><span class="opt">opcional</span><span class="typetag">Texto</span></div>
+      <textarea id="notas" placeholder="Productos que vende, horarios..." [class.resaltado]="marcas().has('notas')"></textarea>
+    </div>
+  </div>
+
+  <ng-container pie>
+    <button class="btn" data-onclick="nuevo()">Limpiar</button>
+    <button class="btn primary" id="btnGuardar" data-onclick="guardar()"
+      [class.resaltado]="marcas().has('btnGuardar')">Guardar proveedor</button>
+  </ng-container>
+
+</app-marco-dialogo>

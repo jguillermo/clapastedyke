@@ -15,8 +15,9 @@
     "open": "cd src && clasp open-script",
     "preview": "node scripts/render-preview.js",
     "test": "node test/unitarios/run.js",
-    "publish:test": "npm test && node test/e2e/publish.js test && npm run push && node test/e2e/publish.js clear",
-    "publish:prod": "npm test && node test/e2e/publish.js prod && npm run push && node test/e2e/publish.js clear"
+    "build:forms": "cd manual-juego && npm run exportar:formularios",
+    "publish:test": "npm run build:forms && npm test && node test/e2e/publish.js test && npm run push && node test/e2e/publish.js clear",
+    "publish:prod": "npm run build:forms && npm test && node test/e2e/publish.js prod && npm run push && node test/e2e/publish.js clear"
   },
   "repository": {
     "type": "git",

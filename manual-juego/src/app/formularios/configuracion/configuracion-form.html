@@ -1,0 +1,85 @@
+<!-- Markup fiel a src/ConfiguracionForm.html: mismos ids y clases.
+     data-onclick → onclick en el export. [class.resaltado]/[value] solo actúan en el juego. -->
+<app-marco-dialogo titulo="Configuracion" [icono]="icono">
+
+  <div class="card">
+    <div class="grp-title">Parametros del negocio</div>
+    <p class="sub">Lo que cambies aqui afecta los presupuestos nuevos, nunca los ya guardados.</p>
+
+    <div class="two">
+      <div class="field">
+        <div class="lab"><b>Tarifa mano de obra / hora</b><span class="req">*</span><span class="typetag">Numero</span></div>
+        <input id="tarifa_mano_obra_hora" type="number" min="0" step="any"
+          [class.resaltado]="marcas().has('tarifa_mano_obra_hora')" [value]="valor('tarifa_mano_obra_hora')">
+      </div>
+      <div class="field">
+        <div class="lab"><b>Costo indirecto / pedido</b><span class="req">*</span><span class="typetag">Numero</span></div>
+        <input id="costo_indirecto_pedido" type="number" min="0" step="any"
+          [class.resaltado]="marcas().has('costo_indirecto_pedido')" [value]="valor('costo_indirecto_pedido')">
+      </div>
+    </div>
+    <div class="two">
+      <div class="field">
+        <div class="lab"><b>Depreciacion / pedido</b><span class="req">*</span><span class="typetag">Numero</span></div>
+        <input id="depreciacion_pedido" type="number" min="0" step="any"
+          [class.resaltado]="marcas().has('depreciacion_pedido')" [value]="valor('depreciacion_pedido')">
+      </div>
+      <div class="field">
+        <div class="lab"><b>Margen por defecto</b><span class="req">*</span><span class="typetag">Numero %</span></div>
+        <input id="margen_defecto" type="number" min="0" step="any"
+          [class.resaltado]="marcas().has('margen_defecto')" [value]="valor('margen_defecto')">
+      </div>
+    </div>
+    <div class="two">
+      <div class="field">
+        <div class="lab"><b>Aplicar IGV</b><span class="typetag">Casilla</span></div>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#5d544b">
+          <input type="checkbox" id="aplicar_igv" style="width:auto"
+            [class.resaltado]="marcas().has('aplicar_igv')">
+          <span>Aplicar IGV por defecto en los presupuestos nuevos</span>
+        </label>
+      </div>
+      <div class="field">
+        <div class="lab"><b>Tasa de IGV</b><span class="req">*</span><span class="typetag">Numero %</span></div>
+        <input id="tasa_igv" type="number" min="0" step="any"
+          [class.resaltado]="marcas().has('tasa_igv')" [value]="valor('tasa_igv')">
+      </div>
+    </div>
+    <div class="two">
+      <div class="field">
+        <div class="lab"><b>Redondeo del precio</b><span class="req">*</span><span class="typetag">Dropdown</span></div>
+        <select id="redondeo" [class.resaltado]="marcas().has('redondeo')">
+          <option value="MULTIPLO_5">Multiplo de 5 hacia arriba</option>
+          <option value="NINGUNO">Ninguno</option>
+        </select>
+      </div>
+      <div class="field">
+        <div class="lab"><b>Dias de vencimiento</b><span class="req">*</span><span class="typetag">Numero</span></div>
+        <input id="dias_vencimiento" type="number" min="1" step="1"
+          [class.resaltado]="marcas().has('dias_vencimiento')" [value]="valor('dias_vencimiento')">
+      </div>
+    </div>
+    <div class="two">
+      <div class="field">
+        <div class="lab"><b>Descuento de stock</b><span class="req">*</span><span class="typetag">Dropdown</span></div>
+        <select id="momento_descuento_stock" [class.resaltado]="marcas().has('momento_descuento_stock')">
+          <option value="APROBAR">Al aprobar el pedido</option>
+          <option value="PRODUCCION">Al iniciar produccion</option>
+        </select>
+      </div>
+      <div class="field">
+        <div class="lab"><b>Nombre del negocio</b><span class="req">*</span><span class="typetag">Texto</span></div>
+        <input id="nombre_negocio" placeholder="Aparece en el menu"
+          [class.resaltado]="marcas().has('nombre_negocio')" [value]="valor('nombre_negocio')">
+      </div>
+    </div>
+    <div class="note">Los tamaños, sus factores, los factores de escalado y los tipos de ajuste se editan directamente en la hoja Config, en sus bloques. El nombre del negocio se aplica al menu la proxima vez que abras el archivo.</div>
+  </div>
+
+  <ng-container pie>
+    <button class="btn" data-onclick="S.cerrar()">Cancelar</button>
+    <button class="btn primary" id="btnGuardar" data-onclick="guardar()"
+      [class.resaltado]="marcas().has('btnGuardar')">Guardar configuracion</button>
+  </ng-container>
+
+</app-marco-dialogo>

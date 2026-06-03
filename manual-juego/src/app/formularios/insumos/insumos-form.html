@@ -1,0 +1,84 @@
+<!-- Markup fiel a src/InsumosForm.html: mismos ids y clases.
+     data-onclick/oninput/onchange → on* en el export. [class.resaltado]/[value] solo actúan en el juego. -->
+<app-marco-dialogo titulo="Insumos" [icono]="icono">
+
+  <div class="card">
+    <div class="toolbar">
+      <h4>Lista de insumos</h4>
+      <button class="btn mini" data-onclick="nuevo()" [class.resaltado]="marcas().has('btnNuevo')">+ Nuevo insumo</button>
+    </div>
+    <div id="lista"><div class="empty">Cargando...</div></div>
+  </div>
+
+  <div class="card">
+    <div class="grp-title" id="formTitulo">Nuevo insumo</div>
+    <input type="hidden" id="id">
+    <div class="two">
+      <div class="field">
+        <div class="lab"><b>Nombre</b><span class="req">*</span><span class="typetag">Texto</span></div>
+        <input id="nombre" placeholder="Ej. Harina"
+          [class.resaltado]="marcas().has('nombre')" [value]="valor('nombre')">
+      </div>
+      <div class="field">
+        <div class="lab"><b>Tipo</b><span class="req">*</span><span class="typetag">Dropdown</span></div>
+        <select id="tipo" [class.resaltado]="marcas().has('tipo')">
+          <option value="ingrediente">Ingrediente</option>
+          <option value="empaque">Empaque</option>
+        </select>
+      </div>
+    </div>
+    <div class="two">
+      <div class="field">
+        <div class="lab"><b>Unidad base</b><span class="req">*</span><span class="typetag">Dropdown</span></div>
+        <select id="unidad_base" data-onchange="recalc()" [class.resaltado]="marcas().has('unidad_base')">
+          <option value="g">Gramos</option>
+          <option value="u">Unidad</option>
+        </select>
+      </div>
+      <div class="field">
+        <div class="lab"><b>Tamano presentacion</b><span class="req">*</span><span class="typetag">Numero</span></div>
+        <input id="tamano_presentacion" type="number" min="0" step="any" placeholder="Ej. 1000" data-oninput="recalc()"
+          [class.resaltado]="marcas().has('tamano_presentacion')" [value]="valor('tamano_presentacion')">
+      </div>
+    </div>
+    <div class="two">
+      <div class="field">
+        <div class="lab"><b>Precio presentacion</b><span class="req">*</span><span class="typetag">Numero</span></div>
+        <input id="precio_presentacion" type="number" min="0" step="any" placeholder="Ej. 3.20" data-oninput="recalc()"
+          [class.resaltado]="marcas().has('precio_presentacion')" [value]="valor('precio_presentacion')">
+      </div>
+      <div class="field">
+        <div class="lab"><b>Precio por <span id="uLbl">gramo</span></b><span class="typetag">Solo lectura</span></div>
+        <input id="ppu" class="calc" readonly value="0.0000" [class.resaltado]="marcas().has('ppu')">
+      </div>
+    </div>
+    <div class="three">
+      <div class="field" id="boxStockIni">
+        <div class="lab"><b>Stock inicial</b><span class="opt">al crear</span><span class="typetag">Numero</span></div>
+        <input id="stock_inicial" type="number" min="0" step="any" placeholder="0"
+          [class.resaltado]="marcas().has('stock_inicial')" [value]="valor('stock_inicial')">
+      </div>
+      <div class="field">
+        <div class="lab"><b>Stock minimo</b><span class="req">*</span><span class="typetag">Numero</span></div>
+        <input id="stock_minimo" type="number" min="0" step="any" placeholder="0"
+          [class.resaltado]="marcas().has('stock_minimo')" [value]="valor('stock_minimo')">
+      </div>
+      <div class="field ac">
+        <div class="lab"><b>Proveedor rec.</b><span class="opt">opcional</span><span class="typetag">Autocompletado</span></div>
+        <input id="prov_nombre" placeholder="Buscar proveedor..."
+          [class.resaltado]="marcas().has('prov_nombre')" [value]="valor('prov_nombre')">
+        <input type="hidden" id="proveedor_recomendado_id">
+      </div>
+    </div>
+    <div class="note" id="notaEdicion" style="display:none">
+      En edicion el stock no se toca desde aqui. El stock lo mueven las compras y los ajustes de inventario.
+    </div>
+  </div>
+
+  <ng-container pie>
+    <button class="btn" data-onclick="nuevo()">Limpiar</button>
+    <button class="btn primary" id="btnGuardar" data-onclick="guardar()"
+      [class.resaltado]="marcas().has('btnGuardar')">Guardar insumo</button>
+  </ng-container>
+
+</app-marco-dialogo>

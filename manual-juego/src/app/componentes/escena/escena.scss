@@ -335,6 +335,14 @@
   from { opacity: 0; transform: translateY(10px); }
 }
 
+/* Formulario REAL dentro de la escena: el chrome lo pone el propio form */
+.modal.real {
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
 /* ---------- Cursor animado ---------- */
 .cursor {
   position: absolute;

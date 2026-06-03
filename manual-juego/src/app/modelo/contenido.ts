@@ -64,7 +64,10 @@ const CONFIGURAR: Mision = {
       instruccion: 'Escribe la <b>tarifa de mano de obra por hora</b>: cuánto vale una hora de tu trabajo.',
       detalle: 'Alimenta el costo de cada presupuesto: las horas de la receta se multiplican por esta tarifa.',
       escena: {
-        tipo: 'formulario', titulo: 'Configuración',
+        tipo: 'formulario', formulario: 'configuracion',
+        resaltarIds: ['tarifa_mano_obra_hora'],
+        valoresEjemplo: { tarifa_mano_obra_hora: '10' },
+        titulo: 'Configuración',
         campos: [{ etiqueta: 'Tarifa mano de obra (S/ por hora)', tipo: 'numero', valor: '10', resaltado: true }],
       },
     },
@@ -73,7 +76,10 @@ const CONFIGURAR: Mision = {
       titulo: 'Costos fijos por pedido',
       instruccion: 'Pon el <b>costo indirecto</b> y la <b>depreciación</b> por pedido: montos fijos por luz, gas o desgaste de tus equipos.',
       escena: {
-        tipo: 'formulario', titulo: 'Configuración',
+        tipo: 'formulario', formulario: 'configuracion',
+        resaltarIds: ['costo_indirecto_pedido', 'depreciacion_pedido'],
+        valoresEjemplo: { tarifa_mano_obra_hora: '10', costo_indirecto_pedido: '3', depreciacion_pedido: '2' },
+        titulo: 'Configuración',
         campos: [
           { etiqueta: 'Costo indirecto por pedido (S/)', tipo: 'numero', valor: '3', resaltado: true },
           { etiqueta: 'Depreciación por pedido (S/)', tipo: 'numero', valor: '2', resaltado: true },
@@ -86,7 +92,10 @@ const CONFIGURAR: Mision = {
       instruccion: 'Define el <b>margen por defecto</b>, en porcentaje. Es tu ganancia sobre la venta.',
       detalle: 'Cada presupuesto lo trae puesto y lo puedes cambiar caso por caso.',
       escena: {
-        tipo: 'formulario', titulo: 'Configuración',
+        tipo: 'formulario', formulario: 'configuracion',
+        resaltarIds: ['margen_defecto'],
+        valoresEjemplo: { margen_defecto: '30' },
+        titulo: 'Configuración',
         campos: [{ etiqueta: 'Margen por defecto (%)', tipo: 'numero', valor: '30', resaltado: true }],
       },
     },
@@ -95,7 +104,10 @@ const CONFIGURAR: Mision = {
       titulo: 'IGV y redondeo',
       instruccion: 'Decide si <b>aplicar IGV</b> (y su tasa) y deja el <b>redondeo</b> en «múltiplo de 5 hacia arriba» para precios redonditos.',
       escena: {
-        tipo: 'formulario', titulo: 'Configuración',
+        tipo: 'formulario', formulario: 'configuracion',
+        resaltarIds: ['aplicar_igv', 'tasa_igv', 'redondeo'],
+        valoresEjemplo: { tasa_igv: '18' },
+        titulo: 'Configuración',
         campos: [
           { etiqueta: 'Aplicar IGV', tipo: 'check', valor: 'Sí', resaltado: true },
           { etiqueta: 'Tasa IGV (%)', tipo: 'numero', valor: '18' },
@@ -109,7 +121,10 @@ const CONFIGURAR: Mision = {
       instruccion: 'Pon los <b>días de vencimiento</b> del presupuesto y elige el <b>momento de descuento de stock</b>: al aprobar o al iniciar producción.',
       detalle: 'Cuántos días vale tu cotización, y cuándo el sistema descuenta los materiales del inventario.',
       escena: {
-        tipo: 'formulario', titulo: 'Configuración',
+        tipo: 'formulario', formulario: 'configuracion',
+        resaltarIds: ['dias_vencimiento', 'momento_descuento_stock'],
+        valoresEjemplo: { dias_vencimiento: '7' },
+        titulo: 'Configuración',
         campos: [
           { etiqueta: 'Días de vencimiento', tipo: 'numero', valor: '7', resaltado: true },
           { etiqueta: 'Descuento de stock', tipo: 'select', valor: 'APROBAR', resaltado: true },
@@ -136,7 +151,10 @@ const CONFIGURAR: Mision = {
       instruccion: `Escribe el <b>nombre de tu negocio</b> y toca ${t('Guardar')}.`,
       quePasa: 'Caes en la hoja Config, con 4 bloques editables: Parámetros generales, Factores de escalado, Tamaños y Tipos de ajuste. Lo que cambies aquí afecta los presupuestos <b>nuevos</b>, nunca los ya guardados.',
       escena: {
-        tipo: 'formulario', titulo: 'Configuración',
+        tipo: 'formulario', formulario: 'configuracion',
+        resaltarIds: ['nombre_negocio', 'btnGuardar'],
+        valoresEjemplo: { nombre_negocio: 'Dulces Misa' },
+        titulo: 'Configuración',
         campos: [{ etiqueta: 'Nombre del negocio', tipo: 'texto', valor: 'Dulces Misa', resaltado: true }],
         boton: 'guardar',
       },
@@ -161,8 +179,9 @@ const CLIENTE: Mision = {
       instruccion: 'Escribe el <b>nombre</b>: por ejemplo <b>Ana Torres</b>.',
       detalle: 'Es obligatorio y no se puede repetir exacto con otro cliente.',
       escena: {
-        tipo: 'formulario', titulo: 'Nuevo cliente',
-        campos: [{ etiqueta: 'Nombre', tipo: 'texto', valor: 'Ana Torres', resaltado: true }],
+        tipo: 'formulario', formulario: 'clientes',
+        resaltarIds: ['nombre'],
+        valoresEjemplo: { nombre: 'Ana Torres' },
       },
     },
     {
@@ -170,12 +189,9 @@ const CLIENTE: Mision = {
       titulo: 'Su teléfono',
       instruccion: 'Pon su <b>teléfono</b> (<b>999000111</b>) y notas si quieres. Ambos son opcionales.',
       escena: {
-        tipo: 'formulario', titulo: 'Nuevo cliente',
-        campos: [
-          { etiqueta: 'Nombre', tipo: 'texto', valor: 'Ana Torres' },
-          { etiqueta: 'Teléfono', tipo: 'texto', valor: '999000111', resaltado: true },
-          { etiqueta: 'Notas', tipo: 'texto', valor: '' },
-        ],
+        tipo: 'formulario', formulario: 'clientes',
+        resaltarIds: ['telefono', 'notas'],
+        valoresEjemplo: { nombre: 'Ana Torres', telefono: '999000111' },
       },
     },
     {
@@ -184,11 +200,9 @@ const CLIENTE: Mision = {
       instruccion: `Toca ${t('Guardar')}.`,
       quePasa: 'Aparece la fila <b>CL-0001</b> en la hoja Clientes. Ya tienes a quién cotizarle.',
       escena: {
-        tipo: 'formulario', titulo: 'Nuevo cliente',
-        campos: [
-          { etiqueta: 'Nombre', tipo: 'texto', valor: 'Ana Torres' },
-          { etiqueta: 'Teléfono', tipo: 'texto', valor: '999000111' },
-        ],
+        tipo: 'formulario', formulario: 'clientes',
+        resaltarIds: ['btnGuardar'],
+        valoresEjemplo: { nombre: 'Ana Torres', telefono: '999000111' },
         boton: 'guardar',
       },
     },
@@ -212,7 +226,10 @@ const INSUMO: Mision = {
       instruccion: `Crea <b>Harina</b>: tipo <b>ingrediente</b>, unidad <b>gramos</b>, presentación <b>1000</b>, precio <b>S/ 5</b>, mínimo <b>2000</b>. Toca ${t('Guardar')}.`,
       detalle: 'Verás «Precio por unidad base» = 0.005 (5÷1000) y el semáforo en rojo (stock 0).',
       escena: {
-        tipo: 'formulario', titulo: 'Nuevo insumo',
+        tipo: 'formulario', formulario: 'insumos',
+        resaltarIds: ['nombre', 'tamano_presentacion', 'precio_presentacion', 'stock_minimo', 'btnGuardar'],
+        valoresEjemplo: { nombre: 'Harina', tamano_presentacion: '1000', precio_presentacion: '5', stock_minimo: '2000' },
+        titulo: 'Nuevo insumo',
         campos: [
           { etiqueta: 'Nombre', tipo: 'texto', valor: 'Harina', resaltado: true },
           { etiqueta: 'Tipo', tipo: 'select', valor: 'Ingrediente' },
@@ -230,7 +247,10 @@ const INSUMO: Mision = {
       instruccion: `Crea <b>Huevo</b>: ingrediente, presentación <b>30</b>, precio <b>S/ 15</b>, mínimo <b>30</b>. Toca ${t('Guardar')}.`,
       detalle: '«Precio por unidad base» = 0.5 (15÷30): cada huevo te cuesta 50 céntimos.',
       escena: {
-        tipo: 'formulario', titulo: 'Nuevo insumo',
+        tipo: 'formulario', formulario: 'insumos',
+        resaltarIds: ['nombre', 'tamano_presentacion', 'precio_presentacion', 'stock_minimo', 'btnGuardar'],
+        valoresEjemplo: { nombre: 'Huevo', tamano_presentacion: '30', precio_presentacion: '15', stock_minimo: '30' },
+        titulo: 'Nuevo insumo',
         campos: [
           { etiqueta: 'Nombre', tipo: 'texto', valor: 'Huevo', resaltado: true },
           { etiqueta: 'Tipo', tipo: 'select', valor: 'Ingrediente' },
@@ -247,7 +267,10 @@ const INSUMO: Mision = {
       instruccion: `Crea <b>Caja torta</b>: tipo <b>empaque</b>, presentación <b>25</b>, precio <b>S/ 25</b>, stock <b>50</b>, mínimo <b>10</b>. Toca ${t('Guardar')}.`,
       quePasa: 'Las columnas calculadas («Precio por unidad base» y «Semáforo») se actualizan solas cuando cambia el precio o el stock. <b>No las toques a mano.</b> El semáforo de la caja sale verde (50 > 10).',
       escena: {
-        tipo: 'formulario', titulo: 'Nuevo insumo',
+        tipo: 'formulario', formulario: 'insumos',
+        resaltarIds: ['nombre', 'tipo', 'btnGuardar'],
+        valoresEjemplo: { nombre: 'Caja torta', tamano_presentacion: '25', precio_presentacion: '25', stock_inicial: '50', stock_minimo: '10' },
+        titulo: 'Nuevo insumo',
         campos: [
           { etiqueta: 'Nombre', tipo: 'texto', valor: 'Caja torta', resaltado: true },
           { etiqueta: 'Tipo', tipo: 'select', valor: 'Empaque', resaltado: true },
@@ -278,7 +301,10 @@ const RECETA: Mision = {
       titulo: 'Nombre y categoría',
       instruccion: 'Escribe el nombre <b>Torta chocolate</b> y la categoría <b>tortas</b>.',
       escena: {
-        tipo: 'formulario', titulo: 'Nueva receta',
+        tipo: 'formulario', formulario: 'recetas',
+        resaltarIds: ['nombre', 'categoria'],
+        valoresEjemplo: { nombre: 'Torta chocolate', categoria: 'tortas' },
+        titulo: 'Nueva receta',
         campos: [
           { etiqueta: 'Nombre', tipo: 'texto', valor: 'Torta chocolate', resaltado: true },
           { etiqueta: 'Categoría', tipo: 'texto', valor: 'tortas', resaltado: true },
@@ -291,7 +317,10 @@ const RECETA: Mision = {
       instruccion: 'Tipo de base <b>«Por personas»</b>, base <b>10</b>.',
       detalle: 'Es la clave del escalado: si luego te piden 20 personas, el sistema multiplica todo por 2.',
       escena: {
-        tipo: 'formulario', titulo: 'Nueva receta',
+        tipo: 'formulario', formulario: 'recetas',
+        resaltarIds: ['tipo_base', 'raciones_base'],
+        valoresEjemplo: { nombre: 'Torta chocolate', categoria: 'tortas', raciones_base: '10' },
+        titulo: 'Nueva receta',
         campos: [
           { etiqueta: 'Tipo de base', tipo: 'select', valor: 'Por personas', resaltado: true },
           { etiqueta: 'Base', tipo: 'numero', valor: '10', resaltado: true },
@@ -304,7 +333,10 @@ const RECETA: Mision = {
       instruccion: 'Pon la <b>mano de obra</b>: <b>2 horas</b>.',
       detalle: 'Se multiplica por la tarifa por hora que pusiste en Configuración.',
       escena: {
-        tipo: 'formulario', titulo: 'Nueva receta',
+        tipo: 'formulario', formulario: 'recetas',
+        resaltarIds: ['tiempo'],
+        valoresEjemplo: { nombre: 'Torta chocolate', categoria: 'tortas', raciones_base: '10', tiempo: '2' },
+        titulo: 'Nueva receta',
         campos: [{ etiqueta: 'Mano de obra (horas)', tipo: 'numero', valor: '2', resaltado: true }],
       },
     },
@@ -314,7 +346,10 @@ const RECETA: Mision = {
       instruccion: 'Agrega los ingredientes: <b>Harina 300</b> (la unidad sale sola: g) y <b>Huevo 4</b> (u).',
       pista: 'Si no aparecen en el desplegable, vuelve a la misión anterior: primero hay que crear los insumos.',
       escena: {
-        tipo: 'formulario', titulo: 'Nueva receta',
+        tipo: 'formulario', formulario: 'recetas',
+        resaltarIds: ['ings'],
+        valoresEjemplo: { nombre: 'Torta chocolate', categoria: 'tortas', raciones_base: '10', tiempo: '2' },
+        titulo: 'Nueva receta',
         campos: [
           { etiqueta: 'Ingrediente: Harina · cantidad', tipo: 'numero', valor: '300', resaltado: true },
           { etiqueta: 'Ingrediente: Huevo · cantidad', tipo: 'numero', valor: '4', resaltado: true },
@@ -327,7 +362,10 @@ const RECETA: Mision = {
       instruccion: `Toca ${t('Guardar')}. El formulario pide al menos un ingrediente.`,
       quePasa: 'Queda la receta <b>RC-0001</b>. Escríbela siempre para una base cómoda: el sistema la escala solo al cotizar. Cambiarla después no afecta los presupuestos ya guardados.',
       escena: {
-        tipo: 'formulario', titulo: 'Nueva receta',
+        tipo: 'formulario', formulario: 'recetas',
+        resaltarIds: ['btnGuardar'],
+        valoresEjemplo: { nombre: 'Torta chocolate', categoria: 'tortas', raciones_base: '10', tiempo: '2' },
+        titulo: 'Nueva receta',
         campos: [
           { etiqueta: 'Nombre', tipo: 'texto', valor: 'Torta chocolate' },
           { etiqueta: 'Base', tipo: 'numero', valor: '10 personas' },
@@ -359,7 +397,10 @@ const COTIZAR: Mision = {
       instruccion: 'En <b>Cliente</b>, elige <b>Ana Torres</b>.',
       pista: 'Si llega alguien nuevo en plena cotización, el botón «+» junto a Cliente lo crea sin salir del formulario.',
       escena: {
-        tipo: 'formulario', titulo: 'Nuevo presupuesto',
+        tipo: 'formulario', formulario: 'nuevo-presupuesto',
+        resaltarIds: ['cli_nombre'],
+        valoresEjemplo: { cli_nombre: 'Ana Torres' },
+        titulo: 'Nuevo presupuesto',
         campos: [{ etiqueta: 'Cliente', tipo: 'select', valor: 'Ana Torres', resaltado: true }],
       },
     },
@@ -369,7 +410,10 @@ const COTIZAR: Mision = {
       instruccion: 'En <b>Receta</b>, elige <b>Torta chocolate</b>.',
       detalle: 'El modo de escalado se pone solo en «Por personas» y la tabla trae Harina y Huevo con su precio.',
       escena: {
-        tipo: 'formulario', titulo: 'Nuevo presupuesto',
+        tipo: 'formulario', formulario: 'nuevo-presupuesto',
+        resaltarIds: ['rec_nombre'],
+        valoresEjemplo: { cli_nombre: 'Ana Torres', rec_nombre: 'Torta chocolate' },
+        titulo: 'Nuevo presupuesto',
         campos: [
           { etiqueta: 'Cliente', tipo: 'select', valor: 'Ana Torres' },
           { etiqueta: 'Receta', tipo: 'select', valor: 'Torta chocolate', resaltado: true },
@@ -383,7 +427,10 @@ const COTIZAR: Mision = {
       instruccion: 'Escala a <b>20 personas</b>.',
       detalle: 'La base de la receta es 10, así que el factor es 2: Harina pasa a 600 g y Huevo a 8 u. El costo se recalcula al instante.',
       escena: {
-        tipo: 'formulario', titulo: 'Nuevo presupuesto',
+        tipo: 'formulario', formulario: 'nuevo-presupuesto',
+        resaltarIds: ['raciones', 'tablaIng'],
+        valoresEjemplo: { cli_nombre: 'Ana Torres', rec_nombre: 'Torta chocolate', raciones: '20' },
+        titulo: 'Nuevo presupuesto',
         campos: [
           { etiqueta: 'Personas', tipo: 'numero', valor: '20', resaltado: true },
           { etiqueta: 'Harina (escalada)', tipo: 'numero', valor: '600 g' },
@@ -397,7 +444,10 @@ const COTIZAR: Mision = {
       instruccion: 'Cambia el modo a <b>«Por tamaño»</b> y elige <b>grande</b>.',
       detalle: 'El factor de «grande» también es 2. Si la receta tiene regla de empaque (la definirás en el nivel avanzado), aparece el empaque sugerido con su casilla marcada.',
       escena: {
-        tipo: 'formulario', titulo: 'Nuevo presupuesto',
+        tipo: 'formulario', formulario: 'nuevo-presupuesto',
+        resaltarIds: ['modo', 'tamano', 'materiales'],
+        valoresEjemplo: { cli_nombre: 'Ana Torres', rec_nombre: 'Torta chocolate' },
+        titulo: 'Nuevo presupuesto',
         campos: [
           { etiqueta: 'Modo de escalado', tipo: 'select', valor: 'Por tamaño', resaltado: true },
           { etiqueta: 'Tamaño', tipo: 'select', valor: 'grande', resaltado: true },
@@ -411,7 +461,10 @@ const COTIZAR: Mision = {
       instruccion: 'Revisa los costos (mano de obra, indirecto, depreciación), <b>ajusta el margen</b> y marca <b>Aplicar IGV</b>.',
       detalle: 'El precio final se actualiza solo y se redondea hacia arriba al múltiplo de 5.',
       escena: {
-        tipo: 'formulario', titulo: 'Nuevo presupuesto',
+        tipo: 'formulario', formulario: 'nuevo-presupuesto',
+        resaltarIds: ['margen', 'aplica_igv', 't_final'],
+        valoresEjemplo: { cli_nombre: 'Ana Torres', rec_nombre: 'Torta chocolate', margen: '30' },
+        titulo: 'Nuevo presupuesto',
         campos: [
           { etiqueta: 'Margen (%)', tipo: 'numero', valor: '30', resaltado: true },
           { etiqueta: 'Aplicar IGV', tipo: 'check', valor: 'Sí', resaltado: true },
@@ -425,7 +478,10 @@ const COTIZAR: Mision = {
       instruccion: `Escribe notas si hace falta y toca ${t('Guardar')}.`,
       quePasa: 'Nace el presupuesto <b>P-0001</b> en estado <b>Pendiente</b>, con emisión hoy y el vencimiento de tu Configuración. Sus precios quedan <b>congelados</b>: aunque cambies tus costos después, este no se mueve. Todavía no toca el inventario.',
       escena: {
-        tipo: 'formulario', titulo: 'Nuevo presupuesto',
+        tipo: 'formulario', formulario: 'nuevo-presupuesto',
+        resaltarIds: ['notas', 'btnGuardar'],
+        valoresEjemplo: { cli_nombre: 'Ana Torres', rec_nombre: 'Torta chocolate', margen: '30' },
+        titulo: 'Nuevo presupuesto',
         campos: [
           { etiqueta: 'Notas', tipo: 'texto', valor: 'Entrega sábado' },
           { etiqueta: 'Precio final (S/)', tipo: 'numero', valor: '95' },
@@ -453,7 +509,9 @@ const APROBAR: Mision = {
       instruccion: 'En el detalle, <b>lee el aviso de faltantes</b>.',
       detalle: 'Verás que Harina y Huevo quedarán en negativo, porque su stock es 0. Es informativo: no impide aprobar.',
       escena: {
-        tipo: 'formulario', titulo: 'Presupuesto P-0001',
+        tipo: 'formulario', formulario: 'detalle-presupuesto',
+        resaltarIds: ['cuerpo'],
+        titulo: 'Presupuesto P-0001',
         campos: [
           { etiqueta: 'Estado', tipo: 'texto', valor: 'Pendiente' },
           { etiqueta: 'Faltante: Harina', tipo: 'texto', valor: '−600 g', resaltado: true },
@@ -468,7 +526,9 @@ const APROBAR: Mision = {
       quePasa: 'P-0001 pasa a <b>Aprobado</b> y nace el pedido <b>PD-0001</b> (Pendiente) con su lista de requerimientos. Si tu configuración descuenta el stock al aprobar, baja ahora; si no, bajará al iniciar producción.',
       pista: 'Si el cliente no acepta, el botón Rechazar guarda el motivo y no nace ningún pedido.',
       escena: {
-        tipo: 'formulario', titulo: 'Presupuesto P-0001',
+        tipo: 'formulario', formulario: 'detalle-presupuesto',
+        resaltarIds: ['pie'],
+        titulo: 'Presupuesto P-0001',
         campos: [
           { etiqueta: 'Estado', tipo: 'texto', valor: 'Pendiente' },
           { etiqueta: 'Precio final (S/)', tipo: 'numero', valor: '95' },
@@ -497,7 +557,9 @@ const ENTREGAR: Mision = {
       detalle: 'Si tu sistema descuenta el stock al iniciar producción, aquí es donde baja.',
       quePasa: 'El pedido pasa a <b>Producción</b>. A partir de aquí ya estás trabajando el encargo.',
       escena: {
-        tipo: 'formulario', titulo: 'Pedido PD-0001',
+        tipo: 'formulario', formulario: 'detalle-pedido',
+        resaltarIds: ['pie'],
+        titulo: 'Pedido PD-0001',
         campos: [
           { etiqueta: 'Estado', tipo: 'texto', valor: 'Pendiente', resaltado: true },
           { etiqueta: 'Cliente', tipo: 'texto', valor: 'Ana Torres' },
@@ -511,7 +573,9 @@ const ENTREGAR: Mision = {
       instruccion: `Cuando termines el encargo, sobre el pedido en Producción toca ${t('Entregar')} y confirma.`,
       quePasa: 'Se registra la fecha de entrega y nace la venta <b>VT-0001</b> con el precio final del presupuesto. Cerraste el ciclo: de cotizar a vender. Si el pedido se cae, «Cancelar» devuelve solo el stock consumido (un Entregado ya no se puede cancelar).',
       escena: {
-        tipo: 'formulario', titulo: 'Pedido PD-0001',
+        tipo: 'formulario', formulario: 'detalle-pedido',
+        resaltarIds: ['pie'],
+        titulo: 'Pedido PD-0001',
         campos: [
           { etiqueta: 'Estado', tipo: 'texto', valor: 'Producción', resaltado: true },
           { etiqueta: 'Cliente', tipo: 'texto', valor: 'Ana Torres' },
@@ -564,7 +628,10 @@ const PROVEEDOR: Mision = {
       instruccion: 'Escribe el <b>nombre</b>: <b>Molinos SAC</b>.',
       detalle: 'Es obligatorio y no se puede repetir exacto.',
       escena: {
-        tipo: 'formulario', titulo: 'Nuevo proveedor',
+        tipo: 'formulario', formulario: 'proveedores',
+        resaltarIds: ['nombre'],
+        valoresEjemplo: { nombre: 'Molinos SAC' },
+        titulo: 'Nuevo proveedor',
         campos: [{ etiqueta: 'Nombre', tipo: 'texto', valor: 'Molinos SAC', resaltado: true }],
       },
     },
@@ -574,7 +641,10 @@ const PROVEEDOR: Mision = {
       instruccion: 'Pon su <b>WhatsApp con código de país</b>: <b>51999111222</b>, sin espacios ni signos.',
       detalle: 'Es lo que arma el enlace para pedirle con un clic.',
       escena: {
-        tipo: 'formulario', titulo: 'Nuevo proveedor',
+        tipo: 'formulario', formulario: 'proveedores',
+        resaltarIds: ['whatsapp'],
+        valoresEjemplo: { nombre: 'Molinos SAC', whatsapp: '51999111222' },
+        titulo: 'Nuevo proveedor',
         campos: [
           { etiqueta: 'Nombre', tipo: 'texto', valor: 'Molinos SAC' },
           { etiqueta: 'WhatsApp', tipo: 'texto', valor: '51999111222', resaltado: true },
@@ -587,7 +657,10 @@ const PROVEEDOR: Mision = {
       instruccion: `Notas opcionales y toca ${t('Guardar')}.`,
       quePasa: 'Aparece la fila <b>PR-0001</b>. Ahora puedes ponerlo como «proveedor recomendado» en tus insumos.',
       escena: {
-        tipo: 'formulario', titulo: 'Nuevo proveedor',
+        tipo: 'formulario', formulario: 'proveedores',
+        resaltarIds: ['btnGuardar'],
+        valoresEjemplo: { nombre: 'Molinos SAC', whatsapp: '51999111222' },
+        titulo: 'Nuevo proveedor',
         campos: [
           { etiqueta: 'Nombre', tipo: 'texto', valor: 'Molinos SAC' },
           { etiqueta: 'WhatsApp', tipo: 'texto', valor: '51999111222' },
@@ -615,7 +688,9 @@ const COMPRAR: Mision = {
       instruccion: 'En <b>modo automático</b>, elige el pedido <b>PD-0001</b>.',
       detalle: 'Aparecen los faltantes (Harina, Huevo) agrupados por proveedor, con el último precio pagado. El modo manual lista todos los insumos, con los que están bajo el mínimo ya marcados.',
       escena: {
-        tipo: 'formulario', titulo: 'Comprar materiales',
+        tipo: 'formulario', formulario: 'comprar-materiales',
+        resaltarIds: ['modo', 'pedido'],
+        titulo: 'Comprar materiales',
         campos: [
           { etiqueta: 'Modo', tipo: 'select', valor: 'Automático (por pedido)', resaltado: true },
           { etiqueta: 'Pedido', tipo: 'select', valor: 'PD-0001', resaltado: true },
@@ -630,7 +705,9 @@ const COMPRAR: Mision = {
       detalle: 'Se abre el chat con el mensaje ya escrito para preguntar disponibilidad y precio.',
       quePasa: 'Esto todavía <b>no</b> cambia el stock: solo arma el pedido al proveedor. El stock sube cuando registres la compra recibida.',
       escena: {
-        tipo: 'formulario', titulo: 'Comprar materiales',
+        tipo: 'formulario', formulario: 'comprar-materiales',
+        resaltarIds: ['resultado'],
+        titulo: 'Comprar materiales',
         campos: [
           { etiqueta: 'Proveedor', tipo: 'texto', valor: 'Molinos SAC' },
           { etiqueta: 'Mensaje', tipo: 'texto', valor: 'Hola, ¿tienes harina y…' },
@@ -651,7 +728,10 @@ const COMPRAR: Mision = {
       detalle: 'Recibes en presentaciones, no en gramos: 5 bolsas de 1000 g.',
       quePasa: 'Queda la compra <b>CMP-0001</b>. La Harina sube su precio de presentación a 5.50 (unidad base 0.0055), el stock sube 5×1000 = 5000 g y el semáforo deja de estar rojo. Costos al día y faltantes cubiertos.',
       escena: {
-        tipo: 'formulario', titulo: 'Registrar compra',
+        tipo: 'formulario', formulario: 'registrar-compra',
+        resaltarIds: ['lineas', 'btnGuardar'],
+        valoresEjemplo: { prov_nombre: 'Molinos SAC' },
+        titulo: 'Registrar compra',
         campos: [
           { etiqueta: 'Proveedor', tipo: 'select', valor: 'Molinos SAC' },
           { etiqueta: 'Harina · cantidad × precio', tipo: 'numero', valor: '5 × 5.50', resaltado: true },
@@ -680,7 +760,10 @@ const AJUSTAR: Mision = {
       instruccion: 'Busca <b>Caja torta</b>. Tipo de ajuste <b>merma</b>, cantidad <b>5</b>, motivo <b>«se dañaron»</b>.',
       detalle: 'Merma, daño y vencimiento sacan stock; devolución lo regresa; conteo lo escribes con signo (un menos para quitar).',
       escena: {
-        tipo: 'formulario', titulo: 'Ajustar inventario',
+        tipo: 'formulario', formulario: 'ajustar-inventario',
+        resaltarIds: ['ins_nombre', 'tipo', 'cantidad', 'motivo'],
+        valoresEjemplo: { ins_nombre: 'Caja torta', cantidad: '5', motivo: 'se dañaron' },
+        titulo: 'Ajustar inventario',
         campos: [
           { etiqueta: 'Insumo', tipo: 'select', valor: 'Caja torta', resaltado: true },
           { etiqueta: 'Tipo de ajuste', tipo: 'select', valor: 'Merma', resaltado: true },
@@ -695,7 +778,10 @@ const AJUSTAR: Mision = {
       instruccion: `Mira la <b>vista previa</b> (cómo quedan el stock y el semáforo) y toca ${t('Guardar')}.`,
       quePasa: 'Queda registrado en Movimientos con fecha, tipo y motivo, y el stock de Caja torta baja 5. Siempre podrás rastrear por qué el inventario está como está.',
       escena: {
-        tipo: 'formulario', titulo: 'Ajustar inventario',
+        tipo: 'formulario', formulario: 'ajustar-inventario',
+        resaltarIds: ['preview', 'btnGuardar'],
+        valoresEjemplo: { ins_nombre: 'Caja torta', cantidad: '5', motivo: 'se dañaron' },
+        titulo: 'Ajustar inventario',
         campos: [
           { etiqueta: 'Stock actual', tipo: 'numero', valor: '50' },
           { etiqueta: 'Stock después', tipo: 'numero', valor: '45', resaltado: true },
@@ -724,7 +810,10 @@ const REGLA_EMPAQUE: Mision = {
       instruccion: 'Receta <b>Torta chocolate</b>, tamaño <b>grande</b>.',
       detalle: 'El desplegable solo muestra los tamaños definidos en Configuración.',
       escena: {
-        tipo: 'formulario', titulo: 'Nueva regla de empaque',
+        tipo: 'formulario', formulario: 'reglas-empaque',
+        resaltarIds: ['rec_nombre', 'tamano'],
+        valoresEjemplo: { rec_nombre: 'Torta chocolate' },
+        titulo: 'Nueva regla de empaque',
         campos: [
           { etiqueta: 'Receta', tipo: 'select', valor: 'Torta chocolate', resaltado: true },
           { etiqueta: 'Tamaño', tipo: 'select', valor: 'grande', resaltado: true },
@@ -737,7 +826,10 @@ const REGLA_EMPAQUE: Mision = {
       instruccion: `Empaque <b>Caja torta</b>, cantidad <b>1</b>. Toca ${t('Guardar')}.`,
       quePasa: 'Queda la regla <b>RL-0001</b>. Al cotizar Torta chocolate en tamaño grande, el sistema propondrá <b>1 Caja torta</b> automáticamente (con una casilla que puedes desmarcar). ¡Y con esto dominas toda la operación!',
       escena: {
-        tipo: 'formulario', titulo: 'Nueva regla de empaque',
+        tipo: 'formulario', formulario: 'reglas-empaque',
+        resaltarIds: ['emp_nombre', 'cantidad', 'btnGuardar'],
+        valoresEjemplo: { rec_nombre: 'Torta chocolate', emp_nombre: 'Caja torta', cantidad: '1' },
+        titulo: 'Nueva regla de empaque',
         campos: [
           { etiqueta: 'Empaque', tipo: 'select', valor: 'Caja torta', resaltado: true },
           { etiqueta: 'Cantidad sugerida', tipo: 'numero', valor: '1', resaltado: true },

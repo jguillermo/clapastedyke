@@ -1,0 +1,298 @@
+/* ============================================================
+ * Estilos de los formularios GAS — fuente única de verdad.
+ * Se usa en dos destinos:
+ *   (a) global en el juego Angular (los componentes de formularios/)
+ *   (b) inline en cada src/XForm.html generado por el export
+ * Traducción Tailwind v4 de src/Estilos.html. Todo va scoped bajo
+ * `.gas-form` (en el export, <body class="gas-form">) para no
+ * contaminar los estilos del juego. SIN Preflight: el reset ya existe.
+ * ============================================================ */
+
+@layer theme, base, components, utilities;
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/utilities.css' layer(utilities);
+
+/* Paleta GAS como tokens de Tailwind (uso futuro: bg-papel, text-tinta…) */
+@theme {
+  --color-papel: #f7f1e8;
+  --color-hoja: #ffffff;
+  --color-tinta: #2a2420;
+  --color-apagado: #8c8278;
+  --color-linea: #e7ddcf;
+  --color-acento: #bb5530;
+  --color-acento-profundo: #9a4324;
+  --color-acento-suave: #f6e3d6;
+  --color-verde: #4f8a5b;
+  --color-ambar: #cf9a32;
+  --color-rojo: #bf412c;
+  --font-titulo: 'Fraunces', serif;
+  --font-texto: 'Figtree', sans-serif;
+  --font-mono: 'Space Mono', monospace;
+}
+
+@layer components {
+  /* Variables EXACTAS de src/Estilos.html: dentro del formulario mandan
+     estas, no las del juego (#f6efe5 vs #f7f1e8, etc.). */
+  .gas-form {
+    --paper: #f7f1e8; --sheet: #ffffff; --ink: #2a2420; --muted: #8c8278;
+    --line: #e7ddcf; --line-soft: #f0e8db;
+    --accent: #bb5530; --accent-deep: #9a4324; --accent-soft: #f6e3d6;
+    --green: #4f8a5b; --green-soft: #e1efe2;
+    --amber: #cf9a32; --amber-soft: #f7ecd1;
+    --red: #bf412c; --red-soft: #f7ddd6;
+    --shadow: 0 10px 30px -12px rgba(60, 40, 25, .28);
+    --shadow-sm: 0 2px 8px -3px rgba(60, 40, 25, .22);
+
+    @apply flex flex-col antialiased;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-texto);
+    line-height: 1.5;
+  }
+
+  /* En el export la clase va en <body>: ocupa toda la ventana del modal. */
+  body.gas-form { @apply m-0 h-full; }
+  html:has(body.gas-form) { @apply m-0 h-full; }
+
+  .gas-form *, .gas-form *::before, .gas-form *::after { box-sizing: border-box; }
+
+  .gas-form .num { font-family: var(--font-mono); }
+
+  /* Encabezado de la ventana */
+  .gas-form .dlg-head {
+    @apply flex items-center justify-between;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--line);
+    background: linear-gradient(#fff, #fdfaf6);
+    flex: 0 0 auto;
+  }
+  .gas-form .dlg-head h3 { font-family: var(--font-titulo); font-size: 18px; font-weight: 600; margin: 0; }
+  .gas-form .dlg-head .x { color: var(--muted); font-size: 20px; cursor: pointer; border: 0; background: none; line-height: 1; }
+  .gas-form .dlg-head .x:hover { color: var(--ink); }
+
+  /* Cuerpo con scroll y pie fijo */
+  .gas-form .dlg-body { padding: 18px 20px; overflow: auto; flex: 1 1 auto; background: var(--paper); }
+  .gas-form .dlg-foot {
+    @apply flex justify-end;
+    gap: 10px;
+    padding: 13px 20px;
+    border-top: 1px solid var(--line);
+    background: #fdfaf6;
+    flex: 0 0 auto;
+  }
+
+  /* Aviso de exito o error */
+  .gas-form .flash { display: none; margin: 0 0 14px; padding: 10px 13px; border-radius: 10px; font-size: 13px; }
+  .gas-form .flash.show { display: block; }
+  .gas-form .flash.ok { background: var(--green-soft); color: var(--green); border: 1px solid #c4e0c8; }
+  .gas-form .flash.err { background: var(--red-soft); color: var(--red); border: 1px solid #e9c2b8; }
+
+  /* Botones */
+  .gas-form .btn {
+    font-family: var(--font-texto); font-size: 13.5px; font-weight: 600;
+    padding: 9px 18px; border-radius: 9px;
+    border: 1px solid var(--line); background: #fff; color: #5d544b; cursor: pointer;
+  }
+  .gas-form .btn:hover { border-color: var(--muted); }
+  .gas-form .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .gas-form .btn.primary:hover { background: var(--accent-deep); }
+  .gas-form .btn.primary:disabled { opacity: .55; cursor: default; }
+  .gas-form .btn.ghost { background: none; border: 0; color: var(--accent); padding: 8px 6px; }
+  .gas-form .btn.mini { font-size: 11px; padding: 4px 9px; border-radius: 7px; }
+  .gas-form .btn.mini.no { border-color: var(--red); color: var(--red); }
+
+  /* Tarjetas de seccion */
+  .gas-form .card {
+    background: #fff; border: 1px solid var(--line); border-radius: 13px;
+    padding: 18px; box-shadow: var(--shadow-sm); margin-bottom: 14px;
+  }
+  .gas-form .grp-title {
+    font-family: var(--font-mono); font-size: 11px; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--accent); margin: 0 0 14px;
+  }
+
+  /* Campos */
+  .gas-form .field { margin-bottom: 14px; }
+  .gas-form .field:last-child { margin-bottom: 0; }
+  .gas-form .lab { @apply flex flex-wrap items-center; gap: 8px; margin-bottom: 5px; }
+  .gas-form .lab b { font-size: 13px; font-weight: 600; }
+  .gas-form .req { color: var(--accent); font-weight: 700; }
+  .gas-form .opt { font-size: 11px; color: var(--muted); }
+  .gas-form .typetag {
+    font-family: var(--font-mono); font-size: 9.5px; text-transform: uppercase;
+    letter-spacing: .04em; color: var(--muted); border: 1px solid var(--line);
+    border-radius: 999px; padding: 1px 7px; margin-left: auto;
+  }
+
+  .gas-form input, .gas-form select, .gas-form textarea {
+    font-family: var(--font-texto); font-size: 13.5px; color: var(--ink);
+    border: 1px solid var(--line); border-radius: 9px; padding: 9px 11px;
+    width: 100%; background: #fff; outline: none;
+  }
+  .gas-form input:focus, .gas-form select:focus, .gas-form textarea:focus { border-color: var(--accent); }
+  .gas-form input.bad, .gas-form select.bad, .gas-form textarea.bad { border-color: var(--red); background: #fdf3f0; }
+  .gas-form textarea { resize: vertical; min-height: 54px; }
+  .gas-form input[readonly], .gas-form .ro { background: #f8f3ec; color: #6f655b; }
+  .gas-form .calc {
+    background: var(--accent-soft); border-color: #eecdba; color: var(--accent-deep);
+    font-family: var(--font-mono); font-weight: 700;
+  }
+  .gas-form .two { @apply grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .gas-form .three { @apply grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 10px; }
+
+  /* Autocompletado */
+  .gas-form .ac { position: relative; }
+  .gas-form .ac-list {
+    position: absolute; left: 0; right: 0; top: calc(100% + 3px); background: #fff;
+    border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); z-index: 20;
+    max-height: 190px; overflow: auto; display: none;
+  }
+  .gas-form .ac-list.show { display: block; }
+  .gas-form .ac-item { padding: 8px 11px; font-size: 13px; cursor: pointer; }
+  .gas-form .ac-item:hover, .gas-form .ac-item.sel { background: var(--accent-soft); color: var(--accent-deep); }
+  .gas-form .ac-empty { padding: 8px 11px; font-size: 12.5px; color: var(--muted); }
+
+  /* Tablas */
+  .gas-form table.t { width: 100%; border-collapse: collapse; font-size: 12.5px; margin: 2px 0; }
+  .gas-form table.t th {
+    text-align: left; font-family: var(--font-mono); font-size: 10px; letter-spacing: .04em;
+    text-transform: uppercase; color: var(--muted); font-weight: 400;
+    padding: 7px 8px; border-bottom: 1px solid var(--line);
+  }
+  .gas-form table.t td { padding: 8px; border-bottom: 1px solid var(--line-soft); vertical-align: middle; }
+  .gas-form table.t td.n, .gas-form table.t th.n { text-align: right; font-family: var(--font-mono); }
+  .gas-form table.t tr:last-child td { border-bottom: 0; }
+  .gas-form .empty { padding: 18px; text-align: center; color: var(--muted); font-size: 13px; }
+
+  /* Semaforo de stock */
+  .gas-form .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; }
+  .gas-form .dot.rojo { background: var(--red); }
+  .gas-form .dot.amarillo { background: var(--amber); }
+  .gas-form .dot.verde { background: var(--green); }
+
+  /* Lista de filas que se agregan (ingredientes, lineas) */
+  .gas-form .row-add { @apply grid items-end; gap: 8px; margin-bottom: 8px; }
+  .gas-form .note {
+    font-size: 12.5px; color: var(--muted); margin-top: 6px; padding: 11px 13px;
+    background: #fbf6ef; border-radius: 10px; border: 1px dashed var(--line);
+  }
+  .gas-form .sub { font-size: 12px; color: var(--muted); margin: 0 0 12px; }
+  .gas-form .toolbar { @apply flex items-center justify-between; margin-bottom: 12px; gap: 10px; }
+  .gas-form .toolbar h4 { margin: 0; font-family: var(--font-titulo); font-size: 16px; }
+
+  /* Resaltado del juego-tutorial (no existe en el export) */
+  .gas-form .resaltado {
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 0 3px rgba(187, 85, 48, .18) !important;
+    animation: gas-resalta 1.6s ease-in-out infinite;
+  }
+}
+
+/* ============================================================
+ * Bloques crudos (fuera de @apply): fx, microinteracciones,
+ * media queries — copiados de src/Estilos.html con scope .gas-form
+ * ============================================================ */
+
+@media (max-width: 620px) {
+  .gas-form .two, .gas-form .three { grid-template-columns: 1fr; }
+}
+
+/* Barra de progreso del scroll del cuerpo (la inserta S.fx en el body) */
+.dlg-progress { flex: 0 0 auto; height: 3px; background: var(--line-soft, #f0e8db); display: none; }
+.dlg-progress.on { display: block; }
+.dlg-progress i {
+  display: block; height: 100%; width: 0;
+  background: linear-gradient(90deg, var(--accent, #bb5530), var(--accent-deep, #9a4324));
+  transition: width .08s linear;
+}
+
+/* Encabezado: icono + titulo */
+.gas-form .dlg-title { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.gas-form .dlg-title h3 { min-width: 0; }
+.gas-form .dlg-ico { flex: 0 0 auto; width: 20px; height: 20px; color: var(--accent); }
+
+/* Revelado de tarjetas/secciones (una sola vez, stagger suave) */
+html.fx-anim .gas-form .card, html.fx-anim .gas-form .reveal {
+  opacity: 0; transform: translateY(16px);
+  transition: opacity .5s ease, transform .55s cubic-bezier(.16, .84, .24, 1);
+  transition-delay: calc(var(--i, 0) * 70ms);
+}
+html.fx-anim .gas-form .card.is-in, html.fx-anim .gas-form .reveal.is-in { opacity: 1; transform: none; }
+
+/* Icono SVG de linea que se dibuja solo */
+.gas-form .draw { stroke-dasharray: var(--len, 260); }
+@keyframes draw { from { stroke-dashoffset: var(--len, 260); } to { stroke-dashoffset: 0; } }
+html.fx-anim .gas-form .dlg-head .draw { animation: draw 1s ease .25s both; }
+html.fx-anim .gas-form .draw.is-in { animation: draw .9s ease both; }
+
+/* Pasos numerados con rebote + linea conectora */
+.gas-form .steps { list-style: none; margin: 0; padding: 0; }
+.gas-form .steps li { position: relative; padding: 0 0 14px 34px; }
+.gas-form .steps li::before {
+  content: attr(data-n); position: absolute; left: 0; top: 0; width: 22px; height: 22px;
+  border-radius: 50%; background: var(--accent); color: #fff; font-family: var(--font-mono);
+  font-size: 11px; display: flex; align-items: center; justify-content: center;
+}
+.gas-form .steps li::after { content: ""; position: absolute; left: 10px; top: 24px; bottom: 0; width: 2px; background: var(--line); }
+.gas-form .steps li:last-child::after { display: none; }
+html.fx-anim .gas-form .steps li::before { transform: scale(.2); opacity: 0; }
+html.fx-anim .gas-form .steps li::after { transform: scaleY(0); transform-origin: top; transition: transform .5s ease; }
+html.fx-anim .gas-form .steps li.is-in::before { animation: pop .5s cubic-bezier(.34, 1.56, .64, 1) forwards; }
+html.fx-anim .gas-form .steps li.is-in::after { transform: scaleY(1); }
+@keyframes pop { to { transform: scale(1); opacity: 1; } }
+
+/* Microinteracciones de formulario */
+.gas-form input, .gas-form select, .gas-form textarea {
+  transition: border-color .18s ease, background-color .18s ease, box-shadow .18s ease;
+}
+.gas-form input:focus, .gas-form select:focus, .gas-form textarea:focus { box-shadow: 0 0 0 3px var(--accent-soft); }
+.gas-form .btn { transition: background-color .18s ease, border-color .18s ease, transform .12s ease; }
+.gas-form .btn:active { transform: translateY(1px); }
+@keyframes shake { 10%, 90% { transform: translateX(-1px); } 30%, 70% { transform: translateX(2px); } 50% { transform: translateX(-3px); } }
+.gas-form input.bad, .gas-form select.bad, .gas-form textarea.bad { animation: shake .4s ease; }
+.gas-form .flash.show { animation: flashIn .32s cubic-bezier(.2, .7, .2, 1); }
+@keyframes flashIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+
+/* Vida ambiental: reaccion al hover y micro-movimiento continuo */
+.gas-form .card { transition: transform .28s cubic-bezier(.16, .84, .24, 1), box-shadow .28s ease; }
+.gas-form table.t td { transition: background-color .2s ease; }
+@media (hover: hover) {
+  .gas-form .card:hover { box-shadow: var(--shadow); }
+  html.fx-anim .gas-form .card.is-in:hover, html.fx-anim .gas-form .reveal.is-in:hover { transform: translateY(-4px); }
+  .gas-form .btn:hover { transform: translateY(-1px); }
+  .gas-form .btn.primary:hover { box-shadow: 0 9px 20px -8px var(--accent); }
+  .gas-form table.t tr:hover td { background: var(--accent-soft); }
+}
+/* Brillo que recorre el boton primario al pasar el cursor */
+.gas-form .btn.primary { position: relative; overflow: hidden; }
+.gas-form .btn.primary::after {
+  content: ""; position: absolute; top: 0; left: -70%; width: 45%; height: 100%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, .4), transparent);
+  transform: skewX(-18deg); pointer-events: none;
+}
+@media (hover: hover) { .gas-form .btn.primary:hover::after { animation: sheen .75s ease; } }
+@keyframes sheen { from { left: -70%; } to { left: 150%; } }
+/* Punto de acento que respira (titulos de grupo) */
+@keyframes breathe { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }
+html.fx-anim .gas-form .grp-title::before {
+  content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--accent); margin-right: 8px; vertical-align: middle;
+  animation: breathe 2.8s ease-in-out infinite;
+}
+
+/* Resaltado del juego: anillo que pulsa */
+@keyframes gas-resalta { 50% { box-shadow: 0 0 0 7px rgba(187, 85, 48, .26); } }
+
+/* Puntero grueso (movil/tactil): atenua los hover finos */
+@media (hover: none) { .gas-form .btn:hover { border-color: var(--line); transform: none; } }
+
+/* Accesibilidad: sin movimiento => todo visible e instantaneo */
+@media (prefers-reduced-motion: reduce) {
+  .gas-form *, .gas-form *::before, .gas-form *::after { animation: none !important; transition: none !important; }
+  html.fx-anim .gas-form .card, html.fx-anim .gas-form .reveal, .gas-form .draw,
+  html.fx-anim .gas-form .steps li::before, html.fx-anim .gas-form .steps li::after {
+    opacity: 1 !important; transform: none !important; stroke-dashoffset: 0 !important;
+  }
+  html.fx-anim .gas-form .grp-title::before { display: none !important; }
+  .dlg-progress { display: none !important; }
+}

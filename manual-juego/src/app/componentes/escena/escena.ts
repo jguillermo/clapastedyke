@@ -1,5 +1,7 @@
+import { NgComponentOutlet } from '@angular/common';
 import { Component, computed, input } from '@angular/core';
 import { EscenaSvg } from '../../modelo/tutorial.types';
+import { buscarFormulario } from '../../formularios/registro-formularios';
 
 /**
  * Escena instructiva: recrea en vectorial (HTML/CSS + SVG) la pantalla del
@@ -11,11 +13,23 @@ import { EscenaSvg } from '../../modelo/tutorial.types';
  */
 @Component({
   selector: 'app-escena',
+  imports: [NgComponentOutlet],
   templateUrl: './escena.html',
   styleUrl: './escena.scss',
 })
 export class Escena {
   readonly escena = input.required<EscenaSvg>();
+
+  /** Formulario REAL a renderizar (sustituye a la maqueta sintética). */
+  protected readonly componenteFormulario = computed(() => {
+    const id = this.escena().formulario;
+    return id ? (buscarFormulario(id)?.componente ?? null) : null;
+  });
+
+  protected readonly entradasFormulario = computed(() => ({
+    resaltar: this.escena().resaltarIds ?? [],
+    valores: this.escena().valoresEjemplo ?? {},
+  }));
 
   /** Items "de relleno" del menú Sistema, como en el software real. */
   protected readonly MENU_SISTEMA = [

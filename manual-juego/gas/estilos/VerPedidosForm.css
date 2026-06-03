@@ -1,0 +1,6 @@
+  .stbadge{font-family:"Space Mono",monospace;font-size:10px;text-transform:uppercase;padding:2px 8px;border-radius:999px}
+  .st-Pendiente{background:#f0ece4;color:#7a7166}
+  .st-Producción{background:var(--accent-soft);color:var(--accent-deep)}
+  .st-Entregado{background:var(--green-soft);color:var(--green)}
+  .st-Cancelado{background:var(--red-soft);color:var(--red)}
+  .filtros{display:grid;grid-template-columns:1fr 2fr;gap:10px}

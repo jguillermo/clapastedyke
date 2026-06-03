@@ -39,6 +39,13 @@ jobs:
         working-directory: manual-juego
         run: npm ci
 
+      - name: Verificar formularios sin deriva (export == commiteado)
+        working-directory: manual-juego
+        run: |
+          npm run exportar:formularios
+          git diff --exit-code ../src/*Form.html \
+            || { echo '::error::Los src/*Form.html no están sincronizados con los componentes. Corre npm run build:forms y commitea.'; exit 1; }
+
       - name: Construir el juego
         working-directory: manual-juego
         run: npm run build:pages
