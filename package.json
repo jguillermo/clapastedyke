@@ -1,7 +1,7 @@
 {
   "name": "clapastedyke",
   "version": "1.0.0",
-  "appVersion": 6,
+  "appVersion": 7,
   "description": "",
   "main": "index.js",
   "directories": {
@@ -11,7 +11,7 @@
     "login": "clasp login",
     "logout": "clasp logout",
     "push": "cd src && clasp push",
-    "pull": "cd src && clasp pull",
+    "pull": "node test/e2e/publish.js prod && cd src && clasp pull",
     "open": "cd src && clasp open-script",
     "preview": "node scripts/render-preview.js",
     "test": "node test/unitarios/run.js",
