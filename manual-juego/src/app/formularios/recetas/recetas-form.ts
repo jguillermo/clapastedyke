@@ -1,14 +1,14 @@
 import { Component, ViewEncapsulation, computed, input } from '@angular/core';
 import { MarcoDialogo } from '../marco-dialogo/marco-dialogo';
+import { UI_FORMULARIOS } from '../ui/ui';
 
 /**
- * Formulario de Recetas — capa visual fiel a src/RecetasForm.html.
- * La lógica vanilla vive en gas/logica/RecetasForm.js y se adjunta al exportar.
- * Inputs `resaltar`/`valores` solo se usan en el juego-tutorial.
+ * Formulario de Recetas — rediseño Tailwind (tokens + directivas ui).
+ * Inputs `resaltar`/`valores` los usa el juego-tutorial; ids intactos.
  */
 @Component({
   selector: 'app-recetas-form',
-  imports: [MarcoDialogo],
+  imports: [MarcoDialogo, ...UI_FORMULARIOS],
   encapsulation: ViewEncapsulation.None,
   host: { style: 'display: contents' },
   templateUrl: './recetas-form.html',

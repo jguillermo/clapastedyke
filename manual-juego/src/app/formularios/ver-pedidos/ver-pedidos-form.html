@@ -1,29 +1,32 @@
-<!-- Markup fiel a src/VerPedidosForm.html: mismos ids y clases.
-     data-onclick → onclick en el export. [class.resaltado]/[value] solo actúan en el juego. -->
+<!-- Rediseño Tailwind: utilities vía directivas ui. ids y data-on* intactos
+     (el juego valida por id; data-onchange/oninput es herencia del contrato GAS). -->
 <app-marco-dialogo titulo="Ver pedidos" [icono]="icono">
 
-  <div class="card">
-    <div class="grp-title">Filtros</div>
-    <div class="filtros">
-      <div class="field" style="margin:0">
-        <div class="lab"><b>Estado</b></div>
-        <select id="f_estado" data-onchange="pintar()" [class.resaltado]="marcas().has('f_estado')">
+  <section uiTarjeta>
+    <div uiTituloGrupo>Filtros</div>
+    <div class="grid grid-cols-2 gap-2.5 mb-3">
+      <div>
+        <div uiEtiqueta><b>Estado</b></div>
+        <select uiCampo id="f_estado" data-onchange="pintar()" [class.resaltado]="marcas().has('f_estado')">
           <option value="">Todos</option><option>Pendiente</option><option>Producción</option>
           <option>Entregado</option><option>Cancelado</option>
         </select>
       </div>
-      <div class="field ac" style="margin:0">
-        <div class="lab"><b>Cliente</b></div>
-        <input id="f_cliente" placeholder="Buscar cliente..." data-oninput="pintar()"
+      <div class="relative">
+        <div uiEtiqueta><b>Cliente</b></div>
+        <input uiCampo id="f_cliente" placeholder="Buscar cliente..." data-oninput="pintar()"
           [class.resaltado]="marcas().has('f_cliente')" [value]="valor('f_cliente')">
         <input type="hidden" id="f_cliente_id">
       </div>
     </div>
-  </div>
-  <div class="card"><div id="lista"><div class="empty">Cargando...</div></div></div>
+  </section>
+
+  <section uiTarjeta>
+    <div id="lista"><div uiVacio>Cargando...</div></div>
+  </section>
 
   <ng-container pie>
-    <button class="btn" data-onclick="S.cerrar()">Cerrar</button>
+    <button uiBoton data-onclick="S.cerrar()">Cerrar</button>
   </ng-container>
 
 </app-marco-dialogo>

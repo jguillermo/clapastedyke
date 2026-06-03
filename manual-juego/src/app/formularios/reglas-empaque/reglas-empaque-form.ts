@@ -1,14 +1,14 @@
 import { Component, ViewEncapsulation, computed, input } from '@angular/core';
 import { MarcoDialogo } from '../marco-dialogo/marco-dialogo';
+import { UI_FORMULARIOS } from '../ui/ui';
 
 /**
- * Formulario de Reglas de empaque — capa visual fiel a src/ReglasEmpaqueForm.html.
- * La lógica vanilla vive en gas/logica/ReglasEmpaqueForm.js y se adjunta al exportar.
- * Inputs `resaltar`/`valores` solo se usan en el juego-tutorial.
+ * Formulario de Reglas de empaque — rediseño Tailwind (tokens + directivas ui).
+ * Inputs `resaltar`/`valores` los usa el juego-tutorial; ids intactos.
  */
 @Component({
   selector: 'app-reglas-empaque-form',
-  imports: [MarcoDialogo],
+  imports: [MarcoDialogo, ...UI_FORMULARIOS],
   encapsulation: ViewEncapsulation.None,
   host: { style: 'display: contents' },
   templateUrl: './reglas-empaque-form.html',

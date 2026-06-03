@@ -1,14 +1,15 @@
 import { Component, ViewEncapsulation, computed, input } from '@angular/core';
 import { MarcoDialogo } from '../marco-dialogo/marco-dialogo';
+import { UI_FORMULARIOS } from '../ui/ui';
 
 /**
- * Formulario de Registrar compra — capa visual fiel a src/RegistrarCompraForm.html.
+ * Formulario de Registrar compra — rediseño Tailwind (tokens + directivas ui).
  * La lógica vanilla vive en gas/logica/RegistrarCompraForm.js y se adjunta al exportar.
- * Inputs `resaltar`/`valores` solo se usan en el juego-tutorial.
+ * Inputs `resaltar`/`valores` solo se usan en el juego-tutorial; ids intactos.
  */
 @Component({
   selector: 'app-registrar-compra-form',
-  imports: [MarcoDialogo],
+  imports: [MarcoDialogo, ...UI_FORMULARIOS],
   encapsulation: ViewEncapsulation.None,
   host: { style: 'display: contents' },
   templateUrl: './registrar-compra-form.html',

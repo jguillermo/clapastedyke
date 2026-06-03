@@ -1,34 +1,34 @@
-<!-- Markup fiel a src/RegistrarCompraForm.html: mismos ids y clases.
-     data-onclick → onclick en el export. [class.resaltado]/[value] solo actúan en el juego. -->
+<!-- Rediseño Tailwind: utilities vía directivas ui. ids y data-on* intactos
+     (el juego valida por id; data-onclick es herencia del contrato GAS). -->
 <app-marco-dialogo titulo="Registrar compra" [icono]="icono">
 
-  <div class="card">
-    <div class="grp-title">Datos de la compra</div>
-    <div class="two">
-      <div class="field ac">
-        <div class="lab"><b>Proveedor</b><span class="req">*</span><span class="typetag">Autocompletado</span></div>
-        <input id="prov_nombre" placeholder="Buscar proveedor..."
+  <section uiTarjeta>
+    <div uiTituloGrupo>Datos de la compra</div>
+    <div uiGrid="two">
+      <div class="relative">
+        <div uiEtiqueta><b>Proveedor</b><span uiReq>*</span><span uiPildora>Autocompletado</span></div>
+        <input uiCampo id="prov_nombre" placeholder="Buscar proveedor..."
           [class.resaltado]="marcas().has('prov_nombre')" [value]="valor('prov_nombre')">
         <input type="hidden" id="proveedor_id">
       </div>
-      <div class="field">
-        <div class="lab"><b>Fecha</b><span class="req">*</span><span class="typetag">Fecha</span></div>
-        <input id="fecha" type="date"
+      <div>
+        <div uiEtiqueta><b>Fecha</b><span uiReq>*</span><span uiPildora>Fecha</span></div>
+        <input uiCampo id="fecha" type="date"
           [class.resaltado]="marcas().has('fecha')" [value]="valor('fecha')">
       </div>
     </div>
-  </div>
+  </section>
 
-  <div class="card">
-    <div class="grp-title">Líneas de la compra</div>
-    <p class="sub">La cantidad va en presentaciones. Por ejemplo, 1 caja de 500 g se escribe como 1.</p>
+  <section uiTarjeta>
+    <div uiTituloGrupo>Líneas de la compra</div>
+    <p uiSub>La cantidad va en presentaciones. Por ejemplo, 1 caja de 500 g se escribe como 1.</p>
     <div id="lineas"></div>
-    <button class="btn mini" data-onclick="addLinea()">+ Agregar línea</button>
-  </div>
+    <button uiBoton="mini" data-onclick="addLinea()">+ Agregar línea</button>
+  </section>
 
   <ng-container pie>
-    <button class="btn" data-onclick="S.cerrar()">Cancelar</button>
-    <button class="btn primary" id="btnGuardar" data-onclick="guardar()"
+    <button uiBoton data-onclick="S.cerrar()">Cancelar</button>
+    <button uiBoton="primario" id="btnGuardar" data-onclick="guardar()"
       [class.resaltado]="marcas().has('btnGuardar')">Guardar compra</button>
   </ng-container>
 

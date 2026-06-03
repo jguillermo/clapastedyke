@@ -65,7 +65,7 @@
 
     <!-- ====== TIPO FORMULARIO con componente REAL migrado ====== -->
     @if (escena().tipo === 'formulario' && componenteFormulario(); as comp) {
-      <div class="modal real gas-form">
+      <div class="modal real">
         <ng-container *ngComponentOutlet="comp; inputs: entradasFormulario()" />
       </div>
 

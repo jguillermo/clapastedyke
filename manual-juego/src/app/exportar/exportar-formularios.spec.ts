@@ -44,7 +44,7 @@ describe('export de formularios a src/', () => {
 
       // El markup ya no debe tener rastros de Angular
       expect(markup).not.toMatch(/<app-|ng-reflect|_ngcontent|_nghost|ng-version|data-onclick/);
-      expect(markup).toContain('class="dlg-head"');
+      expect(markup).toContain('id="flash"');
 
       const html = ensamblarHtml({
         archivoGas: def.archivoGas,
@@ -71,7 +71,6 @@ describe('export de formularios a src/', () => {
     const markup = limpiarMarkup((fixture.nativeElement as HTMLElement).innerHTML);
 
     expect(markup).not.toMatch(/<app-|ng-reflect|_ngcontent|_nghost|ng-version|data-onclick/);
-    expect(markup).toContain('class="dlg-head"');
     expect(markup).toContain('onclick="S.cerrar()"');
     expect(markup).toContain('id="flash"');
   });

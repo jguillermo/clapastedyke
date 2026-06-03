@@ -6,7 +6,7 @@
     @if (esFormulario()) {
       <!-- ============ MODO FORMULARIO REAL · pantalla completa ============ -->
       <section class="reto-full">
-        <div class="form-zona gas-form" (input)="alEscribir($event)">
+        <div class="form-zona" (input)="alEscribir($event)">
           <ng-container *ngComponentOutlet="componenteFormulario()!; inputs: entradasFormulario()" />
         </div>
 

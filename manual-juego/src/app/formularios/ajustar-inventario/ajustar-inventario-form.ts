@@ -1,14 +1,14 @@
 import { Component, ViewEncapsulation, computed, input } from '@angular/core';
 import { MarcoDialogo } from '../marco-dialogo/marco-dialogo';
+import { UI_FORMULARIOS } from '../ui/ui';
 
 /**
- * Formulario de Ajustar inventario — capa visual fiel a src/AjustarInventarioForm.html.
- * La lógica vanilla vive en gas/logica/AjustarInventarioForm.js y se adjunta al exportar.
- * Inputs `resaltar`/`valores` solo se usan en el juego-tutorial.
+ * Formulario de Ajustar inventario — rediseño Tailwind (tokens + directivas ui).
+ * Inputs `resaltar`/`valores` los usa el juego-tutorial; ids intactos.
  */
 @Component({
   selector: 'app-ajustar-inventario-form',
-  imports: [MarcoDialogo],
+  imports: [MarcoDialogo, ...UI_FORMULARIOS],
   encapsulation: ViewEncapsulation.None,
   host: { style: 'display: contents' },
   templateUrl: './ajustar-inventario-form.html',

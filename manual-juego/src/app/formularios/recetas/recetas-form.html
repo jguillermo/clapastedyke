@@ -1,59 +1,59 @@
-<!-- Markup fiel a src/RecetasForm.html: mismos ids y clases.
-     data-onclick/onchange → on* en el export. [class.resaltado]/[value] solo actúan en el juego. -->
+<!-- Rediseño Tailwind: utilities vía directivas ui. ids y data-on* intactos
+     (el juego valida por id; data-on* es herencia del contrato GAS). -->
 <app-marco-dialogo titulo="Recetas" [icono]="icono">
 
-  <div class="card">
-    <div class="toolbar">
-      <h4>Lista de recetas</h4>
-      <button class="btn mini" data-onclick="nuevo()" [class.resaltado]="marcas().has('btnNuevo')">+ Nueva receta</button>
+  <section uiTarjeta>
+    <div uiToolbar>
+      <h4 uiToolbarTitulo>Lista de recetas</h4>
+      <button uiBoton="mini" data-onclick="nuevo()" [class.resaltado]="marcas().has('btnNuevo')">+ Nueva receta</button>
     </div>
-    <div id="lista"><div class="empty">Cargando...</div></div>
-  </div>
+    <div id="lista"><div uiVacio>Cargando...</div></div>
+  </section>
 
-  <div class="card">
-    <div class="grp-title" id="formTitulo">Nueva receta</div>
+  <section uiTarjeta>
+    <div uiTituloGrupo id="formTitulo">Nueva receta</div>
     <input type="hidden" id="id">
-    <div class="two">
-      <div class="field">
-        <div class="lab"><b>Nombre</b><span class="req">*</span><span class="typetag">Texto</span></div>
-        <input id="nombre" placeholder="Ej. Torta de chocolate"
+    <div uiGrid="two">
+      <div>
+        <div uiEtiqueta><b>Nombre</b><span uiReq>*</span><span uiPildora>Texto</span></div>
+        <input uiCampo id="nombre" placeholder="Ej. Torta de chocolate"
           [class.resaltado]="marcas().has('nombre')" [value]="valor('nombre')">
       </div>
-      <div class="field">
-        <div class="lab"><b>Categoria</b><span class="opt">opcional</span><span class="typetag">Texto</span></div>
-        <input id="categoria" placeholder="Tortas, bocaditos..."
+      <div>
+        <div uiEtiqueta><b>Categoria</b><span uiOpt>opcional</span><span uiPildora>Texto</span></div>
+        <input uiCampo id="categoria" placeholder="Tortas, bocaditos..."
           [class.resaltado]="marcas().has('categoria')" [value]="valor('categoria')">
       </div>
     </div>
-    <div class="two">
-      <div class="field">
-        <div class="lab"><b>Tipo de base</b><span class="req">*</span><span class="typetag">Dropdown</span></div>
-        <select id="tipo_base" data-onchange="actualizarLabelBase()" [class.resaltado]="marcas().has('tipo_base')">
+    <div uiGrid="two" class="mt-3.5">
+      <div>
+        <div uiEtiqueta><b>Tipo de base</b><span uiReq>*</span><span uiPildora>Dropdown</span></div>
+        <select uiCampo id="tipo_base" data-onchange="actualizarLabelBase()" [class.resaltado]="marcas().has('tipo_base')">
           <option value="personas">Por personas</option>
           <option value="tamano">Por tamano</option>
         </select>
       </div>
-      <div class="field">
-        <div class="lab"><b id="labBase">Valor de la base</b><span class="req">*</span><span class="typetag">Numero</span></div>
-        <input id="raciones_base" type="number" min="0" step="any" placeholder="Personas que rinde tal cual"
+      <div>
+        <div uiEtiqueta><b id="labBase">Valor de la base</b><span uiReq>*</span><span uiPildora>Numero</span></div>
+        <input uiCampo id="raciones_base" type="number" min="0" step="any" placeholder="Personas que rinde tal cual"
           [class.resaltado]="marcas().has('raciones_base')" [value]="valor('raciones_base')">
       </div>
     </div>
-    <div class="field">
-      <div class="lab"><b>Tiempo mano de obra</b><span class="req">*</span><span class="typetag">Numero (horas)</span></div>
-      <input id="tiempo" type="number" min="0" step="any" placeholder="Ej. 1.5"
+    <div class="mt-3.5">
+      <div uiEtiqueta><b>Tiempo mano de obra</b><span uiReq>*</span><span uiPildora>Numero (horas)</span></div>
+      <input uiCampo id="tiempo" type="number" min="0" step="any" placeholder="Ej. 1.5"
         [class.resaltado]="marcas().has('tiempo')" [value]="valor('tiempo')">
     </div>
 
-    <div class="grp-title" style="margin-top:18px;border-top:1px dashed var(--line);padding-top:16px">Ingredientes</div>
+    <div uiTituloGrupo class="mt-[18px] border-t border-dashed border-linea pt-4">Ingredientes</div>
     <div id="ings"></div>
-    <button class="btn mini" data-onclick="addRow()">+ Agregar ingrediente</button>
-    <div class="note">La unidad se toma sola del insumo. Las cantidades son para la base de la receta.</div>
-  </div>
+    <button uiBoton="mini" data-onclick="addRow()">+ Agregar ingrediente</button>
+    <div uiNota>La unidad se toma sola del insumo. Las cantidades son para la base de la receta.</div>
+  </section>
 
   <ng-container pie>
-    <button class="btn" data-onclick="nuevo()">Limpiar</button>
-    <button class="btn primary" id="btnGuardar" data-onclick="guardar()"
+    <button uiBoton data-onclick="nuevo()">Limpiar</button>
+    <button uiBoton="primario" id="btnGuardar" data-onclick="guardar()"
       [class.resaltado]="marcas().has('btnGuardar')">Guardar receta</button>
   </ng-container>
 

@@ -1,14 +1,15 @@
 import { Component, ViewEncapsulation, computed, input } from '@angular/core';
 import { MarcoDialogo } from '../marco-dialogo/marco-dialogo';
+import { UI_FORMULARIOS } from '../ui/ui';
 
 /**
- * Formulario Ver presupuestos — capa visual fiel a src/VerPresupuestosForm.html.
+ * Formulario Ver presupuestos — rediseño Tailwind (tokens + directivas ui).
  * La lógica vanilla vive en gas/logica/VerPresupuestosForm.js y se adjunta al exportar.
- * Inputs `resaltar`/`valores` solo se usan en el juego-tutorial.
+ * Inputs `resaltar`/`valores` solo se usan en el juego-tutorial; ids intactos.
  */
 @Component({
   selector: 'app-ver-presupuestos-form',
-  imports: [MarcoDialogo],
+  imports: [MarcoDialogo, ...UI_FORMULARIOS],
   encapsulation: ViewEncapsulation.None,
   host: { style: 'display: contents' },
   templateUrl: './ver-presupuestos-form.html',

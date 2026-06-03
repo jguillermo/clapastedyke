@@ -10,7 +10,7 @@ import { buscarFormulario } from '../registro-formularios';
   template: `
     @if (definicion(); as def) {
       <p class="miga"><a routerLink="/formularios">← Formularios</a> / {{ def.titulo }}</p>
-      <div class="ventana gas-form">
+      <div class="ventana">
         <ng-container *ngComponentOutlet="def.componente" />
       </div>
     } @else {
@@ -22,6 +22,8 @@ import { buscarFormulario } from '../registro-formularios';
     .miga { font-size: 13.5px; color: var(--muted); margin: 0 0 12px; }
     .miga a { color: var(--accent); font-weight: 600; text-decoration: none; }
     .ventana {
+      display: flex;
+      flex-direction: column;
       border: 1px solid var(--line);
       border-radius: 14px;
       overflow: hidden;

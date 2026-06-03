@@ -31,7 +31,7 @@
             ],
             "styles": [
               "src/styles.scss",
-              "src/estilos/formularios.css"
+              "src/estilos/tokens-formularios.css"
             ]
           },
           "configurations": {

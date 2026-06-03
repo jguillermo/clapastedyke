@@ -1,38 +1,38 @@
-<!-- Markup fiel a src/ComprarMaterialesForm.html: mismos ids y clases.
-     data-onclick → onclick en el export. [class.resaltado]/[value] solo actúan en el juego. -->
+<!-- Rediseño Tailwind: utilities vía directivas ui. ids y data-on* intactos
+     (el juego valida por id; data-onchange/onclick es herencia del contrato GAS). -->
 <app-marco-dialogo titulo="Comprar materiales" [icono]="icono">
 
-  <div class="card">
-    <div class="two">
-      <div class="field" style="margin:0">
-        <div class="lab"><b>Modo</b><span class="typetag">Dropdown</span></div>
-        <select id="modo" data-onchange="cambioModo()" [class.resaltado]="marcas().has('modo')">
+  <section uiTarjeta>
+    <div uiGrid="two">
+      <div>
+        <div uiEtiqueta><b>Modo</b><span uiPildora>Dropdown</span></div>
+        <select uiCampo id="modo" data-onchange="cambioModo()" [class.resaltado]="marcas().has('modo')">
           <option value="auto">Desde un pedido (faltantes)</option>
           <option value="manual">Manual (yo elijo)</option>
         </select>
       </div>
-      <div class="field" id="boxPedido" style="margin:0">
-        <div class="lab"><b>Pedido</b><span class="typetag">Dropdown</span></div>
-        <select id="pedido" data-onchange="generarAuto()" [class.resaltado]="marcas().has('pedido')"></select>
+      <div id="boxPedido">
+        <div uiEtiqueta><b>Pedido</b><span uiPildora>Dropdown</span></div>
+        <select uiCampo id="pedido" data-onchange="generarAuto()" [class.resaltado]="marcas().has('pedido')"></select>
       </div>
     </div>
-  </div>
+  </section>
 
-  <div class="card" id="boxManual" style="display:none">
-    <div class="grp-title">Elige insumos y cantidad</div>
-    <p class="sub">Los que están bajo el mínimo vienen marcados.</p>
+  <section uiTarjeta id="boxManual" style="display:none">
+    <div uiTituloGrupo>Elige insumos y cantidad</div>
+    <p uiSub>Los que están bajo el mínimo vienen marcados.</p>
     <div id="listaManual"></div>
-    <button class="btn mini" data-onclick="generarManual()">Generar lista</button>
-  </div>
+    <button uiBoton="mini" data-onclick="generarManual()">Generar lista</button>
+  </section>
 
-  <div class="card">
-    <div class="grp-title">Lista por proveedor</div>
-    <div id="resultado"><div class="empty">Elige un pedido o arma la lista manual.</div></div>
-  </div>
+  <section uiTarjeta>
+    <div uiTituloGrupo>Lista por proveedor</div>
+    <div id="resultado"><div uiVacio>Elige un pedido o arma la lista manual.</div></div>
+  </section>
 
   <ng-container pie>
-    <button class="btn" data-onclick="S.cerrar()">Cerrar</button>
-    <button class="btn primary" data-onclick="irRegistrar()">Registrar una compra</button>
+    <button uiBoton data-onclick="S.cerrar()">Cerrar</button>
+    <button uiBoton="primario" data-onclick="irRegistrar()">Registrar una compra</button>
   </ng-container>
 
 </app-marco-dialogo>

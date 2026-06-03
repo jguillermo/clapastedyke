@@ -1,49 +1,49 @@
-<!-- Markup fiel a src/ReglasEmpaqueForm.html: mismos ids y clases.
-     data-onclick → onclick en el export. [class.resaltado]/[value] solo actúan en el juego. -->
+<!-- Rediseño Tailwind: utilities vía directivas ui. ids y data-on* intactos
+     (el juego valida por id; data-onclick es herencia del contrato GAS). -->
 <app-marco-dialogo titulo="Reglas de empaque" [icono]="icono">
 
-  <div class="card">
-    <div class="toolbar">
-      <h4>Reglas registradas</h4>
-      <button class="btn mini" data-onclick="nuevo()" [class.resaltado]="marcas().has('btnNuevo')">+ Nueva regla</button>
+  <section uiTarjeta>
+    <div uiToolbar>
+      <h4 uiToolbarTitulo>Reglas registradas</h4>
+      <button uiBoton="mini" data-onclick="nuevo()" [class.resaltado]="marcas().has('btnNuevo')">+ Nueva regla</button>
     </div>
-    <div id="lista"><div class="empty">Cargando...</div></div>
-  </div>
+    <div id="lista"><div uiVacio>Cargando...</div></div>
+  </section>
 
-  <div class="card">
-    <div class="grp-title" id="formTitulo">Nueva regla</div>
-    <p class="sub">Define que empaque se sugiere para una receta en cierto tamano. Una receta y tamano puede tener varias filas.</p>
+  <section uiTarjeta>
+    <div uiTituloGrupo id="formTitulo">Nueva regla</div>
+    <p uiSub>Define que empaque se sugiere para una receta en cierto tamano. Una receta y tamano puede tener varias filas.</p>
     <input type="hidden" id="id_regla">
-    <div class="two">
-      <div class="field ac">
-        <div class="lab"><b>Receta</b><span class="req">*</span><span class="typetag">Autocompletado</span></div>
-        <input id="rec_nombre" placeholder="Buscar receta..."
+    <div uiGrid="two">
+      <div class="relative">
+        <div uiEtiqueta><b>Receta</b><span uiReq>*</span><span uiPildora>Autocompletado</span></div>
+        <input uiCampo id="rec_nombre" placeholder="Buscar receta..."
           [class.resaltado]="marcas().has('rec_nombre')" [value]="valor('rec_nombre')">
         <input type="hidden" id="receta_id">
       </div>
-      <div class="field">
-        <div class="lab"><b>Tamano</b><span class="req">*</span><span class="typetag">Dropdown</span></div>
-        <select id="tamano" [class.resaltado]="marcas().has('tamano')"></select>
+      <div>
+        <div uiEtiqueta><b>Tamano</b><span uiReq>*</span><span uiPildora>Dropdown</span></div>
+        <select uiCampo id="tamano" [class.resaltado]="marcas().has('tamano')"></select>
       </div>
     </div>
-    <div class="two">
-      <div class="field ac">
-        <div class="lab"><b>Empaque</b><span class="req">*</span><span class="typetag">Autocompletado</span></div>
-        <input id="emp_nombre" placeholder="Buscar empaque..."
+    <div uiGrid="two">
+      <div class="relative">
+        <div uiEtiqueta><b>Empaque</b><span uiReq>*</span><span uiPildora>Autocompletado</span></div>
+        <input uiCampo id="emp_nombre" placeholder="Buscar empaque..."
           [class.resaltado]="marcas().has('emp_nombre')" [value]="valor('emp_nombre')">
         <input type="hidden" id="insumo_empaque_id">
       </div>
-      <div class="field">
-        <div class="lab"><b>Cantidad</b><span class="req">*</span><span class="typetag">Numero</span></div>
-        <input id="cantidad" type="number" min="0" step="any" placeholder="Ej. 1"
+      <div>
+        <div uiEtiqueta><b>Cantidad</b><span uiReq>*</span><span uiPildora>Numero</span></div>
+        <input uiCampo id="cantidad" type="number" min="0" step="any" placeholder="Ej. 1"
           [class.resaltado]="marcas().has('cantidad')" [value]="valor('cantidad')">
       </div>
     </div>
-  </div>
+  </section>
 
   <ng-container pie>
-    <button class="btn" data-onclick="nuevo()">Limpiar</button>
-    <button class="btn primary" id="btnGuardar" data-onclick="guardar()"
+    <button uiBoton data-onclick="nuevo()">Limpiar</button>
+    <button uiBoton="primario" id="btnGuardar" data-onclick="guardar()"
       [class.resaltado]="marcas().has('btnGuardar')">Guardar regla</button>
   </ng-container>
 

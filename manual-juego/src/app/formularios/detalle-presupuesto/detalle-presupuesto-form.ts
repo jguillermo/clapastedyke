@@ -1,14 +1,15 @@
 import { Component, ViewEncapsulation, computed, input } from '@angular/core';
 import { MarcoDialogo } from '../marco-dialogo/marco-dialogo';
+import { UI_FORMULARIOS } from '../ui/ui';
 
 /**
- * Formulario Detalle de presupuesto — capa visual fiel a src/DetallePresupuestoForm.html.
+ * Formulario Detalle de presupuesto — rediseño Tailwind (tokens + directivas ui).
  * La lógica vanilla vive en gas/logica/DetallePresupuestoForm.js y se adjunta al exportar.
- * Inputs `resaltar`/`valores` solo se usan en el juego-tutorial.
+ * Inputs `resaltar`/`valores` solo se usan en el juego-tutorial; ids intactos.
  */
 @Component({
   selector: 'app-detalle-presupuesto-form',
-  imports: [MarcoDialogo],
+  imports: [MarcoDialogo, ...UI_FORMULARIOS],
   encapsulation: ViewEncapsulation.None,
   host: { style: 'display: contents' },
   templateUrl: './detalle-presupuesto-form.html',

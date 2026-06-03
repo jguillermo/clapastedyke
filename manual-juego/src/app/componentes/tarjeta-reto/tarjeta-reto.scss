@@ -26,6 +26,10 @@
   min-height: 0;
   overflow: hidden;
   border-bottom: 1px solid var(--line);
+  /* El marco del formulario es display:contents: la columna
+     cabecera / cuerpo-scroll / pie la da este contenedor. */
+  display: flex;
+  flex-direction: column;
 }
 
 /* Barra inferior de acciones del reto */
