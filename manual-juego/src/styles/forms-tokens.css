@@ -2,7 +2,7 @@
  * Form design tokens — pure Tailwind v4.
  * Templates use ONLY utilities over these tokens (bg-paper,
  * text-ink, rounded-field, shadow-card…), applied via the
- * directivas de src/app/formularios/ui/ui.ts.
+ * directivas de src/app/features/_common/ui/ui.ts.
  * NO Preflight: the global reset lives in src/styles.scss.
  * ============================================================ */
 
