@@ -1,0 +1,41 @@
+@use 'estilos/tokens';
+
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--fuente-texto);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+h1, h2, h3 { font-family: var(--fuente-titulo); font-weight: 600; }
+
+button { font-family: var(--fuente-texto); }
+
+// Etiqueta de "botón del sistema" (lo que el usuario debe tocar en el software real)
+.tag {
+  display: inline-block;
+  font-family: var(--fuente-mono);
+  font-size: .85em;
+  background: var(--accent-soft);
+  border: 1px solid #eecdba;
+  border-radius: 7px;
+  padding: 2px 9px;
+  color: var(--accent-deep);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}

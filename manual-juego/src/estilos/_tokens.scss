@@ -1,0 +1,22 @@
+// Paleta y tipografías heredadas del Manual de usuario (doc/diseno_visual_interfaz.html)
+:root {
+  --paper: #f6efe5;
+  --sheet: #fffdf9;
+  --ink: #241d18;
+  --muted: #8c8278;
+  --line: #e7ddcf;
+  --line-soft: #f0e8db;
+  --accent: #bb5530;
+  --accent-deep: #9a4324;
+  --accent-soft: #f6e3d6;
+  --accent-glow: #e08a52;
+  --green: #4f8a5b;
+  --amber: #cf9a32;
+  --red: #bf412c;
+  --shadow: 0 22px 50px -22px rgba(60, 40, 25, .45);
+  --shadow-sm: 0 8px 22px -12px rgba(60, 40, 25, .34);
+
+  --fuente-titulo: 'Fraunces', serif;
+  --fuente-texto: 'Figtree', sans-serif;
+  --fuente-mono: 'Space Mono', monospace;
+}

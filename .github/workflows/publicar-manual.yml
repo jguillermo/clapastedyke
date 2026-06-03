@@ -1,7 +1,13 @@
-name: Publicar Manual de Usuario
+name: Publicar Manual y Juego
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'Manual_de_usuario.html'
+      - 'manual-juego/**'
+      - '.github/workflows/publicar-manual.yml'
 
 permissions:
   contents: read
@@ -22,12 +28,29 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Configurar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: manual-juego/package-lock.json
+
+      - name: Instalar dependencias del juego
+        working-directory: manual-juego
+        run: npm ci
+
+      - name: Construir el juego
+        working-directory: manual-juego
+        run: npm run build:pages
+
       - name: Preparar archivos
         run: |
-          mkdir -p _site
+          mkdir -p _site/juego
           cp Manual_de_usuario.html _site/Manual_de_usuario.html
           cp Manual_de_usuario.html _site/index.html
-          cp Manual_rapido.html _site/Manual_rapido.html
+          cp -r manual-juego/dist/manual-juego/browser/* _site/juego/
+          # Fallback SPA: recargar una ruta profunda del juego no debe dar 404
+          cp _site/juego/index.html _site/juego/404.html
 
       - name: Configurar Pages
         uses: actions/configure-pages@v4

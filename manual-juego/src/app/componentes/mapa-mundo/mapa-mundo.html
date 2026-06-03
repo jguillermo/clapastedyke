@@ -1,0 +1,68 @@
+<section class="mapa">
+
+  <header class="portada">
+    <p class="kick">El juego del manual</p>
+    <h1>Aprende jugando,<br>reto a reto</h1>
+    <p class="sub">
+      Te llevamos de la mano por el sistema de costeo: haces cada paso en tu
+      hoja de cálculo real y marcas <b>«Ya lo completé»</b> para seguir.
+      Tu avance se guarda solo en este navegador.
+    </p>
+
+    @if (estado.juegoTerminado()) {
+      <p class="fin">🏆 ¡Completaste todos los retos! Puedes repasar cualquier misión.</p>
+    } @else {
+      <button type="button" class="boton solido grande" (click)="continuar()">
+        ▶ {{ estado.completadosTotal() === 0 ? 'Empezar a jugar' : 'Continuar donde quedé' }}
+      </button>
+    }
+  </header>
+
+  <app-mapa-3d [islas]="islas3d()" (misionElegida)="irAMision($event)" />
+
+  @for (nivel of niveles; track nivel.id) {
+    <article class="isla" [attr.data-nivel]="nivel.id">
+      <header class="isla-cabeza">
+        <span class="isla-icono" [innerHTML]="ICONOS_NIVEL[nivel.id]"></span>
+        <div>
+          <p class="isla-orden">Nivel {{ nivel.orden }} · {{ nivel.id }}</p>
+          <h2>{{ nivel.titulo }}</h2>
+          <p class="isla-lema">{{ nivel.lema }}</p>
+        </div>
+        <span class="isla-avance">{{ estado.porcentajeNivel(nivel.id) }}%</span>
+      </header>
+
+      <div class="camino">
+        @for (mision of nivel.misiones; track mision.id) {
+          @let desbloqueada = estado.misionDesbloqueada(mision.id);
+          @let avance = estado.porcentajeMision(mision.id);
+          <button
+            type="button"
+            class="nodo"
+            [class.bloqueada]="!desbloqueada"
+            [class.completa]="avance === 100"
+            [disabled]="!desbloqueada"
+            (click)="irAMision(mision.id)"
+            [style.animation-delay.ms]="$index * 90"
+          >
+            <span class="nodo-icono" [innerHTML]="desbloqueada ? iconoDe(mision.id) : CANDADO"></span>
+            <span class="nodo-textos">
+              <b>{{ mision.titulo }}</b>
+              <small>{{ desbloqueada ? mision.paraQue : 'Completa lo anterior para desbloquear' }}</small>
+            </span>
+            <span class="nodo-estado">
+              @if (avance === 100) { ✓ }
+              @else if (desbloqueada) { {{ avance }}% }
+              @else { 🔒 }
+            </span>
+          </button>
+        }
+      </div>
+    </article>
+  }
+
+  <footer class="pie-mapa">
+    ¿Prefieres leerlo todo de corrido? Abre el
+    <a href="../Manual_de_usuario.html">manual completo</a>.
+  </footer>
+</section>

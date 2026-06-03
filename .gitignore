@@ -1,3 +1,6 @@
 /.idea/
 /.env
 /html/
+/manual-juego/node_modules/
+/manual-juego/dist/
+/manual-juego/.angular/
