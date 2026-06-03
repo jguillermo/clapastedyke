@@ -1,8 +1,6 @@
 import {
   ApplicationConfig,
-  inject,
   isDevMode,
-  provideAppInitializer,
   provideBrowserGlobalErrorListeners,
 } from '@angular/core';
 import { provideHttpClient, withFetch } from '@angular/common/http';
@@ -10,8 +8,8 @@ import { provideRouter, withComponentInputBinding } from '@angular/router';
 import { provideTransloco } from '@jsverse/transloco';
 
 import { routes } from './app.routes';
-import { Business } from './composition/business';
-import { TranslocoHttpLoader } from './i18n/transloco-loader';
+import { TranslocoHttpLoader } from './platform/i18n/transloco-loader';
+import { provideCore } from './core/core.providers';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -28,11 +26,6 @@ export const appConfig: ApplicationConfig = {
       },
       loader: TranslocoHttpLoader,
     }),
-    // Build the composition root at startup so the persisted language is
-    // applied on EVERY route (game included), not only when a system screen
-    // first injects Business.
-    provideAppInitializer(() => {
-      inject(Business);
-    }),
+    provideCore(),
   ],
 };
