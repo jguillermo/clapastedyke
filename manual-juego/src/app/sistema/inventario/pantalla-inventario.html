@@ -1,0 +1,139 @@
+<h1 class="font-titulo text-3xl font-semibold text-tinta mb-1">Inventario</h1>
+<p class="text-sm text-apagado mb-5">
+  Corrige el stock cuando la realidad no cuadra con el sistema y revisa el historial de movimientos.
+</p>
+
+@if (aviso(); as a) {
+  <div
+    class="mb-3.5 rounded-campo px-3.5 py-2.5 text-[13.5px] border"
+    [class]="a.tipo === 'ok'
+      ? 'bg-verde-suave text-verde border-verde/30'
+      : 'bg-rojo-suave text-rojo border-rojo/30'"
+  >{{ a.texto }}</div>
+}
+
+<section uiTarjeta>
+  <div uiTituloGrupo>Ajustar inventario</div>
+
+  <div uiGrid="two">
+    <div>
+      <div uiEtiqueta><b>Insumo</b><span uiReq>*</span><span uiPildora>Lista</span></div>
+      <select uiCampo [formField]="formulario.insumoId"
+        [class.!border-rojo]="formulario.insumoId().touched() && formulario.insumoId().invalid()"
+        (change)="actualizarPrevia()">
+        <option value="">— Elige —</option>
+        @for (i of insumos(); track i.id) {
+          <option [value]="i.id">{{ i.nombre }} (stock {{ i.stockActual }})</option>
+        }
+      </select>
+      @if (formulario.insumoId().touched() && formulario.insumoId().invalid()) {
+        @for (e of formulario.insumoId().errors(); track e.kind) {
+          <p class="mt-1 text-[12px] text-rojo">{{ e.message }}</p>
+        }
+      }
+    </div>
+    <div>
+      <div uiEtiqueta><b>Tipo de ajuste</b><span uiReq>*</span><span uiPildora>Lista</span></div>
+      <select uiCampo [formField]="formulario.tipo"
+        [class.!border-rojo]="formulario.tipo().touched() && formulario.tipo().invalid()"
+        (change)="actualizarPrevia()">
+        <option value="">— Elige —</option>
+        @for (t of tiposAjuste(); track t.nombre) {
+          <option [value]="t.nombre">{{ etiquetaTipo(t) }}</option>
+        }
+      </select>
+      @if (formulario.tipo().touched() && formulario.tipo().invalid()) {
+        @for (e of formulario.tipo().errors(); track e.kind) {
+          <p class="mt-1 text-[12px] text-rojo">{{ e.message }}</p>
+        }
+      }
+    </div>
+  </div>
+
+  <div uiGrid="two">
+    <div>
+      <div uiEtiqueta><b>Cantidad</b><span uiReq>*</span><span uiPildora>Número</span></div>
+      <input uiCampo type="number" step="any" placeholder="Ej. 5"
+        [formField]="formulario.cantidad"
+        [class.!border-rojo]="formulario.cantidad().touched() && formulario.cantidad().invalid()"
+        (input)="actualizarPrevia()">
+      @if (formulario.cantidad().touched() && formulario.cantidad().invalid()) {
+        @for (e of formulario.cantidad().errors(); track e.kind) {
+          <p class="mt-1 text-[12px] text-rojo">{{ e.message }}</p>
+        }
+      }
+    </div>
+    <div>
+      <div uiEtiqueta><b>Motivo</b><span uiOpt>opcional</span><span uiPildora>Texto</span></div>
+      <input uiCampo placeholder="Ej. Se cayó al piso"
+        [formField]="formulario.motivo"
+        [class.!border-rojo]="formulario.motivo().touched() && formulario.motivo().invalid()">
+      @if (formulario.motivo().touched() && formulario.motivo().invalid()) {
+        @for (e of formulario.motivo().errors(); track e.kind) {
+          <p class="mt-1 text-[12px] text-rojo">{{ e.message }}</p>
+        }
+      }
+    </div>
+  </div>
+
+  @if (previa(); as p) {
+    <div uiNota>
+      <span [uiPunto]="p.semaforo"></span>Stock actual {{ p.stockActual }} → quedaría {{ p.stockResultante }}
+    </div>
+  }
+
+  <div class="mt-4 flex justify-end gap-2.5">
+    <button uiBoton (click)="limpiar()">Limpiar</button>
+    <button uiBoton="primario" [disabled]="guardando()" (click)="guardar()">
+      {{ guardando() ? 'Registrando…' : 'Registrar ajuste' }}
+    </button>
+  </div>
+</section>
+
+<section uiTarjeta>
+  <div uiToolbar>
+    <h4 uiToolbarTitulo>Kardex (movimientos)</h4>
+    <select uiCampo class="!w-auto" [value]="filtroInsumo()"
+      (change)="cambiarFiltro($any($event.target).value)">
+      <option value="">Todos los insumos</option>
+      @for (i of insumos(); track i.id) {
+        <option [value]="i.id">{{ i.nombre }}</option>
+      }
+    </select>
+  </div>
+
+  @if (cargando()) {
+    <div uiVacio>Cargando…</div>
+  } @else if (!movimientos().length) {
+    <div uiVacio>Aún no hay movimientos registrados.</div>
+  } @else {
+    <table class="w-full border-collapse text-[12.5px]">
+      <thead>
+        <tr>
+          <th class="text-left font-mono text-[10px] uppercase tracking-wide text-apagado font-normal px-2 py-1.5 border-b border-linea">Fecha</th>
+          <th class="text-left font-mono text-[10px] uppercase tracking-wide text-apagado font-normal px-2 py-1.5 border-b border-linea">Insumo</th>
+          <th class="text-left font-mono text-[10px] uppercase tracking-wide text-apagado font-normal px-2 py-1.5 border-b border-linea">Tipo</th>
+          <th class="text-left font-mono text-[10px] uppercase tracking-wide text-apagado font-normal px-2 py-1.5 border-b border-linea">Cantidad</th>
+          <th class="text-left font-mono text-[10px] uppercase tracking-wide text-apagado font-normal px-2 py-1.5 border-b border-linea">Referencia</th>
+          <th class="text-left font-mono text-[10px] uppercase tracking-wide text-apagado font-normal px-2 py-1.5 border-b border-linea">Motivo</th>
+          <th class="text-left font-mono text-[10px] uppercase tracking-wide text-apagado font-normal px-2 py-1.5 border-b border-linea">Stock resultante</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (m of movimientos(); track m.id) {
+          <tr class="transition-colors hover:bg-acento-suave/50">
+            <td class="px-2 py-2 border-b border-linea-suave text-apagado font-mono text-[11px]">{{ m.fechaFormato }}</td>
+            <td class="px-2 py-2 border-b border-linea-suave font-semibold">{{ m.insumoNombre }}</td>
+            <td class="px-2 py-2 border-b border-linea-suave text-apagado">{{ m.tipo }}</td>
+            <td class="px-2 py-2 border-b border-linea-suave font-mono"
+              [class.text-verde]="m.cantidad > 0"
+              [class.text-rojo]="m.cantidad < 0">{{ m.cantidad }}</td>
+            <td class="px-2 py-2 border-b border-linea-suave font-mono text-[11px] text-apagado">{{ m.referencia }}</td>
+            <td class="px-2 py-2 border-b border-linea-suave text-apagado">{{ m.motivo }}</td>
+            <td class="px-2 py-2 border-b border-linea-suave">{{ m.stockResultante }}</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  }
+</section>

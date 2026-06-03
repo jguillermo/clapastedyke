@@ -1,0 +1,97 @@
+<h1 class="font-titulo text-3xl font-semibold text-tinta mb-1">Clientes</h1>
+<p class="text-sm text-apagado mb-5">
+  A quién le cotizas. Todo presupuesto va a nombre de un cliente.
+</p>
+
+@if (aviso(); as a) {
+  <div
+    class="mb-3.5 rounded-campo px-3.5 py-2.5 text-[13.5px] border"
+    [class]="a.tipo === 'ok'
+      ? 'bg-verde-suave text-verde border-verde/30'
+      : 'bg-rojo-suave text-rojo border-rojo/30'"
+  >{{ a.texto }}</div>
+}
+
+<section uiTarjeta>
+  <div uiToolbar>
+    <h4 uiToolbarTitulo>Lista de clientes</h4>
+    <button uiBoton="mini" (click)="limpiar()">+ Nuevo cliente</button>
+  </div>
+
+  @if (cargando()) {
+    <div uiVacio>Cargando…</div>
+  } @else if (!clientes().length) {
+    <div uiVacio>Aún no hay clientes. Crea el primero abajo.</div>
+  } @else {
+    <table class="w-full border-collapse text-[12.5px]">
+      <thead>
+        <tr>
+          <th class="text-left font-mono text-[10px] uppercase tracking-wide text-apagado font-normal px-2 py-1.5 border-b border-linea">Id</th>
+          <th class="text-left font-mono text-[10px] uppercase tracking-wide text-apagado font-normal px-2 py-1.5 border-b border-linea">Nombre</th>
+          <th class="text-left font-mono text-[10px] uppercase tracking-wide text-apagado font-normal px-2 py-1.5 border-b border-linea">Contacto</th>
+          <th class="text-left font-mono text-[10px] uppercase tracking-wide text-apagado font-normal px-2 py-1.5 border-b border-linea">Notas</th>
+          <th class="border-b border-linea"></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (c of clientes(); track c.id) {
+          <tr class="transition-colors hover:bg-acento-suave/50">
+            <td class="px-2 py-2 border-b border-linea-suave font-mono text-[11px] text-apagado">{{ c.id }}</td>
+            <td class="px-2 py-2 border-b border-linea-suave font-semibold">{{ c.nombre }}</td>
+            <td class="px-2 py-2 border-b border-linea-suave">{{ c.telefono }}</td>
+            <td class="px-2 py-2 border-b border-linea-suave text-apagado">{{ c.notas }}</td>
+            <td class="px-2 py-2 border-b border-linea-suave text-right">
+              <button uiBoton="mini" (click)="editar(c)">Editar</button>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  }
+</section>
+
+<section uiTarjeta>
+  <div uiTituloGrupo>{{ edicionId() ? 'Editar cliente ' + edicionId() : 'Nuevo cliente' }}</div>
+
+  <div class="mb-3.5">
+    <div uiEtiqueta><b>Nombre</b><span uiReq>*</span><span uiPildora>Texto</span></div>
+    <input uiCampo placeholder="Nombre del cliente"
+      [formField]="formulario.nombre"
+      [class.!border-rojo]="formulario.nombre().touched() && formulario.nombre().invalid()"
+      (keyup.enter)="guardar()">
+    @if (formulario.nombre().touched() && formulario.nombre().invalid()) {
+      @for (e of formulario.nombre().errors(); track e.kind) {
+        <p class="mt-1 text-[12px] text-rojo">{{ e.message }}</p>
+      }
+    }
+  </div>
+  <div uiGrid="two">
+    <div>
+      <div uiEtiqueta><b>Telefono o contacto</b><span uiOpt>opcional</span><span uiPildora>Texto</span></div>
+      <input uiCampo placeholder="Ej. 999 888 777" [formField]="formulario.telefono"
+        [class.!border-rojo]="formulario.telefono().touched() && formulario.telefono().invalid()">
+      @if (formulario.telefono().touched() && formulario.telefono().invalid()) {
+        @for (e of formulario.telefono().errors(); track e.kind) {
+          <p class="mt-1 text-[12px] text-rojo">{{ e.message }}</p>
+        }
+      }
+    </div>
+    <div>
+      <div uiEtiqueta><b>Notas</b><span uiOpt>opcional</span><span uiPildora>Texto</span></div>
+      <input uiCampo placeholder="Referencia, direccion..." [formField]="formulario.notas"
+        [class.!border-rojo]="formulario.notas().touched() && formulario.notas().invalid()">
+      @if (formulario.notas().touched() && formulario.notas().invalid()) {
+        @for (e of formulario.notas().errors(); track e.kind) {
+          <p class="mt-1 text-[12px] text-rojo">{{ e.message }}</p>
+        }
+      }
+    </div>
+  </div>
+
+  <div class="mt-4 flex justify-end gap-2.5">
+    <button uiBoton (click)="limpiar()">Limpiar</button>
+    <button uiBoton="primario" [disabled]="guardando()" (click)="guardar()">
+      {{ guardando() ? 'Guardando…' : 'Guardar cliente' }}
+    </button>
+  </div>
+</section>

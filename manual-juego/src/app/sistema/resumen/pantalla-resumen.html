@@ -1,0 +1,65 @@
+@if (resumen(); as r) {
+  <!-- Cabecera: Inicio + fecha larga (del negocio) -->
+  <div class="mb-6 flex flex-wrap items-baseline justify-between gap-2">
+    <h1 class="font-titulo text-4xl font-semibold text-tinta">Inicio</h1>
+    <span class="font-mono text-[12px] tracking-wide text-apagado">{{ r.fechaLarga }}</span>
+  </div>
+
+  <!-- ====== RESUMEN DE HOY: tarjetas KPI ====== -->
+  <p class="mb-3 font-mono text-[11px] uppercase tracking-[.18em] text-apagado">Resumen de hoy</p>
+  <div class="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+    @for (kpi of r.kpis; track kpi.titulo) {
+      <div
+        class="rounded-tarjeta border border-linea border-l-4 bg-hoja px-4 py-3.5 shadow-tarjeta"
+        [class]="claseKpi(kpi.color)"
+      >
+        <p class="font-mono text-3xl font-bold leading-none" [class]="claseNumeroKpi(kpi.color)">
+          {{ kpi.valor }}
+        </p>
+        <p class="mt-1.5 text-[13px] text-tinta">{{ kpi.titulo }}</p>
+      </div>
+    }
+  </div>
+
+  <!-- ====== ACCESOS ====== -->
+  <p class="mb-3 font-mono text-[11px] uppercase tracking-[.18em] text-apagado">Accesos</p>
+  <div class="mb-8 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    @for (a of accesos; track a.titulo) {
+      <a
+        [routerLink]="a.ruta"
+        class="block rounded-tarjeta border border-linea bg-hoja p-5 shadow-tarjeta no-underline transition hover:-translate-y-0.5 hover:border-acento hover:shadow-flotante"
+      >
+        <span class="mb-3.5 grid h-11 w-11 place-items-center rounded-[12px] bg-acento-suave text-acento [&>svg]:h-6 [&>svg]:w-6 [&>svg]:fill-none [&>svg]:stroke-current [&>svg]:stroke-[1.7]"
+          [innerHTML]="a.icono"></span>
+        <p class="font-titulo text-base font-semibold text-tinta">{{ a.titulo }}</p>
+        <p class="mt-0.5 text-[13px] text-apagado">{{ a.subtitulo }}</p>
+      </a>
+    }
+  </div>
+
+  <!-- ====== NECESITA TU ATENCIÓN ====== -->
+  <p class="mb-3 font-mono text-[11px] uppercase tracking-[.18em] text-apagado">Necesita tu atención</p>
+  @if (!r.atencion.length) {
+    <div class="rounded-tarjeta border border-dashed border-linea bg-hoja p-5 text-center text-[13.5px] text-apagado">
+      Todo en orden: nada urgente por hoy ✦
+    </div>
+  } @else {
+    <div class="overflow-hidden rounded-tarjeta border border-linea bg-hoja shadow-tarjeta">
+      @for (alerta of r.atencion; track $index) {
+        <div class="flex items-center gap-3.5 border-b border-linea-suave px-4 py-3 last:border-b-0">
+          <span
+            class="shrink-0 rounded-pildora px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-wide"
+            [class]="claseBadge(alerta.tipo)"
+          >{{ alerta.etiqueta }}</span>
+          <span class="min-w-0 flex-1 truncate text-[14px] text-tinta">{{ alerta.texto }}</span>
+          <a
+            [routerLink]="alerta.ruta"
+            class="shrink-0 text-[13.5px] font-semibold text-acento no-underline hover:text-acento-profundo"
+          >{{ alerta.accion }} →</a>
+        </div>
+      }
+    </div>
+  }
+} @else {
+  <div uiVacio>Cargando…</div>
+}

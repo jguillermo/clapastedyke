@@ -1,0 +1,129 @@
+<h1 class="font-titulo text-3xl font-semibold text-tinta mb-1">Reglas de empaque</h1>
+<p class="text-sm text-apagado mb-5">
+  Qué empaque sugerir para cada receta y tamaño, sin tener que acordarte.
+</p>
+
+@if (aviso(); as a) {
+  <div
+    class="mb-3.5 rounded-campo px-3.5 py-2.5 text-[13.5px] border"
+    [class]="a.tipo === 'ok'
+      ? 'bg-verde-suave text-verde border-verde/30'
+      : 'bg-rojo-suave text-rojo border-rojo/30'"
+  >{{ a.texto }}</div>
+}
+
+<section uiTarjeta>
+  <div uiToolbar>
+    <h4 uiToolbarTitulo>Lista de reglas</h4>
+    <button uiBoton="mini" (click)="limpiar()">+ Nueva regla</button>
+  </div>
+
+  @if (cargando()) {
+    <div uiVacio>Cargando…</div>
+  } @else if (!reglas().length) {
+    <div uiVacio>Aún no hay reglas de empaque. Crea la primera abajo.</div>
+  } @else {
+    <table class="w-full border-collapse text-[12.5px]">
+      <thead>
+        <tr>
+          <th class="text-left font-mono text-[10px] uppercase tracking-wide text-apagado font-normal px-2 py-1.5 border-b border-linea">Id</th>
+          <th class="text-left font-mono text-[10px] uppercase tracking-wide text-apagado font-normal px-2 py-1.5 border-b border-linea">Receta</th>
+          <th class="text-left font-mono text-[10px] uppercase tracking-wide text-apagado font-normal px-2 py-1.5 border-b border-linea">Tamaño</th>
+          <th class="text-left font-mono text-[10px] uppercase tracking-wide text-apagado font-normal px-2 py-1.5 border-b border-linea">Empaque</th>
+          <th class="text-left font-mono text-[10px] uppercase tracking-wide text-apagado font-normal px-2 py-1.5 border-b border-linea">Cantidad</th>
+          <th class="border-b border-linea"></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (r of reglas(); track r.id) {
+          <tr class="transition-colors hover:bg-acento-suave/50">
+            <td class="px-2 py-2 border-b border-linea-suave font-mono text-[11px] text-apagado">{{ r.id }}</td>
+            <td class="px-2 py-2 border-b border-linea-suave font-semibold">{{ nombreReceta().get(r.recetaId) ?? r.recetaId }}</td>
+            <td class="px-2 py-2 border-b border-linea-suave">{{ r.tamano }}</td>
+            <td class="px-2 py-2 border-b border-linea-suave">{{ nombreEmpaque().get(r.insumoEmpaqueId) ?? r.insumoEmpaqueId }}</td>
+            <td class="px-2 py-2 border-b border-linea-suave text-apagado">{{ r.cantidad }}</td>
+            <td class="px-2 py-2 border-b border-linea-suave text-right">
+              <button uiBoton="mini" (click)="editar(r)">Editar</button>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  }
+</section>
+
+<section uiTarjeta>
+  <div uiTituloGrupo>{{ edicionId() ? 'Editar regla ' + edicionId() : 'Nueva regla' }}</div>
+
+  <div uiGrid="two">
+    <div>
+      <div uiEtiqueta><b>Receta</b><span uiReq>*</span><span uiPildora>Lista</span></div>
+      <select uiCampo
+        [formField]="formulario.recetaId"
+        [class.!border-rojo]="formulario.recetaId().touched() && formulario.recetaId().invalid()">
+        <option value="">Elige una receta…</option>
+        @for (r of recetas(); track r.id) {
+          <option [value]="r.id">{{ r.nombre }}</option>
+        }
+      </select>
+      @if (formulario.recetaId().touched() && formulario.recetaId().invalid()) {
+        @for (e of formulario.recetaId().errors(); track e.kind) {
+          <p class="mt-1 text-[12px] text-rojo">{{ e.message }}</p>
+        }
+      }
+    </div>
+    <div>
+      <div uiEtiqueta><b>Tamaño</b><span uiReq>*</span><span uiPildora>Lista</span></div>
+      <select uiCampo
+        [formField]="formulario.tamano"
+        [class.!border-rojo]="formulario.tamano().touched() && formulario.tamano().invalid()">
+        <option value="">Elige un tamaño…</option>
+        @for (t of tamanos(); track t.nombre) {
+          <option [value]="t.nombre">{{ etiquetaTamano(t) }}</option>
+        }
+      </select>
+      @if (formulario.tamano().touched() && formulario.tamano().invalid()) {
+        @for (e of formulario.tamano().errors(); track e.kind) {
+          <p class="mt-1 text-[12px] text-rojo">{{ e.message }}</p>
+        }
+      }
+    </div>
+  </div>
+
+  <div uiGrid="two" class="mt-3.5">
+    <div>
+      <div uiEtiqueta><b>Empaque</b><span uiReq>*</span><span uiPildora>Lista</span></div>
+      <select uiCampo
+        [formField]="formulario.insumoEmpaqueId"
+        [class.!border-rojo]="formulario.insumoEmpaqueId().touched() && formulario.insumoEmpaqueId().invalid()">
+        <option value="">Elige un empaque…</option>
+        @for (e of empaques(); track e.id) {
+          <option [value]="e.id">{{ e.nombre }}</option>
+        }
+      </select>
+      @if (formulario.insumoEmpaqueId().touched() && formulario.insumoEmpaqueId().invalid()) {
+        @for (e of formulario.insumoEmpaqueId().errors(); track e.kind) {
+          <p class="mt-1 text-[12px] text-rojo">{{ e.message }}</p>
+        }
+      }
+    </div>
+    <div>
+      <div uiEtiqueta><b>Cantidad sugerida</b><span uiReq>*</span><span uiPildora>Número</span></div>
+      <input uiCampo type="number" placeholder="Ej. 1" [formField]="formulario.cantidad"
+        [class.!border-rojo]="formulario.cantidad().touched() && formulario.cantidad().invalid()"
+        (keyup.enter)="guardar()">
+      @if (formulario.cantidad().touched() && formulario.cantidad().invalid()) {
+        @for (e of formulario.cantidad().errors(); track e.kind) {
+          <p class="mt-1 text-[12px] text-rojo">{{ e.message }}</p>
+        }
+      }
+    </div>
+  </div>
+
+  <div class="mt-4 flex justify-end gap-2.5">
+    <button uiBoton (click)="limpiar()">Limpiar</button>
+    <button uiBoton="primario" [disabled]="guardando()" (click)="guardar()">
+      {{ guardando() ? 'Guardando…' : 'Guardar regla' }}
+    </button>
+  </div>
+</section>

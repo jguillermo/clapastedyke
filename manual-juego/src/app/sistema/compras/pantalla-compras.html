@@ -1,0 +1,245 @@
+<h1 class="font-titulo text-3xl font-semibold text-tinta mb-1">Compras</h1>
+<p class="text-sm text-apagado mb-5">
+  Pídele a tu proveedor lo que falta y registra lo que recibes: el stock sube al registrar.
+</p>
+
+@if (aviso(); as a) {
+  <div
+    class="mb-3.5 rounded-campo px-3.5 py-2.5 text-[13.5px] border"
+    [class]="a.tipo === 'ok'
+      ? 'bg-verde-suave text-verde border-verde/30'
+      : 'bg-rojo-suave text-rojo border-rojo/30'"
+  >{{ a.texto }}</div>
+}
+
+<!-- ============ Tarjeta 1: Comprar materiales ============ -->
+<section uiTarjeta>
+  <div uiToolbar>
+    <h4 uiToolbarTitulo>Comprar materiales</h4>
+  </div>
+
+  <div class="flex flex-wrap items-end gap-3 mb-3.5">
+    <div>
+      <div uiEtiqueta><b>Modo</b><span uiPildora>Lista</span></div>
+      <div class="flex gap-2">
+        <button uiBoton="mini"
+          [class]="modo() === 'automatico' ? '!border-acento !text-acento' : ''"
+          (click)="cambiarModo('automatico')">Automático (pedido)</button>
+        <button uiBoton="mini"
+          [class]="modo() === 'manual' ? '!border-acento !text-acento' : ''"
+          (click)="cambiarModo('manual')">Manual (bajo mínimo)</button>
+      </div>
+    </div>
+
+    @if (modo() === 'automatico') {
+      <div class="flex-1 min-w-[220px]">
+        <div uiEtiqueta><b>Pedido con faltantes</b><span uiPildora>Lista</span></div>
+        <select uiCampo [value]="pedidoId()" (change)="elegirPedido($any($event.target).value)">
+          <option value="">— Elige un pedido —</option>
+          @for (p of pedidosConFaltantes(); track p.id) {
+            <option [value]="p.id">{{ p.id }} · {{ p.clienteNombre }} · {{ p.recetaNombre }}</option>
+          }
+        </select>
+      </div>
+    }
+  </div>
+
+  @if (cargandoItems()) {
+    <div uiVacio>Cargando…</div>
+  } @else if (modo() === 'automatico' && !pedidoId()) {
+    <div uiVacio>Elige un pedido para ver lo que falta comprar.</div>
+  } @else if (!items().length) {
+    <div uiVacio>
+      {{ modo() === 'manual' ? 'No hay insumos bajo el mínimo.' : 'Este pedido no tiene faltantes.' }}
+    </div>
+  } @else {
+    <table class="w-full border-collapse text-[12.5px]">
+      <thead>
+        <tr>
+          <th class="text-left font-mono text-[10px] uppercase tracking-wide text-apagado font-normal px-2 py-1.5 border-b border-linea">Insumo</th>
+          <th class="text-left font-mono text-[10px] uppercase tracking-wide text-apagado font-normal px-2 py-1.5 border-b border-linea">Cantidad sugerida</th>
+          <th class="text-left font-mono text-[10px] uppercase tracking-wide text-apagado font-normal px-2 py-1.5 border-b border-linea">Proveedor</th>
+          <th class="border-b border-linea"></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (it of items(); track it.insumoId) {
+          <tr class="transition-colors hover:bg-acento-suave/50">
+            <td class="px-2 py-2 border-b border-linea-suave font-semibold">{{ it.insumoNombre }}</td>
+            <td class="px-2 py-2 border-b border-linea-suave">{{ it.cantidadSugerida }}</td>
+            <td class="px-2 py-2 border-b border-linea-suave text-apagado">{{ it.proveedorNombre }}</td>
+            <td class="px-2 py-2 border-b border-linea-suave text-right">
+              @if (it.whatsappEnlace) {
+                <a [href]="it.whatsappEnlace" target="_blank" rel="noopener"
+                  class="inline-flex items-center justify-center gap-1.5 font-texto font-semibold cursor-pointer transition select-none text-[11px] px-2.5 py-1 rounded-[7px] bg-verde-suave border border-verde text-verde hover:bg-verde hover:text-white">
+                  WhatsApp
+                </a>
+              }
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  }
+
+  <div uiNota>Esto aún no cambia el stock: el stock sube al registrar la compra recibida.</div>
+</section>
+
+<!-- ============ Tarjeta 2: Registrar compra recibida ============ -->
+<section uiTarjeta>
+  <div uiTituloGrupo>Registrar compra recibida</div>
+
+  <div uiGrid="two">
+    <div>
+      <div uiEtiqueta><b>Proveedor</b><span uiReq>*</span><span uiPildora>Lista</span></div>
+      <select uiCampo [formField]="formulario.proveedorId"
+        [class.!border-rojo]="formulario.proveedorId().touched() && formulario.proveedorId().invalid()">
+        <option value="">— Elige —</option>
+        @for (p of proveedores(); track p.id) {
+          <option [value]="p.id">{{ p.nombre }}</option>
+        }
+      </select>
+      @if (formulario.proveedorId().touched() && formulario.proveedorId().invalid()) {
+        @for (e of formulario.proveedorId().errors(); track e.kind) {
+          <p class="mt-1 text-[12px] text-rojo">{{ e.message }}</p>
+        }
+      }
+    </div>
+    <div>
+      <div uiEtiqueta><b>Fecha</b><span uiOpt>opcional</span><span uiPildora>Fecha</span></div>
+      <input uiCampo type="date" [formField]="formulario.fecha">
+    </div>
+  </div>
+
+  <div uiTituloGrupo>Líneas de compra</div>
+
+  @if (!formulario.lineas.length) {
+    <div uiNota>Agrega al menos una línea con lo que recibiste.</div>
+  } @else {
+    @for (linea of formulario.lineas; track $index) {
+      <div uiGrid="three" class="mb-3">
+        <div>
+          <div uiEtiqueta><b>Insumo</b><span uiReq>*</span><span uiPildora>Lista</span></div>
+          <select uiCampo [formField]="linea.insumoId"
+            [class.!border-rojo]="linea.insumoId().touched() && linea.insumoId().invalid()">
+            <option value="">— Elige —</option>
+            @for (i of insumos(); track i.id) {
+              <option [value]="i.id">{{ i.nombre }}</option>
+            }
+          </select>
+          @if (linea.insumoId().touched() && linea.insumoId().invalid()) {
+            @for (e of linea.insumoId().errors(); track e.kind) {
+              <p class="mt-1 text-[12px] text-rojo">{{ e.message }}</p>
+            }
+          }
+        </div>
+        <div>
+          <div uiEtiqueta><b>Presentaciones</b><span uiReq>*</span><span uiPildora>Número</span></div>
+          <input uiCampo type="number" step="any" placeholder="Ej. 5"
+            [formField]="linea.cantidadRecibidaPresent"
+            [class.!border-rojo]="linea.cantidadRecibidaPresent().touched() && linea.cantidadRecibidaPresent().invalid()">
+          @if (linea.cantidadRecibidaPresent().touched() && linea.cantidadRecibidaPresent().invalid()) {
+            @for (e of linea.cantidadRecibidaPresent().errors(); track e.kind) {
+              <p class="mt-1 text-[12px] text-rojo">{{ e.message }}</p>
+            }
+          }
+        </div>
+        <div>
+          <div uiEtiqueta><b>Precio pagado (S/)</b><span uiReq>*</span><span uiPildora>Número</span></div>
+          <div class="flex items-end gap-2">
+            <div class="flex-1">
+              <input uiCampo type="number" step="any" placeholder="Ej. 12.50"
+                [formField]="linea.precioPresentacionPagadoSoles"
+                [class.!border-rojo]="linea.precioPresentacionPagadoSoles().touched() && linea.precioPresentacionPagadoSoles().invalid()">
+              @if (linea.precioPresentacionPagadoSoles().touched() && linea.precioPresentacionPagadoSoles().invalid()) {
+                @for (e of linea.precioPresentacionPagadoSoles().errors(); track e.kind) {
+                  <p class="mt-1 text-[12px] text-rojo">{{ e.message }}</p>
+                }
+              }
+            </div>
+            <button uiBoton="peligro" (click)="quitarLinea($index)">Quitar</button>
+          </div>
+        </div>
+      </div>
+    }
+  }
+
+  <div class="mt-1">
+    <button uiBoton="mini" (click)="agregarLinea()">+ Agregar línea</button>
+  </div>
+
+  <div class="mt-4 flex justify-end gap-2.5">
+    <button uiBoton (click)="limpiar()">Limpiar</button>
+    <button uiBoton="primario" [disabled]="guardando()" (click)="guardar()">
+      {{ guardando() ? 'Registrando…' : 'Registrar compra' }}
+    </button>
+  </div>
+</section>
+
+<!-- ============ Tarjeta 3: Historial ============ -->
+<section uiTarjeta>
+  <div uiToolbar>
+    <h4 uiToolbarTitulo>Historial de compras</h4>
+  </div>
+
+  @if (cargandoHistorial()) {
+    <div uiVacio>Cargando…</div>
+  } @else if (!compras().length) {
+    <div uiVacio>Aún no hay compras registradas.</div>
+  } @else {
+    <table class="w-full border-collapse text-[12.5px]">
+      <thead>
+        <tr>
+          <th class="text-left font-mono text-[10px] uppercase tracking-wide text-apagado font-normal px-2 py-1.5 border-b border-linea">Id</th>
+          <th class="text-left font-mono text-[10px] uppercase tracking-wide text-apagado font-normal px-2 py-1.5 border-b border-linea">Fecha</th>
+          <th class="text-left font-mono text-[10px] uppercase tracking-wide text-apagado font-normal px-2 py-1.5 border-b border-linea">Proveedor</th>
+          <th class="text-left font-mono text-[10px] uppercase tracking-wide text-apagado font-normal px-2 py-1.5 border-b border-linea">Líneas</th>
+          <th class="text-left font-mono text-[10px] uppercase tracking-wide text-apagado font-normal px-2 py-1.5 border-b border-linea">Total</th>
+          <th class="border-b border-linea"></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (c of compras(); track c.id) {
+          <tr class="transition-colors hover:bg-acento-suave/50">
+            <td class="px-2 py-2 border-b border-linea-suave font-mono text-[11px] text-apagado">{{ c.id }}</td>
+            <td class="px-2 py-2 border-b border-linea-suave">{{ c.fechaFormato }}</td>
+            <td class="px-2 py-2 border-b border-linea-suave font-semibold">{{ c.proveedorNombre }}</td>
+            <td class="px-2 py-2 border-b border-linea-suave">{{ c.cantidadLineas }}</td>
+            <td class="px-2 py-2 border-b border-linea-suave">{{ c.totalFormato }}</td>
+            <td class="px-2 py-2 border-b border-linea-suave text-right">
+              <button uiBoton="mini" (click)="alternarExpandida(c.id)">
+                {{ expandida() === c.id ? 'Ocultar' : 'Ver líneas' }}
+              </button>
+            </td>
+          </tr>
+          @if (expandida() === c.id) {
+            <tr>
+              <td colspan="6" class="px-2 py-2 border-b border-linea-suave bg-crema">
+                <table class="w-full border-collapse text-[12px]">
+                  <thead>
+                    <tr>
+                      <th class="text-left font-mono text-[10px] uppercase tracking-wide text-apagado font-normal px-2 py-1">Insumo</th>
+                      <th class="text-left font-mono text-[10px] uppercase tracking-wide text-apagado font-normal px-2 py-1">Presentaciones</th>
+                      <th class="text-left font-mono text-[10px] uppercase tracking-wide text-apagado font-normal px-2 py-1">Precio pagado</th>
+                      <th class="text-left font-mono text-[10px] uppercase tracking-wide text-apagado font-normal px-2 py-1">Unidad base</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (l of c.lineas; track $index) {
+                      <tr>
+                        <td class="px-2 py-1">{{ l.insumoNombre }}</td>
+                        <td class="px-2 py-1">{{ l.cantidadRecibidaPresent }}</td>
+                        <td class="px-2 py-1">{{ l.precioPagadoFormato }}</td>
+                        <td class="px-2 py-1">{{ l.cantidadUnidadBase }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </td>
+            </tr>
+          }
+        }
+      </tbody>
+    </table>
+  }
+</section>

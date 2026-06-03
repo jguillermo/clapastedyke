@@ -1,0 +1,191 @@
+<h1 class="font-titulo text-3xl font-semibold text-tinta mb-1">Configuración</h1>
+<p class="text-sm text-apagado mb-5">
+  Las reglas con las que el sistema arma tus precios y la lista de tamaños vendibles.
+</p>
+
+@if (aviso(); as a) {
+  <div
+    class="mb-3.5 rounded-campo px-3.5 py-2.5 text-[13.5px] border"
+    [class]="a.tipo === 'ok'
+      ? 'bg-verde-suave text-verde border-verde/30'
+      : 'bg-rojo-suave text-rojo border-rojo/30'"
+  >{{ a.texto }}</div>
+}
+
+<div uiNota class="mb-3.5">
+  Los presupuestos ya guardados están congelados: estos cambios solo afectan a los nuevos.
+</div>
+
+@if (cargando()) {
+  <section uiTarjeta><div uiVacio>Cargando…</div></section>
+} @else {
+  <section uiTarjeta>
+    <div uiTituloGrupo>Precio y costos</div>
+
+    <div uiGrid="two">
+      <div>
+        <div uiEtiqueta><b>Tarifa de mano de obra (por hora)</b><span uiPildora>S/</span></div>
+        <input uiCampo type="number" step="any" placeholder="Ej. 12"
+          [formField]="formulario.tarifaManoObraHora"
+          [class.!border-rojo]="formulario.tarifaManoObraHora().touched() && formulario.tarifaManoObraHora().invalid()">
+        @if (formulario.tarifaManoObraHora().touched() && formulario.tarifaManoObraHora().invalid()) {
+          @for (e of formulario.tarifaManoObraHora().errors(); track e.kind) {
+            <p class="mt-1 text-[12px] text-rojo">{{ e.message }}</p>
+          }
+        }
+      </div>
+      <div>
+        <div uiEtiqueta><b>Costo indirecto por pedido</b><span uiPildora>S/</span></div>
+        <input uiCampo type="number" step="any" placeholder="Ej. 5"
+          [formField]="formulario.costoIndirectoPedido"
+          [class.!border-rojo]="formulario.costoIndirectoPedido().touched() && formulario.costoIndirectoPedido().invalid()">
+        @if (formulario.costoIndirectoPedido().touched() && formulario.costoIndirectoPedido().invalid()) {
+          @for (e of formulario.costoIndirectoPedido().errors(); track e.kind) {
+            <p class="mt-1 text-[12px] text-rojo">{{ e.message }}</p>
+          }
+        }
+      </div>
+    </div>
+
+    <div uiGrid="two">
+      <div>
+        <div uiEtiqueta><b>Depreciación por pedido</b><span uiPildora>S/</span></div>
+        <input uiCampo type="number" step="any" placeholder="Ej. 3"
+          [formField]="formulario.depreciacionPedido"
+          [class.!border-rojo]="formulario.depreciacionPedido().touched() && formulario.depreciacionPedido().invalid()">
+        @if (formulario.depreciacionPedido().touched() && formulario.depreciacionPedido().invalid()) {
+          @for (e of formulario.depreciacionPedido().errors(); track e.kind) {
+            <p class="mt-1 text-[12px] text-rojo">{{ e.message }}</p>
+          }
+        }
+      </div>
+      <div>
+        <div uiEtiqueta><b>Margen por defecto</b><span uiPildora>%</span></div>
+        <input uiCampo type="number" step="any" placeholder="Ej. 35"
+          [formField]="formulario.margenDefecto"
+          [class.!border-rojo]="formulario.margenDefecto().touched() && formulario.margenDefecto().invalid()">
+        @if (formulario.margenDefecto().touched() && formulario.margenDefecto().invalid()) {
+          @for (e of formulario.margenDefecto().errors(); track e.kind) {
+            <p class="mt-1 text-[12px] text-rojo">{{ e.message }}</p>
+          }
+        }
+      </div>
+    </div>
+
+    <div uiGrid="two">
+      <div>
+        <div uiEtiqueta><b>Aplicar IGV</b></div>
+        <label class="flex items-center gap-2 text-[13.5px] text-tinta py-2.5">
+          <input type="checkbox" class="w-4 h-4 accent-acento" [formField]="formulario.aplicarIgv">
+          Sumar IGV al precio final
+        </label>
+      </div>
+      <div>
+        <div uiEtiqueta><b>Tasa de IGV</b><span uiPildora>%</span></div>
+        <input uiCampo type="number" step="any" placeholder="Ej. 18"
+          [formField]="formulario.tasaIgv"
+          [class.!border-rojo]="formulario.tasaIgv().touched() && formulario.tasaIgv().invalid()">
+        @if (formulario.tasaIgv().touched() && formulario.tasaIgv().invalid()) {
+          @for (e of formulario.tasaIgv().errors(); track e.kind) {
+            <p class="mt-1 text-[12px] text-rojo">{{ e.message }}</p>
+          }
+        }
+      </div>
+    </div>
+
+    <div class="mb-3.5">
+      <div uiEtiqueta><b>Redondeo del precio final</b><span uiPildora>Lista</span></div>
+      <select uiCampo [formField]="formulario.redondeo">
+        <option value="NINGUNO">Sin redondeo</option>
+        <option value="MULTIPLO_5">Múltiplo de 5 hacia arriba</option>
+      </select>
+    </div>
+  </section>
+
+  <section uiTarjeta>
+    <div uiTituloGrupo>Operación</div>
+
+    <div uiGrid="two">
+      <div>
+        <div uiEtiqueta><b>Días de vencimiento del presupuesto</b><span uiPildora>Número</span></div>
+        <input uiCampo type="number" placeholder="Ej. 15"
+          [formField]="formulario.diasVencimiento"
+          [class.!border-rojo]="formulario.diasVencimiento().touched() && formulario.diasVencimiento().invalid()">
+        @if (formulario.diasVencimiento().touched() && formulario.diasVencimiento().invalid()) {
+          @for (e of formulario.diasVencimiento().errors(); track e.kind) {
+            <p class="mt-1 text-[12px] text-rojo">{{ e.message }}</p>
+          }
+        }
+      </div>
+      <div>
+        <div uiEtiqueta><b>Momento del descuento de stock</b><span uiPildora>Lista</span></div>
+        <select uiCampo [formField]="formulario.momentoDescuentoStock">
+          <option value="APROBAR">Al aprobar el presupuesto</option>
+          <option value="PRODUCCION">Al iniciar producción</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="mb-3.5">
+      <div uiEtiqueta><b>Nombre del negocio</b><span uiReq>*</span><span uiPildora>Texto</span></div>
+      <input uiCampo placeholder="Ej. Dulces de Misa"
+        [formField]="formulario.nombreNegocio"
+        [class.!border-rojo]="formulario.nombreNegocio().touched() && formulario.nombreNegocio().invalid()">
+      @if (formulario.nombreNegocio().touched() && formulario.nombreNegocio().invalid()) {
+        @for (e of formulario.nombreNegocio().errors(); track e.kind) {
+          <p class="mt-1 text-[12px] text-rojo">{{ e.message }}</p>
+        }
+      }
+    </div>
+  </section>
+
+  <section uiTarjeta>
+    <div uiTituloGrupo>Tamaños</div>
+
+    @if (!formulario.tamanos.length) {
+      <div uiNota>Define al menos un tamaño vendible (ej. chico, mediano, grande).</div>
+    } @else {
+      @for (t of formulario.tamanos; track $index) {
+        <div uiGrid="two" class="mb-3">
+          <div>
+            <div uiEtiqueta><b>Nombre</b><span uiReq>*</span><span uiPildora>Texto</span></div>
+            <input uiCampo placeholder="Ej. mediano"
+              [formField]="t.nombre"
+              [class.!border-rojo]="t.nombre().touched() && t.nombre().invalid()">
+            @if (t.nombre().touched() && t.nombre().invalid()) {
+              @for (e of t.nombre().errors(); track e.kind) {
+                <p class="mt-1 text-[12px] text-rojo">{{ e.message }}</p>
+              }
+            }
+          </div>
+          <div>
+            <div uiEtiqueta><b>Factor</b><span uiReq>*</span><span uiPildora>Número</span></div>
+            <div class="flex items-end gap-2">
+              <div class="flex-1">
+                <input uiCampo type="number" step="any" placeholder="Ej. 1"
+                  [formField]="t.factor"
+                  [class.!border-rojo]="t.factor().touched() && t.factor().invalid()">
+                @if (t.factor().touched() && t.factor().invalid()) {
+                  @for (e of t.factor().errors(); track e.kind) {
+                    <p class="mt-1 text-[12px] text-rojo">{{ e.message }}</p>
+                  }
+                }
+              </div>
+              <button uiBoton="peligro" (click)="quitarTamano($index)">Quitar</button>
+            </div>
+          </div>
+        </div>
+      }
+    }
+
+    <div class="mt-1">
+      <button uiBoton="mini" (click)="agregarTamano()">+ Agregar tamaño</button>
+    </div>
+  </section>
+
+  <div class="flex justify-end gap-2.5">
+    <button uiBoton="primario" [disabled]="guardando()" (click)="guardar()">
+      {{ guardando() ? 'Guardando…' : 'Guardar configuración' }}
+    </button>
+  </div>
+}
