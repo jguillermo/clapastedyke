@@ -1,0 +1,36 @@
+<!-- Tailwind redesign: utilities via ui directives. ids and data-on* intact
+     (the game validates by id; data-onclick is inherited from the GAS contract).
+     All visible texts are transloco keys under scope formsSales.registerPurchase.* -->
+<app-dialog-frame title="formsSales.registerPurchase.title" [icon]="icon">
+
+  <section uiCard>
+    <div uiGroupTitle>{{ 'formsSales.registerPurchase.purchaseData' | transloco }}</div>
+    <div uiGrid="two">
+      <div class="relative">
+        <div uiLabel><b>{{ 'formsSales.registerPurchase.supplier' | transloco }}</b><span uiReq>*</span><span uiPill>{{ 'formsSales.common.autocomplete' | transloco }}</span></div>
+        <input uiField id="prov_nombre" [placeholder]="'formsSales.registerPurchase.supplierPlaceholder' | transloco"
+          [class.highlighted]="marks().has('prov_nombre')" [value]="value('prov_nombre')">
+        <input type="hidden" id="proveedor_id">
+      </div>
+      <div>
+        <div uiLabel><b>{{ 'formsSales.registerPurchase.date' | transloco }}</b><span uiReq>*</span><span uiPill>{{ 'formsSales.common.date' | transloco }}</span></div>
+        <input uiField id="fecha" type="date"
+          [class.highlighted]="marks().has('fecha')" [value]="value('fecha')">
+      </div>
+    </div>
+  </section>
+
+  <section uiCard>
+    <div uiGroupTitle>{{ 'formsSales.registerPurchase.purchaseLines' | transloco }}</div>
+    <p uiSub>{{ 'formsSales.registerPurchase.linesHint' | transloco }}</p>
+    <div id="lineas"></div>
+    <button uiButton="mini" data-onclick="addLinea()">{{ 'formsSales.registerPurchase.addLine' | transloco }}</button>
+  </section>
+
+  <ng-container footer>
+    <button uiButton data-onclick="S.cerrar()">{{ 'formsSales.registerPurchase.cancel' | transloco }}</button>
+    <button uiButton="primary" id="btnGuardar" data-onclick="guardar()"
+      [class.highlighted]="marks().has('btnGuardar')">{{ 'formsSales.registerPurchase.save' | transloco }}</button>
+  </ng-container>
+
+</app-dialog-frame>

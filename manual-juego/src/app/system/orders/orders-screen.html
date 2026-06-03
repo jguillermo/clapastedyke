@@ -1,0 +1,133 @@
+<h1 class="font-heading text-3xl font-semibold text-ink mb-1">{{ 'operations.orders.title' | transloco }}</h1>
+<p class="text-sm text-muted mb-5">{{ 'operations.orders.subtitle' | transloco }}</p>
+
+@if (notice(); as n) {
+  <div
+    class="mb-3.5 rounded-field px-3.5 py-2.5 text-[13.5px] border"
+    [class]="n.kind === 'ok'
+      ? 'bg-green-soft text-green border-green/30'
+      : 'bg-red-soft text-red border-red/30'"
+  >{{ n.text }}</div>
+}
+
+<section uiCard>
+  <div uiGroupTitle>{{ 'operations.orders.filtersTitle' | transloco }}</div>
+  <div uiGrid="two">
+    <div>
+      <div uiLabel><b>{{ 'operations.orders.filterStatus' | transloco }}</b></div>
+      <select uiField [value]="statusFilter()" (change)="changeStatus($any($event.target).value)">
+        <option value="">{{ 'operations.orders.all' | transloco }}</option>
+        @for (s of statuses; track s) {
+          <option [value]="s">{{ 'status.order.' + s | transloco }}</option>
+        }
+      </select>
+    </div>
+    <div>
+      <div uiLabel><b>{{ 'operations.orders.filterCustomer' | transloco }}</b></div>
+      <select uiField [value]="customerFilter()" (change)="changeCustomer($any($event.target).value)">
+        <option value="">{{ 'operations.orders.all' | transloco }}</option>
+        @for (c of customers(); track c.id) {
+          <option [value]="c.id">{{ c.name }}</option>
+        }
+      </select>
+    </div>
+  </div>
+</section>
+
+<section uiCard>
+  <div uiToolbar>
+    <h4 uiToolbarTitle>{{ 'operations.orders.listTitle' | transloco }}</h4>
+  </div>
+
+  @if (loading()) {
+    <div uiEmpty>{{ 'operations.orders.loading' | transloco }}</div>
+  } @else if (!hasOrders()) {
+    <div uiEmpty>{{ 'operations.orders.empty' | transloco }}</div>
+  } @else {
+    <table class="w-full border-collapse text-[12.5px]">
+      <thead>
+        <tr>
+          <th class="text-left font-mono text-[10px] uppercase tracking-wide text-muted font-normal px-2 py-1.5 border-b border-line">{{ 'operations.orders.colId' | transloco }}</th>
+          <th class="text-left font-mono text-[10px] uppercase tracking-wide text-muted font-normal px-2 py-1.5 border-b border-line">{{ 'operations.orders.colQuote' | transloco }}</th>
+          <th class="text-left font-mono text-[10px] uppercase tracking-wide text-muted font-normal px-2 py-1.5 border-b border-line">{{ 'operations.orders.colCustomer' | transloco }}</th>
+          <th class="text-left font-mono text-[10px] uppercase tracking-wide text-muted font-normal px-2 py-1.5 border-b border-line">{{ 'operations.orders.colRecipe' | transloco }}</th>
+          <th class="text-left font-mono text-[10px] uppercase tracking-wide text-muted font-normal px-2 py-1.5 border-b border-line">{{ 'operations.orders.colCreated' | transloco }}</th>
+          <th class="text-left font-mono text-[10px] uppercase tracking-wide text-muted font-normal px-2 py-1.5 border-b border-line">{{ 'operations.orders.colDelivered' | transloco }}</th>
+          <th class="text-left font-mono text-[10px] uppercase tracking-wide text-muted font-normal px-2 py-1.5 border-b border-line">{{ 'operations.orders.colStatus' | transloco }}</th>
+          <th class="border-b border-line"></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (o of orders(); track o.id) {
+          <tr class="transition-colors hover:bg-accent-soft/50 cursor-pointer" (click)="toggleDetail(o.id)">
+            <td class="px-2 py-2 border-b border-line-soft font-mono text-[11px] text-muted">{{ o.id }}</td>
+            <td class="px-2 py-2 border-b border-line-soft font-mono text-[11px] text-muted">{{ o.quoteId }}</td>
+            <td class="px-2 py-2 border-b border-line-soft font-semibold">{{ o.customerName }}</td>
+            <td class="px-2 py-2 border-b border-line-soft">{{ o.recipeName }}</td>
+            <td class="px-2 py-2 border-b border-line-soft text-muted">{{ o.createdAtFormatted }}</td>
+            <td class="px-2 py-2 border-b border-line-soft text-muted">{{ o.deliveredAtFormatted }}</td>
+            <td class="px-2 py-2 border-b border-line-soft">
+              <span
+                class="font-mono text-[10px] uppercase tracking-wide rounded-pill px-2 py-0.5"
+                [class]="statusClasses[o.status]"
+              >{{ 'status.order.' + o.status | transloco }}</span>
+              @if (o.status === 'Cancelled' && o.cancellationReason) {
+                <span class="block mt-0.5 text-[10px] text-muted" [title]="o.cancellationReason">
+                  {{ o.cancellationReason }}
+                </span>
+              }
+            </td>
+            <td class="px-2 py-2 border-b border-line-soft text-right whitespace-nowrap" (click)="$event.stopPropagation()">
+              @switch (o.status) {
+                @case ('Pending') {
+                  <button uiButton="mini" [disabled]="processing()" (click)="startProduction(o)">{{ 'operations.orders.startProduction' | transloco }}</button>
+                  <button uiButton="danger" class="ml-1.5" [disabled]="processing()" (click)="cancel(o)">{{ 'operations.orders.cancel' | transloco }}</button>
+                }
+                @case ('InProduction') {
+                  <button uiButton="mini" [disabled]="processing()" (click)="deliver(o)">{{ 'operations.orders.deliver' | transloco }}</button>
+                  <button uiButton="danger" class="ml-1.5" [disabled]="processing()" (click)="cancel(o)">{{ 'operations.orders.cancel' | transloco }}</button>
+                }
+                @default {
+                  <span class="text-[11px] text-muted">—</span>
+                }
+              }
+            </td>
+          </tr>
+          @if (openOrder() === o.id) {
+            <tr>
+              <td colspan="8" class="px-2 py-2 border-b border-line-soft bg-cream">
+                <div uiGroupTitle>{{ 'operations.orders.requirementsTitle' | transloco }}</div>
+                @if (!o.requirements.length) {
+                  <div uiEmpty>{{ 'operations.orders.noRequirements' | transloco }}</div>
+                } @else {
+                  <table class="w-full border-collapse text-[12px]">
+                    <thead>
+                      <tr>
+                        <th class="text-left font-mono text-[10px] uppercase tracking-wide text-muted font-normal px-2 py-1 border-b border-line">{{ 'operations.orders.reqSupply' | transloco }}</th>
+                        <th class="text-right font-mono text-[10px] uppercase tracking-wide text-muted font-normal px-2 py-1 border-b border-line">{{ 'operations.orders.reqRequired' | transloco }}</th>
+                        <th class="text-right font-mono text-[10px] uppercase tracking-wide text-muted font-normal px-2 py-1 border-b border-line">{{ 'operations.orders.reqShortage' | transloco }}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (r of o.requirements; track r.supplyId) {
+                        <tr>
+                          <td class="px-2 py-1.5 border-b border-line-soft">{{ r.supplyName }}</td>
+                          <td class="px-2 py-1.5 border-b border-line-soft text-right font-mono">{{ r.requiredQuantity }}</td>
+                          <td
+                            class="px-2 py-1.5 border-b border-line-soft text-right font-mono"
+                            [class.text-red]="r.shortage > 0"
+                            [class.font-bold]="r.shortage > 0"
+                          >{{ r.shortage }}</td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                }
+              </td>
+            </tr>
+          }
+        }
+      </tbody>
+    </table>
+  }
+</section>

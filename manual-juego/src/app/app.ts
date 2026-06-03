@@ -1,6 +1,6 @@
 import { Component } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
-import { Hud } from './componentes/hud/hud';
+import { Hud } from './game/components/hud/hud';
 
 @Component({
   selector: 'app-root',

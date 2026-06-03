@@ -1,0 +1,12 @@
+<!-- Tailwind redesign: chrome only (uiEmpty + uiButton). Chrome ids
+     (titleId/footerId) and data-on* intact.
+     All visible texts are transloco keys under scope formsSales.orderDetail.* -->
+<app-dialog-frame title="formsSales.orderDetail.title" [icon]="icon" titleId="titulo" footerId="pie">
+
+  <div id="cuerpo"><div uiEmpty>{{ 'formsSales.orderDetail.loading' | transloco }}</div></div>
+
+  <ng-container footer>
+    <button uiButton data-onclick="volver()">{{ 'formsSales.orderDetail.backToList' | transloco }}</button>
+  </ng-container>
+
+</app-dialog-frame>

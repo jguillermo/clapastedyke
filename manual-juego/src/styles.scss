@@ -1,4 +1,4 @@
-@use 'estilos/tokens';
+@use 'styles/tokens';
 
 * { box-sizing: border-box; }
 
@@ -8,20 +8,20 @@ body {
   margin: 0;
   background: var(--paper);
   color: var(--ink);
-  font-family: var(--fuente-texto);
+  font-family: var(--font-body);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
 }
 
-h1, h2, h3 { font-family: var(--fuente-titulo); font-weight: 600; }
+h1, h2, h3 { font-family: var(--font-heading); font-weight: 600; }
 
-button { font-family: var(--fuente-texto); }
+button { font-family: var(--font-body); }
 
 // Etiqueta de "botón del sistema" (lo que el usuario debe tocar en el software real)
 .tag {
   display: inline-block;
-  font-family: var(--fuente-mono);
+  font-family: var(--font-mono);
   font-size: .85em;
   background: var(--accent-soft);
   border: 1px solid #eecdba;

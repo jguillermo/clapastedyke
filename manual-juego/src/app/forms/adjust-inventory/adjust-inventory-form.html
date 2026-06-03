@@ -1,0 +1,46 @@
+<!-- Tailwind redesign: utilities via ui directives. ids and data-on* intact
+     (the game validates by id; data-on* is inherited from the GAS contract).
+     All visible texts are transloco keys under scope formsCatalog.adjustInventory.* -->
+<app-dialog-frame title="formsCatalog.adjustInventory.title" [icon]="icon">
+
+  <section uiCard>
+    <div uiGroupTitle>{{ 'formsCatalog.adjustInventory.groupTitle' | transloco }}</div>
+    <div class="relative mb-3.5">
+      <div uiLabel><b>{{ 'formsCatalog.adjustInventory.supply' | transloco }}</b><span uiReq>*</span><span uiPill>{{ 'formsCatalog.common.autocomplete' | transloco }}</span></div>
+      <input uiField id="ins_nombre" [placeholder]="'formsCatalog.adjustInventory.supplyPlaceholder' | transloco"
+        [class.highlighted]="marks().has('ins_nombre')" [value]="value('ins_nombre')">
+      <input type="hidden" id="insumo_id">
+    </div>
+    <div uiGrid="two">
+      <div>
+        <div uiLabel><b>{{ 'formsCatalog.adjustInventory.adjustmentType' | transloco }}</b><span uiReq>*</span><span uiPill>{{ 'formsCatalog.common.dropdown' | transloco }}</span></div>
+        <select uiField id="tipo" data-onchange="prev()" [class.highlighted]="marks().has('tipo')"></select>
+      </div>
+      <div>
+        <div uiLabel><b>{{ 'formsCatalog.adjustInventory.quantity' | transloco }}</b><span uiReq>*</span><span uiPill>{{ 'formsCatalog.adjustInventory.numberPill' | transloco }}</span></div>
+        <input uiField id="cantidad" type="number" step="any" [placeholder]="'formsCatalog.adjustInventory.quantityPlaceholder' | transloco" data-oninput="prev()"
+          [class.highlighted]="marks().has('cantidad')" [value]="value('cantidad')">
+      </div>
+    </div>
+    <div class="mb-3.5">
+      <div uiLabel><b>{{ 'formsCatalog.adjustInventory.reason' | transloco }}</b><span uiOpt>{{ 'formsCatalog.adjustInventory.reasonHint' | transloco }}</span><span uiPill>{{ 'formsCatalog.common.text' | transloco }}</span></div>
+      <input uiField id="motivo" [placeholder]="'formsCatalog.adjustInventory.reasonPlaceholder' | transloco"
+        [class.highlighted]="marks().has('motivo')" [value]="value('motivo')">
+    </div>
+    <div class="mb-3.5">
+      <div uiLabel><b>{{ 'formsCatalog.adjustInventory.date' | transloco }}</b><span uiPill>{{ 'formsCatalog.common.date' | transloco }}</span></div>
+      <input uiField id="fecha" type="date"
+        [class.highlighted]="marks().has('fecha')" [value]="value('fecha')">
+    </div>
+    <div id="preview"
+      class="bg-cream border border-dashed border-line rounded-field px-3.5 py-3 text-[13px] text-muted font-mono">{{ 'formsCatalog.adjustInventory.previewEmpty' | transloco }}</div>
+    <p uiNote>{{ 'formsCatalog.adjustInventory.note' | transloco }}</p>
+  </section>
+
+  <ng-container footer>
+    <button uiButton data-onclick="S.cerrar()">{{ 'formsCatalog.common.cancel' | transloco }}</button>
+    <button uiButton="primary" id="btnGuardar" data-onclick="guardar()"
+      [class.highlighted]="marks().has('btnGuardar')">{{ 'formsCatalog.adjustInventory.saveButton' | transloco }}</button>
+  </ng-container>
+
+</app-dialog-frame>

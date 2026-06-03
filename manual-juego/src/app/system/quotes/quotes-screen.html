@@ -1,0 +1,85 @@
+<h1 class="font-heading text-3xl font-semibold text-ink mb-1">{{ 'sales.quotes.title' | transloco }}</h1>
+<p class="text-sm text-muted mb-5">{{ 'sales.quotes.subtitle' | transloco }}</p>
+
+@if (notice(); as n) {
+  <div
+    class="mb-3.5 rounded-field px-3.5 py-2.5 text-[13.5px] border"
+    [class]="n.kind === 'ok'
+      ? 'bg-green-soft text-green border-green/30'
+      : 'bg-red-soft text-red border-red/30'"
+  >{{ n.text }}</div>
+}
+
+<section uiCard>
+  <div uiToolbar>
+    <h4 uiToolbarTitle>{{ 'sales.quotes.listTitle' | transloco }}</h4>
+    <button uiButton="primary" routerLink="new">{{ 'sales.quotes.newQuote' | transloco }}</button>
+  </div>
+
+  <div uiGrid="two" class="mb-4">
+    <div>
+      <div uiLabel><b>{{ 'sales.quotes.filters.status' | transloco }}</b><span uiPill>{{ 'sales.quotes.filters.list' | transloco }}</span></div>
+      <select uiField [value]="statusFilter()" (change)="changeStatus($any($event.target).value)">
+        <option value="">{{ 'common.all' | transloco }}</option>
+        <option value="Pending">{{ 'status.quote.Pending' | transloco }}</option>
+        <option value="Approved">{{ 'status.quote.Approved' | transloco }}</option>
+        <option value="Rejected">{{ 'status.quote.Rejected' | transloco }}</option>
+        <option value="Expired">{{ 'status.quote.Expired' | transloco }}</option>
+      </select>
+    </div>
+    <div>
+      <div uiLabel><b>{{ 'sales.quotes.filters.customer' | transloco }}</b><span uiPill>{{ 'sales.quotes.filters.list' | transloco }}</span></div>
+      <select uiField [value]="customerFilter()" (change)="changeCustomer($any($event.target).value)">
+        <option value="">{{ 'common.all' | transloco }}</option>
+        @for (c of customers(); track c.id) {
+          <option [value]="c.id">{{ c.name }}</option>
+        }
+      </select>
+    </div>
+  </div>
+
+  @if (loading()) {
+    <div uiEmpty>{{ 'common.loading' | transloco }}</div>
+  } @else if (!quotes().length) {
+    <div uiEmpty>{{ 'sales.quotes.empty' | transloco }}</div>
+  } @else {
+    <table class="w-full border-collapse text-[12.5px]">
+      <thead>
+        <tr>
+          <th class="text-left font-mono text-[10px] uppercase tracking-wide text-muted font-normal px-2 py-1.5 border-b border-line">{{ 'sales.quotes.columns.id' | transloco }}</th>
+          <th class="text-left font-mono text-[10px] uppercase tracking-wide text-muted font-normal px-2 py-1.5 border-b border-line">{{ 'sales.quotes.columns.customer' | transloco }}</th>
+          <th class="text-left font-mono text-[10px] uppercase tracking-wide text-muted font-normal px-2 py-1.5 border-b border-line">{{ 'sales.quotes.columns.recipe' | transloco }}</th>
+          <th class="text-left font-mono text-[10px] uppercase tracking-wide text-muted font-normal px-2 py-1.5 border-b border-line">{{ 'sales.quotes.columns.issued' | transloco }}</th>
+          <th class="text-left font-mono text-[10px] uppercase tracking-wide text-muted font-normal px-2 py-1.5 border-b border-line">{{ 'sales.quotes.columns.expires' | transloco }}</th>
+          <th class="text-left font-mono text-[10px] uppercase tracking-wide text-muted font-normal px-2 py-1.5 border-b border-line">{{ 'sales.quotes.columns.price' | transloco }}</th>
+          <th class="text-left font-mono text-[10px] uppercase tracking-wide text-muted font-normal px-2 py-1.5 border-b border-line">{{ 'sales.quotes.columns.status' | transloco }}</th>
+          <th class="border-b border-line"></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (q of quotes(); track q.id) {
+          <tr class="transition-colors hover:bg-accent-soft/50">
+            <td class="px-2 py-2 border-b border-line-soft font-mono text-[11px] text-muted">{{ q.id }}</td>
+            <td class="px-2 py-2 border-b border-line-soft font-semibold">{{ q.customerName }}</td>
+            <td class="px-2 py-2 border-b border-line-soft text-muted">{{ q.recipeName }}</td>
+            <td class="px-2 py-2 border-b border-line-soft">{{ q.issuedAtFormatted }}</td>
+            <td class="px-2 py-2 border-b border-line-soft">{{ q.expiresAtFormatted }}</td>
+            <td class="px-2 py-2 border-b border-line-soft font-mono font-semibold text-ink">{{ q.finalPriceFormatted }}</td>
+            <td class="px-2 py-2 border-b border-line-soft">
+              <span
+                class="inline-block font-mono text-[10px] uppercase tracking-wide rounded-pill border px-2 py-px"
+                [class]="statusClasses(q.visibleStatus)"
+              >{{ ('status.quote.' + q.visibleStatus) | transloco }}</span>
+            </td>
+            <td class="px-2 py-2 border-b border-line-soft text-right whitespace-nowrap">
+              @if (q.visibleStatus === 'Pending') {
+                <button uiButton="mini" [disabled]="processing()" (click)="approve(q)">{{ 'sales.quotes.approve' | transloco }}</button>
+                <button uiButton="danger" class="ml-1.5" [disabled]="processing()" (click)="reject(q)">{{ 'sales.quotes.reject' | transloco }}</button>
+              }
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  }
+</section>

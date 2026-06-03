@@ -1,0 +1,146 @@
+<div class="marco" [class.con-menu]="scene().type === 'menu'">
+
+  <!-- Google Sheets window bar -->
+  <div class="ventana-barra">
+    <span class="punto r"></span><span class="punto a"></span><span class="punto v"></span>
+    <span class="ventana-titulo">{{ 'game.scene.windowTitle' | transloco }}</span>
+  </div>
+
+  <!-- Menu bar -->
+  <div class="menubar">
+    @for (m of ['File', 'Edit', 'View', 'Insert']; track m) {
+      <span class="menu-item tenue">{{ m }}</span>
+    }
+    <span class="menu-item sistema" [class.activo]="scene().type === 'menu'">
+      {{ 'game.scene.menu.system' | transloco }}
+    </span>
+    <span class="menu-item tenue">{{ 'game.scene.menu.help' | transloco }}</span>
+  </div>
+
+  <div class="lienzo">
+
+    <!-- Sheet grid, always in the background -->
+    <svg class="rejilla" viewBox="0 0 480 240" aria-hidden="true" preserveAspectRatio="none">
+      @for (i of [0, 1, 2, 3, 4, 5, 6, 7]; track i) {
+        <line x1="0" [attr.y1]="30 + i * 30" x2="480" [attr.y2]="30 + i * 30" />
+      }
+      @for (i of [0, 1, 2, 3, 4, 5]; track i) {
+        <line [attr.x1]="80 + i * 80" y1="0" [attr.x2]="80 + i * 80" y2="240" />
+      }
+    </svg>
+
+    <!-- ====== TYPE MENU: the System menu unfolded ====== -->
+    @if (scene().type === 'menu') {
+      <div class="menu-desplegable" role="presentation">
+        @for (key of SYSTEM_MENU_KEYS; track key) {
+          <div
+            class="menu-line"
+            [class.highlighted]="key === highlightedMenuKey()"
+            [style.animation-delay.ms]="400 + $index * 28"
+          >
+            {{ key | transloco }}
+            @if (key === MAINTENANCE_KEY) { <span class="flecha">▸</span> }
+          </div>
+        }
+      </div>
+
+      @if (hasSubmenu()) {
+        <div class="submenu" role="presentation">
+          @for (key of MAINTENANCE_SUBMENU_KEYS; track key) {
+            <div
+              class="menu-line"
+              [class.highlighted]="key === highlightedSubmenuKey()"
+              [style.animation-delay.ms]="900 + $index * 28"
+            >{{ key | transloco }}</div>
+          }
+        </div>
+      }
+
+      <span class="cursor viaja-menu" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="M5 3l14 9-6.5 1L9 19z"/></svg>
+        <span class="halo"></span>
+      </span>
+    }
+
+    <!-- ====== TYPE FORM with REAL migrated component ====== -->
+    @if (scene().type === 'form' && formComponent(); as comp) {
+      <div class="modal real">
+        <ng-container *ngComponentOutlet="comp; inputs: formInputs()" />
+      </div>
+
+      @if (scene().button === 'save') {
+        <span class="cursor viaja-guardar" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M5 3l14 9-6.5 1L9 19z"/></svg>
+          <span class="halo"></span>
+        </span>
+      }
+    }
+
+    <!-- ====== TYPE FORM: synthetic mockup (fallback) ====== -->
+    @if (scene().type === 'form' && !formComponent()) {
+      <div class="modal">
+        <div class="modal-barra">
+          <span class="modal-titulo">{{ scene().title }}</span>
+          <span class="modal-x">×</span>
+        </div>
+        <div class="modal-cuerpo">
+          @for (field of scene().fields ?? []; track field.labelKey) {
+            <label class="campo" [class.highlighted]="field.highlighted"
+              [style.animation-delay.ms]="250 + $index * 110">
+              <span class="campo-etiqueta">{{ field.labelKey | transloco }}</span>
+              @switch (field.kind) {
+                @case ('check') {
+                  <span class="campo-control check" [class.marcado]="field.value === 'Sí' || field.value === 'Yes'">
+                    <svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+                  </span>
+                }
+                @case ('select') {
+                  <span class="campo-control select">{{ field.value }}<i>▾</i></span>
+                }
+                @default {
+                  <span class="campo-control" [class.numero]="field.kind === 'number'">
+                    {{ field.value }}<i class="caret"></i>
+                  </span>
+                }
+              }
+            </label>
+          }
+        </div>
+        <div class="modal-pie">
+          <span class="mboton fantasma">{{ 'game.scene.cancel' | transloco }}</span>
+          <span class="mboton solido" [class.highlighted]="scene().button === 'save'">
+            {{ 'game.scene.save' | transloco }}
+          </span>
+        </div>
+      </div>
+
+      @if (scene().button === 'save') {
+        <span class="cursor viaja-guardar" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M5 3l14 9-6.5 1L9 19z"/></svg>
+          <span class="halo"></span>
+        </span>
+      }
+    }
+
+    <!-- ====== TYPE SHEET: tabs and toast ====== -->
+    @if (scene().type === 'sheet') {
+      @if (scene().toastKey; as toastKey) {
+        <div class="aviso">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12.2l2.6 2.6L16 9.4"/></svg>
+          {{ toastKey | transloco }}
+        </div>
+      }
+    }
+  </div>
+
+  <!-- Sheet tab row (type 'sheet') -->
+  @if (scene().type === 'sheet') {
+    <div class="pestanas">
+      <span class="pestana mas">+</span>
+      @for (p of scene().tabs ?? []; track p) {
+        <span class="pestana" [class.activa]="$index === 0"
+          [style.animation-delay.ms]="200 + $index * 90">{{ p }}</span>
+      }
+    </div>
+  }
+</div>

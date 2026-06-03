@@ -1,0 +1,115 @@
+{
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "clear": "Clear",
+    "edit": "Edit",
+    "view": "View",
+    "buy": "Buy",
+    "loading": "Loading…",
+    "saving": "Saving…",
+    "actions": "Actions",
+    "yes": "Yes",
+    "no": "No",
+    "all": "All",
+    "back": "Back",
+    "next": "Next",
+    "optional": "optional",
+    "required": "required",
+    "noSupplier": "No supplier",
+    "couldNotSave": "Could not save."
+  },
+  "nav": {
+    "system": "System",
+    "home": "Home",
+    "quotes": "Quotes",
+    "orders": "Orders",
+    "purchases": "Purchases",
+    "inventory": "Inventory",
+    "customers": "Customers",
+    "suppliers": "Suppliers",
+    "supplies": "Supplies",
+    "recipes": "Recipes",
+    "packagingRules": "Packaging rules",
+    "settings": "Settings",
+    "fullManual": "Full manual",
+    "game": "Tutorial game"
+  },
+  "status": {
+    "quote": {
+      "Pending": "Pending",
+      "Approved": "Approved",
+      "Rejected": "Rejected",
+      "Expired": "Expired"
+    },
+    "order": {
+      "Pending": "Pending",
+      "InProduction": "In production",
+      "Delivered": "Delivered",
+      "Cancelled": "Cancelled"
+    },
+    "stockLight": {
+      "red": "red",
+      "yellow": "yellow",
+      "green": "green"
+    }
+  },
+  "adjustment": {
+    "waste": "waste",
+    "damage": "damage",
+    "expiry": "expiry",
+    "count": "count",
+    "return": "return",
+    "sign": {
+      "subtracts": "subtracts",
+      "adds": "adds",
+      "signed": "signed"
+    }
+  },
+  "movement": {
+    "initial": "initial",
+    "purchase": "purchase",
+    "consumption": "consumption",
+    "cancellation": "cancellation"
+  },
+  "dashboard": {
+    "title": "Home",
+    "todaySummary": "Today's summary",
+    "quickAccess": "Quick access",
+    "needsAttention": "Needs your attention",
+    "allClear": "All clear: nothing urgent today ✦",
+    "kpi": {
+      "pendingQuotes": "Pending quotes",
+      "expiringThisWeek": "Expiring this week",
+      "pendingOrders": "Pending orders",
+      "toDeliver": "To deliver",
+      "suppliesInRed": "Supplies in red"
+    },
+    "alert": {
+      "expiringQuote": "Quote {{refId}} · {{name}}",
+      "expiredQuote": "Quote {{refId}} · {{name}}",
+      "outOfStock": "{{name}} · stock {{stock}} {{unit}}",
+      "belowMinimum": "{{name}} · {{stock}} {{unit}} of {{minStock}} {{unit}}",
+      "toDeliver": "Order {{refId}} · {{name}}",
+      "badge": {
+        "expiresToday": "EXPIRES TODAY",
+        "expiresTomorrow": "EXPIRES TOMORROW",
+        "expiresInDays": "EXPIRES IN {{days}} DAYS",
+        "expired": "EXPIRED",
+        "outOfStock": "OUT OF STOCK",
+        "belowMinimum": "BELOW MINIMUM",
+        "toDeliver": "TO DELIVER"
+      }
+    },
+    "access": {
+      "newQuote": { "title": "New quote", "subtitle": "Create and freeze prices" },
+      "viewQuotes": { "title": "View quotes", "subtitle": "Approve or reject" },
+      "viewOrders": { "title": "View orders", "subtitle": "Production and delivery" },
+      "buyMaterials": { "title": "Buy materials", "subtitle": "List by supplier" },
+      "registerPurchase": { "title": "Register purchase", "subtitle": "Raises stock and price" },
+      "adjustInventory": { "title": "Adjust inventory", "subtitle": "Waste and counts" },
+      "catalogs": { "title": "Catalogs", "subtitle": "Customers, supplies, more" },
+      "settings": { "title": "Settings", "subtitle": "Rates, IGV, margin" }
+    }
+  }
+}

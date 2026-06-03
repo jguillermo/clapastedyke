@@ -1,0 +1,63 @@
+<section class="mapa">
+
+  <header class="portada">
+    <p class="kick">{{ 'game.map.kicker' | transloco }}</p>
+    <h1 [innerHTML]="'game.map.title' | transloco"></h1>
+    <p class="sub" [innerHTML]="'game.map.sub' | transloco"></p>
+
+    @if (state.gameFinished()) {
+      <p class="fin">{{ 'game.map.finished' | transloco }}</p>
+    } @else {
+      <button type="button" class="boton solido grande" (click)="continue()">
+        ▶ {{ (state.completedCount() === 0 ? 'game.map.start' : 'game.map.continue') | transloco }}
+      </button>
+    }
+  </header>
+
+  <app-world-map-3d [islands]="islands3d()" (missionChosen)="goToMission($event)" />
+
+  @for (level of levels; track level.id) {
+    <article class="isla" [attr.data-nivel]="level.id">
+      <header class="isla-cabeza">
+        <span class="isla-icono" [innerHTML]="LEVEL_ICONS[level.id] | safeSvg"></span>
+        <div>
+          <p class="isla-orden">
+            {{ 'game.map.levelN' | transloco: { n: level.order } }} · {{ 'game.map.difficulty.' + level.id | transloco }}
+          </p>
+          <h2>{{ level.titleKey | transloco }}</h2>
+          <p class="isla-lema">{{ level.mottoKey | transloco }}</p>
+        </div>
+        <span class="isla-avance">{{ state.levelPercent(level.id) }}%</span>
+      </header>
+
+      <div class="camino">
+        @for (mission of level.missions; track mission.id) {
+          @let unlocked = state.missionUnlocked(mission.id);
+          @let percent = state.missionPercent(mission.id);
+          <button
+            type="button"
+            class="nodo"
+            [class.bloqueada]="!unlocked"
+            [class.completa]="percent === 100"
+            [disabled]="!unlocked"
+            (click)="goToMission(mission.id)"
+            [style.animation-delay.ms]="$index * 90"
+          >
+            <span class="nodo-icono" [innerHTML]="(unlocked ? iconOf(mission.id) : LOCK) | safeSvg"></span>
+            <span class="nodo-textos">
+              <b>{{ mission.titleKey | transloco }}</b>
+              <small>{{ unlocked ? (mission.whyKey | transloco) : ('game.map.lockedHint' | transloco) }}</small>
+            </span>
+            <span class="nodo-estado">
+              @if (percent === 100) { ✓ }
+              @else if (unlocked) { {{ percent }}% }
+              @else { 🔒 }
+            </span>
+          </button>
+        }
+      </div>
+    </article>
+  }
+
+  <footer class="pie-mapa" [innerHTML]="'game.map.footer' | transloco"></footer>
+</section>

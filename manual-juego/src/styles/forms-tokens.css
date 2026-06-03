@@ -1,0 +1,64 @@
+/* ============================================================
+ * Form design tokens — pure Tailwind v4.
+ * Templates use ONLY utilities over these tokens (bg-paper,
+ * text-ink, rounded-field, shadow-card…), applied via the
+ * directivas de src/app/formularios/ui/ui.ts.
+ * NO Preflight: the global reset lives in src/styles.scss.
+ * ============================================================ */
+
+@layer theme, base, components, utilities;
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/utilities.css' layer(utilities);
+
+@theme {
+  /* Base colors — brand identity */
+  --color-paper: #f7f1e8;
+  --color-sheet: #ffffff;
+  --color-ink: #2a2420;
+  --color-muted: #8c8278;
+  --color-line: #e7ddcf;
+  --color-line-soft: #f0e8db;
+  --color-cream: #fbf6ef;
+  --color-accent: #bb5530;
+  --color-accent-deep: #9a4324;
+  --color-accent-soft: #f6e3d6;
+  --color-green: #4f8a5b;
+  --color-green-soft: #e1efe2;
+  --color-amber: #cf9a32;
+  --color-amber-soft: #f7ecd1;
+  --color-red: #bf412c;
+  --color-red-soft: #f7ddd6;
+
+  /* Typography */
+  --font-heading: 'Fraunces', serif;
+  --font-body: 'Figtree', sans-serif;
+  --font-mono: 'Space Mono', monospace;
+
+  /* Radii */
+  --radius-field: 10px;
+  --radius-card: 14px;
+  --radius-pill: 999px;
+
+  /* Shadows */
+  --shadow-card: 0 2px 10px -4px rgba(60, 40, 25, .22);
+  --shadow-floating: 0 12px 34px -14px rgba(60, 40, 25, .30);
+}
+
+/* Tutorial-game state: target field/button with pulsing ring.
+   A utility so it can toggle via [class.highlighted]; !important to win
+   over the field focus ring. */
+@utility highlighted {
+  border-color: var(--color-accent) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 18%, transparent) !important;
+  animation: highlight-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes highlight-pulse {
+  50% {
+    box-shadow: 0 0 0 7px color-mix(in srgb, var(--color-accent) 26%, transparent) !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .highlighted { animation: none; }
+}

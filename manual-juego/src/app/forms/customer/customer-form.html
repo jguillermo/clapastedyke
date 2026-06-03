@@ -1,0 +1,42 @@
+<!-- Tailwind redesign: utilities via ui directives. ids and data-on* intact
+     (the game validates by id; data-onclick is inherited from the GAS contract).
+     All visible texts are transloco keys under scope formsCatalog.customer.* -->
+<app-dialog-frame title="formsCatalog.customer.title" [icon]="icon">
+
+  <section uiCard>
+    <div uiToolbar>
+      <h4 uiToolbarTitle>{{ 'formsCatalog.customer.listTitle' | transloco }}</h4>
+      <button uiButton="mini" data-onclick="nuevo()" [class.highlighted]="marks().has('btnNuevo')">{{ 'formsCatalog.customer.newButton' | transloco }}</button>
+    </div>
+    <div id="lista"><div uiEmpty>{{ 'formsCatalog.customer.loading' | transloco }}</div></div>
+  </section>
+
+  <section uiCard>
+    <div uiGroupTitle id="formTitulo">{{ 'formsCatalog.customer.formTitle' | transloco }}</div>
+    <input type="hidden" id="id">
+    <div class="mb-3.5">
+      <div uiLabel><b>{{ 'formsCatalog.customer.name' | transloco }}</b><span uiReq>*</span><span uiPill>{{ 'formsCatalog.common.text' | transloco }}</span></div>
+      <input uiField id="nombre" [placeholder]="'formsCatalog.customer.namePlaceholder' | transloco"
+        [class.highlighted]="marks().has('nombre')" [value]="value('nombre')">
+    </div>
+    <div uiGrid="two">
+      <div>
+        <div uiLabel><b>{{ 'formsCatalog.customer.phone' | transloco }}</b><span uiOpt>{{ 'formsCatalog.common.optional' | transloco }}</span><span uiPill>{{ 'formsCatalog.common.text' | transloco }}</span></div>
+        <input uiField id="telefono" [placeholder]="'formsCatalog.customer.phonePlaceholder' | transloco"
+          [class.highlighted]="marks().has('telefono')" [value]="value('telefono')">
+      </div>
+      <div>
+        <div uiLabel><b>{{ 'formsCatalog.customer.notes' | transloco }}</b><span uiOpt>{{ 'formsCatalog.common.optional' | transloco }}</span><span uiPill>{{ 'formsCatalog.common.text' | transloco }}</span></div>
+        <input uiField id="notas" [placeholder]="'formsCatalog.customer.notesPlaceholder' | transloco"
+          [class.highlighted]="marks().has('notas')" [value]="value('notas')">
+      </div>
+    </div>
+  </section>
+
+  <ng-container footer>
+    <button uiButton data-onclick="nuevo()">{{ 'formsCatalog.common.clear' | transloco }}</button>
+    <button uiButton="primary" id="btnGuardar" data-onclick="guardar()"
+      [class.highlighted]="marks().has('btnGuardar')">{{ 'formsCatalog.customer.saveButton' | transloco }}</button>
+  </ng-container>
+
+</app-dialog-frame>

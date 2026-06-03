@@ -1,0 +1,399 @@
+{
+  "levels": {
+    "basic": {
+      "title": "Prepara tu negocio",
+      "motto": "Instala el sistema y carga lo mínimo para poder vender."
+    },
+    "intermediate": {
+      "title": "Tu primera venta",
+      "motto": "El ciclo completo: cotiza, aprueba, entrega y revisa."
+    },
+    "advanced": {
+      "title": "Domina la operación",
+      "motto": "Proveedores, compras, inventario y reglas de empaque."
+    }
+  },
+  "missions": {
+    "f12": {
+      "title": "Instalar el sistema",
+      "why": "Es el primer paso de todos: crea las pestañas, cabeceras y fórmulas donde vivirá tu negocio."
+    },
+    "f13": {
+      "title": "Configurar el negocio",
+      "why": "Defines las reglas con las que se arma el precio: margen, IGV, redondeo y los tamaños que venderás."
+    },
+    "f07": {
+      "title": "Tu primer cliente",
+      "why": "Todo presupuesto va a nombre de un cliente. Sin cliente no hay a quién cotizarle."
+    },
+    "f08": {
+      "title": "Tus primeros insumos",
+      "why": "Los insumos (ingredientes y empaques) son la base de todos los costos: aquí vive su precio y su stock."
+    },
+    "f10": {
+      "title": "Tu primera receta",
+      "why": "La receta define qué lleva tu producto y para cuántas raciones rinde. Es lo que el presupuesto escala."
+    },
+    "f01": {
+      "title": "Cotizar",
+      "why": "Poner precio a lo que te piden: eliges cliente y receta, escalas la cantidad y el sistema saca el precio."
+    },
+    "f02": {
+      "title": "Aprobar",
+      "why": "El momento de decidir: si el cliente acepta, apruebas y nace el pedido con su lista de materiales."
+    },
+    "f03": {
+      "title": "Producir y entregar",
+      "why": "Llevar el pedido de Pendiente a Producción y a Entregado. Al entregar, la venta se registra sola."
+    },
+    "f04": {
+      "title": "Revisar el negocio",
+      "why": "Tu tablero del día a día: de un vistazo ves qué necesita tu atención, sin tocar nada."
+    },
+    "f09": {
+      "title": "Tu proveedor",
+      "why": "Su WhatsApp te deja pedirle con un clic desde «Comprar materiales»."
+    },
+    "f05": {
+      "title": "Comprar y registrar",
+      "why": "Reponer el stock: pides al proveedor por WhatsApp y, cuando llega el material, registras la compra."
+    },
+    "f06": {
+      "title": "Ajustar el inventario",
+      "why": "Para cuando algo se daña, vence o el conteo real no cuadra con el sistema."
+    },
+    "f11": {
+      "title": "Reglas de empaque",
+      "why": "Para que el presupuesto sugiera solo el empaque correcto según el tamaño, sin que tengas que acordarte."
+    }
+  },
+  "steps": {
+    "f12-1": {
+      "title": "Abre el instalador",
+      "instruction": "En tu hoja de cálculo, abre el menú <span class=\"tag\">Sistema</span>, entra a <span class=\"tag\">Mantenimiento</span> y toca <span class=\"tag\">Instalar o reparar (todo)</span>.",
+      "detail": "El menú Sistema aparece en la barra de arriba de Google Sheets, junto a Ayuda.",
+      "hint": "Si no ves el menú Sistema, cierra y vuelve a abrir el archivo: el menú se crea al abrir."
+    },
+    "f12-2": {
+      "title": "Espera el aviso «Listo»",
+      "instruction": "Espera sin cerrar el archivo hasta que aparezca el aviso <b>«Listo»</b> con el número de hojas creadas y revisadas.",
+      "detail": "La primera vez puede tardar varios minutos, porque crea todas las hojas.",
+      "hint": "Si se corta por tiempo, en el manual completo está «Mantenimiento por partes» (Flujo 14)."
+    },
+    "f12-3": {
+      "title": "Confirma las pestañas",
+      "instruction": "Mira abajo: debe aparecer la pestaña <b>Resumen</b> como primera, y detrás las demás (Config, Insumos, Presupuestos, Pedidos, Clientes, Proveedores, Recetas…).",
+      "whatHappens": "Quedan creadas todas las hojas con sus cabeceras y fórmulas. Las columnas que se calculan solas salen con cabecera <b>verde</b>. Es seguro repetir la instalación: nunca borra tus datos, solo repara lo que falte."
+    },
+    "f13-1": {
+      "title": "Abre la configuración",
+      "instruction": "Abre el menú <span class=\"tag\">Sistema</span> y entra a <span class=\"tag\">Configuración</span>."
+    },
+    "f13-2": {
+      "title": "Tu hora de trabajo",
+      "instruction": "Escribe la <b>tarifa de mano de obra por hora</b>: cuánto vale una hora de tu trabajo.",
+      "detail": "Alimenta el costo de cada presupuesto: las horas de la receta se multiplican por esta tarifa."
+    },
+    "f13-3": {
+      "title": "Costos fijos por pedido",
+      "instruction": "Pon el <b>costo indirecto</b> y la <b>depreciación</b> por pedido: montos fijos por luz, gas o desgaste de tus equipos."
+    },
+    "f13-4": {
+      "title": "Tu ganancia",
+      "instruction": "Define el <b>margen por defecto</b>, en porcentaje. Es tu ganancia sobre la venta.",
+      "detail": "Cada presupuesto lo trae puesto y lo puedes cambiar caso por caso."
+    },
+    "f13-5": {
+      "title": "IGV y redondeo",
+      "instruction": "Decide si <b>aplicar IGV</b> (y su tasa) y deja el <b>redondeo</b> en «múltiplo de 5 hacia arriba» para precios redonditos."
+    },
+    "f13-6": {
+      "title": "Vigencia y stock",
+      "instruction": "Pon los <b>días de vencimiento</b> del presupuesto y elige el <b>momento de descuento de stock</b>: al aprobar o al iniciar producción.",
+      "detail": "Cuántos días vale tu cotización, y cuándo el sistema descuenta los materiales del inventario."
+    },
+    "f13-7": {
+      "title": "Tus tamaños",
+      "instruction": "Revisa la <b>lista de tamaños</b> con su factor: <b>chico 0.5</b>, <b>mediano 1</b>, <b>grande 2</b>.",
+      "detail": "El factor multiplica la receta: un grande lleva el doble de ingredientes que un mediano."
+    },
+    "f13-8": {
+      "title": "Nombre y guardar",
+      "instruction": "Escribe el <b>nombre de tu negocio</b> y toca <span class=\"tag\">Guardar</span>.",
+      "whatHappens": "Caes en la hoja Config, con 4 bloques editables: Parámetros generales, Factores de escalado, Tamaños y Tipos de ajuste. Lo que cambies aquí afecta los presupuestos <b>nuevos</b>, nunca los ya guardados."
+    },
+    "f07-1": {
+      "title": "Abre los clientes",
+      "instruction": "Abre el menú <span class=\"tag\">Sistema</span>, entra a <span class=\"tag\">Clientes</span> y toca <span class=\"tag\">Nuevo cliente</span>."
+    },
+    "f07-2": {
+      "title": "Su nombre",
+      "instruction": "Escribe el <b>nombre</b>: por ejemplo <b>Ana Torres</b>.",
+      "detail": "Es obligatorio y no se puede repetir exacto con otro cliente."
+    },
+    "f07-3": {
+      "title": "Su teléfono",
+      "instruction": "Pon su <b>teléfono</b> (<b>999000111</b>) y notas si quieres. Ambos son opcionales."
+    },
+    "f07-4": {
+      "title": "Guarda",
+      "instruction": "Toca <span class=\"tag\">Guardar</span>.",
+      "whatHappens": "Aparece la fila <b>CL-0001</b> en la hoja Clientes. Ya tienes a quién cotizarle."
+    },
+    "f08-1": {
+      "title": "Abre los insumos",
+      "instruction": "Abre el menú <span class=\"tag\">Sistema</span>, entra a <span class=\"tag\">Insumos</span> y toca <span class=\"tag\">Nuevo insumo</span>."
+    },
+    "f08-2": {
+      "title": "La harina",
+      "instruction": "Crea <b>Harina</b>: tipo <b>ingrediente</b>, unidad <b>gramos</b>, presentación <b>1000</b>, precio <b>S/ 5</b>, mínimo <b>2000</b>. Toca <span class=\"tag\">Guardar</span>.",
+      "detail": "Verás «Precio por unidad base» = 0.005 (5÷1000) y el semáforo en rojo (stock 0)."
+    },
+    "f08-3": {
+      "title": "Los huevos",
+      "instruction": "Crea <b>Huevo</b>: ingrediente, presentación <b>30</b>, precio <b>S/ 15</b>, mínimo <b>30</b>. Toca <span class=\"tag\">Guardar</span>.",
+      "detail": "«Precio por unidad base» = 0.5 (15÷30): cada huevo te cuesta 50 céntimos."
+    },
+    "f08-4": {
+      "title": "La caja",
+      "instruction": "Crea <b>Caja torta</b>: tipo <b>empaque</b>, presentación <b>25</b>, precio <b>S/ 25</b>, stock <b>50</b>, mínimo <b>10</b>. Toca <span class=\"tag\">Guardar</span>.",
+      "whatHappens": "Las columnas calculadas («Precio por unidad base» y «Semáforo») se actualizan solas cuando cambia el precio o el stock. <b>No las toques a mano.</b> El semáforo de la caja sale verde (50 > 10)."
+    },
+    "f10-1": {
+      "title": "Abre las recetas",
+      "instruction": "Abre el menú <span class=\"tag\">Sistema</span>, entra a <span class=\"tag\">Recetas</span> y toca <span class=\"tag\">Nueva receta</span>."
+    },
+    "f10-2": {
+      "title": "Nombre y categoría",
+      "instruction": "Escribe el nombre <b>Torta chocolate</b> y la categoría <b>tortas</b>."
+    },
+    "f10-3": {
+      "title": "Para cuántos rinde",
+      "instruction": "Tipo de base <b>«Por personas»</b>, base <b>10</b>.",
+      "detail": "Es la clave del escalado: si luego te piden 20 personas, el sistema multiplica todo por 2."
+    },
+    "f10-4": {
+      "title": "Tu trabajo",
+      "instruction": "Pon la <b>mano de obra</b>: <b>2 horas</b>.",
+      "detail": "Se multiplica por la tarifa por hora que pusiste en Configuración."
+    },
+    "f10-5": {
+      "title": "Los ingredientes",
+      "instruction": "Agrega los ingredientes: <b>Harina 300</b> (la unidad sale sola: g) y <b>Huevo 4</b> (u).",
+      "hint": "Si no aparecen en el desplegable, vuelve a la misión anterior: primero hay que crear los insumos."
+    },
+    "f10-6": {
+      "title": "Guarda",
+      "instruction": "Toca <span class=\"tag\">Guardar</span>. El formulario pide al menos un ingrediente.",
+      "whatHappens": "Queda la receta <b>RC-0001</b>. Escríbela siempre para una base cómoda: el sistema la escala solo al cotizar. Cambiarla después no afecta los presupuestos ya guardados."
+    },
+    "f01-1": {
+      "title": "Abre el formulario",
+      "instruction": "Abre el menú <span class=\"tag\">Sistema</span> y toca <span class=\"tag\">Nuevo presupuesto</span>."
+    },
+    "f01-2": {
+      "title": "El cliente",
+      "instruction": "En <b>Cliente</b>, elige <b>Ana Torres</b>.",
+      "hint": "Si llega alguien nuevo en plena cotización, el botón «+» junto a Cliente lo crea sin salir del formulario."
+    },
+    "f01-3": {
+      "title": "La receta",
+      "instruction": "En <b>Receta</b>, elige <b>Torta chocolate</b>.",
+      "detail": "El modo de escalado se pone solo en «Por personas» y la tabla trae Harina y Huevo con su precio."
+    },
+    "f01-4": {
+      "title": "La cantidad",
+      "instruction": "Escala a <b>20 personas</b>.",
+      "detail": "La base de la receta es 10, así que el factor es 2: Harina pasa a 600 g y Huevo a 8 u. El costo se recalcula al instante."
+    },
+    "f01-5": {
+      "title": "Prueba por tamaño",
+      "instruction": "Cambia el modo a <b>«Por tamaño»</b> y elige <b>grande</b>.",
+      "detail": "El factor de «grande» también es 2. Si la receta tiene regla de empaque (la definirás en el nivel avanzado), aparece el empaque sugerido con su casilla marcada."
+    },
+    "f01-6": {
+      "title": "Margen e IGV",
+      "instruction": "Revisa los costos (mano de obra, indirecto, depreciación), <b>ajusta el margen</b> y marca <b>Aplicar IGV</b>.",
+      "detail": "El precio final se actualiza solo y se redondea hacia arriba al múltiplo de 5."
+    },
+    "f01-7": {
+      "title": "Guarda",
+      "instruction": "Escribe notas si hace falta y toca <span class=\"tag\">Guardar</span>.",
+      "whatHappens": "Nace el presupuesto <b>P-0001</b> en estado <b>Pendiente</b>, con emisión hoy y el vencimiento de tu Configuración. Sus precios quedan <b>congelados</b>: aunque cambies tus costos después, este no se mueve. Todavía no toca el inventario."
+    },
+    "f02-1": {
+      "title": "Abre tus presupuestos",
+      "instruction": "Abre el menú <span class=\"tag\">Sistema</span> y toca <span class=\"tag\">Ver presupuestos</span>. Luego abre el detalle de <b>P-0001</b> con <span class=\"tag\">Ver</span>."
+    },
+    "f02-2": {
+      "title": "Lee los faltantes",
+      "instruction": "En el detalle, <b>lee el aviso de faltantes</b>.",
+      "detail": "Verás que Harina y Huevo quedarán en negativo, porque su stock es 0. Es informativo: no impide aprobar."
+    },
+    "f02-3": {
+      "title": "Aprueba",
+      "instruction": "Toca <span class=\"tag\">Aprobar</span> y confirma.",
+      "whatHappens": "P-0001 pasa a <b>Aprobado</b> y nace el pedido <b>PD-0001</b> (Pendiente) con su lista de requerimientos. Si tu configuración descuenta el stock al aprobar, baja ahora; si no, bajará al iniciar producción.",
+      "hint": "Si el cliente no acepta, el botón Rechazar guarda el motivo y no nace ningún pedido."
+    },
+    "f03-1": {
+      "title": "Abre tus pedidos",
+      "instruction": "Abre el menú <span class=\"tag\">Sistema</span> y toca <span class=\"tag\">Ver pedidos</span>. Abre el detalle de <b>PD-0001</b> con <span class=\"tag\">Ver</span>."
+    },
+    "f03-2": {
+      "title": "A producción",
+      "instruction": "Sobre PD-0001 (Pendiente), toca <span class=\"tag\">Producción</span> y confirma.",
+      "detail": "Si tu sistema descuenta el stock al iniciar producción, aquí es donde baja.",
+      "whatHappens": "El pedido pasa a <b>Producción</b>. A partir de aquí ya estás trabajando el encargo."
+    },
+    "f03-3": {
+      "title": "Entrega",
+      "instruction": "Cuando termines el encargo, sobre el pedido en Producción toca <span class=\"tag\">Entregar</span> y confirma.",
+      "whatHappens": "Se registra la fecha de entrega y nace la venta <b>VT-0001</b> con el precio final del presupuesto. Cerraste el ciclo: de cotizar a vender. Si el pedido se cae, «Cancelar» devuelve solo el stock consumido (un Entregado ya no se puede cancelar)."
+    },
+    "f04-1": {
+      "title": "Ve al Resumen",
+      "instruction": "Abre el menú <span class=\"tag\">Sistema</span> y toca <span class=\"tag\">Ir al Resumen</span>."
+    },
+    "f04-2": {
+      "title": "Léelo de un vistazo",
+      "instruction": "Mira los presupuestos <b>pendientes, por vencer y vencidos</b>; los pedidos <b>pendientes, en producción y entregados</b>; los insumos <b>agotados o bajo el mínimo</b>; y la lista de <b>alertas</b>.",
+      "whatHappens": "El panel es de solo lectura y se vuelve a dibujar solo: al abrir el archivo y después de cada acción que mueva algo (aprobar, entregar…). No escribas sobre él."
+    },
+    "f09-1": {
+      "title": "Abre los proveedores",
+      "instruction": "Abre el menú <span class=\"tag\">Sistema</span>, entra a <span class=\"tag\">Proveedores</span> y toca <span class=\"tag\">Nuevo proveedor</span>."
+    },
+    "f09-2": {
+      "title": "Su nombre",
+      "instruction": "Escribe el <b>nombre</b>: <b>Molinos SAC</b>.",
+      "detail": "Es obligatorio y no se puede repetir exacto."
+    },
+    "f09-3": {
+      "title": "Su WhatsApp",
+      "instruction": "Pon su <b>WhatsApp con código de país</b>: <b>51999111222</b>, sin espacios ni signos.",
+      "detail": "Es lo que arma el enlace para pedirle con un clic."
+    },
+    "f09-4": {
+      "title": "Guarda",
+      "instruction": "Notas opcionales y toca <span class=\"tag\">Guardar</span>.",
+      "whatHappens": "Aparece la fila <b>PR-0001</b>. Ahora puedes ponerlo como «proveedor recomendado» en tus insumos."
+    },
+    "f05-1": {
+      "title": "Arma el pedido",
+      "instruction": "Abre el menú <span class=\"tag\">Sistema</span> y toca <span class=\"tag\">Comprar materiales</span>."
+    },
+    "f05-2": {
+      "title": "Elige los faltantes",
+      "instruction": "En <b>modo automático</b>, elige el pedido <b>PD-0001</b>.",
+      "detail": "Aparecen los faltantes (Harina, Huevo) agrupados por proveedor, con el último precio pagado. El modo manual lista todos los insumos, con los que están bajo el mínimo ya marcados."
+    },
+    "f05-3": {
+      "title": "Pide por WhatsApp",
+      "instruction": "Toca <span class=\"tag\">WhatsApp</span> en Molinos SAC.",
+      "detail": "Se abre el chat con el mensaje ya escrito para preguntar disponibilidad y precio.",
+      "whatHappens": "Esto todavía <b>no</b> cambia el stock: solo arma el pedido al proveedor. El stock sube cuando registres la compra recibida."
+    },
+    "f05-4": {
+      "title": "Llegó el material",
+      "instruction": "Cuando recibas la compra, abre el menú <span class=\"tag\">Sistema</span> y toca <span class=\"tag\">Registrar compra</span>. Proveedor <b>Molinos SAC</b>, fecha de hoy."
+    },
+    "f05-5": {
+      "title": "Las líneas y guarda",
+      "instruction": "Línea <b>Harina</b>: cantidad <b>5</b> (presentaciones), precio <b>5.50</b>. Línea <b>Huevo</b>: cantidad <b>2</b>, precio <b>15</b>. Toca <span class=\"tag\">Guardar</span> y confirma.",
+      "detail": "Recibes en presentaciones, no en gramos: 5 bolsas de 1000 g.",
+      "whatHappens": "Queda la compra <b>CMP-0001</b>. La Harina sube su precio de presentación a 5.50 (unidad base 0.0055), el stock sube 5×1000 = 5000 g y el semáforo deja de estar rojo. Costos al día y faltantes cubiertos."
+    },
+    "f06-1": {
+      "title": "Abre el ajuste",
+      "instruction": "Abre el menú <span class=\"tag\">Sistema</span> y toca <span class=\"tag\">Ajustar inventario</span>."
+    },
+    "f06-2": {
+      "title": "El insumo y el ajuste",
+      "instruction": "Busca <b>Caja torta</b>. Tipo de ajuste <b>merma</b>, cantidad <b>5</b>, motivo <b>«se dañaron»</b>.",
+      "detail": "Merma, daño y vencimiento sacan stock; devolución lo regresa; conteo lo escribes con signo (un menos para quitar)."
+    },
+    "f06-3": {
+      "title": "Vista previa y guarda",
+      "instruction": "Mira la <b>vista previa</b> (cómo quedan el stock y el semáforo) y toca <span class=\"tag\">Guardar</span>.",
+      "whatHappens": "Queda registrado en Movimientos con fecha, tipo y motivo, y el stock de Caja torta baja 5. Siempre podrás rastrear por qué el inventario está como está."
+    },
+    "f11-1": {
+      "title": "Abre las reglas",
+      "instruction": "Abre el menú <span class=\"tag\">Sistema</span>, entra a <span class=\"tag\">Reglas de empaque</span> y toca <span class=\"tag\">Nueva regla</span>."
+    },
+    "f11-2": {
+      "title": "Receta y tamaño",
+      "instruction": "Receta <b>Torta chocolate</b>, tamaño <b>grande</b>.",
+      "detail": "El desplegable solo muestra los tamaños definidos en Configuración."
+    },
+    "f11-3": {
+      "title": "Empaque y guarda",
+      "instruction": "Empaque <b>Caja torta</b>, cantidad <b>1</b>. Toca <span class=\"tag\">Guardar</span>.",
+      "whatHappens": "Queda la regla <b>RL-0001</b>. Al cotizar Torta chocolate en tamaño grande, el sistema propondrá <b>1 Caja torta</b> automáticamente (con una casilla que puedes desmarcar). ¡Y con esto dominas toda la operación!"
+    }
+  },
+  "fields": {
+    "laborRatePerHour": "Tarifa mano de obra (S/ por hora)",
+    "indirectCostPerOrder": "Costo indirecto por pedido (S/)",
+    "depreciationPerOrder": "Depreciación por pedido (S/)",
+    "defaultMargin": "Margen por defecto (%)",
+    "applyIgv": "Aplicar IGV",
+    "igvRate": "Tasa IGV (%)",
+    "rounding": "Redondeo",
+    "expiryDays": "Días de vencimiento",
+    "stockDiscount": "Descuento de stock",
+    "sizeSmallFactor": "Tamaño: chico · factor",
+    "sizeMediumFactor": "Tamaño: mediano · factor",
+    "sizeLargeFactor": "Tamaño: grande · factor",
+    "businessName": "Nombre del negocio",
+    "name": "Nombre",
+    "type": "Tipo",
+    "unit": "Unidad",
+    "presentation": "Presentación",
+    "price": "Precio (S/)",
+    "minStock": "Stock mínimo",
+    "initialStock": "Stock inicial",
+    "category": "Categoría",
+    "baseType": "Tipo de base",
+    "base": "Base",
+    "laborHours": "Mano de obra (horas)",
+    "ingredientFlourQty": "Ingrediente: Harina · cantidad",
+    "ingredientEggQty": "Ingrediente: Huevo · cantidad",
+    "customer": "Cliente",
+    "recipe": "Receta",
+    "scalingMode": "Modo de escalado",
+    "people": "Personas",
+    "flourScaled": "Harina (escalada)",
+    "eggScaled": "Huevo (escalado)",
+    "size": "Tamaño",
+    "suggestedPackagingCajaTorta": "Empaque sugerido: Caja torta",
+    "margin": "Margen (%)",
+    "finalPrice": "Precio final (S/)",
+    "notes": "Notas",
+    "status": "Estado",
+    "shortageFlour": "Faltante: Harina",
+    "shortageEgg": "Faltante: Huevo",
+    "whatsapp": "WhatsApp",
+    "mode": "Modo",
+    "order": "Pedido",
+    "shortages": "Faltantes",
+    "supplier": "Proveedor",
+    "message": "Mensaje",
+    "flourQtyTimesPrice": "Harina · cantidad × precio",
+    "eggQtyTimesPrice": "Huevo · cantidad × precio",
+    "supply": "Insumo",
+    "adjustmentType": "Tipo de ajuste",
+    "quantity": "Cantidad",
+    "reason": "Motivo",
+    "currentStock": "Stock actual",
+    "stockAfter": "Stock después",
+    "semaphore": "Semáforo",
+    "packaging": "Empaque",
+    "suggestedQuantity": "Cantidad sugerida"
+  },
+  "toasts": {
+    "installDone": "Listo: hojas creadas y revisadas",
+    "overviewStatus": "1 en producción · 2 alertas de stock"
+  }
+}

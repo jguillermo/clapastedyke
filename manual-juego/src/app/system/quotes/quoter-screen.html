@@ -1,0 +1,235 @@
+<div class="flex items-center gap-3 mb-1">
+  <button uiButton="ghost" (click)="back()">{{ 'sales.quoter.backToList' | transloco }}</button>
+</div>
+<h1 class="font-heading text-3xl font-semibold text-ink mb-1">{{ 'sales.quoter.title' | transloco }}</h1>
+<p class="text-sm text-muted mb-5">{{ 'sales.quoter.subtitle' | transloco }}</p>
+
+@if (notice(); as n) {
+  <div
+    class="mb-3.5 rounded-field px-3.5 py-2.5 text-[13.5px] border"
+    [class]="n.kind === 'ok'
+      ? 'bg-green-soft text-green border-green/30'
+      : 'bg-red-soft text-red border-red/30'"
+  >{{ n.text }}</div>
+}
+
+@if (loading()) {
+  <section uiCard><div uiEmpty>{{ 'common.loading' | transloco }}</div></section>
+} @else {
+  <div class="grid grid-cols-1 lg:grid-cols-[1.3fr_1fr] gap-3.5 items-start">
+    <!-- ====== FORM ====== -->
+    <section uiCard>
+      <div uiGroupTitle>{{ 'sales.quoter.dataGroup' | transloco }}</div>
+
+      <div uiGrid="two">
+        <div>
+          <div uiLabel><b>{{ 'sales.quoter.customer' | transloco }}</b><span uiReq>*</span><span uiPill>{{ 'sales.quoter.list' | transloco }}</span></div>
+          <select uiField [formField]="quoterForm.customerId"
+            (change)="recalculate()"
+            [class.!border-red]="quoterForm.customerId().touched() && quoterForm.customerId().invalid()">
+            <option value="">{{ 'sales.quoter.choose' | transloco }}</option>
+            @for (c of customers(); track c.id) {
+              <option [value]="c.id">{{ c.name }}</option>
+            }
+          </select>
+          @if (quoterForm.customerId().touched() && quoterForm.customerId().invalid()) {
+            @for (e of quoterForm.customerId().errors(); track e.kind) {
+              <p class="mt-1 text-[12px] text-red">{{ e.message | transloco }}</p>
+            }
+          }
+        </div>
+        <div>
+          <div uiLabel><b>{{ 'sales.quoter.recipe' | transloco }}</b><span uiReq>*</span><span uiPill>{{ 'sales.quoter.list' | transloco }}</span></div>
+          <select uiField [formField]="quoterForm.recipeId"
+            (change)="applySuggestedPackaging()"
+            [class.!border-red]="quoterForm.recipeId().touched() && quoterForm.recipeId().invalid()">
+            <option value="">{{ 'sales.quoter.choose' | transloco }}</option>
+            @for (r of recipes(); track r.id) {
+              <option [value]="r.id">{{ r.name }}</option>
+            }
+          </select>
+          @if (quoterForm.recipeId().touched() && quoterForm.recipeId().invalid()) {
+            @for (e of quoterForm.recipeId().errors(); track e.kind) {
+              <p class="mt-1 text-[12px] text-red">{{ e.message | transloco }}</p>
+            }
+          }
+        </div>
+      </div>
+
+      <div uiGrid="two">
+        <div>
+          <div uiLabel><b>{{ 'sales.quoter.scalingMode' | transloco }}</b><span uiPill>{{ 'sales.quoter.list' | transloco }}</span></div>
+          <select uiField [formField]="quoterForm.scalingMode" (change)="applySuggestedPackaging()">
+            <option value="people">{{ 'sales.quoter.people' | transloco }}</option>
+            <option value="quantity">{{ 'sales.quoter.quantity' | transloco }}</option>
+            <option value="size">{{ 'sales.quoter.sizeMode' | transloco }}</option>
+            <option value="factor">{{ 'sales.quoter.factorMode' | transloco }}</option>
+          </select>
+        </div>
+        <div>
+          @if (isSizeMode()) {
+            <div uiLabel><b>{{ 'sales.quoter.sizeLabel' | transloco }}</b><span uiReq>*</span><span uiPill>{{ 'sales.quoter.list' | transloco }}</span></div>
+            <select uiField [formField]="quoterForm.size" (change)="applySuggestedPackaging()"
+              [class.!border-red]="quoterForm.size().touched() && quoterForm.size().invalid()">
+              <option value="">{{ 'sales.quoter.choose' | transloco }}</option>
+              @for (s of sizes(); track s.name) {
+                <option [value]="s.name">{{ sizeLabel(s) }}</option>
+              }
+            </select>
+            @if (quoterForm.size().touched() && quoterForm.size().invalid()) {
+              @for (e of quoterForm.size().errors(); track e.kind) {
+                <p class="mt-1 text-[12px] text-red">{{ e.message | transloco }}</p>
+              }
+            }
+          } @else if (isFactorMode()) {
+            <div uiLabel><b>{{ 'sales.quoter.factorLabel' | transloco }}</b><span uiReq>*</span><span uiPill>{{ 'sales.quoter.list' | transloco }}</span></div>
+            <select uiField [value]="model().scalingValue"
+              (change)="changeFactor($any($event.target).value)"
+              [class.!border-red]="quoterForm.scalingValue().touched() && quoterForm.scalingValue().invalid()">
+              <option value="0">{{ 'sales.quoter.choose' | transloco }}</option>
+              @for (f of factors(); track f.code) {
+                <option [value]="f.code">{{ f.label }}</option>
+              }
+            </select>
+            @if (quoterForm.scalingValue().touched() && quoterForm.scalingValue().invalid()) {
+              @for (e of quoterForm.scalingValue().errors(); track e.kind) {
+                <p class="mt-1 text-[12px] text-red">{{ e.message | transloco }}</p>
+              }
+            }
+          } @else {
+            <div uiLabel>
+              <b>{{ (model().scalingMode === 'people' ? 'sales.quoter.peopleLabel' : 'sales.quoter.quantityLabel') | transloco }}</b>
+              <span uiReq>*</span><span uiPill>{{ 'sales.quoter.number' | transloco }}</span>
+            </div>
+            <input uiField type="number" step="any" [placeholder]="'sales.quoter.scalingValuePlaceholder' | transloco"
+              [formField]="quoterForm.scalingValue" (input)="recalculate()"
+              [class.!border-red]="quoterForm.scalingValue().touched() && quoterForm.scalingValue().invalid()">
+            @if (quoterForm.scalingValue().touched() && quoterForm.scalingValue().invalid()) {
+              @for (e of quoterForm.scalingValue().errors(); track e.kind) {
+                <p class="mt-1 text-[12px] text-red">{{ e.message | transloco }}</p>
+              }
+            }
+          }
+        </div>
+      </div>
+
+      <div uiGrid="two">
+        <div>
+          <div uiLabel><b>{{ 'sales.quoter.margin' | transloco }}</b><span uiReq>*</span><span uiPill>{{ 'sales.quoter.number' | transloco }}</span></div>
+          <input uiField type="number" step="any" [placeholder]="'sales.quoter.marginPlaceholder' | transloco"
+            [formField]="quoterForm.margin" (input)="recalculate()"
+            [class.!border-red]="quoterForm.margin().touched() && quoterForm.margin().invalid()">
+          @if (quoterForm.margin().touched() && quoterForm.margin().invalid()) {
+            @for (e of quoterForm.margin().errors(); track e.kind) {
+              <p class="mt-1 text-[12px] text-red">{{ e.message | transloco }}</p>
+            }
+          }
+        </div>
+        <div>
+          <div uiLabel><b>{{ 'sales.quoter.applyIgv' | transloco }}</b><span uiPill>{{ 'sales.quoter.yesNo' | transloco }}</span></div>
+          <label class="flex items-center gap-2 mt-2 text-[13.5px] text-ink cursor-pointer">
+            <input type="checkbox" [formField]="quoterForm.applyIgv" (change)="recalculate()">
+            {{ 'sales.quoter.applyIgvLabel' | transloco }}
+          </label>
+        </div>
+      </div>
+
+      <!-- ====== PACKAGING ====== -->
+      <div uiGroupTitle>{{ 'sales.quoter.packaging' | transloco }}</div>
+      @if (isSizeMode()) {
+        <div uiNote>{{ 'sales.quoter.suggested' | transloco }}</div>
+      }
+
+      @if (!packagingRows().length) {
+        <div uiNote class="mt-2">{{ 'sales.quoter.noPackaging' | transloco }}</div>
+      } @else {
+        @for (row of packagingRows(); track $index) {
+          <div uiGrid="two" class="mb-3">
+            <div>
+              <div uiLabel><b>{{ 'sales.quoter.packagingItem' | transloco }}</b><span uiPill>{{ 'sales.quoter.list' | transloco }}</span></div>
+              <select uiField [value]="row.supplyId"
+                (change)="changePackagingSupply($index, $any($event.target).value)">
+                <option value="">{{ 'sales.quoter.choose' | transloco }}</option>
+                @for (s of packagingCatalog(); track s.id) {
+                  <option [value]="s.id">{{ s.name }}</option>
+                }
+              </select>
+            </div>
+            <div>
+              <div uiLabel><b>{{ 'sales.quoter.packagingQuantity' | transloco }}</b><span uiPill>{{ 'sales.quoter.number' | transloco }}</span></div>
+              <div class="flex items-end gap-2">
+                <input uiField type="number" step="any" [placeholder]="'sales.quoter.packagingQuantityPlaceholder' | transloco"
+                  [value]="row.quantity"
+                  (input)="changePackagingQuantity($index, $any($event.target).value)">
+                <button uiButton="danger" (click)="removePackaging($index)">{{ 'sales.quoter.removePackaging' | transloco }}</button>
+              </div>
+            </div>
+          </div>
+        }
+      }
+
+      <div class="mt-1">
+        <button uiButton="mini" (click)="addPackaging()">{{ 'sales.quoter.addPackaging' | transloco }}</button>
+      </div>
+
+      <div uiGroupTitle class="mt-5">{{ 'sales.quoter.notes' | transloco }}</div>
+      <input uiField [placeholder]="'sales.quoter.notesPlaceholder' | transloco"
+        [formField]="quoterForm.notes">
+
+      <div class="mt-4 flex justify-end gap-2.5">
+        <button uiButton (click)="back()">{{ 'common.cancel' | transloco }}</button>
+        <button uiButton="primary" [disabled]="saving()" (click)="save()">
+          {{ (saving() ? 'common.saving' : 'sales.quoter.saveQuote') | transloco }}
+        </button>
+      </div>
+    </section>
+
+    <!-- ====== PREVIEW ====== -->
+    <section uiCard>
+      <div uiGroupTitle>{{ 'sales.quoter.preview' | transloco }}</div>
+      @if (calc(); as c) {
+        <table class="w-full border-collapse text-[12px] mb-4">
+          <thead>
+            <tr>
+              <th class="text-left font-mono text-[10px] uppercase tracking-wide text-muted font-normal px-2 py-1.5 border-b border-line">{{ 'sales.quoter.previewDetail' | transloco }}</th>
+              <th class="text-right font-mono text-[10px] uppercase tracking-wide text-muted font-normal px-2 py-1.5 border-b border-line">{{ 'sales.quoter.previewQty' | transloco }}</th>
+              <th class="text-right font-mono text-[10px] uppercase tracking-wide text-muted font-normal px-2 py-1.5 border-b border-line">{{ 'sales.quoter.previewUnitPrice' | transloco }}</th>
+              <th class="text-right font-mono text-[10px] uppercase tracking-wide text-muted font-normal px-2 py-1.5 border-b border-line">{{ 'sales.quoter.previewSubtotal' | transloco }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (l of c.lines; track $index) {
+              <tr>
+                <td class="px-2 py-1.5 border-b border-line-soft">{{ l.name }}</td>
+                <td class="px-2 py-1.5 border-b border-line-soft text-right">{{ l.quantity }} {{ l.unit }}</td>
+                <td class="px-2 py-1.5 border-b border-line-soft text-right font-mono">{{ l.unitPriceFormatted }}</td>
+                <td class="px-2 py-1.5 border-b border-line-soft text-right font-mono">{{ l.subtotalFormatted }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+
+        <div class="space-y-1 text-[12.5px]">
+          <div class="flex justify-between"><span class="text-muted">{{ 'sales.quoter.ingredients' | transloco }}</span><span class="font-mono">{{ c.ingredientsCostFormatted }}</span></div>
+          <div class="flex justify-between"><span class="text-muted">{{ 'sales.quoter.materials' | transloco }}</span><span class="font-mono">{{ c.materialsCostFormatted }}</span></div>
+          <div class="flex justify-between"><span class="text-muted">{{ 'sales.quoter.labor' | transloco }}</span><span class="font-mono">{{ c.laborCostFormatted }}</span></div>
+          <div class="flex justify-between"><span class="text-muted">{{ 'sales.quoter.indirect' | transloco }}</span><span class="font-mono">{{ c.indirectCostFormatted }}</span></div>
+          <div class="flex justify-between"><span class="text-muted">{{ 'sales.quoter.depreciation' | transloco }}</span><span class="font-mono">{{ c.depreciationCostFormatted }}</span></div>
+          <div class="flex justify-between border-t border-line pt-1 font-semibold"><span>{{ 'sales.quoter.totalCost' | transloco }}</span><span class="font-mono">{{ c.totalCostFormatted }}</span></div>
+          <div class="flex justify-between"><span class="text-muted">{{ 'sales.quoter.priceWithMargin' | transloco: { margin: c.margin } }}</span><span class="font-mono">{{ c.priceWithMarginFormatted }}</span></div>
+          @if (c.applyIgv) {
+            <div class="flex justify-between"><span class="text-muted">{{ 'sales.quoter.igv' | transloco: { rate: c.igvRate } }}</span><span class="font-mono">{{ c.igvAmountFormatted }}</span></div>
+          }
+          <div class="flex justify-between"><span class="text-muted">{{ 'sales.quoter.rounding' | transloco }}</span><span class="font-mono">{{ c.roundingAppliedFormatted }}</span></div>
+        </div>
+
+        <div class="mt-4 rounded-card bg-accent-soft border border-accent-soft px-4 py-3 flex items-center justify-between">
+          <span class="font-mono text-[11px] uppercase tracking-wide text-accent-deep">{{ 'sales.quoter.finalPrice' | transloco }}</span>
+          <span class="font-heading text-2xl font-bold text-accent-deep">{{ c.finalPriceFormatted }}</span>
+        </div>
+      } @else {
+        <div uiEmpty>{{ 'sales.quoter.previewEmpty' | transloco }}</div>
+      }
+    </section>
+  </div>
+}

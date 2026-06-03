@@ -1,0 +1,243 @@
+<h1 class="font-heading text-3xl font-semibold text-ink mb-1">{{ 'operations.purchases.title' | transloco }}</h1>
+<p class="text-sm text-muted mb-5">{{ 'operations.purchases.subtitle' | transloco }}</p>
+
+@if (notice(); as n) {
+  <div
+    class="mb-3.5 rounded-field px-3.5 py-2.5 text-[13.5px] border"
+    [class]="n.kind === 'ok'
+      ? 'bg-green-soft text-green border-green/30'
+      : 'bg-red-soft text-red border-red/30'"
+  >{{ n.text }}</div>
+}
+
+<!-- ============ Card 1: Buy materials ============ -->
+<section uiCard>
+  <div uiToolbar>
+    <h4 uiToolbarTitle>{{ 'operations.purchases.buyMaterialsTitle' | transloco }}</h4>
+  </div>
+
+  <div class="flex flex-wrap items-end gap-3 mb-3.5">
+    <div>
+      <div uiLabel><b>{{ 'operations.purchases.mode' | transloco }}</b><span uiPill>{{ 'operations.purchases.list' | transloco }}</span></div>
+      <div class="flex gap-2">
+        <button uiButton="mini"
+          [class]="mode() === 'auto' ? '!border-accent !text-accent' : ''"
+          (click)="changeMode('auto')">{{ 'operations.purchases.modeAuto' | transloco }}</button>
+        <button uiButton="mini"
+          [class]="mode() === 'manual' ? '!border-accent !text-accent' : ''"
+          (click)="changeMode('manual')">{{ 'operations.purchases.modeManual' | transloco }}</button>
+      </div>
+    </div>
+
+    @if (mode() === 'auto') {
+      <div class="flex-1 min-w-[220px]">
+        <div uiLabel><b>{{ 'operations.purchases.orderWithShortages' | transloco }}</b><span uiPill>{{ 'operations.purchases.list' | transloco }}</span></div>
+        <select uiField [value]="orderId()" (change)="chooseOrder($any($event.target).value)">
+          <option value="">{{ 'operations.purchases.chooseOrder' | transloco }}</option>
+          @for (o of ordersWithShortages(); track o.id) {
+            <option [value]="o.id">{{ o.id }} · {{ o.customerName }} · {{ o.recipeName }}</option>
+          }
+        </select>
+      </div>
+    }
+  </div>
+
+  @if (loadingItems()) {
+    <div uiEmpty>{{ 'operations.purchases.loading' | transloco }}</div>
+  } @else if (mode() === 'auto' && !orderId()) {
+    <div uiEmpty>{{ 'operations.purchases.chooseOrderToSee' | transloco }}</div>
+  } @else if (!items().length) {
+    <div uiEmpty>
+      {{ (mode() === 'manual' ? 'operations.purchases.noBelowMinimum' : 'operations.purchases.noShortages') | transloco }}
+    </div>
+  } @else {
+    <table class="w-full border-collapse text-[12.5px]">
+      <thead>
+        <tr>
+          <th class="text-left font-mono text-[10px] uppercase tracking-wide text-muted font-normal px-2 py-1.5 border-b border-line">{{ 'operations.purchases.colSupply' | transloco }}</th>
+          <th class="text-left font-mono text-[10px] uppercase tracking-wide text-muted font-normal px-2 py-1.5 border-b border-line">{{ 'operations.purchases.colSuggestedQuantity' | transloco }}</th>
+          <th class="text-left font-mono text-[10px] uppercase tracking-wide text-muted font-normal px-2 py-1.5 border-b border-line">{{ 'operations.purchases.colSupplier' | transloco }}</th>
+          <th class="border-b border-line"></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (it of items(); track it.supplyId) {
+          <tr class="transition-colors hover:bg-accent-soft/50">
+            <td class="px-2 py-2 border-b border-line-soft font-semibold">{{ it.supplyName }}</td>
+            <td class="px-2 py-2 border-b border-line-soft">{{ it.suggestedQuantity }}</td>
+            <td class="px-2 py-2 border-b border-line-soft text-muted">{{ supplierLabel(it) }}</td>
+            <td class="px-2 py-2 border-b border-line-soft text-right">
+              @if (it.whatsappLink) {
+                <a [href]="it.whatsappLink" target="_blank" rel="noopener"
+                  class="inline-flex items-center justify-center gap-1.5 font-body font-semibold cursor-pointer transition select-none text-[11px] px-2.5 py-1 rounded-[7px] bg-green-soft border border-green text-green hover:bg-green hover:text-white">
+                  {{ 'operations.purchases.whatsapp' | transloco }}
+                </a>
+              }
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  }
+
+  <div uiNote>{{ 'operations.purchases.noStockChangeNote' | transloco }}</div>
+</section>
+
+<!-- ============ Card 2: Record received purchase ============ -->
+<section uiCard>
+  <div uiGroupTitle>{{ 'operations.purchases.registerTitle' | transloco }}</div>
+
+  <div uiGrid="two">
+    <div>
+      <div uiLabel><b>{{ 'operations.purchases.supplier' | transloco }}</b><span uiReq>*</span><span uiPill>{{ 'operations.purchases.list' | transloco }}</span></div>
+      <select uiField [formField]="form.supplierId"
+        [class.!border-red]="form.supplierId().touched() && form.supplierId().invalid()">
+        <option value="">{{ 'operations.purchases.chooseOption' | transloco }}</option>
+        @for (p of suppliers(); track p.id) {
+          <option [value]="p.id">{{ p.name }}</option>
+        }
+      </select>
+      @if (form.supplierId().touched() && form.supplierId().invalid()) {
+        @for (e of form.supplierId().errors(); track e.kind) {
+          <p class="mt-1 text-[12px] text-red">{{ e.message | transloco }}</p>
+        }
+      }
+    </div>
+    <div>
+      <div uiLabel><b>{{ 'operations.purchases.date' | transloco }}</b><span uiOpt>{{ 'common.optional' | transloco }}</span></div>
+      <input uiField type="date" [formField]="form.date">
+    </div>
+  </div>
+
+  <div uiGroupTitle>{{ 'operations.purchases.linesTitle' | transloco }}</div>
+
+  @if (!form.lines.length) {
+    <div uiNote>{{ 'operations.purchases.addLineNote' | transloco }}</div>
+  } @else {
+    @for (line of form.lines; track $index) {
+      <div uiGrid="three" class="mb-3">
+        <div>
+          <div uiLabel><b>{{ 'operations.purchases.lineSupply' | transloco }}</b><span uiReq>*</span><span uiPill>{{ 'operations.purchases.list' | transloco }}</span></div>
+          <select uiField [formField]="line.supplyId"
+            [class.!border-red]="line.supplyId().touched() && line.supplyId().invalid()">
+            <option value="">{{ 'operations.purchases.chooseOption' | transloco }}</option>
+            @for (s of supplies(); track s.id) {
+              <option [value]="s.id">{{ s.name }}</option>
+            }
+          </select>
+          @if (line.supplyId().touched() && line.supplyId().invalid()) {
+            @for (e of line.supplyId().errors(); track e.kind) {
+              <p class="mt-1 text-[12px] text-red">{{ e.message | transloco }}</p>
+            }
+          }
+        </div>
+        <div>
+          <div uiLabel><b>{{ 'operations.purchases.presentations' | transloco }}</b><span uiReq>*</span><span uiPill>{{ 'operations.purchases.number' | transloco }}</span></div>
+          <input uiField type="number" step="any" [placeholder]="'operations.purchases.presentationsPlaceholder' | transloco"
+            [formField]="line.receivedPresentations"
+            [class.!border-red]="line.receivedPresentations().touched() && line.receivedPresentations().invalid()">
+          @if (line.receivedPresentations().touched() && line.receivedPresentations().invalid()) {
+            @for (e of line.receivedPresentations().errors(); track e.kind) {
+              <p class="mt-1 text-[12px] text-red">{{ e.message | transloco }}</p>
+            }
+          }
+        </div>
+        <div>
+          <div uiLabel><b>{{ 'operations.purchases.paidPrice' | transloco }}</b><span uiReq>*</span><span uiPill>{{ 'operations.purchases.number' | transloco }}</span></div>
+          <div class="flex items-end gap-2">
+            <div class="flex-1">
+              <input uiField type="number" step="any" [placeholder]="'operations.purchases.paidPricePlaceholder' | transloco"
+                [formField]="line.paidPresentationPriceSoles"
+                [class.!border-red]="line.paidPresentationPriceSoles().touched() && line.paidPresentationPriceSoles().invalid()">
+              @if (line.paidPresentationPriceSoles().touched() && line.paidPresentationPriceSoles().invalid()) {
+                @for (e of line.paidPresentationPriceSoles().errors(); track e.kind) {
+                  <p class="mt-1 text-[12px] text-red">{{ e.message | transloco }}</p>
+                }
+              }
+            </div>
+            <button uiButton="danger" (click)="removeLine($index)">{{ 'operations.purchases.remove' | transloco }}</button>
+          </div>
+        </div>
+      </div>
+    }
+  }
+
+  <div class="mt-1">
+    <button uiButton="mini" (click)="addLine()">{{ 'operations.purchases.addLine' | transloco }}</button>
+  </div>
+
+  <div class="mt-4 flex justify-end gap-2.5">
+    <button uiButton (click)="clear()">{{ 'common.clear' | transloco }}</button>
+    <button uiButton="primary" [disabled]="saving()" (click)="save()">
+      {{ (saving() ? 'operations.purchases.registering' : 'operations.purchases.register') | transloco }}
+    </button>
+  </div>
+</section>
+
+<!-- ============ Card 3: History ============ -->
+<section uiCard>
+  <div uiToolbar>
+    <h4 uiToolbarTitle>{{ 'operations.purchases.historyTitle' | transloco }}</h4>
+  </div>
+
+  @if (loadingHistory()) {
+    <div uiEmpty>{{ 'operations.purchases.loading' | transloco }}</div>
+  } @else if (!purchases().length) {
+    <div uiEmpty>{{ 'operations.purchases.noPurchases' | transloco }}</div>
+  } @else {
+    <table class="w-full border-collapse text-[12.5px]">
+      <thead>
+        <tr>
+          <th class="text-left font-mono text-[10px] uppercase tracking-wide text-muted font-normal px-2 py-1.5 border-b border-line">{{ 'operations.purchases.colId' | transloco }}</th>
+          <th class="text-left font-mono text-[10px] uppercase tracking-wide text-muted font-normal px-2 py-1.5 border-b border-line">{{ 'operations.purchases.colDate' | transloco }}</th>
+          <th class="text-left font-mono text-[10px] uppercase tracking-wide text-muted font-normal px-2 py-1.5 border-b border-line">{{ 'operations.purchases.colSupplier' | transloco }}</th>
+          <th class="text-left font-mono text-[10px] uppercase tracking-wide text-muted font-normal px-2 py-1.5 border-b border-line">{{ 'operations.purchases.colLines' | transloco }}</th>
+          <th class="text-left font-mono text-[10px] uppercase tracking-wide text-muted font-normal px-2 py-1.5 border-b border-line">{{ 'operations.purchases.colTotal' | transloco }}</th>
+          <th class="border-b border-line"></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (c of purchases(); track c.id) {
+          <tr class="transition-colors hover:bg-accent-soft/50">
+            <td class="px-2 py-2 border-b border-line-soft font-mono text-[11px] text-muted">{{ c.id }}</td>
+            <td class="px-2 py-2 border-b border-line-soft">{{ c.dateFormatted }}</td>
+            <td class="px-2 py-2 border-b border-line-soft font-semibold">{{ c.supplierName }}</td>
+            <td class="px-2 py-2 border-b border-line-soft">{{ c.lineCount }}</td>
+            <td class="px-2 py-2 border-b border-line-soft">{{ c.totalFormatted }}</td>
+            <td class="px-2 py-2 border-b border-line-soft text-right">
+              <button uiButton="mini" (click)="toggleExpanded(c.id)">
+                {{ (expanded() === c.id ? 'operations.purchases.hideLines' : 'operations.purchases.viewLines') | transloco }}
+              </button>
+            </td>
+          </tr>
+          @if (expanded() === c.id) {
+            <tr>
+              <td colspan="6" class="px-2 py-2 border-b border-line-soft bg-cream">
+                <table class="w-full border-collapse text-[12px]">
+                  <thead>
+                    <tr>
+                      <th class="text-left font-mono text-[10px] uppercase tracking-wide text-muted font-normal px-2 py-1">{{ 'operations.purchases.colSupply' | transloco }}</th>
+                      <th class="text-left font-mono text-[10px] uppercase tracking-wide text-muted font-normal px-2 py-1">{{ 'operations.purchases.presentations' | transloco }}</th>
+                      <th class="text-left font-mono text-[10px] uppercase tracking-wide text-muted font-normal px-2 py-1">{{ 'operations.purchases.paidPrice' | transloco }}</th>
+                      <th class="text-left font-mono text-[10px] uppercase tracking-wide text-muted font-normal px-2 py-1">{{ 'operations.purchases.lineBaseUnit' | transloco }}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (l of c.lines; track $index) {
+                      <tr>
+                        <td class="px-2 py-1">{{ l.supplyName }}</td>
+                        <td class="px-2 py-1">{{ l.receivedPresentations }}</td>
+                        <td class="px-2 py-1">{{ l.paidPriceFormatted }}</td>
+                        <td class="px-2 py-1">{{ l.baseUnitQuantity }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </td>
+            </tr>
+          }
+        }
+      </tbody>
+    </table>
+  }
+</section>

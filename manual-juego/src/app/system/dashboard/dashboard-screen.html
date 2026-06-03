@@ -1,0 +1,65 @@
+@if (dashboard(); as r) {
+  <!-- Header: Home title + long date (from the business) -->
+  <div class="mb-6 flex flex-wrap items-baseline justify-between gap-2">
+    <h1 class="font-heading text-4xl font-semibold text-ink">{{ 'dashboard.title' | transloco }}</h1>
+    <span class="font-mono text-[12px] tracking-wide text-muted">{{ r.longDate }}</span>
+  </div>
+
+  <!-- ====== TODAY'S SUMMARY: KPI cards ====== -->
+  <p class="mb-3 font-mono text-[11px] uppercase tracking-[.18em] text-muted">{{ 'dashboard.todaySummary' | transloco }}</p>
+  <div class="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+    @for (kpi of r.kpis; track kpi.key) {
+      <div
+        class="rounded-card border border-line border-l-4 bg-sheet px-4 py-3.5 shadow-card"
+        [class]="kpiBorderClass(kpi.color)"
+      >
+        <p class="font-mono text-3xl font-bold leading-none" [class]="kpiNumberClass(kpi.color)">
+          {{ kpi.value }}
+        </p>
+        <p class="mt-1.5 text-[13px] text-ink">{{ ('dashboard.kpi.' + kpi.key) | transloco }}</p>
+      </div>
+    }
+  </div>
+
+  <!-- ====== QUICK ACCESS ====== -->
+  <p class="mb-3 font-mono text-[11px] uppercase tracking-[.18em] text-muted">{{ 'dashboard.quickAccess' | transloco }}</p>
+  <div class="mb-8 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    @for (a of accesses; track a.id) {
+      <a
+        [routerLink]="a.route"
+        class="block rounded-card border border-line bg-sheet p-5 shadow-card no-underline transition hover:-translate-y-0.5 hover:border-accent hover:shadow-floating"
+      >
+        <span class="mb-3.5 grid h-11 w-11 place-items-center rounded-[12px] bg-accent-soft text-accent [&>svg]:h-6 [&>svg]:w-6 [&>svg]:fill-none [&>svg]:stroke-current [&>svg]:stroke-[1.7]"
+          [innerHTML]="a.icon | safeSvg"></span>
+        <p class="font-heading text-base font-semibold text-ink">{{ ('dashboard.access.' + a.id + '.title') | transloco }}</p>
+        <p class="mt-0.5 text-[13px] text-muted">{{ ('dashboard.access.' + a.id + '.subtitle') | transloco }}</p>
+      </a>
+    }
+  </div>
+
+  <!-- ====== NEEDS YOUR ATTENTION ====== -->
+  <p class="mb-3 font-mono text-[11px] uppercase tracking-[.18em] text-muted">{{ 'dashboard.needsAttention' | transloco }}</p>
+  @if (!r.alerts.length) {
+    <div class="rounded-card border border-dashed border-line bg-sheet p-5 text-center text-[13.5px] text-muted">
+      {{ 'dashboard.allClear' | transloco }}
+    </div>
+  } @else {
+    <div class="overflow-hidden rounded-card border border-line bg-sheet shadow-card">
+      @for (a of r.alerts; track $index) {
+        <div class="flex items-center gap-3.5 border-b border-line-soft px-4 py-3 last:border-b-0">
+          <span
+            class="shrink-0 rounded-pill px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-wide"
+            [class]="badgeClass(a.type)"
+          >{{ badgeKey(a.type, a.daysLeft) | transloco: { days: a.daysLeft } }}</span>
+          <span class="min-w-0 flex-1 truncate text-[14px] text-ink">{{ ('dashboard.alert.' + a.type) | transloco: a }}</span>
+          <a
+            [routerLink]="a.route"
+            class="shrink-0 text-[13.5px] font-semibold text-accent no-underline hover:text-accent-deep"
+          >{{ ('common.' + a.action) | transloco }} →</a>
+        </div>
+      }
+    </div>
+  }
+} @else {
+  <div uiEmpty>{{ 'common.loading' | transloco }}</div>
+}

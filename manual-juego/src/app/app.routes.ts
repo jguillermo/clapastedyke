@@ -1,105 +1,47 @@
 import { Routes } from '@angular/router';
-import { desbloqueoGuard, redirigirMisionGuard } from './rutas/desbloqueo.guard';
+import { missionRedirectGuard, unlockGuard } from './game/unlock.guard';
 
 export const routes: Routes = [
-  { path: '', pathMatch: 'full', redirectTo: 'mapa' },
+  { path: '', pathMatch: 'full', redirectTo: 'map' },
   {
-    path: 'mapa',
-    loadComponent: () =>
-      import('./componentes/mapa-mundo/mapa-mundo').then(m => m.MapaMundo),
+    path: 'map',
+    loadComponent: () => import('./game/components/world-map/world-map').then(m => m.WorldMap),
   },
   {
-    path: 'mision/:misionId/:pasoId',
-    canActivate: [desbloqueoGuard],
+    path: 'mission/:missionId/:stepId',
+    canActivate: [unlockGuard],
     loadComponent: () =>
-      import('./componentes/tarjeta-reto/tarjeta-reto').then(m => m.TarjetaReto),
+      import('./game/components/challenge-card/challenge-card').then(m => m.ChallengeCard),
   },
   {
-    // Sin paso: cae en el primer paso pendiente de la misión (el guard redirige siempre).
-    path: 'mision/:misionId',
-    canActivate: [redirigirMisionGuard],
+    // No step: lands on the mission's first pending step (guard always redirects).
+    path: 'mission/:missionId',
+    canActivate: [missionRedirectGuard],
     children: [],
   },
   {
-    path: 'nivel/:nivelId/completado',
+    path: 'level/:levelId/completed',
     loadComponent: () =>
-      import('./componentes/nivel-completado/nivel-completado').then(m => m.NivelCompletado),
+      import('./game/components/level-completed/level-completed').then(m => m.LevelCompleted),
   },
   {
-    path: 'sistema',
-    loadComponent: () => import('./sistema/sistema').then(m => m.Sistema),
+    path: 'system',
+    loadComponent: () => import('./system/system').then(m => m.System),
     children: [
-      { path: '', pathMatch: 'full', redirectTo: 'resumen' },
-      {
-        path: 'resumen',
-        loadComponent: () =>
-          import('./sistema/resumen/pantalla-resumen').then(m => m.PantallaResumen),
-      },
-      {
-        path: 'clientes',
-        loadComponent: () =>
-          import('./sistema/clientes/pantalla-clientes').then(m => m.PantallaClientes),
-      },
-      {
-        path: 'proveedores',
-        loadComponent: () =>
-          import('./sistema/proveedores/pantalla-proveedores').then(m => m.PantallaProveedores),
-      },
-      {
-        path: 'insumos',
-        loadComponent: () =>
-          import('./sistema/insumos/pantalla-insumos').then(m => m.PantallaInsumos),
-      },
-      {
-        path: 'recetas',
-        loadComponent: () =>
-          import('./sistema/recetas/pantalla-recetas').then(m => m.PantallaRecetas),
-      },
-      {
-        path: 'reglas-empaque',
-        loadComponent: () =>
-          import('./sistema/reglas-empaque/pantalla-reglas-empaque').then(m => m.PantallaReglasEmpaque),
-      },
-      {
-        path: 'presupuestos',
-        loadComponent: () =>
-          import('./sistema/presupuestos/pantalla-presupuestos').then(m => m.PantallaPresupuestos),
-      },
-      {
-        path: 'presupuestos/nuevo',
-        loadComponent: () => import('./sistema/presupuestos/cotizador').then(m => m.Cotizador),
-      },
-      {
-        path: 'pedidos',
-        loadComponent: () =>
-          import('./sistema/pedidos/pantalla-pedidos').then(m => m.PantallaPedidos),
-      },
-      {
-        path: 'compras',
-        loadComponent: () =>
-          import('./sistema/compras/pantalla-compras').then(m => m.PantallaCompras),
-      },
-      {
-        path: 'inventario',
-        loadComponent: () =>
-          import('./sistema/inventario/pantalla-inventario').then(m => m.PantallaInventario),
-      },
-      {
-        path: 'configuracion',
-        loadComponent: () =>
-          import('./sistema/configuracion/pantalla-configuracion').then(m => m.PantallaConfiguracion),
-      },
+      { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
+      { path: 'dashboard', loadComponent: () => import('./system/dashboard/dashboard-screen').then(m => m.DashboardScreen) },
+      { path: 'quotes', loadComponent: () => import('./system/quotes/quotes-screen').then(m => m.QuotesScreen) },
+      { path: 'quotes/new', loadComponent: () => import('./system/quotes/quoter-screen').then(m => m.QuoterScreen) },
+      { path: 'orders', loadComponent: () => import('./system/orders/orders-screen').then(m => m.OrdersScreen) },
+      { path: 'purchases', loadComponent: () => import('./system/purchases/purchases-screen').then(m => m.PurchasesScreen) },
+      { path: 'inventory', loadComponent: () => import('./system/inventory/inventory-screen').then(m => m.InventoryScreen) },
+      { path: 'customers', loadComponent: () => import('./system/customers/customers-screen').then(m => m.CustomersScreen) },
+      { path: 'suppliers', loadComponent: () => import('./system/suppliers/suppliers-screen').then(m => m.SuppliersScreen) },
+      { path: 'supplies', loadComponent: () => import('./system/supplies/supplies-screen').then(m => m.SuppliesScreen) },
+      { path: 'recipes', loadComponent: () => import('./system/recipes/recipes-screen').then(m => m.RecipesScreen) },
+      { path: 'packaging-rules', loadComponent: () => import('./system/packaging-rules/packaging-rules-screen').then(m => m.PackagingRulesScreen) },
+      { path: 'settings', loadComponent: () => import('./system/settings/settings-screen').then(m => m.SettingsScreen) },
     ],
   },
-  {
-    path: 'formularios',
-    loadComponent: () =>
-      import('./formularios/galeria/galeria').then(m => m.GaleriaFormularios),
-  },
-  {
-    path: 'formularios/:id',
-    loadComponent: () =>
-      import('./formularios/visor/visor').then(m => m.VisorFormulario),
-  },
-  { path: '**', redirectTo: 'mapa' },
+  { path: '**', redirectTo: 'map' },
 ];

@@ -1,0 +1,51 @@
+<!-- Tailwind redesign: utilities via ui directives. ids and data-on* intact
+     (the game validates by id; data-onclick is inherited from the GAS contract).
+     All visible texts are transloco keys under scope formsCatalog.packagingRule.* -->
+<app-dialog-frame title="formsCatalog.packagingRule.title" [icon]="icon">
+
+  <section uiCard>
+    <div uiToolbar>
+      <h4 uiToolbarTitle>{{ 'formsCatalog.packagingRule.listTitle' | transloco }}</h4>
+      <button uiButton="mini" data-onclick="nuevo()" [class.highlighted]="marks().has('btnNuevo')">{{ 'formsCatalog.packagingRule.newButton' | transloco }}</button>
+    </div>
+    <div id="lista"><div uiEmpty>{{ 'formsCatalog.packagingRule.loading' | transloco }}</div></div>
+  </section>
+
+  <section uiCard>
+    <div uiGroupTitle id="formTitulo">{{ 'formsCatalog.packagingRule.formTitle' | transloco }}</div>
+    <p uiSub>{{ 'formsCatalog.packagingRule.subtitle' | transloco }}</p>
+    <input type="hidden" id="id_regla">
+    <div uiGrid="two">
+      <div class="relative">
+        <div uiLabel><b>{{ 'formsCatalog.packagingRule.recipe' | transloco }}</b><span uiReq>*</span><span uiPill>{{ 'formsCatalog.common.autocomplete' | transloco }}</span></div>
+        <input uiField id="rec_nombre" [placeholder]="'formsCatalog.packagingRule.recipePlaceholder' | transloco"
+          [class.highlighted]="marks().has('rec_nombre')" [value]="value('rec_nombre')">
+        <input type="hidden" id="receta_id">
+      </div>
+      <div>
+        <div uiLabel><b>{{ 'formsCatalog.packagingRule.size' | transloco }}</b><span uiReq>*</span><span uiPill>{{ 'formsCatalog.common.dropdown' | transloco }}</span></div>
+        <select uiField id="tamano" [class.highlighted]="marks().has('tamano')"></select>
+      </div>
+    </div>
+    <div uiGrid="two">
+      <div class="relative">
+        <div uiLabel><b>{{ 'formsCatalog.packagingRule.packaging' | transloco }}</b><span uiReq>*</span><span uiPill>{{ 'formsCatalog.common.autocomplete' | transloco }}</span></div>
+        <input uiField id="emp_nombre" [placeholder]="'formsCatalog.packagingRule.packagingPlaceholder' | transloco"
+          [class.highlighted]="marks().has('emp_nombre')" [value]="value('emp_nombre')">
+        <input type="hidden" id="insumo_empaque_id">
+      </div>
+      <div>
+        <div uiLabel><b>{{ 'formsCatalog.packagingRule.quantity' | transloco }}</b><span uiReq>*</span><span uiPill>{{ 'formsCatalog.common.number' | transloco }}</span></div>
+        <input uiField id="cantidad" type="number" min="0" step="any" [placeholder]="'formsCatalog.packagingRule.quantityPlaceholder' | transloco"
+          [class.highlighted]="marks().has('cantidad')" [value]="value('cantidad')">
+      </div>
+    </div>
+  </section>
+
+  <ng-container footer>
+    <button uiButton data-onclick="nuevo()">{{ 'formsCatalog.common.clear' | transloco }}</button>
+    <button uiButton="primary" id="btnGuardar" data-onclick="guardar()"
+      [class.highlighted]="marks().has('btnGuardar')">{{ 'formsCatalog.packagingRule.saveButton' | transloco }}</button>
+  </ng-container>
+
+</app-dialog-frame>

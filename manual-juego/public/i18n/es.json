@@ -1,0 +1,115 @@
+{
+  "common": {
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "clear": "Limpiar",
+    "edit": "Editar",
+    "view": "Ver",
+    "buy": "Comprar",
+    "loading": "Cargando…",
+    "saving": "Guardando…",
+    "actions": "Acciones",
+    "yes": "Sí",
+    "no": "No",
+    "all": "Todos",
+    "back": "Volver",
+    "next": "Siguiente",
+    "optional": "opcional",
+    "required": "obligatorio",
+    "noSupplier": "Sin proveedor",
+    "couldNotSave": "No se pudo guardar."
+  },
+  "nav": {
+    "system": "Sistema",
+    "home": "Inicio",
+    "quotes": "Presupuestos",
+    "orders": "Pedidos",
+    "purchases": "Compras",
+    "inventory": "Inventario",
+    "customers": "Clientes",
+    "suppliers": "Proveedores",
+    "supplies": "Insumos",
+    "recipes": "Recetas",
+    "packagingRules": "Reglas de empaque",
+    "settings": "Configuración",
+    "fullManual": "Manual completo",
+    "game": "Juego-tutorial"
+  },
+  "status": {
+    "quote": {
+      "Pending": "Pendiente",
+      "Approved": "Aprobado",
+      "Rejected": "Rechazado",
+      "Expired": "Vencido"
+    },
+    "order": {
+      "Pending": "Pendiente",
+      "InProduction": "Producción",
+      "Delivered": "Entregado",
+      "Cancelled": "Cancelado"
+    },
+    "stockLight": {
+      "red": "rojo",
+      "yellow": "amarillo",
+      "green": "verde"
+    }
+  },
+  "adjustment": {
+    "waste": "merma",
+    "damage": "daño",
+    "expiry": "vencimiento",
+    "count": "conteo",
+    "return": "devolución",
+    "sign": {
+      "subtracts": "resta",
+      "adds": "suma",
+      "signed": "con signo"
+    }
+  },
+  "movement": {
+    "initial": "inicial",
+    "purchase": "compra",
+    "consumption": "consumo",
+    "cancellation": "cancelación"
+  },
+  "dashboard": {
+    "title": "Inicio",
+    "todaySummary": "Resumen de hoy",
+    "quickAccess": "Accesos",
+    "needsAttention": "Necesita tu atención",
+    "allClear": "Todo en orden: nada urgente por hoy ✦",
+    "kpi": {
+      "pendingQuotes": "Presupuestos pendientes",
+      "expiringThisWeek": "Vencen esta semana",
+      "pendingOrders": "Pedidos pendientes",
+      "toDeliver": "Por entregar",
+      "suppliesInRed": "Insumos en rojo"
+    },
+    "alert": {
+      "expiringQuote": "Presupuesto {{refId}} · {{name}}",
+      "expiredQuote": "Presupuesto {{refId}} · {{name}}",
+      "outOfStock": "{{name}} · stock {{stock}} {{unit}}",
+      "belowMinimum": "{{name}} · {{stock}} {{unit}} de {{minStock}} {{unit}}",
+      "toDeliver": "Pedido {{refId}} · {{name}}",
+      "badge": {
+        "expiresToday": "VENCE HOY",
+        "expiresTomorrow": "VENCE MAÑANA",
+        "expiresInDays": "VENCE EN {{days}} DÍAS",
+        "expired": "VENCIDO",
+        "outOfStock": "AGOTADO",
+        "belowMinimum": "BAJO MÍNIMO",
+        "toDeliver": "POR ENTREGAR"
+      }
+    },
+    "access": {
+      "newQuote": { "title": "Nuevo presupuesto", "subtitle": "Crear y congelar precios" },
+      "viewQuotes": { "title": "Ver presupuestos", "subtitle": "Aprobar o rechazar" },
+      "viewOrders": { "title": "Ver pedidos", "subtitle": "Producción y entrega" },
+      "buyMaterials": { "title": "Comprar materiales", "subtitle": "Lista por proveedor" },
+      "registerPurchase": { "title": "Registrar compra", "subtitle": "Sube stock y precio" },
+      "adjustInventory": { "title": "Ajustar inventario", "subtitle": "Mermas y conteos" },
+      "catalogs": { "title": "Catálogos", "subtitle": "Clientes, insumos, más" },
+      "settings": { "title": "Configuración", "subtitle": "Tarifas, IGV, margen" }
+    }
+  }
+}

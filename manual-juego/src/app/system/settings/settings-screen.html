@@ -1,0 +1,196 @@
+<h1 class="font-heading text-3xl font-semibold text-ink mb-1">{{ 'operations.settings.title' | transloco }}</h1>
+<p class="text-sm text-muted mb-5">{{ 'operations.settings.subtitle' | transloco }}</p>
+
+@if (notice(); as n) {
+  <div
+    class="mb-3.5 rounded-field px-3.5 py-2.5 text-[13.5px] border"
+    [class]="n.kind === 'ok'
+      ? 'bg-green-soft text-green border-green/30'
+      : 'bg-red-soft text-red border-red/30'"
+  >{{ n.kind === 'ok' ? (n.text | transloco) : n.text }}</div>
+}
+
+<div uiNote class="mb-3.5">{{ 'operations.settings.frozenNote' | transloco }}</div>
+
+@if (loading()) {
+  <section uiCard><div uiEmpty>{{ 'operations.settings.loading' | transloco }}</div></section>
+} @else {
+  <section uiCard>
+    <div uiGroupTitle>{{ 'operations.settings.priceCostsTitle' | transloco }}</div>
+
+    <div uiGrid="two">
+      <div>
+        <div uiLabel><b>{{ 'operations.settings.laborRate' | transloco }}</b><span uiPill>S/</span></div>
+        <input uiField type="number" step="any" [placeholder]="'operations.settings.laborRatePlaceholder' | transloco"
+          [formField]="form.laborRatePerHour"
+          [class.!border-red]="form.laborRatePerHour().touched() && form.laborRatePerHour().invalid()">
+        @if (form.laborRatePerHour().touched() && form.laborRatePerHour().invalid()) {
+          @for (e of form.laborRatePerHour().errors(); track e.kind) {
+            <p class="mt-1 text-[12px] text-red">{{ e.message | transloco }}</p>
+          }
+        }
+      </div>
+      <div>
+        <div uiLabel><b>{{ 'operations.settings.indirectCost' | transloco }}</b><span uiPill>S/</span></div>
+        <input uiField type="number" step="any" [placeholder]="'operations.settings.indirectCostPlaceholder' | transloco"
+          [formField]="form.indirectCostPerOrder"
+          [class.!border-red]="form.indirectCostPerOrder().touched() && form.indirectCostPerOrder().invalid()">
+        @if (form.indirectCostPerOrder().touched() && form.indirectCostPerOrder().invalid()) {
+          @for (e of form.indirectCostPerOrder().errors(); track e.kind) {
+            <p class="mt-1 text-[12px] text-red">{{ e.message | transloco }}</p>
+          }
+        }
+      </div>
+    </div>
+
+    <div uiGrid="two">
+      <div>
+        <div uiLabel><b>{{ 'operations.settings.depreciation' | transloco }}</b><span uiPill>S/</span></div>
+        <input uiField type="number" step="any" [placeholder]="'operations.settings.depreciationPlaceholder' | transloco"
+          [formField]="form.depreciationPerOrder"
+          [class.!border-red]="form.depreciationPerOrder().touched() && form.depreciationPerOrder().invalid()">
+        @if (form.depreciationPerOrder().touched() && form.depreciationPerOrder().invalid()) {
+          @for (e of form.depreciationPerOrder().errors(); track e.kind) {
+            <p class="mt-1 text-[12px] text-red">{{ e.message | transloco }}</p>
+          }
+        }
+      </div>
+      <div>
+        <div uiLabel><b>{{ 'operations.settings.defaultMargin' | transloco }}</b><span uiPill>%</span></div>
+        <input uiField type="number" step="any" [placeholder]="'operations.settings.defaultMarginPlaceholder' | transloco"
+          [formField]="form.defaultMargin"
+          [class.!border-red]="form.defaultMargin().touched() && form.defaultMargin().invalid()">
+        @if (form.defaultMargin().touched() && form.defaultMargin().invalid()) {
+          @for (e of form.defaultMargin().errors(); track e.kind) {
+            <p class="mt-1 text-[12px] text-red">{{ e.message | transloco }}</p>
+          }
+        }
+      </div>
+    </div>
+
+    <div uiGrid="two">
+      <div>
+        <div uiLabel><b>{{ 'operations.settings.applyIgv' | transloco }}</b></div>
+        <label class="flex items-center gap-2 text-[13.5px] text-ink py-2.5">
+          <input type="checkbox" class="w-4 h-4 accent-accent" [formField]="form.applyIgv">
+          {{ 'operations.settings.applyIgvLabel' | transloco }}
+        </label>
+      </div>
+      <div>
+        <div uiLabel><b>{{ 'operations.settings.igvRate' | transloco }}</b><span uiPill>%</span></div>
+        <input uiField type="number" step="any" [placeholder]="'operations.settings.igvRatePlaceholder' | transloco"
+          [formField]="form.igvRate"
+          [class.!border-red]="form.igvRate().touched() && form.igvRate().invalid()">
+        @if (form.igvRate().touched() && form.igvRate().invalid()) {
+          @for (e of form.igvRate().errors(); track e.kind) {
+            <p class="mt-1 text-[12px] text-red">{{ e.message | transloco }}</p>
+          }
+        }
+      </div>
+    </div>
+
+    <div class="mb-3.5">
+      <div uiLabel><b>{{ 'operations.settings.rounding' | transloco }}</b><span uiPill>{{ 'operations.settings.list' | transloco }}</span></div>
+      <select uiField [formField]="form.rounding">
+        <option value="NONE">{{ 'operations.settings.roundingNone' | transloco }}</option>
+        <option value="MULTIPLE_OF_5">{{ 'operations.settings.roundingMultiple5' | transloco }}</option>
+      </select>
+    </div>
+  </section>
+
+  <section uiCard>
+    <div uiGroupTitle>{{ 'operations.settings.operationTitle' | transloco }}</div>
+
+    <div uiGrid="two">
+      <div>
+        <div uiLabel><b>{{ 'operations.settings.quoteExpiryDays' | transloco }}</b><span uiPill>{{ 'operations.settings.number' | transloco }}</span></div>
+        <input uiField type="number" [placeholder]="'operations.settings.quoteExpiryDaysPlaceholder' | transloco"
+          [formField]="form.quoteExpiryDays"
+          [class.!border-red]="form.quoteExpiryDays().touched() && form.quoteExpiryDays().invalid()">
+        @if (form.quoteExpiryDays().touched() && form.quoteExpiryDays().invalid()) {
+          @for (e of form.quoteExpiryDays().errors(); track e.kind) {
+            <p class="mt-1 text-[12px] text-red">{{ e.message | transloco }}</p>
+          }
+        }
+      </div>
+      <div>
+        <div uiLabel><b>{{ 'operations.settings.stockDeductionMoment' | transloco }}</b><span uiPill>{{ 'operations.settings.list' | transloco }}</span></div>
+        <select uiField [formField]="form.stockDeductionMoment">
+          <option value="ON_APPROVAL">{{ 'operations.settings.stockDeductionOnApproval' | transloco }}</option>
+          <option value="ON_PRODUCTION">{{ 'operations.settings.stockDeductionOnProduction' | transloco }}</option>
+        </select>
+      </div>
+    </div>
+
+    <div uiGrid="two">
+      <div>
+        <div uiLabel><b>{{ 'operations.settings.businessName' | transloco }}</b><span uiReq>*</span><span uiPill>{{ 'operations.settings.text' | transloco }}</span></div>
+        <input uiField [placeholder]="'operations.settings.businessNamePlaceholder' | transloco"
+          [formField]="form.businessName"
+          [class.!border-red]="form.businessName().touched() && form.businessName().invalid()">
+        @if (form.businessName().touched() && form.businessName().invalid()) {
+          @for (e of form.businessName().errors(); track e.kind) {
+            <p class="mt-1 text-[12px] text-red">{{ e.message | transloco }}</p>
+          }
+        }
+      </div>
+      <div>
+        <div uiLabel><b>{{ 'operations.settings.language' | transloco }}</b><span uiPill>{{ 'operations.settings.list' | transloco }}</span></div>
+        <select uiField [formField]="form.language">
+          <option value="es">{{ 'operations.settings.languageSpanish' | transloco }}</option>
+          <option value="en">{{ 'operations.settings.languageEnglish' | transloco }}</option>
+        </select>
+      </div>
+    </div>
+  </section>
+
+  <section uiCard>
+    <div uiGroupTitle>{{ 'operations.settings.sizesTitle' | transloco }}</div>
+
+    @if (!form.sizes.length) {
+      <div uiNote>{{ 'operations.settings.sizesNote' | transloco }}</div>
+    } @else {
+      @for (s of form.sizes; track $index) {
+        <div uiGrid="two" class="mb-3">
+          <div>
+            <div uiLabel><b>{{ 'operations.settings.sizeName' | transloco }}</b><span uiReq>*</span><span uiPill>{{ 'operations.settings.text' | transloco }}</span></div>
+            <input uiField [placeholder]="'operations.settings.sizeNamePlaceholder' | transloco"
+              [formField]="s.name"
+              [class.!border-red]="s.name().touched() && s.name().invalid()">
+            @if (s.name().touched() && s.name().invalid()) {
+              @for (e of s.name().errors(); track e.kind) {
+                <p class="mt-1 text-[12px] text-red">{{ e.message | transloco }}</p>
+              }
+            }
+          </div>
+          <div>
+            <div uiLabel><b>{{ 'operations.settings.sizeFactor' | transloco }}</b><span uiReq>*</span><span uiPill>{{ 'operations.settings.number' | transloco }}</span></div>
+            <div class="flex items-end gap-2">
+              <div class="flex-1">
+                <input uiField type="number" step="any" [placeholder]="'operations.settings.sizeFactorPlaceholder' | transloco"
+                  [formField]="s.factor"
+                  [class.!border-red]="s.factor().touched() && s.factor().invalid()">
+                @if (s.factor().touched() && s.factor().invalid()) {
+                  @for (e of s.factor().errors(); track e.kind) {
+                    <p class="mt-1 text-[12px] text-red">{{ e.message | transloco }}</p>
+                  }
+                }
+              </div>
+              <button uiButton="danger" (click)="removeSize($index)">{{ 'operations.settings.remove' | transloco }}</button>
+            </div>
+          </div>
+        </div>
+      }
+    }
+
+    <div class="mt-1">
+      <button uiButton="mini" (click)="addSize()">{{ 'operations.settings.addSize' | transloco }}</button>
+    </div>
+  </section>
+
+  <div class="flex justify-end gap-2.5">
+    <button uiButton="primary" [disabled]="saving()" (click)="save()">
+      {{ (saving() ? 'common.saving' : 'operations.settings.save') | transloco }}
+    </button>
+  </div>
+}

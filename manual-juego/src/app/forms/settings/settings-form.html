@@ -1,0 +1,86 @@
+<!-- Tailwind redesign: utilities via ui directives. ids and data-on* intact
+     (the game validates by id; data-onclick is inherited from the GAS contract).
+     All visible texts are transloco keys under scope formsCatalog.settings.* -->
+<app-dialog-frame title="formsCatalog.settings.title" [icon]="icon">
+
+  <section uiCard>
+    <div uiGroupTitle>{{ 'formsCatalog.settings.groupTitle' | transloco }}</div>
+    <p uiSub>{{ 'formsCatalog.settings.subtitle' | transloco }}</p>
+
+    <div uiGrid="two">
+      <div>
+        <div uiLabel><b>{{ 'formsCatalog.settings.laborRate' | transloco }}</b><span uiReq>*</span><span uiPill>{{ 'formsCatalog.common.number' | transloco }}</span></div>
+        <input uiField id="tarifa_mano_obra_hora" type="number" min="0" step="any"
+          [class.highlighted]="marks().has('tarifa_mano_obra_hora')" [value]="value('tarifa_mano_obra_hora')">
+      </div>
+      <div>
+        <div uiLabel><b>{{ 'formsCatalog.settings.indirectCost' | transloco }}</b><span uiReq>*</span><span uiPill>{{ 'formsCatalog.common.number' | transloco }}</span></div>
+        <input uiField id="costo_indirecto_pedido" type="number" min="0" step="any"
+          [class.highlighted]="marks().has('costo_indirecto_pedido')" [value]="value('costo_indirecto_pedido')">
+      </div>
+    </div>
+    <div uiGrid="two">
+      <div>
+        <div uiLabel><b>{{ 'formsCatalog.settings.depreciation' | transloco }}</b><span uiReq>*</span><span uiPill>{{ 'formsCatalog.common.number' | transloco }}</span></div>
+        <input uiField id="depreciacion_pedido" type="number" min="0" step="any"
+          [class.highlighted]="marks().has('depreciacion_pedido')" [value]="value('depreciacion_pedido')">
+      </div>
+      <div>
+        <div uiLabel><b>{{ 'formsCatalog.settings.defaultMargin' | transloco }}</b><span uiReq>*</span><span uiPill>{{ 'formsCatalog.common.numberPercent' | transloco }}</span></div>
+        <input uiField id="margen_defecto" type="number" min="0" step="any"
+          [class.highlighted]="marks().has('margen_defecto')" [value]="value('margen_defecto')">
+      </div>
+    </div>
+    <div uiGrid="two">
+      <div>
+        <div uiLabel><b>{{ 'formsCatalog.settings.applyVat' | transloco }}</b><span uiPill>{{ 'formsCatalog.common.checkbox' | transloco }}</span></div>
+        <label class="flex items-center gap-2 text-[13px] text-[#5d544b]">
+          <input type="checkbox" id="aplicar_igv" class="w-4 h-4 accent-accent"
+            [class.highlighted]="marks().has('aplicar_igv')">
+          <span>{{ 'formsCatalog.settings.applyVatLabel' | transloco }}</span>
+        </label>
+      </div>
+      <div>
+        <div uiLabel><b>{{ 'formsCatalog.settings.vatRate' | transloco }}</b><span uiReq>*</span><span uiPill>{{ 'formsCatalog.common.numberPercent' | transloco }}</span></div>
+        <input uiField id="tasa_igv" type="number" min="0" step="any"
+          [class.highlighted]="marks().has('tasa_igv')" [value]="value('tasa_igv')">
+      </div>
+    </div>
+    <div uiGrid="two">
+      <div>
+        <div uiLabel><b>{{ 'formsCatalog.settings.priceRounding' | transloco }}</b><span uiReq>*</span><span uiPill>{{ 'formsCatalog.common.dropdown' | transloco }}</span></div>
+        <select uiField id="redondeo" [class.highlighted]="marks().has('redondeo')">
+          <option value="MULTIPLO_5">{{ 'formsCatalog.settings.roundingMultiple5' | transloco }}</option>
+          <option value="NINGUNO">{{ 'formsCatalog.settings.roundingNone' | transloco }}</option>
+        </select>
+      </div>
+      <div>
+        <div uiLabel><b>{{ 'formsCatalog.settings.expiryDays' | transloco }}</b><span uiReq>*</span><span uiPill>{{ 'formsCatalog.common.number' | transloco }}</span></div>
+        <input uiField id="dias_vencimiento" type="number" min="1" step="1"
+          [class.highlighted]="marks().has('dias_vencimiento')" [value]="value('dias_vencimiento')">
+      </div>
+    </div>
+    <div uiGrid="two">
+      <div>
+        <div uiLabel><b>{{ 'formsCatalog.settings.stockDiscount' | transloco }}</b><span uiReq>*</span><span uiPill>{{ 'formsCatalog.common.dropdown' | transloco }}</span></div>
+        <select uiField id="momento_descuento_stock" [class.highlighted]="marks().has('momento_descuento_stock')">
+          <option value="APROBAR">{{ 'formsCatalog.settings.stockDiscountOnApprove' | transloco }}</option>
+          <option value="PRODUCCION">{{ 'formsCatalog.settings.stockDiscountOnProduction' | transloco }}</option>
+        </select>
+      </div>
+      <div>
+        <div uiLabel><b>{{ 'formsCatalog.settings.businessName' | transloco }}</b><span uiReq>*</span><span uiPill>{{ 'formsCatalog.common.text' | transloco }}</span></div>
+        <input uiField id="nombre_negocio" [placeholder]="'formsCatalog.settings.businessNamePlaceholder' | transloco"
+          [class.highlighted]="marks().has('nombre_negocio')" [value]="value('nombre_negocio')">
+      </div>
+    </div>
+    <p uiNote>{{ 'formsCatalog.settings.note' | transloco }}</p>
+  </section>
+
+  <ng-container footer>
+    <button uiButton data-onclick="S.cerrar()">{{ 'formsCatalog.common.cancel' | transloco }}</button>
+    <button uiButton="primary" id="btnGuardar" data-onclick="guardar()"
+      [class.highlighted]="marks().has('btnGuardar')">{{ 'formsCatalog.settings.saveButton' | transloco }}</button>
+  </ng-container>
+
+</app-dialog-frame>

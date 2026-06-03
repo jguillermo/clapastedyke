@@ -1,0 +1,83 @@
+{
+  "hud": {
+    "brand": "Costing system",
+    "subtitle": "The manual game",
+    "challenges": "{{done}}/{{total}} challenges",
+    "reset": "Reset",
+    "resetTitle": "Reset the game?",
+    "resetBody": "This clears all your progress ({{done}} of {{total}} challenges) and takes you back to the first challenge. It does not touch your spreadsheet: only the tutorial progress.",
+    "resetCancel": "Cancel",
+    "resetConfirm": "Yes, erase my progress"
+  },
+  "map": {
+    "kicker": "The manual game",
+    "title": "Learn by playing,<br>challenge by challenge",
+    "sub": "We walk you through the costing system: you do each step in your real spreadsheet and mark <b>\"Done it\"</b> to move on. Your progress is saved only in this browser.",
+    "start": "Start playing",
+    "continue": "Continue where I left off",
+    "finished": "🏆 You completed every challenge! You can review any mission.",
+    "levelN": "Level {{n}}",
+    "lockedHint": "Complete the previous one to unlock",
+    "footer": "Prefer to read it all at once? Open the <a href=\"../Manual_de_usuario.html\">full manual</a>.",
+    "difficulty": {
+      "basic": "basic",
+      "intermediate": "intermediate",
+      "advanced": "advanced"
+    }
+  },
+  "levelDone": {
+    "kicker": "Level completed",
+    "sub": "You completed the {{missions}} missions of this level. You have {{done}} of {{total}} challenges ({{percent}}%).",
+    "seeMap": "See the map",
+    "nextLevel": "Next level: {{title}}",
+    "backToMap": "Back to the map",
+    "gameFinished": "🏆 You finished the game! You now master the system."
+  },
+  "challenge": {
+    "back": "Back",
+    "hint": "Hint",
+    "giveHint": "Give me a hint",
+    "doneChip": "✓ done",
+    "next": "Next",
+    "complete": "✓ Done it",
+    "stepOf": "challenge {{i}}/{{n}}",
+    "missionProgress": "mission progress",
+    "whatHappenedLabel": "What happened",
+    "challengeDone": "Challenge completed!",
+    "continue": "Continue"
+  },
+  "assistant": {
+    "type": "Type:",
+    "ready": "✓ Perfect! Tap <b>\"Done it\"</b>"
+  },
+  "scene": {
+    "windowTitle": "My business · Spreadsheets",
+    "save": "Save",
+    "cancel": "Cancel",
+    "menu": {
+      "system": "System",
+      "help": "Help",
+      "goToDashboard": "Go to Dashboard",
+      "newQuote": "New quote",
+      "viewQuotes": "View quotes",
+      "viewOrders": "View orders",
+      "buyMaterials": "Buy materials",
+      "registerPurchase": "Register purchase",
+      "adjustInventory": "Adjust inventory",
+      "customers": "Customers",
+      "supplies": "Supplies",
+      "suppliers": "Suppliers",
+      "recipes": "Recipes",
+      "packagingRules": "Packaging rules",
+      "settings": "Settings",
+      "maintenance": "Maintenance"
+    },
+    "submenu": {
+      "installOrRepair": "Install or repair (all)",
+      "createTables": "1. Create tables",
+      "applyDesign": "2. Apply design",
+      "applyFormulas": "3. Apply formulas",
+      "adjustColumnWidth": "Adjust column width"
+    }
+  }
+}

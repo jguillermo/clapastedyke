@@ -1,0 +1,43 @@
+<!-- Tailwind redesign: utilities via ui directives. ids and data-on* intact
+     (the game validates by id; data-onchange/oninput is inherited from the GAS contract).
+     All visible texts are transloco keys under scope formsSales.quotesList.* -->
+<app-dialog-frame title="formsSales.quotesList.title" [icon]="icon">
+
+  <section uiCard>
+    <div uiGroupTitle>{{ 'formsSales.quotesList.filters' | transloco }}</div>
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-3">
+      <div>
+        <div uiLabel><b>{{ 'formsSales.quotesList.status' | transloco }}</b></div>
+        <select uiField id="f_estado" data-onchange="pintar()" [class.highlighted]="marks().has('f_estado')">
+          <option value="">{{ 'formsSales.quotesList.statusAll' | transloco }}</option><option>{{ 'formsSales.quotesList.statusPending' | transloco }}</option><option>{{ 'formsSales.quotesList.statusApproved' | transloco }}</option>
+          <option>{{ 'formsSales.quotesList.statusRejected' | transloco }}</option><option>{{ 'formsSales.quotesList.statusExpired' | transloco }}</option>
+        </select>
+      </div>
+      <div class="relative">
+        <div uiLabel><b>{{ 'formsSales.quotesList.customer' | transloco }}</b></div>
+        <input uiField id="f_cliente" [placeholder]="'formsSales.quotesList.customerPlaceholder' | transloco" data-oninput="pintar()"
+          [class.highlighted]="marks().has('f_cliente')" [value]="value('f_cliente')">
+        <input type="hidden" id="f_cliente_id">
+      </div>
+      <div>
+        <div uiLabel><b>{{ 'formsSales.quotesList.from' | transloco }}</b></div>
+        <input uiField id="f_desde" type="date" data-onchange="pintar()"
+          [class.highlighted]="marks().has('f_desde')" [value]="value('f_desde')">
+      </div>
+      <div>
+        <div uiLabel><b>{{ 'formsSales.quotesList.to' | transloco }}</b></div>
+        <input uiField id="f_hasta" type="date" data-onchange="pintar()"
+          [class.highlighted]="marks().has('f_hasta')" [value]="value('f_hasta')">
+      </div>
+    </div>
+  </section>
+
+  <section uiCard>
+    <div id="lista"><div uiEmpty>{{ 'formsSales.quotesList.loading' | transloco }}</div></div>
+  </section>
+
+  <ng-container footer>
+    <button uiButton data-onclick="S.cerrar()">{{ 'formsSales.quotesList.close' | transloco }}</button>
+  </ng-container>
+
+</app-dialog-frame>

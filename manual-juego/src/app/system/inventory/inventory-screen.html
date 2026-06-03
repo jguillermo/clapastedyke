@@ -1,0 +1,137 @@
+<h1 class="font-heading text-3xl font-semibold text-ink mb-1">{{ 'operations.inventory.title' | transloco }}</h1>
+<p class="text-sm text-muted mb-5">{{ 'operations.inventory.subtitle' | transloco }}</p>
+
+@if (notice(); as n) {
+  <div
+    class="mb-3.5 rounded-field px-3.5 py-2.5 text-[13.5px] border"
+    [class]="n.kind === 'ok'
+      ? 'bg-green-soft text-green border-green/30'
+      : 'bg-red-soft text-red border-red/30'"
+  >{{ n.text }}</div>
+}
+
+<section uiCard>
+  <div uiGroupTitle>{{ 'operations.inventory.adjustTitle' | transloco }}</div>
+
+  <div uiGrid="two">
+    <div>
+      <div uiLabel><b>{{ 'operations.inventory.supply' | transloco }}</b><span uiReq>*</span><span uiPill>{{ 'operations.inventory.list' | transloco }}</span></div>
+      <select uiField [formField]="form.supplyId"
+        [class.!border-red]="form.supplyId().touched() && form.supplyId().invalid()"
+        (change)="updatePreview()">
+        <option value="">{{ 'operations.inventory.chooseOption' | transloco }}</option>
+        @for (s of supplies(); track s.id) {
+          <option [value]="s.id">{{ 'operations.inventory.supplyWithStock' | transloco: { name: s.name, stock: s.stock } }}</option>
+        }
+      </select>
+      @if (form.supplyId().touched() && form.supplyId().invalid()) {
+        @for (e of form.supplyId().errors(); track e.kind) {
+          <p class="mt-1 text-[12px] text-red">{{ e.message | transloco }}</p>
+        }
+      }
+    </div>
+    <div>
+      <div uiLabel><b>{{ 'operations.inventory.adjustmentType' | transloco }}</b><span uiReq>*</span><span uiPill>{{ 'operations.inventory.list' | transloco }}</span></div>
+      <select uiField [formField]="form.type"
+        [class.!border-red]="form.type().touched() && form.type().invalid()"
+        (change)="updatePreview()">
+        <option value="">{{ 'operations.inventory.chooseOption' | transloco }}</option>
+        @for (t of adjustmentTypes(); track t.name) {
+          <option [value]="t.name">{{ typeLabel(t) }}</option>
+        }
+      </select>
+      @if (form.type().touched() && form.type().invalid()) {
+        @for (e of form.type().errors(); track e.kind) {
+          <p class="mt-1 text-[12px] text-red">{{ e.message | transloco }}</p>
+        }
+      }
+    </div>
+  </div>
+
+  <div uiGrid="two">
+    <div>
+      <div uiLabel><b>{{ 'operations.inventory.quantity' | transloco }}</b><span uiReq>*</span><span uiPill>{{ 'operations.inventory.number' | transloco }}</span></div>
+      <input uiField type="number" step="any" [placeholder]="'operations.inventory.quantityPlaceholder' | transloco"
+        [formField]="form.quantity"
+        [class.!border-red]="form.quantity().touched() && form.quantity().invalid()"
+        (input)="updatePreview()">
+      @if (form.quantity().touched() && form.quantity().invalid()) {
+        @for (e of form.quantity().errors(); track e.kind) {
+          <p class="mt-1 text-[12px] text-red">{{ e.message | transloco }}</p>
+        }
+      }
+    </div>
+    <div>
+      <div uiLabel><b>{{ 'operations.inventory.reason' | transloco }}</b><span uiOpt>{{ 'common.optional' | transloco }}</span><span uiPill>{{ 'operations.inventory.text' | transloco }}</span></div>
+      <input uiField [placeholder]="'operations.inventory.reasonPlaceholder' | transloco"
+        [formField]="form.reason"
+        [class.!border-red]="form.reason().touched() && form.reason().invalid()">
+      @if (form.reason().touched() && form.reason().invalid()) {
+        @for (e of form.reason().errors(); track e.kind) {
+          <p class="mt-1 text-[12px] text-red">{{ e.message | transloco }}</p>
+        }
+      }
+    </div>
+  </div>
+
+  @if (preview(); as p) {
+    <div uiNote>
+      <span [uiDot]="p.stockLight"></span>{{ 'operations.inventory.previewNote' | transloco: { current: p.currentStock, resulting: p.resultingStock } }}
+    </div>
+  }
+
+  <div class="mt-4 flex justify-end gap-2.5">
+    <button uiButton (click)="clear()">{{ 'common.clear' | transloco }}</button>
+    <button uiButton="primary" [disabled]="saving()" (click)="save()">
+      {{ (saving() ? 'operations.inventory.registering' : 'operations.inventory.registerAdjustment') | transloco }}
+    </button>
+  </div>
+</section>
+
+<section uiCard>
+  <div uiToolbar>
+    <h4 uiToolbarTitle>{{ 'operations.inventory.kardexTitle' | transloco }}</h4>
+    <select uiField class="!w-auto" [value]="supplyFilter()"
+      (change)="changeFilter($any($event.target).value)">
+      <option value="">{{ 'operations.inventory.allSupplies' | transloco }}</option>
+      @for (s of supplies(); track s.id) {
+        <option [value]="s.id">{{ s.name }}</option>
+      }
+    </select>
+  </div>
+
+  @if (loading()) {
+    <div uiEmpty>{{ 'operations.inventory.loading' | transloco }}</div>
+  } @else if (!movements().length) {
+    <div uiEmpty>{{ 'operations.inventory.noMovements' | transloco }}</div>
+  } @else {
+    <table class="w-full border-collapse text-[12.5px]">
+      <thead>
+        <tr>
+          <th class="text-left font-mono text-[10px] uppercase tracking-wide text-muted font-normal px-2 py-1.5 border-b border-line">{{ 'operations.inventory.colDate' | transloco }}</th>
+          <th class="text-left font-mono text-[10px] uppercase tracking-wide text-muted font-normal px-2 py-1.5 border-b border-line">{{ 'operations.inventory.colSupply' | transloco }}</th>
+          <th class="text-left font-mono text-[10px] uppercase tracking-wide text-muted font-normal px-2 py-1.5 border-b border-line">{{ 'operations.inventory.colType' | transloco }}</th>
+          <th class="text-left font-mono text-[10px] uppercase tracking-wide text-muted font-normal px-2 py-1.5 border-b border-line">{{ 'operations.inventory.colQuantity' | transloco }}</th>
+          <th class="text-left font-mono text-[10px] uppercase tracking-wide text-muted font-normal px-2 py-1.5 border-b border-line">{{ 'operations.inventory.colReference' | transloco }}</th>
+          <th class="text-left font-mono text-[10px] uppercase tracking-wide text-muted font-normal px-2 py-1.5 border-b border-line">{{ 'operations.inventory.colReason' | transloco }}</th>
+          <th class="text-left font-mono text-[10px] uppercase tracking-wide text-muted font-normal px-2 py-1.5 border-b border-line">{{ 'operations.inventory.colResultingStock' | transloco }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (m of movements(); track m.id) {
+          <tr class="transition-colors hover:bg-accent-soft/50">
+            <td class="px-2 py-2 border-b border-line-soft text-muted font-mono text-[11px]">{{ m.dateFormatted }}</td>
+            <td class="px-2 py-2 border-b border-line-soft font-semibold">{{ m.supplyName }}</td>
+            <td class="px-2 py-2 border-b border-line-soft text-muted">{{ movementTypeLabel(m.type) }}</td>
+            <td class="px-2 py-2 border-b border-line-soft font-mono"
+              [class.text-green]="m.quantity > 0"
+              [class.text-red]="m.quantity < 0">{{ m.quantity }}</td>
+            <td class="px-2 py-2 border-b border-line-soft font-mono text-[11px] text-muted">{{ m.reference }}</td>
+            <td class="px-2 py-2 border-b border-line-soft text-muted">{{ m.reason }}</td>
+            <td class="px-2 py-2 border-b border-line-soft">{{ m.resultingStock }}</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  }
+</section>

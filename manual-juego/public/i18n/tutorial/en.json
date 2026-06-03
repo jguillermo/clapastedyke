@@ -1,0 +1,399 @@
+{
+  "levels": {
+    "basic": {
+      "title": "Set up your business",
+      "motto": "Install the system and load the minimum you need to start selling."
+    },
+    "intermediate": {
+      "title": "Your first sale",
+      "motto": "The full cycle: quote, approve, deliver and review."
+    },
+    "advanced": {
+      "title": "Master the operation",
+      "motto": "Suppliers, purchases, inventory and packaging rules."
+    }
+  },
+  "missions": {
+    "f12": {
+      "title": "Install the system",
+      "why": "It is the very first step: it creates the tabs, headers and formulas where your business will live."
+    },
+    "f13": {
+      "title": "Configure the business",
+      "why": "You define the rules that build the price: margin, VAT, rounding and the sizes you will sell."
+    },
+    "f07": {
+      "title": "Your first customer",
+      "why": "Every quote is made out to a customer. Without a customer there is no one to quote."
+    },
+    "f08": {
+      "title": "Your first supplies",
+      "why": "Supplies (ingredients and packaging) are the basis of every cost: this is where their price and stock live."
+    },
+    "f10": {
+      "title": "Your first recipe",
+      "why": "The recipe defines what your product contains and how many servings it yields. It is what the quote scales."
+    },
+    "f01": {
+      "title": "Quote",
+      "why": "Putting a price on what you are asked for: you pick a customer and recipe, scale the quantity and the system works out the price."
+    },
+    "f02": {
+      "title": "Approve",
+      "why": "The moment to decide: if the customer accepts, you approve and the order is born with its materials list."
+    },
+    "f03": {
+      "title": "Produce and deliver",
+      "why": "Move the order from Pending to Production and to Delivered. On delivery, the sale is recorded automatically."
+    },
+    "f04": {
+      "title": "Review the business",
+      "why": "Your day-to-day dashboard: at a glance you see what needs your attention, without touching anything."
+    },
+    "f09": {
+      "title": "Your supplier",
+      "why": "Their WhatsApp lets you order from them in one click from «Comprar materiales»."
+    },
+    "f05": {
+      "title": "Buy and record",
+      "why": "Restocking: you order from the supplier over WhatsApp and, when the material arrives, you record the purchase."
+    },
+    "f06": {
+      "title": "Adjust the inventory",
+      "why": "For when something gets damaged, expires or the real count does not match the system."
+    },
+    "f11": {
+      "title": "Packaging rules",
+      "why": "So the quote suggests just the right packaging based on the size, without you having to remember it."
+    }
+  },
+  "steps": {
+    "f12-1": {
+      "title": "Open the installer",
+      "instruction": "In your spreadsheet, open the <span class=\"tag\">Sistema</span> menu, go into <span class=\"tag\">Mantenimiento</span> and tap <span class=\"tag\">Instalar o reparar (todo)</span>.",
+      "detail": "The Sistema menu appears in the top bar of Google Sheets, next to Help.",
+      "hint": "If you don't see the Sistema menu, close and reopen the file: the menu is created on open."
+    },
+    "f12-2": {
+      "title": "Wait for the «Listo» notice",
+      "instruction": "Wait without closing the file until the <b>«Listo»</b> notice appears with the number of sheets created and checked.",
+      "detail": "The first time it may take several minutes, because it creates all the sheets.",
+      "hint": "If it times out, the full manual has «Maintenance in parts» (Flow 14)."
+    },
+    "f12-3": {
+      "title": "Confirm the tabs",
+      "instruction": "Look at the bottom: the <b>Resumen</b> tab should appear first, with the rest behind it (Config, Insumos, Presupuestos, Pedidos, Clientes, Proveedores, Recetas…).",
+      "whatHappens": "All the sheets are created with their headers and formulas. Columns that compute themselves come with a <b>green</b> header. It is safe to repeat the installation: it never deletes your data, it only repairs what is missing."
+    },
+    "f13-1": {
+      "title": "Open the configuration",
+      "instruction": "Open the <span class=\"tag\">Sistema</span> menu and go into <span class=\"tag\">Configuración</span>."
+    },
+    "f13-2": {
+      "title": "Your hourly rate",
+      "instruction": "Enter the <b>labor rate per hour</b>: how much an hour of your work is worth.",
+      "detail": "It feeds the cost of every quote: the recipe's hours are multiplied by this rate."
+    },
+    "f13-3": {
+      "title": "Fixed costs per order",
+      "instruction": "Set the <b>indirect cost</b> and the <b>depreciation</b> per order: fixed amounts for electricity, gas or wear on your equipment."
+    },
+    "f13-4": {
+      "title": "Your profit",
+      "instruction": "Define the <b>default margin</b>, as a percentage. It is your profit on the sale.",
+      "detail": "Every quote comes with it preset and you can change it case by case."
+    },
+    "f13-5": {
+      "title": "VAT and rounding",
+      "instruction": "Decide whether to <b>apply VAT</b> (and its rate) and leave the <b>rounding</b> at «round up to a multiple of 5» for tidy prices."
+    },
+    "f13-6": {
+      "title": "Validity and stock",
+      "instruction": "Set the quote's <b>expiry days</b> and choose the <b>stock discount moment</b>: on approval or when production starts.",
+      "detail": "How many days your quote is valid, and when the system discounts the materials from inventory."
+    },
+    "f13-7": {
+      "title": "Your sizes",
+      "instruction": "Review the <b>list of sizes</b> with their factor: <b>small 0.5</b>, <b>medium 1</b>, <b>large 2</b>.",
+      "detail": "The factor multiplies the recipe: a large carries twice the ingredients of a medium."
+    },
+    "f13-8": {
+      "title": "Name and save",
+      "instruction": "Enter your <b>business name</b> and tap <span class=\"tag\">Guardar</span>.",
+      "whatHappens": "You land on the Config sheet, with 4 editable blocks: General parameters, Scaling factors, Sizes and Adjustment types. What you change here affects <b>new</b> quotes, never the ones already saved."
+    },
+    "f07-1": {
+      "title": "Open customers",
+      "instruction": "Open the <span class=\"tag\">Sistema</span> menu, go into <span class=\"tag\">Clientes</span> and tap <span class=\"tag\">Nuevo cliente</span>."
+    },
+    "f07-2": {
+      "title": "Their name",
+      "instruction": "Enter the <b>name</b>: for example <b>Ana Torres</b>.",
+      "detail": "It is required and cannot be exactly the same as another customer's."
+    },
+    "f07-3": {
+      "title": "Their phone",
+      "instruction": "Set their <b>phone</b> (<b>999000111</b>) and notes if you like. Both are optional."
+    },
+    "f07-4": {
+      "title": "Save",
+      "instruction": "Tap <span class=\"tag\">Guardar</span>.",
+      "whatHappens": "The <b>CL-0001</b> row appears on the Clientes sheet. You now have someone to quote."
+    },
+    "f08-1": {
+      "title": "Open supplies",
+      "instruction": "Open the <span class=\"tag\">Sistema</span> menu, go into <span class=\"tag\">Insumos</span> and tap <span class=\"tag\">Nuevo insumo</span>."
+    },
+    "f08-2": {
+      "title": "The flour",
+      "instruction": "Create <b>Harina</b>: type <b>ingredient</b>, unit <b>grams</b>, presentation <b>1000</b>, price <b>S/ 5</b>, minimum <b>2000</b>. Tap <span class=\"tag\">Guardar</span>.",
+      "detail": "You'll see «Price per base unit» = 0.005 (5÷1000) and the indicator in red (stock 0)."
+    },
+    "f08-3": {
+      "title": "The eggs",
+      "instruction": "Create <b>Huevo</b>: ingredient, presentation <b>30</b>, price <b>S/ 15</b>, minimum <b>30</b>. Tap <span class=\"tag\">Guardar</span>.",
+      "detail": "«Price per base unit» = 0.5 (15÷30): each egg costs you 50 cents."
+    },
+    "f08-4": {
+      "title": "The box",
+      "instruction": "Create <b>Caja torta</b>: type <b>packaging</b>, presentation <b>25</b>, price <b>S/ 25</b>, stock <b>50</b>, minimum <b>10</b>. Tap <span class=\"tag\">Guardar</span>.",
+      "whatHappens": "The computed columns («Price per base unit» and «Indicator») update themselves when the price or stock changes. <b>Don't touch them by hand.</b> The box's indicator comes out green (50 > 10)."
+    },
+    "f10-1": {
+      "title": "Open recipes",
+      "instruction": "Open the <span class=\"tag\">Sistema</span> menu, go into <span class=\"tag\">Recetas</span> and tap <span class=\"tag\">Nueva receta</span>."
+    },
+    "f10-2": {
+      "title": "Name and category",
+      "instruction": "Enter the name <b>Torta chocolate</b> and the category <b>tortas</b>."
+    },
+    "f10-3": {
+      "title": "How many it yields",
+      "instruction": "Base type <b>«By people»</b>, base <b>10</b>.",
+      "detail": "This is the key to scaling: if you are later asked for 20 people, the system multiplies everything by 2."
+    },
+    "f10-4": {
+      "title": "Your work",
+      "instruction": "Set the <b>labor</b>: <b>2 hours</b>.",
+      "detail": "It is multiplied by the hourly rate you set in Configuración."
+    },
+    "f10-5": {
+      "title": "The ingredients",
+      "instruction": "Add the ingredients: <b>Harina 300</b> (the unit comes by itself: g) and <b>Huevo 4</b> (u).",
+      "hint": "If they don't show in the dropdown, go back to the previous mission: you have to create the supplies first."
+    },
+    "f10-6": {
+      "title": "Save",
+      "instruction": "Tap <span class=\"tag\">Guardar</span>. The form requires at least one ingredient.",
+      "whatHappens": "The recipe <b>RC-0001</b> is saved. Always write it for a convenient base: the system scales it by itself when quoting. Changing it later does not affect quotes already saved."
+    },
+    "f01-1": {
+      "title": "Open the form",
+      "instruction": "Open the <span class=\"tag\">Sistema</span> menu and tap <span class=\"tag\">Nuevo presupuesto</span>."
+    },
+    "f01-2": {
+      "title": "The customer",
+      "instruction": "In <b>Customer</b>, choose <b>Ana Torres</b>.",
+      "hint": "If someone new shows up mid-quote, the «+» button next to Customer creates them without leaving the form."
+    },
+    "f01-3": {
+      "title": "The recipe",
+      "instruction": "In <b>Recipe</b>, choose <b>Torta chocolate</b>.",
+      "detail": "The scaling mode sets itself to «By people» and the table brings in Harina and Huevo with their price."
+    },
+    "f01-4": {
+      "title": "The quantity",
+      "instruction": "Scale to <b>20 people</b>.",
+      "detail": "The recipe's base is 10, so the factor is 2: Harina goes to 600 g and Huevo to 8 u. The cost is recalculated instantly."
+    },
+    "f01-5": {
+      "title": "Try by size",
+      "instruction": "Change the mode to <b>«By size»</b> and choose <b>grande</b>.",
+      "detail": "The «grande» factor is also 2. If the recipe has a packaging rule (you'll define it in the advanced level), the suggested packaging appears with its box checked."
+    },
+    "f01-6": {
+      "title": "Margin and VAT",
+      "instruction": "Review the costs (labor, indirect, depreciation), <b>adjust the margin</b> and check <b>Apply VAT</b>.",
+      "detail": "The final price updates by itself and is rounded up to the multiple of 5."
+    },
+    "f01-7": {
+      "title": "Save",
+      "instruction": "Write notes if needed and tap <span class=\"tag\">Guardar</span>.",
+      "whatHappens": "The quote <b>P-0001</b> is born in <b>Pending</b> status, issued today with the expiry from your Configuración. Its prices are <b>frozen</b>: even if you change your costs later, this one does not move. It does not touch inventory yet."
+    },
+    "f02-1": {
+      "title": "Open your quotes",
+      "instruction": "Open the <span class=\"tag\">Sistema</span> menu and tap <span class=\"tag\">Ver presupuestos</span>. Then open the detail of <b>P-0001</b> with <span class=\"tag\">Ver</span>."
+    },
+    "f02-2": {
+      "title": "Read the shortages",
+      "instruction": "In the detail, <b>read the shortages notice</b>.",
+      "detail": "You'll see that Harina and Huevo will go negative, because their stock is 0. It is informational: it does not prevent approval."
+    },
+    "f02-3": {
+      "title": "Approve",
+      "instruction": "Tap <span class=\"tag\">Aprobar</span> and confirm.",
+      "whatHappens": "P-0001 moves to <b>Approved</b> and the order <b>PD-0001</b> (Pending) is born with its requirements list. If your configuration discounts stock on approval, it drops now; if not, it will drop when production starts.",
+      "hint": "If the customer doesn't accept, the Reject button saves the reason and no order is born."
+    },
+    "f03-1": {
+      "title": "Open your orders",
+      "instruction": "Open the <span class=\"tag\">Sistema</span> menu and tap <span class=\"tag\">Ver pedidos</span>. Open the detail of <b>PD-0001</b> with <span class=\"tag\">Ver</span>."
+    },
+    "f03-2": {
+      "title": "Into production",
+      "instruction": "On PD-0001 (Pending), tap <span class=\"tag\">Producción</span> and confirm.",
+      "detail": "If your system discounts stock when production starts, this is where it drops.",
+      "whatHappens": "The order moves to <b>Production</b>. From here on you are working the order."
+    },
+    "f03-3": {
+      "title": "Deliver",
+      "instruction": "When you finish the order, on the order in Production tap <span class=\"tag\">Entregar</span> and confirm.",
+      "whatHappens": "The delivery date is recorded and the sale <b>VT-0001</b> is born with the quote's final price. You closed the cycle: from quoting to selling. If the order falls through, «Cancel» returns only the stock consumed (a Delivered one can no longer be canceled)."
+    },
+    "f04-1": {
+      "title": "Go to the Overview",
+      "instruction": "Open the <span class=\"tag\">Sistema</span> menu and tap <span class=\"tag\">Ir al Resumen</span>."
+    },
+    "f04-2": {
+      "title": "Read it at a glance",
+      "instruction": "Look at the quotes that are <b>pending, expiring and expired</b>; the orders that are <b>pending, in production and delivered</b>; the supplies that are <b>out of stock or below the minimum</b>; and the list of <b>alerts</b>.",
+      "whatHappens": "The panel is read-only and redraws itself: on opening the file and after every action that moves something (approve, deliver…). Don't write over it."
+    },
+    "f09-1": {
+      "title": "Open suppliers",
+      "instruction": "Open the <span class=\"tag\">Sistema</span> menu, go into <span class=\"tag\">Proveedores</span> and tap <span class=\"tag\">Nuevo proveedor</span>."
+    },
+    "f09-2": {
+      "title": "Their name",
+      "instruction": "Enter the <b>name</b>: <b>Molinos SAC</b>.",
+      "detail": "It is required and cannot be exactly the same as another."
+    },
+    "f09-3": {
+      "title": "Their WhatsApp",
+      "instruction": "Set their <b>WhatsApp with country code</b>: <b>51999111222</b>, with no spaces or symbols.",
+      "detail": "It is what builds the link to order from them in one click."
+    },
+    "f09-4": {
+      "title": "Save",
+      "instruction": "Optional notes and tap <span class=\"tag\">Guardar</span>.",
+      "whatHappens": "The <b>PR-0001</b> row appears. Now you can set them as «recommended supplier» on your supplies."
+    },
+    "f05-1": {
+      "title": "Build the order",
+      "instruction": "Open the <span class=\"tag\">Sistema</span> menu and tap <span class=\"tag\">Comprar materiales</span>."
+    },
+    "f05-2": {
+      "title": "Choose the shortages",
+      "instruction": "In <b>automatic mode</b>, choose order <b>PD-0001</b>.",
+      "detail": "The shortages (Harina, Huevo) appear grouped by supplier, with the last price paid. Manual mode lists all supplies, with those below the minimum already checked."
+    },
+    "f05-3": {
+      "title": "Order over WhatsApp",
+      "instruction": "Tap <span class=\"tag\">WhatsApp</span> on Molinos SAC.",
+      "detail": "The chat opens with the message already written to ask about availability and price.",
+      "whatHappens": "This still does <b>not</b> change stock: it only builds the order to the supplier. Stock goes up when you record the received purchase."
+    },
+    "f05-4": {
+      "title": "The material arrived",
+      "instruction": "When you receive the purchase, open the <span class=\"tag\">Sistema</span> menu and tap <span class=\"tag\">Registrar compra</span>. Supplier <b>Molinos SAC</b>, today's date."
+    },
+    "f05-5": {
+      "title": "The lines and save",
+      "instruction": "Line <b>Harina</b>: quantity <b>5</b> (presentations), price <b>5.50</b>. Line <b>Huevo</b>: quantity <b>2</b>, price <b>15</b>. Tap <span class=\"tag\">Guardar</span> and confirm.",
+      "detail": "You receive in presentations, not in grams: 5 bags of 1000 g.",
+      "whatHappens": "The purchase <b>CMP-0001</b> is saved. Harina raises its presentation price to 5.50 (base unit 0.0055), stock goes up 5×1000 = 5000 g and the indicator stops being red. Costs up to date and shortages covered."
+    },
+    "f06-1": {
+      "title": "Open the adjustment",
+      "instruction": "Open the <span class=\"tag\">Sistema</span> menu and tap <span class=\"tag\">Ajustar inventario</span>."
+    },
+    "f06-2": {
+      "title": "The supply and the adjustment",
+      "instruction": "Search for <b>Caja torta</b>. Adjustment type <b>shrinkage</b>, quantity <b>5</b>, reason <b>«got damaged»</b>.",
+      "detail": "Shrinkage, damage and expiry remove stock; return brings it back; count you write with a sign (a minus to remove)."
+    },
+    "f06-3": {
+      "title": "Preview and save",
+      "instruction": "Look at the <b>preview</b> (how the stock and indicator end up) and tap <span class=\"tag\">Guardar</span>.",
+      "whatHappens": "It is recorded in Movements with date, type and reason, and the stock of Caja torta drops by 5. You'll always be able to trace why the inventory is the way it is."
+    },
+    "f11-1": {
+      "title": "Open the rules",
+      "instruction": "Open the <span class=\"tag\">Sistema</span> menu, go into <span class=\"tag\">Reglas de empaque</span> and tap <span class=\"tag\">Nueva regla</span>."
+    },
+    "f11-2": {
+      "title": "Recipe and size",
+      "instruction": "Recipe <b>Torta chocolate</b>, size <b>grande</b>.",
+      "detail": "The dropdown only shows the sizes defined in Configuración."
+    },
+    "f11-3": {
+      "title": "Packaging and save",
+      "instruction": "Packaging <b>Caja torta</b>, quantity <b>1</b>. Tap <span class=\"tag\">Guardar</span>.",
+      "whatHappens": "The rule <b>RL-0001</b> is saved. When you quote Torta chocolate in size grande, the system will propose <b>1 Caja torta</b> automatically (with a box you can uncheck). And with this you master the whole operation!"
+    }
+  },
+  "fields": {
+    "laborRatePerHour": "Labor rate (S/ per hour)",
+    "indirectCostPerOrder": "Indirect cost per order (S/)",
+    "depreciationPerOrder": "Depreciation per order (S/)",
+    "defaultMargin": "Default margin (%)",
+    "applyIgv": "Apply VAT",
+    "igvRate": "VAT rate (%)",
+    "rounding": "Rounding",
+    "expiryDays": "Expiry days",
+    "stockDiscount": "Stock discount",
+    "sizeSmallFactor": "Size: small · factor",
+    "sizeMediumFactor": "Size: medium · factor",
+    "sizeLargeFactor": "Size: large · factor",
+    "businessName": "Business name",
+    "name": "Name",
+    "type": "Type",
+    "unit": "Unit",
+    "presentation": "Presentation",
+    "price": "Price (S/)",
+    "minStock": "Minimum stock",
+    "initialStock": "Initial stock",
+    "category": "Category",
+    "baseType": "Base type",
+    "base": "Base",
+    "laborHours": "Labor (hours)",
+    "ingredientFlourQty": "Ingredient: Harina · quantity",
+    "ingredientEggQty": "Ingredient: Huevo · quantity",
+    "customer": "Customer",
+    "recipe": "Recipe",
+    "scalingMode": "Scaling mode",
+    "people": "People",
+    "flourScaled": "Harina (scaled)",
+    "eggScaled": "Huevo (scaled)",
+    "size": "Size",
+    "suggestedPackagingCajaTorta": "Suggested packaging: Caja torta",
+    "margin": "Margin (%)",
+    "finalPrice": "Final price (S/)",
+    "notes": "Notes",
+    "status": "Status",
+    "shortageFlour": "Shortage: Harina",
+    "shortageEgg": "Shortage: Huevo",
+    "whatsapp": "WhatsApp",
+    "mode": "Mode",
+    "order": "Order",
+    "shortages": "Shortages",
+    "supplier": "Supplier",
+    "message": "Message",
+    "flourQtyTimesPrice": "Harina · quantity × price",
+    "eggQtyTimesPrice": "Huevo · quantity × price",
+    "supply": "Supply",
+    "adjustmentType": "Adjustment type",
+    "quantity": "Quantity",
+    "reason": "Reason",
+    "currentStock": "Current stock",
+    "stockAfter": "Stock after",
+    "semaphore": "Indicator",
+    "packaging": "Packaging",
+    "suggestedQuantity": "Suggested quantity"
+  },
+  "toasts": {
+    "installDone": "Done: sheets created and checked",
+    "overviewStatus": "1 in production · 2 stock alerts"
+  }
+}

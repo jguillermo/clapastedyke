@@ -1,0 +1,65 @@
+:host {
+  position: fixed;
+  right: 18px;
+  bottom: 86px;
+  z-index: 45;
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  pointer-events: none;
+  max-width: min(420px, calc(100vw - 36px));
+}
+
+canvas {
+  width: 150px;
+  height: 180px;
+  flex: 0 0 auto;
+  filter: drop-shadow(0 14px 18px rgba(60, 40, 25, .3));
+  animation: chef-entra .5s cubic-bezier(.3, 1.4, .5, 1) both;
+}
+
+.emoji {
+  font-size: 84px;
+  line-height: 1;
+  filter: drop-shadow(0 10px 14px rgba(60, 40, 25, .3));
+}
+
+.bubble {
+  pointer-events: auto;
+  background: var(--sheet);
+  border: 1px solid var(--line);
+  border-radius: 18px 18px 4px 18px;
+  box-shadow: var(--shadow);
+  padding: 13px 16px;
+  margin-bottom: 28px;
+  animation: burbuja-entra .4s cubic-bezier(.3, 1.4, .5, 1) .12s both;
+
+  .text { margin: 0; font-size: 14.5px; line-height: 1.45; }
+
+  .expected {
+    margin: 8px 0 0;
+    font-size: 13.5px;
+    color: var(--muted);
+  }
+
+  .done {
+    margin: 8px 0 0;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--green);
+    animation: burbuja-entra .3s ease-out both;
+  }
+}
+
+@keyframes chef-entra { from { opacity: 0; transform: translateY(30px) scale(.6); } }
+@keyframes burbuja-entra { from { opacity: 0; transform: translateY(12px) scale(.95); } }
+
+@media (max-width: 560px) {
+  :host { right: 10px; bottom: 78px; }
+  canvas { width: 104px; height: 126px; }
+  .bubble .text { font-size: 13px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  canvas, .bubble, .bubble .done { animation: none; }
+}

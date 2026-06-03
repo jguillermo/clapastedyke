@@ -1,0 +1,85 @@
+<!-- Tailwind redesign: utilities via ui directives. ids and data-on* intact
+     (the game validates by id; data-on* is inherited from the GAS contract).
+     All visible texts are transloco keys under scope formsCatalog.supply.* -->
+<app-dialog-frame title="formsCatalog.supply.title" [icon]="icon">
+
+  <section uiCard>
+    <div uiToolbar>
+      <h4 uiToolbarTitle>{{ 'formsCatalog.supply.listTitle' | transloco }}</h4>
+      <button uiButton="mini" data-onclick="nuevo()" [class.highlighted]="marks().has('btnNuevo')">{{ 'formsCatalog.supply.newButton' | transloco }}</button>
+    </div>
+    <div id="lista"><div uiEmpty>{{ 'formsCatalog.supply.loading' | transloco }}</div></div>
+  </section>
+
+  <section uiCard>
+    <div uiGroupTitle id="formTitulo">{{ 'formsCatalog.supply.formTitle' | transloco }}</div>
+    <input type="hidden" id="id">
+    <div uiGrid="two">
+      <div>
+        <div uiLabel><b>{{ 'formsCatalog.supply.name' | transloco }}</b><span uiReq>*</span><span uiPill>{{ 'formsCatalog.common.text' | transloco }}</span></div>
+        <input uiField id="nombre" [placeholder]="'formsCatalog.supply.namePlaceholder' | transloco"
+          [class.highlighted]="marks().has('nombre')" [value]="value('nombre')">
+      </div>
+      <div>
+        <div uiLabel><b>{{ 'formsCatalog.supply.type' | transloco }}</b><span uiReq>*</span><span uiPill>{{ 'formsCatalog.common.dropdown' | transloco }}</span></div>
+        <select uiField id="tipo" [class.highlighted]="marks().has('tipo')">
+          <option value="ingrediente">{{ 'formsCatalog.supply.typeIngredient' | transloco }}</option>
+          <option value="empaque">{{ 'formsCatalog.supply.typePackaging' | transloco }}</option>
+        </select>
+      </div>
+    </div>
+    <div uiGrid="two" class="mt-3.5">
+      <div>
+        <div uiLabel><b>{{ 'formsCatalog.supply.baseUnit' | transloco }}</b><span uiReq>*</span><span uiPill>{{ 'formsCatalog.common.dropdown' | transloco }}</span></div>
+        <select uiField id="unidad_base" data-onchange="recalc()" [class.highlighted]="marks().has('unidad_base')">
+          <option value="g">{{ 'formsCatalog.supply.unitGrams' | transloco }}</option>
+          <option value="u">{{ 'formsCatalog.supply.unitUnit' | transloco }}</option>
+        </select>
+      </div>
+      <div>
+        <div uiLabel><b>{{ 'formsCatalog.supply.presentationSize' | transloco }}</b><span uiReq>*</span><span uiPill>{{ 'formsCatalog.common.number' | transloco }}</span></div>
+        <input uiField id="tamano_presentacion" type="number" min="0" step="any" [placeholder]="'formsCatalog.supply.presentationSizePlaceholder' | transloco" data-oninput="recalc()"
+          [class.highlighted]="marks().has('tamano_presentacion')" [value]="value('tamano_presentacion')">
+      </div>
+    </div>
+    <div uiGrid="two" class="mt-3.5">
+      <div>
+        <div uiLabel><b>{{ 'formsCatalog.supply.presentationPrice' | transloco }}</b><span uiReq>*</span><span uiPill>{{ 'formsCatalog.common.number' | transloco }}</span></div>
+        <input uiField id="precio_presentacion" type="number" min="0" step="any" [placeholder]="'formsCatalog.supply.presentationPricePlaceholder' | transloco" data-oninput="recalc()"
+          [class.highlighted]="marks().has('precio_presentacion')" [value]="value('precio_presentacion')">
+      </div>
+      <div>
+        <div uiLabel><b>{{ 'formsCatalog.supply.pricePer' | transloco }} <span id="uLbl">{{ 'formsCatalog.supply.pricePerUnitGram' | transloco }}</span></b><span uiPill>{{ 'formsCatalog.common.readOnly' | transloco }}</span></div>
+        <input uiField="calc" id="ppu" readonly value="0.0000" [class.highlighted]="marks().has('ppu')">
+      </div>
+    </div>
+    <div uiGrid="three" class="mt-3.5">
+      <div id="boxStockIni">
+        <div uiLabel><b>{{ 'formsCatalog.supply.initialStock' | transloco }}</b><span uiOpt>{{ 'formsCatalog.supply.initialStockHint' | transloco }}</span><span uiPill>{{ 'formsCatalog.common.number' | transloco }}</span></div>
+        <input uiField id="stock_inicial" type="number" min="0" step="any" placeholder="0"
+          [class.highlighted]="marks().has('stock_inicial')" [value]="value('stock_inicial')">
+      </div>
+      <div>
+        <div uiLabel><b>{{ 'formsCatalog.supply.minStock' | transloco }}</b><span uiReq>*</span><span uiPill>{{ 'formsCatalog.common.number' | transloco }}</span></div>
+        <input uiField id="stock_minimo" type="number" min="0" step="any" placeholder="0"
+          [class.highlighted]="marks().has('stock_minimo')" [value]="value('stock_minimo')">
+      </div>
+      <div class="relative">
+        <div uiLabel><b>{{ 'formsCatalog.supply.recommendedSupplier' | transloco }}</b><span uiOpt>{{ 'formsCatalog.common.optional' | transloco }}</span><span uiPill>{{ 'formsCatalog.common.autocomplete' | transloco }}</span></div>
+        <input uiField id="prov_nombre" [placeholder]="'formsCatalog.supply.recommendedSupplierPlaceholder' | transloco"
+          [class.highlighted]="marks().has('prov_nombre')" [value]="value('prov_nombre')">
+        <input type="hidden" id="proveedor_recomendado_id">
+      </div>
+    </div>
+    <div uiNote id="notaEdicion" style="display:none">
+      {{ 'formsCatalog.supply.editNote' | transloco }}
+    </div>
+  </section>
+
+  <ng-container footer>
+    <button uiButton data-onclick="nuevo()">{{ 'formsCatalog.common.clear' | transloco }}</button>
+    <button uiButton="primary" id="btnGuardar" data-onclick="guardar()"
+      [class.highlighted]="marks().has('btnGuardar')">{{ 'formsCatalog.supply.saveButton' | transloco }}</button>
+  </ng-container>
+
+</app-dialog-frame>
