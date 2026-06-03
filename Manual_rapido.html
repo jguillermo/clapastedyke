@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Guía rápida · Sistema de costeo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Figtree:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#f6efe5; --sheet:#fffdf9; --ink:#241d18; --muted:#8c8278;
+    --line:#e7ddcf; --line-soft:#f0e8db;
+    --accent:#bb5530; --accent-deep:#9a4324; --accent-soft:#f6e3d6; --accent-glow:#e08a52;
+    --shadow:0 22px 50px -22px rgba(60,40,25,.45);
+    --shadow-sm:0 8px 22px -12px rgba(60,40,25,.34);
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:"Figtree",sans-serif; line-height:1.5; -webkit-font-smoothing:antialiased;
+    overflow-x:hidden;
+  }
+
+  /* Fondo suave (estatico sin JS; con GSAP deriva lentamente) */
+  .bg{position:fixed;inset:0;z-index:-1;overflow:hidden;pointer-events:none}
+  .blob{position:absolute;border-radius:50%;filter:blur(80px);opacity:.5}
+  .b1{width:50vw;height:50vw;top:-14vw;left:-12vw;background:radial-gradient(circle,#f4cdab,transparent 68%)}
+  .b2{width:42vw;height:42vw;bottom:-10vw;right:-12vw;background:radial-gradient(circle,#dcebd6,transparent 70%)}
+
+  /* Barra superior */
+  .topbar{position:sticky;top:0;z-index:40;background:rgba(246,239,229,.9);
+    backdrop-filter:saturate(160%) blur(10px);-webkit-backdrop-filter:saturate(160%) blur(10px);
+    border-bottom:1px solid rgba(231,221,207,.7);
+    display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 18px}
+  .brand{display:flex;align-items:baseline;gap:9px;min-width:0}
+  .brand b{font-family:"Fraunces",serif;font-size:17px;font-weight:600;color:var(--accent-deep);white-space:nowrap}
+  .brand span{font-family:"Space Mono",monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+  .toplink{font-family:"Figtree";font-size:13px;font-weight:600;color:var(--accent);background:none;border:1px solid var(--line);
+    border-radius:999px;padding:7px 14px;cursor:pointer;text-decoration:none;white-space:nowrap;transition:background .2s,border-color .2s}
+  .toplink:hover{background:var(--accent-soft);border-color:var(--accent)}
+  /* Barra de progreso de scroll (ligada al scroll con scrub) */
+  .progress{position:absolute;left:0;bottom:-1px;height:3px;width:100%;transform:scaleX(0);transform-origin:0 50%;
+    background:linear-gradient(90deg,var(--accent),var(--accent-glow));border-radius:0 3px 3px 0}
+
+  .wrap{max-width:760px;margin:0 auto;padding:0 18px 80px}
+
+  /* Encabezado */
+  .head{padding:34px 0 4px}
+  .kick{font-family:"Space Mono",monospace;font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--accent);margin:0 0 10px}
+  .head h1{font-family:"Fraunces",serif;font-weight:600;font-size:clamp(32px,8vw,52px);line-height:1.02;margin:0 0 12px;letter-spacing:-.015em}
+  /* Revelado palabra por palabra con mascara */
+  .head h1 .w{display:inline-block;overflow:hidden;vertical-align:top;padding-bottom:.06em}
+  .head h1 .wi{display:inline-block;will-change:transform}
+  .head p{font-size:15.5px;color:var(--muted);max-width:46ch;margin:0}
+  .head .tag{vertical-align:middle}
+
+  /* Intro de grupo: portada compacta de fase (~40vh, sin pin) */
+  .gintro{position:relative;overflow:hidden;min-height:42vh;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    text-align:center;padding:46px 18px 36px;margin-top:24px}
+  .gi-stage{position:relative;width:100%;max-width:460px;height:clamp(120px,20vh,190px);display:flex;align-items:center;justify-content:center;margin-bottom:2px}
+  .gi-orbit{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none}
+  .gi-chip{position:absolute;left:50%;top:50%;width:48px;height:48px;margin:-24px 0 0 -24px;display:grid;place-items:center;border-radius:14px;
+    background:rgba(255,255,255,.72);border:1px solid rgba(60,40,25,.08);color:var(--accent);box-shadow:var(--shadow-sm);will-change:transform}
+  .gi-chip svg{width:25px;height:25px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+  /* Icono SVG grande y tenue de fondo: se mueve con su propio parallax */
+  .gintro-deco{position:absolute;width:min(380px,80vw);color:var(--accent);opacity:.08;pointer-events:none;z-index:0;will-change:transform}
+  .gintro-deco svg{width:100%;height:auto;fill:none;stroke:currentColor;stroke-width:1;stroke-linecap:round;stroke-linejoin:round}
+  .gintro > *{position:relative;z-index:1}
+  .gintro-ic{position:relative;width:82px;height:82px;display:grid;place-items:center;border-radius:24px;
+    background:rgba(255,255,255,.62);border:1px solid rgba(60,40,25,.08);color:var(--accent);box-shadow:var(--shadow)}
+  .gintro-ic svg{position:relative;z-index:1;width:44px;height:44px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+  .gintro-ring{position:absolute;inset:0;border-radius:24px;border:2px solid var(--accent);opacity:0;pointer-events:none}
+  .gintro-ring.r2{border-color:var(--accent-glow)}
+  .gi-pill{display:inline-block;font-family:"Space Mono",monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--accent-deep);background:var(--accent-soft);border:1px solid #eecdba;border-radius:999px;padding:4px 12px;margin-top:14px}
+  .gintro-title{font-family:"Fraunces",serif;font-weight:600;font-size:clamp(28px,6vw,46px);line-height:1.04;margin:10px 0 12px;letter-spacing:-.02em;color:var(--ink)}
+  .gintro-title .w{display:inline-block;overflow:hidden;vertical-align:top;padding-bottom:.06em}
+  .gintro-title .wi{display:inline-block;will-change:transform}
+  .gintro-rule{display:block;width:56px;height:3px;border-radius:3px;background:linear-gradient(90deg,var(--accent),var(--accent-glow));margin:0 auto 14px}
+  .gintro-desc{font-size:14.5px;color:var(--muted);max-width:46ch;margin:0 auto;line-height:1.55}
+
+  /* Tarjeta de tarea */
+  .card{position:relative;background:var(--sheet);border:1px solid var(--line);border-radius:22px;
+    padding:24px 24px 20px;margin:18px 0;box-shadow:var(--shadow-sm)}
+  .card-h{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+  .ic{flex:0 0 auto;display:grid;place-items:center;width:54px;height:54px;border-radius:16px;
+    background:linear-gradient(135deg,var(--accent-soft),#fffdfa);border:1px solid var(--line);color:var(--accent)}
+  .ic svg{width:29px;height:29px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+  .card-h .ti{font-family:"Fraunces",serif;font-size:23px;font-weight:600;color:var(--ink);margin:0;line-height:1.1;flex:1 1 auto}
+
+  /* Pasos grandes numerados */
+  ol.steps{list-style:none;padding:0;margin:0;position:relative}
+  ol.steps>li{position:relative;display:flex;align-items:flex-start;gap:15px;padding:0 0 16px;min-height:42px}
+  ol.steps>li:last-child{padding-bottom:0}
+  /* Linea conectora: una sola, se traza con el scroll */
+  .stepline{position:absolute;left:17px;top:18px;bottom:20px;width:2px;background:var(--line-soft);transform-origin:top center}
+  .n{flex:0 0 auto;width:36px;height:36px;border-radius:50%;z-index:1;
+    background:linear-gradient(135deg,var(--accent),var(--accent-deep));color:#fff;
+    font-family:"Space Mono",monospace;font-weight:700;font-size:15px;display:grid;place-items:center;
+    box-shadow:0 6px 14px -5px rgba(155,67,36,.6)}
+  .tx{padding-top:6px;font-size:17px;color:var(--ink);line-height:1.4}
+
+  .tag{display:inline-block;font-family:"Space Mono",monospace;font-size:14px;background:var(--accent-soft);border:1px solid #eecdba;
+    border-radius:7px;padding:2px 9px;color:var(--accent-deep);font-weight:700;white-space:nowrap}
+
+  .more{display:inline-flex;align-items:center;gap:5px;margin-top:18px;font-family:"Figtree";font-size:13.5px;font-weight:600;
+    color:var(--accent);text-decoration:none}
+  .more:hover{color:var(--accent-deep)}
+  .more .ar{transition:transform .2s}
+  @media(pointer:fine){ .more:hover .ar{transform:translateX(3px)} }
+
+  .foot{margin-top:46px;padding:24px;border:1px dashed var(--line);border-radius:18px;text-align:center;font-size:14px;color:var(--muted);background:var(--sheet)}
+  .foot a{color:var(--accent);font-weight:700;text-decoration:none}
+  .foot a:hover{text-decoration:underline}
+
+  @media (prefers-reduced-motion: reduce){ .blob{display:none} }
+</style>
+</head>
+<body>
+
+<div class="bg" aria-hidden="true"><span class="blob b1"></span><span class="blob b2"></span></div>
+
+<div class="topbar">
+  <div class="brand"><b>Sistema de costeo</b><span>Guía rápida</span></div>
+  <a class="toplink" href="Manual_de_usuario.html">Manual completo →</a>
+  <div class="progress" id="progress"></div>
+</div>
+
+<div class="wrap">
+
+  <div class="head">
+    <p class="kick">Solo los pasitos</p>
+    <h1 id="title">Guía rápida</h1>
+    <p>Lo justo para hacer cada cosa. Lo que ves <span class="tag">así</span> es el botón que tocas. ¿Quieres más detalle? Toca <b>ver más →</b>.</p>
+  </div>
+
+  <div id="cards"></div>
+
+  <div class="foot">
+    ¿Algo más raro (rechazar, cancelar, editar, reparar) o entender el porqué de los precios?
+    Está todo en el <a href="Manual_de_usuario.html">manual completo</a>.
+  </div>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<script>
+(function(){
+  // Iconos de linea, uno por tarea (mismos del manual completo)
+  var IC = {
+    f01:'<svg viewBox="0 0 24 24"><path d="M20.5 13.5l-7 7-10-10V3.5h7z"/><circle cx="8" cy="8" r="1.6"/></svg>',
+    f02:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12.2l2.6 2.6L16 9.4"/></svg>',
+    f03:'<svg viewBox="0 0 24 24"><path d="M2.5 6.5h11v9h-11z"/><path d="M13.5 9.5h4l3.5 3.5v2.5h-7.5z"/><circle cx="6.5" cy="18" r="1.7"/><circle cx="17.5" cy="18" r="1.7"/></svg>',
+    f04:'<svg viewBox="0 0 24 24"><path d="M3 20.5h18"/><path d="M6 20.5v-7"/><path d="M11.5 20.5V5.5"/><path d="M17 20.5v-10"/></svg>',
+    f05:'<svg viewBox="0 0 24 24"><circle cx="9.5" cy="20" r="1.6"/><circle cx="17.5" cy="20" r="1.6"/><path d="M2.5 4h2.2l2.4 11.2h11l1.9-8.2H6"/></svg>',
+    f06:'<svg viewBox="0 0 24 24"><path d="M12 3l8.5 4.5v9L12 21l-8.5-4.5v-9z"/><path d="M3.6 7.6L12 12l8.4-4.4"/><path d="M12 12v9"/></svg>',
+    f07:'<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4.5 20c0-4.2 3.8-6.3 7.5-6.3s7.5 2.1 7.5 6.3"/></svg>',
+    f08:'<svg viewBox="0 0 24 24"><path d="M8 3.5h8l-1 4H9z"/><path d="M9 7.5h6l2 8a3 3 0 01-3 3.6H10a3 3 0 01-3-3.6z"/><path d="M9.5 13.5h5"/></svg>',
+    f09:'<svg viewBox="0 0 24 24"><path d="M4 9l1.2-4.5h13.6L20 9"/><path d="M4.5 9h15v10.5h-15z"/><path d="M4 9a2.4 2.4 0 004.8 0 2.4 2.4 0 004.8 0 2.4 2.4 0 004.8 0"/><path d="M9.5 19.5v-4.5h5v4.5"/></svg>',
+    f10:'<svg viewBox="0 0 24 24"><path d="M6 3.5h11a2 2 0 012 2v13a2 2 0 01-2 2H6z"/><path d="M6 3.5a2 2 0 00-2 2v13"/><path d="M9 8h7M9 12h7M9 16h4"/></svg>',
+    f11:'<svg viewBox="0 0 24 24"><path d="M12 3l8.5 4.5v9L12 21l-8.5-4.5v-9z"/><path d="M3.6 7.6L12 12l8.4-4.4"/><path d="M12 12v9"/><path d="M7.8 5.2l8.4 4.6"/></svg>',
+    f12:'<svg viewBox="0 0 24 24"><path d="M12 3.5v11"/><path d="M7.5 10.5l4.5 4.5 4.5-4.5"/><path d="M4 20.5h16"/></svg>',
+    f13:'<svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/><circle cx="9" cy="7" r="2.1"/><circle cx="15" cy="12" r="2.1"/><circle cx="8" cy="17" r="2.1"/></svg>'
+  };
+  // Icono de cada grupo (mismos del manual completo)
+  var GICON = {
+    g1:'<svg viewBox="0 0 48 48"><path d="M14 7h16a2 2 0 012 2v25l-4-3-3 3-3-3-3 3-3-3-4 3V9a2 2 0 012-2z"/><path d="M18 15h12M18 21h12M18 27h7"/></svg>',
+    g2:'<svg viewBox="0 0 48 48"><path d="M24 6l16 8v20l-16 8-16-8V14z"/><path d="M8 14l16 8 16-8M24 22v20"/><path d="M16 10l16 8"/></svg>',
+    g3:'<svg viewBox="0 0 48 48"><rect x="9" y="11" width="30" height="22" rx="3"/><path d="M15 19h10M15 25h7"/><path d="M14 39h20M14 44h12"/></svg>',
+    g4:'<svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="8"/><circle cx="24" cy="24" r="2.5"/><path d="M24 4v7M24 37v7M4 24h7M37 24h7M9.9 9.9l5 5M33.1 33.1l5 5M38.1 9.9l-5 5M14.9 33.1l-5 5"/></svg>'
+  };
+
+  // Contenido: solo el camino principal. T=tag (boton), o texto normal.
+  function t(s){ return '<span class="tag">'+s+'</span>'; }
+  var GROUPS = [
+    { g:'g1', freq:'Todos los días', desc:'Cotiza, aprueba y entrega. El ciclo de cada venta, de principio a fin.', tasks:[
+      { id:'f01', ti:'Cotizar', steps:[ t('Nuevo presupuesto'), 'Elige cliente y receta', 'Pon la cantidad', 'Ajusta el margen', t('Guardar') ] },
+      { id:'f02', ti:'Aprobar', steps:[ t('Ver presupuestos'), 'Abre el presupuesto', t('Aprobar')+' (nace el pedido)' ] },
+      { id:'f03', ti:'Entregar', steps:[ t('Ver pedidos'), t('Producción'), t('Entregar')+' (nace la venta)' ] }
+    ]},
+    { g:'g2', freq:'Seguido', desc:'Compra lo que falta, ajusta el inventario y revisa cómo va el negocio.', tasks:[
+      { id:'f04', ti:'Revisar el negocio', steps:[ t('Ir al Resumen'), 'Mira lo pendiente y lo que falta' ] },
+      { id:'f05', ti:'Comprar', steps:[ t('Comprar materiales'), t('WhatsApp')+' al proveedor', 'Cuando llegue: '+t('Registrar compra'), t('Guardar') ] },
+      { id:'f06', ti:'Ajustar inventario', steps:[ t('Ajustar inventario'), 'Elige el insumo', 'Tipo y cantidad', t('Guardar') ] }
+    ]},
+    { g:'g3', freq:'De vez en cuando', desc:'Los catálogos que alimentan todo lo demás: clientes, insumos, proveedores, recetas y empaques.', tasks:[
+      { id:'f07', ti:'Cliente', steps:[ t('Clientes'), t('Nuevo cliente'), 'Escribe el nombre', t('Guardar') ] },
+      { id:'f08', ti:'Insumo', steps:[ t('Insumos'), t('Nuevo insumo'), 'Precio, presentación y mínimo', t('Guardar') ] },
+      { id:'f09', ti:'Proveedor', steps:[ t('Proveedores'), t('Nuevo proveedor'), 'Nombre y WhatsApp', t('Guardar') ] },
+      { id:'f10', ti:'Receta', steps:[ t('Recetas'), t('Nueva receta'), 'Nombre y base', 'Agrega ingredientes', t('Guardar') ] },
+      { id:'f11', ti:'Regla de empaque', steps:[ t('Reglas de empaque'), t('Nueva regla'), 'Receta y tamaño', 'Empaque y cantidad', t('Guardar') ] }
+    ]},
+    { g:'g4', freq:'Una sola vez', desc:'Instala y configura. Se hace una vez y deja todo listo para operar.', tasks:[
+      { id:'f12', ti:'Instalar el sistema', steps:[ t('Mantenimiento'), t('Instalar o reparar (todo)'), 'Espera el aviso “Listo”' ] },
+      { id:'f13', ti:'Configurar el negocio', steps:[ t('Configuración'), 'Ajusta tarifas, margen e IGV', t('Guardar') ] }
+    ]}
+  ];
+
+  // Construir el DOM (siempre, con o sin GSAP: nada queda oculto por defecto)
+  var host = document.getElementById('cards');
+  var html = '';
+  GROUPS.forEach(function(g){
+    var chips = g.tasks.map(function(tk){ return '<span class="gi-chip">'+(IC[tk.id]||'')+'</span>'; });
+    while(chips.length < 4){ chips.push('<span class="gi-chip">'+GICON[g.g]+'</span>'); }
+    html += '<section class="gintro" data-g="'+g.g+'">'
+      + '<div class="gintro-deco">'+GICON[g.g]+'</div>'
+      + '<div class="gi-stage"><div class="gi-orbit">'+chips.join('')+'</div>'
+      + '<div class="gintro-ic"><span class="gintro-ring"></span><span class="gintro-ring r2"></span>'+GICON[g.g]+'</div></div>'
+      + '<span class="gi-pill">'+g.tasks.length+(g.tasks.length===1?' tarea':' tareas')+'</span>'
+      + '<h2 class="gintro-title">'+g.freq+'</h2>'
+      + '<span class="gintro-rule"></span>'
+      + '<p class="gintro-desc">'+g.desc+'</p>'
+      + '</section>';
+    g.tasks.forEach(function(tk){
+      var lis = tk.steps.map(function(s){ return '<li><span class="n"></span><span class="tx">'+s+'</span></li>'; }).join('');
+      html += '<div class="card">'
+        + '<div class="card-h"><div class="ic">'+(IC[tk.id]||'')+'</div><h2 class="ti">'+tk.ti+'</h2></div>'
+        + '<ol class="steps">'+lis+'<span class="stepline"></span></ol>'
+        + '<a class="more" href="Manual_de_usuario.html#'+tk.id+'">ver más <span class="ar">→</span></a>'
+        + '</div>';
+    });
+  });
+  host.innerHTML = html;
+  // Numerar los pasos (por tarjeta)
+  document.querySelectorAll('ol.steps').forEach(function(ol){
+    ol.querySelectorAll(':scope > li .n').forEach(function(n,i){ n.textContent = (i+1); });
+  });
+
+  /* ---------- Animacion (GSAP). Sin GSAP o con movimiento reducido: todo visible y estatico ---------- */
+  var REDUCE = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if(typeof window.gsap === 'undefined' || REDUCE) return;
+
+  gsap.registerPlugin(ScrollTrigger);
+  document.body.classList.add('fx');
+
+  /* ---------- Utilidades ---------- */
+  // Dibuja los trazos de un SVG (stroke-dashoffset), sin plugins de pago
+  function drawSVG(root, dur){
+    if(!root) return;
+    var shapes = root.querySelectorAll('path,line,circle,polyline,polygon,rect,ellipse');
+    shapes.forEach(function(s, i){
+      var len = 0; try{ len = s.getTotalLength(); }catch(e){}
+      if(!len) return;
+      gsap.set(s, {strokeDasharray:len, strokeDashoffset:len});
+      gsap.to(s, {strokeDashoffset:0, duration:dur||1.1, ease:'power2.inOut', delay:i*0.08});
+    });
+  }
+  // Parte un texto en palabras enmascaradas (una sola vez)
+  function ensureSplit(el){
+    if(!el) return [];
+    if(el.dataset.split) return el.querySelectorAll('.wi');
+    var words = el.textContent.trim().split(/\s+/);
+    el.innerHTML = words.map(function(w){ return '<span class="w"><span class="wi">'+w+'</span></span>'; }).join(' ');
+    el.dataset.split = '1';
+    return el.querySelectorAll('.wi');
+  }
+
+  /* ---------- Fondo y barra de progreso (persistentes) ---------- */
+  gsap.to('.b1', {xPercent:14, yPercent:10, scale:1.12, duration:16, repeat:-1, yoyo:true, ease:'sine.inOut'});
+  gsap.to('.b2', {xPercent:-12, yPercent:16, scale:1.08, duration:20, repeat:-1, yoyo:true, ease:'sine.inOut'});
+  gsap.to('#progress', {scaleX:1, ease:'none',
+    scrollTrigger:{ trigger:'.wrap', start:'top top', end:'bottom bottom', scrub:0.3, invalidateOnRefresh:true }});
+
+  /* ---------- Encabezado: titulo revelado palabra por palabra con mascara ---------- */
+  var titleWords = ensureSplit(document.getElementById('title'));
+  gsap.set(titleWords, {yPercent:118});
+  gsap.timeline()
+    .from('.head .kick', {opacity:0, y:16, duration:.6, ease:'power3.out'})
+    .to(titleWords, {yPercent:0, duration:.95, ease:'power4.out', stagger:.07}, '-=.25')
+    .from('.head p:last-child', {opacity:0, y:20, duration:.7, ease:'power3.out'}, '-=.55');
+
+  /* ---------- Tarjetas: icono que se dibuja, numeros con rebote, linea trazada con scrub ---------- */
+  gsap.utils.toArray('.card').forEach(function(card){
+    var lis  = card.querySelectorAll('ol.steps > li');
+    var nums = card.querySelectorAll('.n');
+    var line = card.querySelector('.stepline');
+    var more = card.querySelector('.more');
+    gsap.set(card, {opacity:0, y:42});
+    gsap.set(lis,  {opacity:0, x:-14});
+    gsap.set(nums, {scale:0, opacity:0});
+    gsap.set(line, {scaleY:0});
+    gsap.set(more, {opacity:0});
+    ScrollTrigger.create({ trigger:card, start:'top 86%', once:true, onEnter:function(){
+      gsap.to(card, {opacity:1, y:0, duration:.6, ease:'power3.out'});
+      drawSVG(card.querySelector('.ic svg'), 1.1);
+      gsap.to(lis,  {opacity:1, x:0, duration:.5, ease:'power3.out', stagger:.08, delay:.12});
+      gsap.to(nums, {scale:1, opacity:1, duration:.55, ease:'back.out(2.2)', stagger:.08, delay:.12});
+      gsap.to(more, {opacity:1, duration:.5, ease:'power2.out', delay:.12 + lis.length*.08});
+    }});
+    // La linea conectora se traza con el scroll (reversible)
+    gsap.to(line, {scaleY:1, ease:'none',
+      scrollTrigger:{ trigger:card, start:'top 78%', end:'bottom 55%', scrub:true }});
+  });
+
+  /* ---------- Fondo por fase (parte del scroll, reversible) ---------- */
+  var GBG = {h:'#f6efe5', g1:'#f6efe5', g2:'#edf1ec', g3:'#eceff3', g4:'#f5eedd'};
+  function setBG(g){
+    gsap.to(document.body, {backgroundColor:GBG[g] || GBG.h, duration:0.6, ease:'power2.out', overwrite:'auto'});
+  }
+  gsap.set(document.body, {backgroundColor:GBG.h});
+
+  /* ---------- Intros de grupo: escena con scrub, coreografia distinta por grupo ---------- */
+  // chips: como entran y se separan · title: como brota el titulo · deco: sentido del parallax
+  var STYLE = {
+    g1:{chips:'orbit',   title:'mask',  deco: 1},
+    g2:{chips:'cascade', title:'drop',  deco:-1},
+    g3:{chips:'fan',     title:'slide', deco: 1},
+    g4:{chips:'sides',   title:'zoom',  deco:-1}
+  };
+  var PREV = {g1:'h', g2:'g1', g3:'g2', g4:'g3'};
+
+  gsap.utils.toArray('.gintro').forEach(function(gi){
+    var g = gi.dataset.g, st = STYLE[g];
+    var icBox = gi.querySelector('.gintro-ic');
+    var rings = gi.querySelectorAll('.gintro-ring');
+    var deco  = gi.querySelector('.gintro-deco svg');
+    var titleEl = gi.querySelector('.gintro-title');
+    var rule = gi.querySelector('.gintro-rule');
+    var pill = gi.querySelector('.gi-pill'), desc = gi.querySelector('.gintro-desc');
+    var words = ensureSplit(titleEl);
+    var chips = gi.querySelectorAll('.gi-chip');
+    var orbit = gi.querySelector('.gi-orbit');
+    var N = chips.length, W = window.innerWidth, H = window.innerHeight;
+    var R = Math.min(150, Math.max(90, W * 0.22));
+    chips.forEach(function(c, i){ var a = (i/N)*Math.PI*2 - Math.PI/2; c._a = a; c._ox = Math.cos(a)*R; c._oy = Math.sin(a)*R; });
+
+    // Estados comunes
+    gsap.set(icBox, {opacity:0, scale:0});
+    gsap.set(rings, {opacity:0, scale:1});
+    gsap.set(rule, {scaleX:0, transformOrigin:'50% 50%'});
+    gsap.set([pill, desc], {opacity:0, y:26});
+    gsap.set(deco, {transformOrigin:'50% 50%'});
+    // El icono grande de fondo se mueve y gira durante TODO el paso de la fase (reversible)
+    gsap.fromTo(deco, {yPercent:-30, rotate:-26*st.deco, scale:.84},
+      {yPercent:30, rotate:26*st.deco, scale:1.16, ease:'none',
+       scrollTrigger:{ trigger:gi, start:'top bottom', end:'bottom top', scrub:true }});
+
+    // Timeline ligada al scroll: fluida y reversible, SIN fijar la vista
+    var tl = gsap.timeline({ scrollTrigger:{ trigger:gi, start:'top 82%', end:'bottom 30%', scrub:0.8 } });
+
+    // FASE 1 — entrada y separacion de iconos (distinta por grupo)
+    chips.forEach(function(c, i){
+      var rowx = (i - (N-1)/2) * 64;
+      if(st.chips === 'orbit'){
+        gsap.set(c, {x:Math.cos(c._a)*R*2.6, y:Math.sin(c._a)*R*2.6, opacity:0, scale:.3, rotation:-140});
+        tl.to(c, {x:c._ox, y:c._oy, opacity:1, scale:1, rotation:0, ease:'power2.out'}, i*0.04);
+      } else if(st.chips === 'cascade'){
+        gsap.set(c, {x:rowx, y:-H*0.5, opacity:0, scale:.6, rotation:0});
+        tl.to(c, {y:0, opacity:1, scale:1, ease:'bounce.out'}, i*0.06);
+      } else if(st.chips === 'fan'){
+        gsap.set(c, {x:0, y:0, opacity:0, scale:.35, rotation:0});
+        tl.to(c, {x:rowx, opacity:1, scale:1, ease:'power3.out'}, i*0.04);
+      } else { // sides
+        gsap.set(c, {x:(i%2?1:-1)*W*0.55, y:(i-(N-1)/2)*40, opacity:0, scale:.6, rotation:0});
+        tl.to(c, {x:rowx, y:0, opacity:1, scale:1, ease:'power3.out'}, i*0.05);
+      }
+    });
+    if(st.chips === 'orbit'){ tl.to(orbit, {rotation:120, ease:'none'}, 0); }
+
+    // FASE 2 — los iconos se unen al centro y nace el icono del grupo (anillos que se expanden)
+    tl.addLabel('m', 0.46);
+    chips.forEach(function(c, i){
+      tl.to(c, {x:0, y:0, scale:.12, opacity:0, rotation:70, ease:'power2.in'}, 'm+=' + (i*0.02));
+    });
+    tl.to(icBox, {opacity:1, scale:1, ease:'back.out(1.9)'}, 'm+=0.12');
+    tl.fromTo(rings[0], {opacity:.6, scale:1}, {opacity:0, scale:2.6, ease:'power2.out'}, 'm+=0.18');
+    tl.fromTo(rings[1], {opacity:.4, scale:1}, {opacity:0, scale:3.5, ease:'power2.out'}, 'm+=0.28');
+
+    // FASE 3 — brota el titulo (distinto por grupo) + regla + texto
+    if(st.title === 'mask'){
+      gsap.set(titleEl, {scale:1.12}); gsap.set(words, {yPercent:130});
+      tl.to(words, {yPercent:0, stagger:0.05, ease:'power3.out'}, 0.66).to(titleEl, {scale:1, ease:'power3.out'}, 0.66);
+    } else if(st.title === 'drop'){
+      gsap.set(words, {yPercent:-150, opacity:0});
+      tl.to(words, {yPercent:0, opacity:1, stagger:0.05, ease:'back.out(1.5)'}, 0.64);
+    } else if(st.title === 'slide'){
+      gsap.set(words, {xPercent:-130, opacity:0});
+      tl.to(words, {xPercent:0, opacity:1, stagger:0.06, ease:'power3.out'}, 0.62);
+    } else { // zoom
+      gsap.set(titleEl, {scale:.5, opacity:0}); gsap.set(words, {yPercent:0});
+      tl.to(titleEl, {scale:1, opacity:1, ease:'back.out(1.5)'}, 0.64);
+    }
+    tl.to(pill, {opacity:1, y:0, ease:'power3.out'}, 0.6);
+    tl.to(rule, {scaleX:1, ease:'power3.inOut'}, 0.84);
+    tl.to(desc, {opacity:1, y:0, ease:'power3.out'}, 0.9);
+
+    // Color de fondo por fase (reversible, sin fijar)
+    ScrollTrigger.create({trigger:gi, start:'top 55%',
+      onEnter:function(){ setBG(g); }, onLeaveBack:function(){ setBG(PREV[g]); } });
+  });
+
+  window.addEventListener('load', function(){ ScrollTrigger.refresh(); });
+  ScrollTrigger.refresh();
+})();
+</script>
+</body>
+</html>
