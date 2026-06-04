@@ -1,5 +1,4 @@
 import { Routes } from '@angular/router';
-import { missionRedirectGuard, unlockGuard } from './features/game/unlock.guard';
 import { physicalStoreGuard } from './features/_common/guards/physical-store.guard';
 
 export const routes: Routes = [
@@ -32,26 +31,8 @@ export const routes: Routes = [
       { path: 'settings', loadComponent: () => import('./features/settings/settings-screen').then(m => m.SettingsScreen) },
     ],
   },
-  // The map screen is retired: the town is the hub. Old links land on the town.
+  // Rutas heredadas: el pueblo es el hub avanzado; los enlaces viejos caen ahí.
   { path: 'map', redirectTo: 'town', pathMatch: 'full' },
-  {
-    path: 'mission/:missionId/:stepId',
-    canActivate: [unlockGuard],
-    loadComponent: () =>
-      import('./features/game/components/challenge-card/challenge-card').then(m => m.ChallengeCard),
-  },
-  {
-    // No step: lands on the mission's first pending step (guard always redirects).
-    path: 'mission/:missionId',
-    canActivate: [missionRedirectGuard],
-    children: [],
-  },
-  {
-    path: 'level/:levelId/completed',
-    loadComponent: () =>
-      import('./features/game/components/level-completed/level-completed').then(m => m.LevelCompleted),
-  },
-  // Legacy /system/* routes now live under /town (folded into the world).
   { path: 'system', redirectTo: 'town', pathMatch: 'full' },
   { path: 'system/quotes/new', redirectTo: 'town/quotes/new' },
   { path: 'system/:section', redirectTo: 'town/:section' },

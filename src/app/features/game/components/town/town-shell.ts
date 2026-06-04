@@ -3,11 +3,11 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, NavigationEnd, Router, RouterLink, RouterOutlet } from '@angular/router';
 import { filter } from 'rxjs/operators';
 import { TranslocoPipe, provideTranslocoScope } from '@jsverse/transloco';
-import { GameState } from '../../state/game-state';
+import { ProgressionFacade } from '../../../_common/progression/progression-facade';
 import { BUILDINGS, Building, findBuilding, isBuildingOperational } from '../../model/buildings';
 import { BuildingState } from '../../../../platform/three/town-engine';
 import { GetDashboard, DashboardData } from '../../../../core/dashboard/application/get-dashboard/get-dashboard';
-import { Difficulty } from '../../model/tutorial-types';
+import { Feature } from '../../../../core/progression/domain/feature';
 import { Town3d } from './town-3d';
 
 /**
@@ -23,12 +23,12 @@ import { Town3d } from './town-3d';
 @Component({
   selector: 'app-town-shell',
   imports: [Town3d, RouterOutlet, RouterLink, TranslocoPipe],
-  providers: [provideTranslocoScope('game', 'tutorial')],
+  providers: [provideTranslocoScope('game')],
   templateUrl: './town-shell.html',
   styleUrl: './town-shell.scss',
 })
 export class TownShell {
-  protected readonly state = inject(GameState);
+  private readonly progression = inject(ProgressionFacade);
   private readonly getDashboard = inject(GetDashboard);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
@@ -61,7 +61,10 @@ export class TownShell {
   });
 
   constructor() {
-    afterNextRender(() => this.reloadDashboard());
+    afterNextRender(() => {
+      void this.progression.refresh();
+      this.reloadDashboard();
+    });
 
     this.router.events
       .pipe(
@@ -80,7 +83,7 @@ export class TownShell {
   }
 
   protected operational(b: Building): boolean {
-    return isBuildingOperational(b, (l: Difficulty) => this.state.levelPercent(l));
+    return isBuildingOperational(b, (f: Feature) => this.progression.isFeatureUnlocked(f));
   }
 
   protected alertCount(b: Building): number {
@@ -98,7 +101,8 @@ export class TownShell {
     const building = findBuilding(id);
     if (!building) return;
     if (!this.operational(building)) {
-      void this.router.navigate(['/mission', building.unlockMissionId]);
+      // Aún en obra: vuelve a la cocina (la meta que lo abre vive en la progresión).
+      void this.router.navigate(['/home']);
       return;
     }
     this.selected.set(building);
