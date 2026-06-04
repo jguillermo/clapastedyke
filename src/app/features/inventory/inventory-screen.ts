@@ -9,7 +9,7 @@ import { StockLight } from '../../core/catalog/domain/supply/supply';
 import { SupplyListItem } from '../../core/catalog/application/list-supplies/list-supplies';
 import { AdjustmentType } from '../../core/settings/domain/business-settings';
 import { StockMovementListItem } from '../../core/inventory/application/list-stock-movements/list-stock-movements';
-import { UI_FORMS } from '../_common/ui/ui';
+import { UI_FORMS } from '../_common/directives/ui';
 
 interface Preview {
   currentStock: number;

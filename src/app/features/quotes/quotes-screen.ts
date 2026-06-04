@@ -7,7 +7,7 @@ import { DomainError } from '../../core/_common/domain/errors';
 import { QuoteListItem } from '../../core/sales/application/list-quotes/list-quotes';
 import { VisibleQuoteStatus } from '../../core/sales/domain/quote/quote';
 import { CustomerPrimitives } from '../../core/catalog/domain/customer/customer';
-import { UI_FORMS } from '../_common/ui/ui';
+import { UI_FORMS } from '../_common/directives/ui';
 
 type StatusFilter = '' | VisibleQuoteStatus;
 

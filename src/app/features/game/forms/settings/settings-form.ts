@@ -1,7 +1,7 @@
 import { Component, ViewEncapsulation, computed, input } from '@angular/core';
 import { TranslocoPipe, provideTranslocoScope } from '@jsverse/transloco';
 import { DialogFrame } from '../../../_common/dialog-frame/dialog-frame';
-import { UI_FORMS } from '../../../_common/ui/ui';
+import { UI_FORMS } from '../../../_common/directives/ui';
 
 /**
  * Settings form — Tailwind redesign (tokens + ui directives).

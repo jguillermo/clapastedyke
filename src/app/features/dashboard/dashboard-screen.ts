@@ -5,7 +5,7 @@ import { TranslocoPipe } from '@jsverse/transloco';
 import { DashboardService } from '../../core/dashboard/dashboard.service';
 import { AlertType, DashboardData } from '../../core/dashboard/application/get-dashboard/get-dashboard';
 import { ICONS } from '../game/model/icons';
-import { UI_FORMS } from '../_common/ui/ui';
+import { UI_FORMS } from '../_common/directives/ui';
 
 interface Access {
   id: string;

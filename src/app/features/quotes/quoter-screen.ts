@@ -13,7 +13,7 @@ import { PackagingRulePrimitives } from '../../core/catalog/domain/packaging-rul
 import { BusinessSize, ScalingFactor } from '../../core/settings/domain/business-settings';
 import { ScalingMode } from '../../core/sales/domain/quote/quote-calculator';
 import { QuoteCalculationDto } from '../../core/sales/application/calculate-quote/calculate-quote';
-import { UI_FORMS } from '../_common/ui/ui';
+import { UI_FORMS } from '../_common/directives/ui';
 
 interface QuoterModel {
   customerId: string;

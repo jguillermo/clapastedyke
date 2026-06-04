@@ -8,7 +8,7 @@ import { PackagingRulePrimitives } from '../../core/catalog/domain/packaging-rul
 import { RecipePrimitives } from '../../core/catalog/domain/recipe/recipe';
 import { SupplyListItem } from '../../core/catalog/application/list-supplies/list-supplies';
 import { BusinessSize } from '../../core/settings/domain/business-settings';
-import { UI_FORMS } from '../_common/ui/ui';
+import { UI_FORMS } from '../_common/directives/ui';
 
 /**
  * Packaging rules, live against IndexedDB. Signal Forms for per-field

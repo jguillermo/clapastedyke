@@ -8,7 +8,7 @@ import {
   Rounding,
   StockDeductionMoment,
 } from '../../core/settings/domain/business-settings';
-import { UI_FORMS } from '../_common/ui/ui';
+import { UI_FORMS } from '../_common/directives/ui';
 
 interface SettingsModel {
   laborRatePerHour: number;

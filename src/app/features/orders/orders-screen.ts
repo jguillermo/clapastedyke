@@ -6,7 +6,7 @@ import { DomainError } from '../../core/_common/domain/errors';
 import { CustomerPrimitives } from '../../core/catalog/domain/customer/customer';
 import { OrderStatus } from '../../core/sales/domain/order/order';
 import { OrderListItem } from '../../core/sales/application/list-orders/list-orders';
-import { UI_FORMS } from '../_common/ui/ui';
+import { UI_FORMS } from '../_common/directives/ui';
 
 type StatusFilter = '' | OrderStatus;
 

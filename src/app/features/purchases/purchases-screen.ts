@@ -10,7 +10,7 @@ import { SupplyListItem } from '../../core/catalog/application/list-supplies/lis
 import { OrderListItem } from '../../core/sales/application/list-orders/list-orders';
 import { ShoppingListItem } from '../../core/inventory/application/shopping-list/shopping-list';
 import { PurchaseListItem } from '../../core/inventory/application/list-purchases/list-purchases';
-import { UI_FORMS } from '../_common/ui/ui';
+import { UI_FORMS } from '../_common/directives/ui';
 
 type ListMode = 'auto' | 'manual';
 

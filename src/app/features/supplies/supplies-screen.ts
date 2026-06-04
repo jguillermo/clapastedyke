@@ -7,7 +7,7 @@ import { SupplierPrimitives } from '../../core/catalog/domain/supplier/supplier'
 import { StockLight, SupplyType } from '../../core/catalog/domain/supply/supply';
 import { BaseUnit } from '../../core/_common/domain/quantity';
 import { SupplyListItem } from '../../core/catalog/application/list-supplies/list-supplies';
-import { UI_FORMS } from '../_common/ui/ui';
+import { UI_FORMS } from '../_common/directives/ui';
 
 /**
  * Supplies screen: ingredients and packaging, live against IndexedDB. The

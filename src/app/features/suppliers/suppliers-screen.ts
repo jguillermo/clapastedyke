@@ -4,7 +4,7 @@ import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse
 import { CatalogService } from '../../core/catalog/catalog.service';
 import { DomainError } from '../../core/_common/domain/errors';
 import { SupplierPrimitives } from '../../core/catalog/domain/supplier/supplier';
-import { UI_FORMS } from '../_common/ui/ui';
+import { UI_FORMS } from '../_common/directives/ui';
 
 /**
  * Suppliers screen, live against IndexedDB. Same canonical pattern as

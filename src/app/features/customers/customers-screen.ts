@@ -4,7 +4,7 @@ import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse
 import { CatalogService } from '../../core/catalog/catalog.service';
 import { DomainError } from '../../core/_common/domain/errors';
 import { CustomerPrimitives } from '../../core/catalog/domain/customer/customer';
-import { UI_FORMS } from '../_common/ui/ui';
+import { UI_FORMS } from '../_common/directives/ui';
 
 /**
  * Customers screen, live against IndexedDB. Signal Forms (Angular 21) for

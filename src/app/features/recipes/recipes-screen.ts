@@ -5,7 +5,7 @@ import { CatalogService } from '../../core/catalog/catalog.service';
 import { DomainError } from '../../core/_common/domain/errors';
 import { BaseType, RecipePrimitives } from '../../core/catalog/domain/recipe/recipe';
 import { SupplyListItem } from '../../core/catalog/application/list-supplies/list-supplies';
-import { UI_FORMS } from '../_common/ui/ui';
+import { UI_FORMS } from '../_common/directives/ui';
 
 interface RecipeModel {
   name: string;

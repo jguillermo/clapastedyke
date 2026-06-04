@@ -2,7 +2,7 @@ import { Component, ViewEncapsulation, computed, input } from '@angular/core';
 import { TranslocoPipe, provideTranslocoScope } from '@jsverse/transloco';
 import { DialogFrame } from '../../../_common/dialog-frame/dialog-frame';
 // UI directives still come from the legacy formularios path (renamed at cutover).
-import { UI_FORMS } from '../../../_common/ui/ui';
+import { UI_FORMS } from '../../../_common/directives/ui';
 
 /**
  * Quotes list form — Tailwind redesign (tokens + ui directives).
