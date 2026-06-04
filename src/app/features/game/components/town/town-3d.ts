@@ -30,16 +30,14 @@ import { BuildingState, TownEngine } from '../../../../platform/three/town-engin
   `,
   styles: `
     :host {
+      position: absolute;
+      inset: 0;
       display: block;
-      height: clamp(320px, 52vh, 560px);
-      border-radius: 22px;
       overflow: hidden;
-      border: 1px solid var(--line);
-      background: linear-gradient(180deg, #f9f3e9, #efe2cc);
-      box-shadow: var(--shadow-sm);
+      background: linear-gradient(180deg, #f7efe0, #e9dcc4);
     }
     :host.hidden { display: none; }
-    canvas { width: 100%; height: 100%; display: block; touch-action: pan-y; }
+    canvas { width: 100%; height: 100%; display: block; touch-action: none; }
   `,
   host: { '[class.hidden]': '!hasWebgl()' },
 })

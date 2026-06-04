@@ -1,14 +1,15 @@
 import * as THREE from 'three';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
+import { buildChef } from './chef-mesh';
 
 /** Snapshot of one building the 3D town knows how to draw. */
 export interface BuildingState {
   id: string;
-  /** Accent color (hex int) — used for the locked tint and the plot pad. */
+  /** Accent color (hex int) — used for the plot pad / dock chip. */
   color: number;
   /** FBX model + texture atlas (SimplePoly City). */
   model: { url: string; texture: string };
-  /** Operational = full color model; locked = greyed «under construction». */
+  /** Operational = open; locked shows a floating padlock (still textured). */
   operational: boolean;
   /** Number of attention pins floating above the building. */
   alerts: number;
@@ -22,33 +23,46 @@ interface EngineOptions {
   onBuildingClick?: (buildingId: string) => void;
 }
 
-/** Plots on the ground, in the order buildings are passed to `update()`. */
+/**
+ * Plots (x,z), in the order buildings are passed to `update()`
+ * (oficina, bodega, tienda, obrador, mercado). A shallow V with the shop
+ * (tienda) front-and-center; the rest flank behind, all facing the camera (+z).
+ */
 const PLOTS: [number, number][] = [
-  [-4.2, 0.4], // 0
-  [-2.1, -1.6], // 1
-  [0, 1.6], // 2 — center front, the storefront
-  [2.1, -1.6], // 3
-  [4.2, 0.4], // 4
+  [-5.2, -2.2], // oficina
+  [-2.7, -2.9], // bodega
+  [0, 0.2], //     tienda — front center
+  [2.7, -2.9], //  obrador
+  [5.2, -2.2], //  mercado
 ];
 
-const LOCKED_COLOR = 0xb4aa9c;
 const PIN_COLOR = { amber: 0xcf9a32, red: 0xbf412c };
 const BUILDING_FOOTPRINT = 2.7;
+const CAR_FOOTPRINT = 2.2;
 
-const CAMERA_HOME = { x: 0, y: 5.6, z: 10.6 };
-const LOOK_HOME = new THREE.Vector3(0, 0.8, 0);
+const CAMERA_HOME = { x: 0, y: 6.2, z: 13.5 };
+const LOOK_HOME = new THREE.Vector3(0, 0.6, 0);
+
+const ROAD_Z = 3;
+const SIDEWALK_Z = 1.9;
+const EDGE = 8; // cars/people wrap beyond ±EDGE in x
 
 interface BuildingNode {
-  /** Container placed on its plot; carries the building id for raycasting. */
   group: THREE.Group;
-  /** Loaded model root (added once). */
   model: THREE.Object3D | null;
-  /** Holder for the floating alert pins (rebuilt on state change). */
   pins: THREE.Group;
-  /** Chimney smoke puffs — present only while operational. */
   smoke: THREE.Group | null;
+  /** Floating padlock shown while locked. */
+  lock: THREE.Sprite | null;
   operational: boolean | null;
   modelRequested: boolean;
+}
+
+interface Mover {
+  obj: THREE.Object3D;
+  dir: number; // +1 / -1 along x
+  speed: number;
+  baseY: number;
 }
 
 /** Eased 0→1 for the cinematic camera dolly. */
@@ -57,13 +71,11 @@ function easeInOut(p: number): number {
 }
 
 /**
- * The town in Three.js: a small low-poly city (SimplePoly City assets) where
- * each building is a domain of the pastry shop. The camera orbits softly (hub);
- * clicking a building dollies the camera toward its door (`focusBuilding`) so
- * the overlay can open over it, and `resetView` pulls back to the town.
- *
- * Models load asynchronously via FBXLoader; a plot pad keeps the layout visible
- * until each one arrives. Disposes geometries/materials on teardown.
+ * The town in Three.js: a low-poly street scene (SimplePoly City assets). The
+ * shop sits front-and-center; a road crosses the foreground with cars driving
+ * and people walking the sidewalk, and the chef waves outside the bakery. Each
+ * building is a business domain: clicking it dollies the camera toward its door
+ * (`focusBuilding`); `resetView` pulls back. Models load async via FBXLoader.
  */
 export class TownEngine {
   private readonly renderer: THREE.WebGLRenderer;
@@ -75,19 +87,20 @@ export class TownEngine {
 
   private readonly fbx = new FBXLoader();
   private readonly textures = new THREE.TextureLoader();
-  /** Cache of normalized model templates by url (cloned per building). */
   private readonly templates = new Map<string, Promise<THREE.Object3D>>();
-  private readonly lockedMaterial = new THREE.MeshStandardMaterial({
-    color: LOCKED_COLOR,
-    roughness: 1,
-    flatShading: true,
-  });
 
   private readonly nodes = new Map<string, BuildingNode>();
-  private particles!: THREE.Points;
   private readonly decor: THREE.Object3D[] = [];
+  private readonly cars: Mover[] = [];
+  private readonly people: Mover[] = [];
+  private chef: THREE.Group | null = null;
+  private chefArm: THREE.Object3D | null = null;
+  private particles!: THREE.Points;
+
   private readonly smokeTexture = this.makeSmokeTexture();
+  private readonly lockTexture = this.makeLockTexture();
   private animationId = 0;
+  private lastT = 0;
   private hovered: BuildingNode | null = null;
   private readonly removeListeners: () => void;
 
@@ -95,7 +108,6 @@ export class TownEngine {
   private readonly look = LOOK_HOME.clone();
   private readonly desiredPos = new THREE.Vector3(CAMERA_HOME.x, CAMERA_HOME.y, CAMERA_HOME.z);
   private readonly desiredLook = LOOK_HOME.clone();
-  /** Active eased camera move (focus/reset); null once it settles. */
   private camTween: {
     fromPos: THREE.Vector3;
     toPos: THREE.Vector3;
@@ -113,13 +125,17 @@ export class TownEngine {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
 
-    this.camera = new THREE.PerspectiveCamera(42, 1, 0.1, 120);
+    this.camera = new THREE.PerspectiveCamera(42, 1, 0.1, 140);
     this.camera.position.set(CAMERA_HOME.x, CAMERA_HOME.y, CAMERA_HOME.z);
     this.camera.lookAt(this.look);
 
     this.buildLights();
     this.buildGround();
+    this.buildStreet();
     this.buildDecor();
+    this.buildCars();
+    this.buildPeople();
+    this.buildChef();
     this.resize();
 
     const onMove = (e: PointerEvent) => this.updatePointer(e);
@@ -146,23 +162,16 @@ export class TownEngine {
 
   private buildGround(): void {
     const ground = new THREE.Mesh(
-      new THREE.CylinderGeometry(9.5, 9.9, 0.6, 12),
+      new THREE.CylinderGeometry(13, 13.4, 0.6, 14),
       new THREE.MeshStandardMaterial({ color: 0xcde0c2, flatShading: true, roughness: 1 }),
     );
     ground.position.y = -0.3;
     this.scene.add(ground);
 
-    const plaza = new THREE.Mesh(
-      new THREE.CylinderGeometry(2.4, 2.4, 0.05, 28),
-      new THREE.MeshStandardMaterial({ color: 0xe6dcc7, roughness: 1 }),
-    );
-    plaza.position.y = 0.005;
-    this.scene.add(plaza);
-
-    const N = 90;
+    const N = 70;
     const positions = new Float32Array(N * 3);
     for (let i = 0; i < N; i++) {
-      positions[i * 3] = (Math.random() - 0.5) * 20;
+      positions[i * 3] = (Math.random() - 0.5) * 22;
       positions[i * 3 + 1] = Math.random() * 6;
       positions[i * 3 + 2] = (Math.random() - 0.5) * 14;
     }
@@ -170,19 +179,38 @@ export class TownEngine {
     geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     this.particles = new THREE.Points(
       geo,
-      new THREE.PointsMaterial({ color: 0xe08a52, size: 0.05, transparent: true, opacity: 0.45 }),
+      new THREE.PointsMaterial({ color: 0xe08a52, size: 0.05, transparent: true, opacity: 0.4 }),
     );
     this.scene.add(this.particles);
   }
 
-  /** Trees and street lights scattered around the plaza (non-interactive). */
+  /** Road across the foreground + a light sidewalk between road and buildings. */
+  private buildStreet(): void {
+    const sidewalk = new THREE.Mesh(
+      new THREE.BoxGeometry(20, 0.14, 1.2),
+      new THREE.MeshStandardMaterial({ color: 0xe6dcc7, roughness: 1 }),
+    );
+    sidewalk.position.set(0, 0.07, SIDEWALK_Z);
+    this.scene.add(sidewalk);
+
+    // A row of road tiles forming the street.
+    for (let x = -EDGE; x <= EDGE; x += 2) {
+      this.loadTemplate('assets/city/road-tile.fbx', 'assets/city/road.png', 2.05).then(t => {
+        const tile = t.clone(true);
+        tile.position.set(x, 0, ROAD_Z);
+        this.scene.add(tile);
+        this.requestRender();
+      });
+    }
+  }
+
+  /** Trees and street lights, kept to the back/sides so they don't block the shop. */
   private buildDecor(): void {
     const trees: [string, number, number][] = [
-      ['assets/city/tree-fir.fbx', -6.4, -3],
-      ['assets/city/tree-cube.fbx', 6.4, -3],
-      ['assets/city/tree-fir.fbx', -7, 2.4],
-      ['assets/city/tree-cube.fbx', 7, 2.4],
-      ['assets/city/tree-fir.fbx', 0, -4.2],
+      ['assets/city/tree-fir.fbx', -8.4, -3.6],
+      ['assets/city/tree-cube.fbx', 8.4, -3.6],
+      ['assets/city/tree-fir.fbx', -7, -5],
+      ['assets/city/tree-cube.fbx', 7, -5],
     ];
     for (const [url, x, z] of trees) {
       this.loadTemplate(url, 'assets/city/natures.png', 1.7).then(t => {
@@ -196,24 +224,82 @@ export class TownEngine {
         this.requestRender();
       });
     }
-    const lights: [number, number][] = [
-      [-2.6, 2],
-      [2.6, 2],
-    ];
-    for (const [x, z] of lights) {
+    for (const x of [-4.2, 4.2]) {
       this.loadTemplate('assets/city/street-light.fbx', 'assets/city/props.png', 1.9).then(t => {
         const lamp = t.clone(true);
-        lamp.position.set(x, 0, z);
+        lamp.position.set(x, 0, SIDEWALK_Z);
         this.scene.add(lamp);
         this.requestRender();
       });
     }
   }
 
-  /**
-   * Syncs the buildings onto the scene. The set is stable (5 fixed ids), so we
-   * create each node once and only update its locked tint and alert pins after.
-   */
+  /** Cars driving along the street in two lanes. */
+  private buildCars(): void {
+    const fleet: { url: string; tex: string; dir: number; lane: number; speed: number; x: number }[] = [
+      { url: 'car', tex: 'car', dir: 1, lane: ROAD_Z - 0.45, speed: 2.2, x: -6 },
+      { url: 'suv', tex: 'suv', dir: 1, lane: ROAD_Z - 0.45, speed: 1.7, x: 1 },
+      { url: 'taxi', tex: 'taxi', dir: -1, lane: ROAD_Z + 0.45, speed: 2, x: 5 },
+      { url: 'car', tex: 'car', dir: -1, lane: ROAD_Z + 0.45, speed: 2.5, x: -2 },
+    ];
+    for (const c of fleet) {
+      this.loadTemplate(`assets/city/${c.url}.fbx`, `assets/city/${c.tex}.png`, CAR_FOOTPRINT).then(t => {
+        const car = t.clone(true);
+        // Model length runs along x; flip 180° for the −x lane.
+        car.rotation.y = c.dir > 0 ? 0 : Math.PI;
+        car.position.set(c.x, 0.06, c.lane);
+        this.scene.add(car);
+        this.cars.push({ obj: car, dir: c.dir, speed: c.speed, baseY: 0.06 });
+        this.requestRender();
+      });
+    }
+  }
+
+  /** Low-poly people walking the sidewalk (the pack has no character models). */
+  private buildPeople(): void {
+    const tones: [number, number][] = [
+      [0xbb5530, 0x2a2420],
+      [0x4f8a5b, 0x3a2f28],
+      [0x3f6f9c, 0x5a4a3a],
+      [0xcf9a32, 0x2a2420],
+      [0x9a4324, 0x47402f],
+      [0x6f9c3f, 0x2a2420],
+    ];
+    tones.forEach((c, i) => {
+      const dir = i % 2 ? -1 : 1;
+      const person = this.buildPerson(c[0], c[1]);
+      person.position.set(-EDGE + i * 3, 0, SIDEWALK_Z + (i % 2 ? 0.18 : -0.18));
+      this.scene.add(person);
+      this.people.push({ obj: person, dir, speed: 0.7 + (i % 3) * 0.25, baseY: 0 });
+    });
+  }
+
+  private buildPerson(shirt: number, pants: number): THREE.Group {
+    const g = new THREE.Group();
+    const m = (c: number) => new THREE.MeshStandardMaterial({ color: c, flatShading: true, roughness: 0.9 });
+    const legs = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.18, 0.55, 6), m(pants));
+    legs.position.y = 0.28;
+    const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.22, 0.6, 6), m(shirt));
+    torso.position.y = 0.82;
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.17, 8, 6), m(0xf2c9a0));
+    head.position.y = 1.25;
+    g.add(legs, torso, head);
+    g.scale.setScalar(1.05);
+    return g;
+  }
+
+  /** The chef stands in front of the bakery (tienda) and waves at the street. */
+  private buildChef(): void {
+    const chef = buildChef();
+    chef.position.set(1.1, 0, 1.5);
+    chef.rotation.y = 0.2; // slightly toward the street
+    this.chef = chef;
+    this.chefArm = chef.getObjectByName('arm') ?? null;
+    this.scene.add(chef);
+  }
+
+  /* ---------- Buildings ---------- */
+
   update(buildings: BuildingState[]): void {
     buildings.forEach((data, index) => {
       let node = this.nodes.get(data.id);
@@ -222,15 +308,17 @@ export class TownEngine {
         this.nodes.set(data.id, node);
       }
       this.ensureModel(node, data);
-      if (node.operational !== data.operational) {
-        node.operational = data.operational;
-        this.applyLockTint(node, data.operational);
-      }
-      // Chimney smoke only while operational (the building is "alive").
+      node.operational = data.operational;
+      // Smoke when operational; padlock when locked.
       if (data.operational && !node.smoke) node.smoke = this.addSmoke(node.group);
       else if (!data.operational && node.smoke) {
         node.group.remove(node.smoke);
         node.smoke = null;
+      }
+      if (!data.operational && !node.lock) node.lock = this.addLock(node.group);
+      else if (data.operational && node.lock) {
+        node.group.remove(node.lock);
+        node.lock = null;
       }
       this.rebuildPins(node, data);
     });
@@ -242,7 +330,6 @@ export class TownEngine {
     group.position.set(x, 0, z);
     group.userData['buildingId'] = data.id;
 
-    // Plot pad — visible immediately while the model loads.
     const pad = new THREE.Mesh(
       new THREE.CylinderGeometry(1.5, 1.6, 0.16, 18),
       new THREE.MeshStandardMaterial({ color: 0xe6dcc7, roughness: 1 }),
@@ -255,7 +342,7 @@ export class TownEngine {
     group.add(pins);
 
     this.scene.add(group);
-    return { group, model: null, pins, smoke: null, operational: null, modelRequested: false };
+    return { group, model: null, pins, smoke: null, lock: null, operational: null, modelRequested: false };
   }
 
   private ensureModel(node: BuildingNode, data: BuildingState): void {
@@ -264,15 +351,12 @@ export class TownEngine {
     this.loadTemplate(data.model.url, data.model.texture, BUILDING_FOOTPRINT)
       .then(template => {
         const model = template.clone(true);
-        model.userData['buildingId'] = data.id;
         model.traverse(o => (o.userData['buildingId'] = data.id));
         node.model = model;
         node.group.add(model);
-        if (node.operational === false) this.applyLockTint(node, false);
         this.requestRender();
       })
       .catch(() => {
-        /* keep the plot pad if the model fails to load */
         node.modelRequested = false;
       });
   }
@@ -288,10 +372,7 @@ export class TownEngine {
       const material = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.85 });
       obj.traverse(child => {
         const mesh = child as THREE.Mesh;
-        if (mesh.isMesh) {
-          mesh.material = material;
-          mesh.userData['textured'] = material;
-        }
+        if (mesh.isMesh) mesh.material = material;
       });
       this.normalize(obj, footprint);
       return obj;
@@ -314,16 +395,6 @@ export class TownEngine {
     obj.position.y -= box2.min.y;
   }
 
-  /** Grey out (locked) or restore the textured material (operational). */
-  private applyLockTint(node: BuildingNode, operational: boolean): void {
-    node.model?.traverse(child => {
-      const mesh = child as THREE.Mesh;
-      if (!mesh.isMesh) return;
-      const textured = mesh.userData['textured'] as THREE.Material | undefined;
-      if (textured) mesh.material = operational ? textured : this.lockedMaterial;
-    });
-  }
-
   private rebuildPins(node: BuildingNode, data: BuildingState): void {
     node.pins.clear();
     if (data.alerts <= 0 || !data.alertColor) return;
@@ -332,21 +403,16 @@ export class TownEngine {
     for (let i = 0; i < count; i++) {
       const pin = new THREE.Mesh(
         new THREE.IcosahedronGeometry(0.18, 0),
-        new THREE.MeshStandardMaterial({
-          color,
-          emissive: color,
-          emissiveIntensity: 0.6,
-          flatShading: true,
-        }),
+        new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.6, flatShading: true }),
       );
-      pin.position.set((i - (count - 1) / 2) * 0.36, 3.2, 0);
+      pin.position.set((i - (count - 1) / 2) * 0.36, 3.3, 0);
       pin.userData['pin'] = true;
       pin.userData['phase'] = i * 0.7;
       node.pins.add(pin);
     }
   }
 
-  /* ---------- Ambient: chimney smoke ---------- */
+  /* ---------- Sprites: smoke + padlock ---------- */
 
   private makeSmokeTexture(): THREE.Texture {
     const c = document.createElement('canvas');
@@ -362,10 +428,22 @@ export class TownEngine {
     return tex;
   }
 
+  private makeLockTexture(): THREE.Texture {
+    const c = document.createElement('canvas');
+    c.width = c.height = 64;
+    const ctx = c.getContext('2d')!;
+    ctx.font = '46px serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('🔒', 32, 36);
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
+  }
+
   private addSmoke(group: THREE.Group): THREE.Group {
     const smoke = new THREE.Group();
-    const PUFFS = 6;
-    for (let i = 0; i < PUFFS; i++) {
+    for (let i = 0; i < 6; i++) {
       const material = new THREE.SpriteMaterial({
         map: this.smokeTexture,
         color: 0xb3aa9b,
@@ -377,21 +455,31 @@ export class TownEngine {
       const x = (Math.random() - 0.5) * 0.3;
       puff.position.set(x, 1.9, (Math.random() - 0.5) * 0.3);
       puff.userData['baseX'] = x;
-      puff.userData['phase'] = i / PUFFS;
+      puff.userData['phase'] = i / 6;
       smoke.add(puff);
     }
     group.add(smoke);
     return smoke;
   }
 
-  /* ---------- Focus / reset (the «zoom» into a building) ---------- */
+  private addLock(group: THREE.Group): THREE.Sprite {
+    const sprite = new THREE.Sprite(
+      new THREE.SpriteMaterial({ map: this.lockTexture, transparent: true, depthWrite: false }),
+    );
+    sprite.scale.setScalar(0.8);
+    sprite.position.set(0, 3.3, 0);
+    group.add(sprite);
+    return sprite;
+  }
+
+  /* ---------- Focus / reset ---------- */
 
   focusBuilding(id: string): void {
     const node = this.nodes.get(id);
     if (!node) return;
     this.focusedId = id;
     const { x, z } = node.group.position;
-    this.desiredPos.set(x * 0.6, 2.9, z + 5);
+    this.desiredPos.set(x * 0.6, 3.1, z + 6);
     this.desiredLook.set(x, 1, z);
     if (this.options.animate) this.startTween(0.9);
     else this.snapCamera();
@@ -405,7 +493,6 @@ export class TownEngine {
     else this.snapCamera();
   }
 
-  /** Begins an eased camera move from where it is now to the desired view. */
   private startTween(dur: number): void {
     this.camTween = {
       fromPos: this.camera.position.clone(),
@@ -432,12 +519,6 @@ export class TownEngine {
     this.pointer.y = -((e.clientY - r.top) / r.height) * 2 + 1;
   }
 
-  private nodeUnder(e: PointerEvent): BuildingNode | null {
-    this.updatePointer(e);
-    return this.pickNode();
-  }
-
-  /** Raycast the building groups (recursive) and resolve the owning node. */
   private pickNode(): BuildingNode | null {
     this.raycaster.setFromCamera(this.pointer, this.camera);
     const groups = [...this.nodes.values()].map(n => n.group);
@@ -450,8 +531,9 @@ export class TownEngine {
   }
 
   private handleClick(e: PointerEvent): void {
-    if (this.focusedId) return; // ignore clicks while zoomed in
-    const node = this.nodeUnder(e);
+    if (this.focusedId) return;
+    this.updatePointer(e);
+    const node = this.pickNode();
     const id = node?.group.userData['buildingId'] as string | undefined;
     if (id) this.options.onBuildingClick?.(id);
   }
@@ -465,26 +547,42 @@ export class TownEngine {
   private loop = (): void => {
     this.animationId = requestAnimationFrame(this.loop);
     const t = this.clock.getElapsedTime();
+    const dt = Math.min(0.05, t - this.lastT);
+    this.lastT = t;
 
-    // Pins bob; chimney smoke rises and fades on operational buildings.
     this.nodes.forEach(node => {
       node.pins.children.forEach(pin => {
-        pin.position.y = 3.2 + Math.sin(t * 2 + (pin.userData['phase'] as number)) * 0.14;
+        pin.position.y = 3.3 + Math.sin(t * 2 + (pin.userData['phase'] as number)) * 0.14;
         pin.rotation.y = t * 1.2;
       });
       if (node.smoke) this.animateSmoke(node.smoke, t);
     });
     this.particles.rotation.y = t * 0.02;
 
-    // Trees lean gently in the breeze.
     for (const tree of this.decor) {
       const sway = tree.userData['sway'] as number;
       tree.rotation.z = Math.sin(t * 0.8 + (tree.userData['phase'] as number)) * sway;
     }
 
+    // Cars drive; wrap around the edges.
+    for (const c of this.cars) {
+      c.obj.position.x += c.dir * c.speed * dt;
+      if (c.obj.position.x > EDGE) c.obj.position.x = -EDGE;
+      else if (c.obj.position.x < -EDGE) c.obj.position.x = EDGE;
+    }
+    // People walk with a little bob.
+    for (const p of this.people) {
+      p.obj.position.x += p.dir * p.speed * dt;
+      if (p.obj.position.x > EDGE + 1) p.obj.position.x = -EDGE - 1;
+      else if (p.obj.position.x < -EDGE - 1) p.obj.position.x = EDGE + 1;
+      p.obj.position.y = p.baseY + Math.abs(Math.sin(t * p.speed * 3.5)) * 0.06;
+    }
+    // Chef waves.
+    if (this.chefArm) this.chefArm.rotation.z = 0.7 + Math.sin(t * 5) * 0.3;
+    if (this.chef) this.chef.position.y = Math.sin(t * 2) * 0.04;
+
     this.updateCamera(t);
 
-    // Hover only at home (not mid-dolly, not zoomed in).
     if (!this.focusedId && !this.camTween) {
       const node = this.pickNode();
       if (node !== this.hovered) {
@@ -498,7 +596,6 @@ export class TownEngine {
     this.renderer.render(this.scene, this.camera);
   };
 
-  /** Eased dolly while tweening; soft orbit at home; tiny idle sway when focused. */
   private updateCamera(t: number): void {
     if (this.camTween) {
       const tw = this.camTween;
@@ -508,13 +605,11 @@ export class TownEngine {
       this.look.lerpVectors(tw.fromLook, tw.toLook, e);
       if (p >= 1) this.camTween = null;
     } else if (!this.focusedId) {
-      // Parallax only when the pointer is over the canvas; the off-canvas
-      // sentinel (-9,-9) must not drag the camera away.
       const px = Math.abs(this.pointer.x) <= 1 ? this.pointer.x : 0;
       const py = Math.abs(this.pointer.y) <= 1 ? this.pointer.y : 0;
-      const orbit = Math.sin(t * 0.05) * 1.4;
-      this.desiredPos.x = CAMERA_HOME.x + orbit + px * 0.9;
-      this.desiredPos.y = CAMERA_HOME.y + py * 0.4;
+      const orbit = Math.sin(t * 0.05) * 0.8;
+      this.desiredPos.x = CAMERA_HOME.x + orbit + px * 0.7;
+      this.desiredPos.y = CAMERA_HOME.y + py * 0.35;
       this.desiredPos.z = CAMERA_HOME.z;
       this.camera.position.lerp(this.desiredPos, 0.05);
       this.look.lerp(this.desiredLook, 0.08);

@@ -1,60 +1,57 @@
-<section class="pueblo">
-  <header class="portada">
-    <p class="kick">{{ 'game.town.kicker' | transloco }}</p>
-    <h1>{{ 'game.town.title' | transloco }}</h1>
-    <p class="sub">{{ 'game.town.sub' | transloco }}</p>
-
-    @if (dashboard(); as d) {
-      <div class="kpis" aria-label="{{ 'game.town.kpisLabel' | transloco }}">
-        @for (k of d.kpis; track k.key) {
-          <div class="kpi" [class]="'kpi--' + k.color">
-            <b>{{ k.value }}</b>
-            <span>{{ 'game.town.kpi.' + k.key | transloco }}</span>
-          </div>
-        }
-      </div>
-    }
-  </header>
-
+<!-- Base layer: the 3D world fills the whole screen -->
+<div class="mundo">
   <app-town-3d
     [buildings]="buildingStates()"
     [focus]="focusId()"
     (buildingChosen)="onChosen($event)"
   />
+</div>
 
-  <!-- Accessible / no-WebGL path: every building reachable without the canvas. -->
-  <div class="edificios">
-    @for (b of buildings; track b.id) {
-      @let op = operational(b);
-      @let alerts = alertCount(b);
-      <button
-        type="button"
-        class="edificio"
-        [class.bloqueado]="!op"
-        [style.--acento]="'#' + b.color.toString(16).padStart(6, '0')"
-        (click)="onChosen(b.id)"
-      >
-        <span class="edificio-cabeza">
-          <b>{{ 'game.town.buildings.' + b.nameKey + '.name' | transloco }}</b>
-          @if (alerts > 0) {
-            <span class="badge">{{ alerts }}</span>
-          }
-        </span>
-        <span class="edificio-lema">{{ 'game.town.buildings.' + b.nameKey + '.tagline' | transloco }}</span>
-        <span class="edificio-pie">
-          @if (op) {
-            {{ 'game.town.enter' | transloco }} →
-          } @else {
-            🔒 {{ 'game.town.unlock' | transloco }}
-          }
-        </span>
-      </button>
-    }
-  </div>
-</section>
+<!-- Floating top bar: brand + ambient KPIs -->
+<header class="hud-top">
+  <p class="marca">
+    <span class="kick">{{ 'game.town.kicker' | transloco }}</span>
+    <b>{{ 'game.town.title' | transloco }}</b>
+  </p>
+  @if (dashboard(); as d) {
+    <div class="kpis" aria-label="{{ 'game.town.kpisLabel' | transloco }}">
+      @for (k of d.kpis; track k.key) {
+        <div class="kpi" [class]="'kpi--' + k.color">
+          <b>{{ k.value }}</b>
+          <span>{{ 'game.town.kpi.' + k.key | transloco }}</span>
+        </div>
+      }
+    </div>
+  }
+</header>
+
+<!-- Bottom dock: a chip per building — quick select AND the accessible /
+     no-WebGL path (every building reachable without the canvas). -->
+<nav class="dock" [attr.aria-label]="'game.town.title' | transloco">
+  @for (b of buildings; track b.id) {
+    @let op = operational(b);
+    @let alerts = alertCount(b);
+    <button
+      type="button"
+      class="chip"
+      [class.bloqueado]="!op"
+      [style.--acento]="'#' + b.color.toString(16).padStart(6, '0')"
+      [attr.title]="'game.town.buildings.' + b.nameKey + '.tagline' | transloco"
+      (click)="onChosen(b.id)"
+    >
+      <span class="chip-nombre">{{ 'game.town.buildings.' + b.nameKey + '.name' | transloco }}</span>
+      @if (!op) {
+        <span class="chip-lock" aria-hidden="true">🔒</span>
+      }
+      @if (alerts > 0) {
+        <span class="badge">{{ alerts }}</span>
+      }
+    </button>
+  }
+</nav>
 
 @if (overlayActive()) {
-  <!-- A real operational screen (child route) rendered over the town -->
+  <!-- A real operational screen (child route) as a floating glass panel -->
   <div class="velo" role="dialog" aria-modal="true">
     <div class="hoja">
       <div class="hoja-barra">

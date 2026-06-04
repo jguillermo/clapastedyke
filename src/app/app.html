@@ -1,9 +1,11 @@
-<div class="fondo" aria-hidden="true">
-  <span class="mancha m1"></span>
-  <span class="mancha m2"></span>
-</div>
+@if (!immersive()) {
+  <div class="fondo" aria-hidden="true">
+    <span class="mancha m1"></span>
+    <span class="mancha m2"></span>
+  </div>
 
-<app-hud />
+  <app-hud />
+}
 
 <main>
   <router-outlet />

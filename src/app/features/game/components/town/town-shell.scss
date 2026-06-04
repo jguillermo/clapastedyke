@@ -1,49 +1,82 @@
-:host { display: block; }
-
-.pueblo {
-  max-width: 1060px;
-  margin: 0 auto;
-  padding: 26px 18px 70px;
+// The town is a full-screen world. The host fills the viewport (out of the
+// document flow) and every UI element floats over the 3D layer.
+:host {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  display: block;
 }
 
-/* ---------- Portada + KPIs ambientales ---------- */
+.mundo {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
 
-.portada {
-  text-align: center;
-  margin-bottom: 18px;
+/* ---------- Floating top bar (brand + ambient KPIs) ---------- */
+
+.hud-top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 2;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  pointer-events: none; // the world receives drags; chips re-enable below
+}
+
+.marca {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  pointer-events: auto;
+  background: rgba(246, 239, 229, 0.82);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 8px 14px;
+  box-shadow: var(--shadow-sm);
 
   .kick {
     font-family: var(--font-mono);
-    font-size: 11px;
-    letter-spacing: .18em;
+    font-size: 10px;
+    letter-spacing: 0.18em;
     text-transform: uppercase;
     color: var(--accent);
-    margin: 0 0 6px;
   }
-  h1 { margin: 0 0 6px; font-size: clamp(28px, 5vw, 40px); }
-  .sub { margin: 0 auto; max-width: 560px; color: var(--muted); font-size: 15px; }
+  b {
+    font-family: var(--font-heading);
+    font-size: 18px;
+    font-weight: 600;
+  }
 }
 
 .kpis {
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
-  gap: 10px;
-  margin-top: 16px;
+  justify-content: flex-end;
+  gap: 8px;
+  pointer-events: auto;
 }
 
 .kpi {
   display: flex;
   align-items: baseline;
-  gap: 7px;
-  background: var(--sheet);
+  gap: 6px;
+  background: rgba(255, 253, 249, 0.9);
+  backdrop-filter: blur(8px);
   border: 1px solid var(--line);
   border-radius: 999px;
-  padding: 6px 14px;
+  padding: 5px 12px;
   box-shadow: var(--shadow-sm);
 
-  b { font-family: var(--font-mono); font-size: 17px; }
-  span { font-size: 12px; color: var(--muted); }
+  b { font-family: var(--font-mono); font-size: 16px; }
+  span { font-size: 11px; color: var(--muted); }
 
   &--accent b { color: var(--accent); }
   &--amber b { color: var(--amber); }
@@ -52,50 +85,52 @@
   &--muted b { color: var(--muted); }
 }
 
-app-town-3d { margin: 18px 0; }
+/* ---------- Bottom building dock (select + accessible fallback) ---------- */
 
-/* ---------- Lista accesible de edificios (fallback sin WebGL) ---------- */
-
-.edificios {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
-  gap: 12px;
+.dock {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  padding: 14px 18px calc(14px + env(safe-area-inset-bottom, 0px));
+  pointer-events: none; // chips re-enable; gaps pass through to the world
 }
 
-.edificio {
+.chip {
   --acento: var(--accent);
-  text-align: left;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  background: var(--sheet);
-  border: 1px solid var(--line);
-  border-left: 4px solid var(--acento);
-  border-radius: 16px;
-  padding: 14px 16px;
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
   cursor: pointer;
+  background: rgba(255, 253, 249, 0.92);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--line);
+  border-bottom: 3px solid var(--acento);
+  border-radius: 14px;
+  padding: 9px 14px;
   box-shadow: var(--shadow-sm);
-  transition: transform .15s, box-shadow .15s;
+  transition: transform 0.15s, box-shadow 0.15s;
 
-  &:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+  &:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow);
+  }
 
   &.bloqueado {
-    border-left-color: var(--line);
-    opacity: .7;
-    .edificio-pie { color: var(--muted); }
+    border-bottom-color: var(--line);
+    opacity: 0.65;
   }
 }
 
-.edificio-cabeza {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  b { font-size: 16px; }
-}
-
-.edificio-lema { font-size: 12.5px; color: var(--muted); min-height: 2.6em; }
-.edificio-pie { font-size: 12px; font-weight: 600; color: var(--accent); }
+.chip-nombre { font-weight: 600; font-size: 14px; }
+.chip-lock { font-size: 12px; }
 
 .badge {
   font-family: var(--font-mono);
@@ -104,21 +139,21 @@ app-town-3d { margin: 18px 0; }
   color: #fff;
   background: var(--red);
   border-radius: 999px;
-  padding: 1px 8px;
+  padding: 1px 7px;
 }
 
-/* ---------- Overlay (sala / pantalla real) ---------- */
+/* ---------- Overlays: glass panels floating over the world ---------- */
 
 .velo {
   position: fixed;
   inset: 0;
   z-index: 60;
-  background: rgba(36, 29, 24, .5);
-  backdrop-filter: blur(4px);
+  background: rgba(36, 29, 24, 0.42);
+  backdrop-filter: blur(5px);
   display: grid;
   place-items: center;
   padding: 18px;
-  animation: aparecer .2s ease-out;
+  animation: aparecer 0.2s ease-out;
 }
 
 .sala {
@@ -129,7 +164,7 @@ app-town-3d { margin: 18px 0; }
   padding: 24px 26px;
   width: 100%;
   max-width: 460px;
-  animation: subir .28s cubic-bezier(.22, 1, .36, 1);
+  animation: subir 0.28s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .sala-cabeza {
@@ -142,7 +177,7 @@ app-town-3d { margin: 18px 0; }
   .kick {
     font-family: var(--font-mono);
     font-size: 10px;
-    letter-spacing: .18em;
+    letter-spacing: 0.18em;
     text-transform: uppercase;
     color: var(--accent);
     margin: 0 0 4px;
@@ -159,12 +194,12 @@ app-town-3d { margin: 18px 0; }
   border-radius: 18px;
   box-shadow: var(--shadow);
   width: 100%;
-  max-width: 1080px;
-  height: min(86vh, 920px);
+  max-width: min(1080px, 92vw);
+  height: min(88vh, 940px);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  animation: subir .28s cubic-bezier(.22, 1, .36, 1);
+  animation: subir 0.28s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .hoja-barra {
@@ -181,7 +216,7 @@ app-town-3d { margin: 18px 0; }
 
 .hoja-cuerpo { flex: 1; overflow: auto; padding: 8px 4px 24px; }
 
-/* ---------- Botones (idioma compartido con hud/world-map) ---------- */
+/* ---------- Buttons (shared idiom with the tutorial HUD) ---------- */
 
 .boton {
   font-size: 13px;
@@ -192,7 +227,7 @@ app-town-3d { margin: 18px 0; }
   text-decoration: none;
   white-space: nowrap;
   border: 1px solid var(--line);
-  transition: background .2s, border-color .2s, color .2s, transform .15s;
+  transition: background 0.2s, border-color 0.2s, color 0.2s, transform 0.15s;
 
   &.fantasma { color: var(--accent); background: none; }
   &.fantasma:hover { background: var(--accent-soft); border-color: var(--accent); }
@@ -207,7 +242,10 @@ app-town-3d { margin: 18px 0; }
   &.grande { font-size: 15px; padding: 12px 18px; text-align: left; }
 }
 
-@keyframes aparecer { from { opacity: 0; } to { opacity: 1; } }
+@keyframes aparecer {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
 @keyframes subir {
   from { opacity: 0; transform: translateY(14px); }
   to { opacity: 1; transform: translateY(0); }

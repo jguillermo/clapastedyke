@@ -70,6 +70,37 @@ enruta a la misión guiada que lo abre (`/mission/:unlockMissionId`).
 
 ## 5. Modelo de interacción (estados y wireframes)
 
+### 4bis. Escena de calle viva
+
+El mundo es una **calle** vista de frente, no un diorama estático:
+- **La Tienda (bakery) al frente-centro**; el resto de edificios flanquean detrás
+  en una V poco profunda, todos mirando a la cámara.
+- **Todos los edificios texturizados**; los bloqueados se marcan con un **candado
+  flotante 🔒** encima (sprite de canvas), no con material gris.
+- **Calle** al frente (tejas `road-tile` + acera) con **autos en movimiento**
+  (`car/taxi/suv`, dos carriles, wrap en los bordes) y **gente caminando**
+  (personas low-poly por primitivas, ya que el pack no trae personajes).
+- **El chef** (geometría reutilizable en `chef-mesh.ts`, compartida con el
+  tutorial) parado frente a la pastelería **saludando** con el brazo en alto.
+- Cámara más alejada (`z 13.5`, fov 42) para que toda la calle se lea.
+
+Capturas: `docs/town-street-preview.png` y `docs/town-street-detail.png`.
+
+### 5.0 Layout a pantalla completa
+
+El mundo 3D ocupa el **100% del viewport** y todo flota dentro como capas (no hay
+página con scroll). `TownShell` es `:host { position: fixed; inset: 0 }` con:
+- **`.mundo`** (z 0): `<app-town-3d>` a `inset:0` (canvas full-bleed).
+- **`.hud-top`** (z 2): chip de marca (izq.) + KPI chips translúcidos (der.).
+- **`.dock`** (z 2): tira inferior de chips de edificio — selección rápida y
+  **ruta accesible / sin-WebGL** (siempre presente).
+- **Overlays** (z 60): room-menu y pantallas reales como **panel de vidrio
+  flotante** (`backdrop-filter: blur`), con el mundo difuminado detrás.
+
+En rutas `/town*` el shell global (`App`) oculta el HUD del tutorial y el fondo
+decorativo (señal `immersive`); el tutorial (`/mission`, `/level`) conserva su
+HUD sticky y scroll normal.
+
 ### 5.1 Vista pueblo (hub orbital)
 
 ```
