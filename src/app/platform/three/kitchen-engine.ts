@@ -50,10 +50,12 @@ export class KitchenEngine {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
 
     this.scene.background = new THREE.Color(0xf3e7d3); // crema cálida, sin vacío oscuro
+    this.renderer.setClearColor(0xf3e7d3, 1);
 
-    this.camera = new THREE.PerspectiveCamera(42, 1, 0.1, 200);
+    // FOV bajo → perspectiva aplanada, look isométrico.
+    this.camera = new THREE.PerspectiveCamera(30, 1, 0.1, 200);
     this.rig = new CameraRig(this.camera, options.animate, {
-      pos: new THREE.Vector3(0, 3.2, ROOM_FOOTPRINT),
+      pos: new THREE.Vector3(ROOM_FOOTPRINT, ROOM_FOOTPRINT, ROOM_FOOTPRINT),
       look: new THREE.Vector3(0, 1.5, 0),
     });
 
@@ -134,14 +136,21 @@ export class KitchenEngine {
     this.scene.add(chef);
     this.chef = chef;
 
-    // Cámara: enmarca la sala centrada.
-    const home = new THREE.Vector3(0, h * 0.85, halfZ + ROOM_FOOTPRINT * 0.85);
-    const look = new THREE.Vector3(0, h * 0.45, 0);
+    // Cámara isométrica de esquina: en diagonal (+x,+y,+z), elevada ~35°,
+    // mirando al centro de la sala. Con la cocina de techo abierto, mira hacia
+    // dentro mostrando las dos paredes y los electrodomésticos.
+    const look = new THREE.Vector3(0, h * 0.42, 0);
+    const dist = Math.max(halfX, halfZ) * 2 + 4.5;
+    const home = new THREE.Vector3(
+      look.x + dist * 0.58,
+      look.y + dist * 0.62,
+      look.z + dist * 0.58,
+    );
     this.rig.setHome(home, look);
     if (this.options.animate) {
       this.rig.flyThrough([
-        { x: 0, y: h + 20, z: halfZ + 13, lookX: 0, lookY: look.y, lookZ: 0, dur: 1.4 },
-        { x: 0, y: h + 5, z: halfZ + 9, lookX: 0, lookY: look.y, lookZ: 0, dur: 1.1 },
+        { x: home.x, y: h + 22, z: home.z + 8, lookX: 0, lookY: look.y, lookZ: 0, dur: 1.4 },
+        { x: home.x, y: home.y + 6, z: home.z + 3, lookX: 0, lookY: look.y, lookZ: 0, dur: 1.1 },
         { x: home.x, y: home.y, z: home.z, lookX: look.x, lookY: look.y, lookZ: look.z, dur: 1.0 },
       ]);
     } else {
