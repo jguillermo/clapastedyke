@@ -1,7 +1,10 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
-import { CatalogService } from '../../core/catalog/catalog.service';
-import { SalesService } from '../../core/sales/sales.service';
+import { ListCustomers } from '../../core/catalog/application/list-customers/list-customers';
+import { ListOrders } from '../../core/sales/application/list-orders/list-orders';
+import { StartProduction } from '../../core/sales/application/start-production/start-production';
+import { MarkDelivered } from '../../core/sales/application/mark-delivered/mark-delivered';
+import { CancelOrder } from '../../core/sales/application/cancel-order/cancel-order';
 import { DomainError } from '../../core/_common/domain/errors';
 import { CustomerPrimitives } from '../../core/catalog/domain/customer/customer';
 import { OrderStatus } from '../../core/sales/domain/order/order';
@@ -24,8 +27,11 @@ type StatusFilter = '' | OrderStatus;
   providers: [provideTranslocoScope('operations')],
 })
 export class OrdersScreen {
-  private readonly catalog = inject(CatalogService);
-  private readonly sales = inject(SalesService);
+  private readonly listCustomers = inject(ListCustomers);
+  private readonly listOrders = inject(ListOrders);
+  private readonly startProductionUc = inject(StartProduction);
+  private readonly markDeliveredUc = inject(MarkDelivered);
+  private readonly cancelOrderUc = inject(CancelOrder);
   private readonly transloco = inject(TranslocoService);
 
   protected readonly orders = signal<OrderListItem[]>([]);
@@ -54,13 +60,13 @@ export class OrdersScreen {
   }
 
   private async loadCustomers(): Promise<void> {
-    this.customers.set(await this.catalog.listCustomers.execute());
+    this.customers.set(await this.listCustomers.execute());
   }
 
   protected async reload(): Promise<void> {
     this.loading.set(true);
     this.orders.set(
-      await this.sales.listOrders.execute({
+      await this.listOrders.execute({
         status: this.statusFilter() || undefined,
         customerId: this.customerFilter() || undefined,
       }),
@@ -96,7 +102,7 @@ export class OrdersScreen {
     });
     if (!window.confirm(confirmText)) return;
     await this.action(
-      () => this.sales.startProduction.execute({ orderId: o.id }),
+      () => this.startProductionUc.execute({ orderId: o.id }),
       this.transloco.translate('operations.orders.startedNotice', { id: o.id }),
     );
   }
@@ -105,7 +111,7 @@ export class OrdersScreen {
     const confirmText = this.transloco.translate('operations.orders.deliverConfirm', { id: o.id });
     if (!window.confirm(confirmText)) return;
     await this.action(async () => {
-      const r = await this.sales.markDelivered.execute({ orderId: o.id });
+      const r = await this.markDeliveredUc.execute({ orderId: o.id });
       return this.transloco.translate('operations.orders.deliveredNotice', { saleId: r.saleId });
     });
   }
@@ -115,7 +121,7 @@ export class OrdersScreen {
     const reason = window.prompt(promptText, '');
     if (reason === null) return; // cancelling the prompt aborts
     await this.action(
-      () => this.sales.cancelOrder.execute({ orderId: o.id, reason }),
+      () => this.cancelOrderUc.execute({ orderId: o.id, reason }),
       this.transloco.translate('operations.orders.cancelledNotice', { id: o.id }),
     );
   }

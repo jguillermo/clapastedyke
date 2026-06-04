@@ -1,7 +1,8 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormField, form, maxLength, pattern, required, submit } from '@angular/forms/signals';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
-import { CatalogService } from '../../core/catalog/catalog.service';
+import { SaveSupplier } from '../../core/catalog/application/save-supplier/save-supplier';
+import { ListSuppliers } from '../../core/catalog/application/list-suppliers/list-suppliers';
 import { DomainError } from '../../core/_common/domain/errors';
 import { SupplierPrimitives } from '../../core/catalog/domain/supplier/supplier';
 import { UI_FORMS } from '../_common/directives/ui';
@@ -18,7 +19,8 @@ import { UI_FORMS } from '../_common/directives/ui';
   templateUrl: './suppliers-screen.html',
 })
 export class SuppliersScreen {
-  private readonly catalog = inject(CatalogService);
+  private readonly saveSupplier = inject(SaveSupplier);
+  private readonly listSuppliers = inject(ListSuppliers);
   private readonly transloco = inject(TranslocoService);
 
   protected readonly suppliers = signal<SupplierPrimitives[]>([]);
@@ -46,7 +48,7 @@ export class SuppliersScreen {
 
   protected async reload(): Promise<void> {
     this.loading.set(true);
-    this.suppliers.set(await this.catalog.listSuppliers.execute());
+    this.suppliers.set(await this.listSuppliers.execute());
     this.loading.set(false);
   }
 
@@ -75,7 +77,7 @@ export class SuppliersScreen {
       this.saving.set(true);
       this.notice.set(null);
       try {
-        const r = await this.catalog.saveSupplier.execute({
+        const r = await this.saveSupplier.execute({
           id: this.editingId() ?? undefined,
           ...this.model(),
         });

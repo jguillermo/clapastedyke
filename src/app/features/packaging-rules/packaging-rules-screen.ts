@@ -1,8 +1,11 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormField, disabled, form, min, required, submit } from '@angular/forms/signals';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
-import { CatalogService } from '../../core/catalog/catalog.service';
-import { SettingsService } from '../../core/settings/settings.service';
+import { SavePackagingRule } from '../../core/catalog/application/save-packaging-rule/save-packaging-rule';
+import { ListPackagingRules } from '../../core/catalog/application/list-packaging-rules/list-packaging-rules';
+import { ListRecipes } from '../../core/catalog/application/list-recipes/list-recipes';
+import { ListSupplies } from '../../core/catalog/application/list-supplies/list-supplies';
+import { GetSettings } from '../../core/settings/application/get-settings/get-settings';
 import { DomainError } from '../../core/_common/domain/errors';
 import { PackagingRulePrimitives } from '../../core/catalog/domain/packaging-rule/packaging-rule';
 import { RecipePrimitives } from '../../core/catalog/domain/recipe/recipe';
@@ -24,8 +27,11 @@ import { UI_FORMS } from '../_common/directives/ui';
   templateUrl: './packaging-rules-screen.html',
 })
 export class PackagingRulesScreen {
-  private readonly catalog = inject(CatalogService);
-  private readonly settings = inject(SettingsService);
+  private readonly savePackagingRule = inject(SavePackagingRule);
+  private readonly listPackagingRules = inject(ListPackagingRules);
+  private readonly listRecipes = inject(ListRecipes);
+  private readonly listSupplies = inject(ListSupplies);
+  private readonly getSettings = inject(GetSettings);
   private readonly transloco = inject(TranslocoService);
 
   protected readonly rules = signal<PackagingRulePrimitives[]>([]);
@@ -73,15 +79,15 @@ export class PackagingRulesScreen {
   }
 
   private async loadCatalogs(): Promise<void> {
-    this.recipes.set(await this.catalog.listRecipes.execute());
-    this.packagings.set(await this.catalog.listSupplies.execute({ type: 'packaging' }));
-    const settings = await this.settings.getSettings.execute();
+    this.recipes.set(await this.listRecipes.execute());
+    this.packagings.set(await this.listSupplies.execute({ type: 'packaging' }));
+    const settings = await this.getSettings.execute();
     this.sizes.set([...settings.sizes]);
   }
 
   protected async reload(): Promise<void> {
     this.loading.set(true);
-    this.rules.set(await this.catalog.listPackagingRules.execute());
+    this.rules.set(await this.listPackagingRules.execute());
     this.loading.set(false);
   }
 
@@ -117,7 +123,7 @@ export class PackagingRulesScreen {
       this.saving.set(true);
       this.notice.set(null);
       try {
-        const r = await this.catalog.savePackagingRule.execute({
+        const r = await this.savePackagingRule.execute({
           id: this.editingId() ?? undefined,
           ...this.model(),
         });

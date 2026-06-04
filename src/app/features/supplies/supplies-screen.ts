@@ -1,7 +1,9 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormField, disabled, form, maxLength, min, required, submit } from '@angular/forms/signals';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
-import { CatalogService } from '../../core/catalog/catalog.service';
+import { SaveSupply } from '../../core/catalog/application/save-supply/save-supply';
+import { ListSupplies } from '../../core/catalog/application/list-supplies/list-supplies';
+import { ListSuppliers } from '../../core/catalog/application/list-suppliers/list-suppliers';
 import { DomainError } from '../../core/_common/domain/errors';
 import { SupplierPrimitives } from '../../core/catalog/domain/supplier/supplier';
 import { StockLight, SupplyType } from '../../core/catalog/domain/supply/supply';
@@ -24,7 +26,9 @@ import { UI_FORMS } from '../_common/directives/ui';
   templateUrl: './supplies-screen.html',
 })
 export class SuppliesScreen {
-  private readonly catalog = inject(CatalogService);
+  private readonly saveSupply = inject(SaveSupply);
+  private readonly listSupplies = inject(ListSupplies);
+  private readonly listSuppliers = inject(ListSuppliers);
   private readonly transloco = inject(TranslocoService);
 
   protected readonly supplies = signal<SupplyListItem[]>([]);
@@ -65,12 +69,12 @@ export class SuppliesScreen {
   }
 
   private async loadSuppliers(): Promise<void> {
-    this.suppliers.set(await this.catalog.listSuppliers.execute());
+    this.suppliers.set(await this.listSuppliers.execute());
   }
 
   protected async reload(): Promise<void> {
     this.loading.set(true);
-    this.supplies.set(await this.catalog.listSupplies.execute({}));
+    this.supplies.set(await this.listSupplies.execute({}));
     this.loading.set(false);
   }
 
@@ -116,7 +120,7 @@ export class SuppliesScreen {
       try {
         const m = this.model();
         const editing = this.editingId() !== null;
-        const r = await this.catalog.saveSupply.execute({
+        const r = await this.saveSupply.execute({
           id: this.editingId() ?? undefined,
           name: m.name,
           type: m.type,

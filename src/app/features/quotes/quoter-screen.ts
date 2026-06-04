@@ -2,9 +2,13 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { FormField, form, max, min, required, submit, validate } from '@angular/forms/signals';
 import { Router } from '@angular/router';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
-import { CatalogService } from '../../core/catalog/catalog.service';
-import { SalesService } from '../../core/sales/sales.service';
-import { SettingsService } from '../../core/settings/settings.service';
+import { ListCustomers } from '../../core/catalog/application/list-customers/list-customers';
+import { ListRecipes } from '../../core/catalog/application/list-recipes/list-recipes';
+import { ListSupplies } from '../../core/catalog/application/list-supplies/list-supplies';
+import { ListPackagingRules } from '../../core/catalog/application/list-packaging-rules/list-packaging-rules';
+import { GetSettings } from '../../core/settings/application/get-settings/get-settings';
+import { CalculateQuote } from '../../core/sales/application/calculate-quote/calculate-quote';
+import { SaveQuote } from '../../core/sales/application/save-quote/save-quote';
 import { DomainError } from '../../core/_common/domain/errors';
 import { CustomerPrimitives } from '../../core/catalog/domain/customer/customer';
 import { RecipePrimitives } from '../../core/catalog/domain/recipe/recipe';
@@ -49,9 +53,13 @@ interface PackagingRow {
   providers: [provideTranslocoScope('sales')],
 })
 export class QuoterScreen {
-  private readonly catalog = inject(CatalogService);
-  private readonly sales = inject(SalesService);
-  private readonly settings = inject(SettingsService);
+  private readonly listCustomers = inject(ListCustomers);
+  private readonly listRecipes = inject(ListRecipes);
+  private readonly listSupplies = inject(ListSupplies);
+  private readonly listPackagingRules = inject(ListPackagingRules);
+  private readonly getSettings = inject(GetSettings);
+  private readonly calculateQuote = inject(CalculateQuote);
+  private readonly saveQuote = inject(SaveQuote);
   private readonly router = inject(Router);
   private readonly transloco = inject(TranslocoService);
 
@@ -109,12 +117,12 @@ export class QuoterScreen {
   private async load(): Promise<void> {
     this.loading.set(true);
     const [customers, recipes, packaging, settings] = await Promise.all([
-      this.catalog.listCustomers.execute(),
-      this.catalog.listRecipes.execute(),
-      this.catalog.listSupplies.execute({ type: 'packaging' }),
-      this.settings.getSettings.execute(),
+      this.listCustomers.execute(),
+      this.listRecipes.execute(),
+      this.listSupplies.execute({ type: 'packaging' }),
+      this.getSettings.execute(),
     ]);
-    this.rules = await this.catalog.listPackagingRules.execute();
+    this.rules = await this.listPackagingRules.execute();
     this.customers.set(customers);
     this.recipes.set(recipes);
     this.packagingCatalog.set(packaging);
@@ -186,7 +194,7 @@ export class QuoterScreen {
       return;
     }
     try {
-      const r = await this.sales.calculateQuote.execute({
+      const r = await this.calculateQuote.execute({
         recipeId: m.recipeId,
         scalingMode: m.scalingMode,
         scalingValue: m.scalingValue,
@@ -211,7 +219,7 @@ export class QuoterScreen {
       this.notice.set(null);
       try {
         const m = this.model();
-        const r = await this.sales.saveQuote.execute({
+        const r = await this.saveQuote.execute({
           customerId: m.customerId,
           recipeId: m.recipeId,
           scalingMode: m.scalingMode,

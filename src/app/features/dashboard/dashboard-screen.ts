@@ -2,8 +2,7 @@ import { Component, inject, signal } from '@angular/core';
 import { SafeSvgPipe } from '../_common/pipes/safe-svg.pipe';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { DashboardService } from '../../core/dashboard/dashboard.service';
-import { AlertType, DashboardData } from '../../core/dashboard/application/get-dashboard/get-dashboard';
+import { GetDashboard, AlertType, DashboardData } from '../../core/dashboard/application/get-dashboard/get-dashboard';
 import { ICONS } from '../game/model/icons';
 import { UI_FORMS } from '../_common/directives/ui';
 
@@ -24,7 +23,7 @@ interface Access {
   templateUrl: './dashboard-screen.html',
 })
 export class DashboardScreen {
-  private readonly dashboardService = inject(DashboardService);
+  private readonly getDashboard = inject(GetDashboard);
 
   protected readonly dashboard = signal<DashboardData | null>(null);
 
@@ -44,7 +43,7 @@ export class DashboardScreen {
   }
 
   private async load(): Promise<void> {
-    this.dashboard.set(await this.dashboardService.getDashboard.execute());
+    this.dashboard.set(await this.getDashboard.execute());
   }
 
   /** Left border of the KPI card according to its business color. */

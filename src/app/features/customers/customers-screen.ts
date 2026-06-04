@@ -1,7 +1,8 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormField, form, maxLength, required, submit } from '@angular/forms/signals';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
-import { CatalogService } from '../../core/catalog/catalog.service';
+import { SaveCustomer } from '../../core/catalog/application/save-customer/save-customer';
+import { ListCustomers } from '../../core/catalog/application/list-customers/list-customers';
 import { DomainError } from '../../core/_common/domain/errors';
 import { CustomerPrimitives } from '../../core/catalog/domain/customer/customer';
 import { UI_FORMS } from '../_common/directives/ui';
@@ -19,7 +20,8 @@ import { UI_FORMS } from '../_common/directives/ui';
   templateUrl: './customers-screen.html',
 })
 export class CustomersScreen {
-  private readonly catalog = inject(CatalogService);
+  private readonly saveCustomer = inject(SaveCustomer);
+  private readonly listCustomers = inject(ListCustomers);
   private readonly transloco = inject(TranslocoService);
 
   protected readonly customers = signal<CustomerPrimitives[]>([]);
@@ -43,7 +45,7 @@ export class CustomersScreen {
 
   protected async reload(): Promise<void> {
     this.loading.set(true);
-    this.customers.set(await this.catalog.listCustomers.execute());
+    this.customers.set(await this.listCustomers.execute());
     this.loading.set(false);
   }
 
@@ -67,7 +69,7 @@ export class CustomersScreen {
       this.saving.set(true);
       this.notice.set(null);
       try {
-        const r = await this.catalog.saveCustomer.execute({
+        const r = await this.saveCustomer.execute({
           id: this.editingId() ?? undefined,
           ...this.model(),
         });

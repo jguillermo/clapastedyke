@@ -1,9 +1,12 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormField, applyEach, form, min, required, submit } from '@angular/forms/signals';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
-import { CatalogService } from '../../core/catalog/catalog.service';
-import { SalesService } from '../../core/sales/sales.service';
-import { InventoryService } from '../../core/inventory/inventory.service';
+import { ListSuppliers } from '../../core/catalog/application/list-suppliers/list-suppliers';
+import { ListSupplies } from '../../core/catalog/application/list-supplies/list-supplies';
+import { ListOrders } from '../../core/sales/application/list-orders/list-orders';
+import { OrderShortages, SuppliesBelowMinimum } from '../../core/inventory/application/shopping-list/shopping-list';
+import { RegisterPurchase } from '../../core/inventory/application/register-purchase/register-purchase';
+import { ListPurchases } from '../../core/inventory/application/list-purchases/list-purchases';
 import { DomainError } from '../../core/_common/domain/errors';
 import { SupplierPrimitives } from '../../core/catalog/domain/supplier/supplier';
 import { SupplyListItem } from '../../core/catalog/application/list-supplies/list-supplies';
@@ -35,9 +38,13 @@ interface PurchaseModel {
   providers: [provideTranslocoScope('operations')],
 })
 export class PurchasesScreen {
-  private readonly catalog = inject(CatalogService);
-  private readonly sales = inject(SalesService);
-  private readonly inventory = inject(InventoryService);
+  private readonly listSuppliers = inject(ListSuppliers);
+  private readonly listSupplies = inject(ListSupplies);
+  private readonly listOrders = inject(ListOrders);
+  private readonly orderShortages = inject(OrderShortages);
+  private readonly suppliesBelowMinimum = inject(SuppliesBelowMinimum);
+  private readonly registerPurchase = inject(RegisterPurchase);
+  private readonly listPurchases = inject(ListPurchases);
   private readonly transloco = inject(TranslocoService);
 
   // --- Card 1: buy materials (supplier list) ---
@@ -80,9 +87,9 @@ export class PurchasesScreen {
   }
 
   private async loadCatalogs(): Promise<void> {
-    this.suppliers.set(await this.catalog.listSuppliers.execute());
-    this.supplies.set(await this.catalog.listSupplies.execute({}));
-    this.orders.set(await this.sales.listOrders.execute({}));
+    this.suppliers.set(await this.listSuppliers.execute());
+    this.supplies.set(await this.listSupplies.execute({}));
+    this.orders.set(await this.listOrders.execute({}));
   }
 
   // ---------- Card 1 ----------
@@ -101,9 +108,9 @@ export class PurchasesScreen {
     this.loadingItems.set(true);
     let list: ShoppingListItem[] = [];
     if (this.mode() === 'manual') {
-      list = await this.inventory.suppliesBelowMinimum.execute();
+      list = await this.suppliesBelowMinimum.execute();
     } else if (this.orderId()) {
-      list = await this.sales.orderShortages.execute({ orderId: this.orderId() });
+      list = await this.orderShortages.execute({ orderId: this.orderId() });
     }
     list = [...list].sort((a, b) =>
       this.supplierLabel(a).localeCompare(this.supplierLabel(b), 'es'),
@@ -142,7 +149,7 @@ export class PurchasesScreen {
       this.notice.set(null);
       try {
         const m = this.model();
-        const r = await this.inventory.registerPurchase.execute({
+        const r = await this.registerPurchase.execute({
           supplierId: m.supplierId,
           ...(m.date ? { date: m.date } : {}),
           lines: m.lines.map(l => ({
@@ -175,7 +182,7 @@ export class PurchasesScreen {
   // ---------- Card 3 ----------
   protected async reloadHistory(): Promise<void> {
     this.loadingHistory.set(true);
-    this.purchases.set(await this.inventory.listPurchases.execute());
+    this.purchases.set(await this.listPurchases.execute());
     this.loadingHistory.set(false);
   }
 

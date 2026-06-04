@@ -1,7 +1,8 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormField, applyEach, form, max, min, required, submit } from '@angular/forms/signals';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
-import { SettingsService } from '../../core/settings/settings.service';
+import { GetSettings } from '../../core/settings/application/get-settings/get-settings';
+import { UpdateSettings } from '../../core/settings/application/update-settings/update-settings';
 import { DomainError } from '../../core/_common/domain/errors';
 import {
   Language,
@@ -44,7 +45,8 @@ interface SettingsModel {
   providers: [provideTranslocoScope('operations')],
 })
 export class SettingsScreen {
-  private readonly settings = inject(SettingsService);
+  private readonly getSettings = inject(GetSettings);
+  private readonly updateSettings = inject(UpdateSettings);
   private readonly transloco = inject(TranslocoService);
 
   protected readonly loading = signal(true);
@@ -88,7 +90,7 @@ export class SettingsScreen {
 
   private async load(): Promise<void> {
     this.loading.set(true);
-    const settings = await this.settings.getSettings.execute();
+    const settings = await this.getSettings.execute();
     const g = settings.general;
     this.model.set({
       laborRatePerHour: g.laborRatePerHour,
@@ -123,7 +125,7 @@ export class SettingsScreen {
       this.notice.set(null);
       try {
         const m = this.model();
-        await this.settings.updateSettings.execute({
+        await this.updateSettings.execute({
           general: {
             laborRatePerHour: m.laborRatePerHour,
             indirectCostPerOrder: m.indirectCostPerOrder,

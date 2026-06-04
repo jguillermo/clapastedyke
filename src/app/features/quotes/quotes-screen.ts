@@ -1,8 +1,10 @@
 import { Component, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
-import { CatalogService } from '../../core/catalog/catalog.service';
-import { SalesService } from '../../core/sales/sales.service';
+import { ListCustomers } from '../../core/catalog/application/list-customers/list-customers';
+import { ListQuotes } from '../../core/sales/application/list-quotes/list-quotes';
+import { ApproveQuote } from '../../core/sales/application/approve-quote/approve-quote';
+import { RejectQuote } from '../../core/sales/application/reject-quote/reject-quote';
 import { DomainError } from '../../core/_common/domain/errors';
 import { QuoteListItem } from '../../core/sales/application/list-quotes/list-quotes';
 import { VisibleQuoteStatus } from '../../core/sales/domain/quote/quote';
@@ -25,8 +27,10 @@ type StatusFilter = '' | VisibleQuoteStatus;
   providers: [provideTranslocoScope('sales')],
 })
 export class QuotesScreen {
-  private readonly catalog = inject(CatalogService);
-  private readonly sales = inject(SalesService);
+  private readonly listCustomers = inject(ListCustomers);
+  private readonly listQuotes = inject(ListQuotes);
+  private readonly approveQuote = inject(ApproveQuote);
+  private readonly rejectQuote = inject(RejectQuote);
   private readonly transloco = inject(TranslocoService);
 
   protected readonly quotes = signal<QuoteListItem[]>([]);
@@ -45,13 +49,13 @@ export class QuotesScreen {
   }
 
   private async loadCustomers(): Promise<void> {
-    this.customers.set(await this.catalog.listCustomers.execute());
+    this.customers.set(await this.listCustomers.execute());
   }
 
   protected async reload(): Promise<void> {
     this.loading.set(true);
     this.quotes.set(
-      await this.sales.listQuotes.execute({
+      await this.listQuotes.execute({
         status: this.statusFilter() || undefined,
         customerId: this.customerFilter() || undefined,
       }),
@@ -75,7 +79,7 @@ export class QuotesScreen {
     this.processing.set(true);
     this.notice.set(null);
     try {
-      const r = await this.sales.approveQuote.execute({ quoteId: q.id });
+      const r = await this.approveQuote.execute({ quoteId: q.id });
       let text = this.transloco.translate('sales.quotes.approved', { orderId: r.orderId });
       if (r.shortages.length) {
         const list = r.shortages.map(s => `${s.supplyName} (${s.shortage})`).join(', ');
@@ -101,7 +105,7 @@ export class QuotesScreen {
     this.processing.set(true);
     this.notice.set(null);
     try {
-      await this.sales.rejectQuote.execute({ quoteId: q.id, reason });
+      await this.rejectQuote.execute({ quoteId: q.id, reason });
       this.notice.set({
         kind: 'ok',
         text: this.transloco.translate('sales.quotes.rejected', { id: q.id }),

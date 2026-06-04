@@ -1,7 +1,9 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormField, applyEach, form, maxLength, min, required, submit } from '@angular/forms/signals';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
-import { CatalogService } from '../../core/catalog/catalog.service';
+import { SaveRecipe } from '../../core/catalog/application/save-recipe/save-recipe';
+import { ListRecipes } from '../../core/catalog/application/list-recipes/list-recipes';
+import { ListSupplies } from '../../core/catalog/application/list-supplies/list-supplies';
 import { DomainError } from '../../core/_common/domain/errors';
 import { BaseType, RecipePrimitives } from '../../core/catalog/domain/recipe/recipe';
 import { SupplyListItem } from '../../core/catalog/application/list-supplies/list-supplies';
@@ -29,7 +31,9 @@ interface RecipeModel {
   templateUrl: './recipes-screen.html',
 })
 export class RecipesScreen {
-  private readonly catalog = inject(CatalogService);
+  private readonly saveRecipe = inject(SaveRecipe);
+  private readonly listRecipes = inject(ListRecipes);
+  private readonly listSupplies = inject(ListSupplies);
   private readonly transloco = inject(TranslocoService);
 
   protected readonly recipes = signal<RecipePrimitives[]>([]);
@@ -67,12 +71,12 @@ export class RecipesScreen {
 
   protected async reload(): Promise<void> {
     this.loading.set(true);
-    this.recipes.set(await this.catalog.listRecipes.execute());
+    this.recipes.set(await this.listRecipes.execute());
     this.loading.set(false);
   }
 
   private async loadSupplies(): Promise<void> {
-    this.supplies.set(await this.catalog.listSupplies.execute({ type: 'ingredient' }));
+    this.supplies.set(await this.listSupplies.execute({ type: 'ingredient' }));
   }
 
   protected addIngredient(): void {
@@ -123,7 +127,7 @@ export class RecipesScreen {
       this.saving.set(true);
       this.notice.set(null);
       try {
-        const r = await this.catalog.saveRecipe.execute({
+        const r = await this.saveRecipe.execute({
           id: this.editingId() ?? undefined,
           ...this.model(),
         });

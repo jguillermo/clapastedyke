@@ -1,9 +1,10 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormField, form, maxLength, required, submit } from '@angular/forms/signals';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
-import { CatalogService } from '../../core/catalog/catalog.service';
-import { InventoryService } from '../../core/inventory/inventory.service';
-import { SettingsService } from '../../core/settings/settings.service';
+import { ListSupplies } from '../../core/catalog/application/list-supplies/list-supplies';
+import { GetSettings } from '../../core/settings/application/get-settings/get-settings';
+import { AdjustInventory, PreviewAdjustment } from '../../core/inventory/application/adjust-inventory/adjust-inventory';
+import { ListStockMovements } from '../../core/inventory/application/list-stock-movements/list-stock-movements';
 import { DomainError } from '../../core/_common/domain/errors';
 import { StockLight } from '../../core/catalog/domain/supply/supply';
 import { SupplyListItem } from '../../core/catalog/application/list-supplies/list-supplies';
@@ -36,9 +37,11 @@ const MOVEMENT_TYPES = ['initial', 'purchase', 'consumption', 'cancellation'];
   providers: [provideTranslocoScope('operations')],
 })
 export class InventoryScreen {
-  private readonly catalog = inject(CatalogService);
-  private readonly inventory = inject(InventoryService);
-  private readonly settings = inject(SettingsService);
+  private readonly listSupplies = inject(ListSupplies);
+  private readonly getSettings = inject(GetSettings);
+  private readonly adjustInventory = inject(AdjustInventory);
+  private readonly previewAdjustment = inject(PreviewAdjustment);
+  private readonly listStockMovements = inject(ListStockMovements);
   private readonly transloco = inject(TranslocoService);
 
   protected readonly supplies = signal<SupplyListItem[]>([]);
@@ -70,8 +73,8 @@ export class InventoryScreen {
   private async load(): Promise<void> {
     this.loading.set(true);
     const [supplies, settings] = await Promise.all([
-      this.catalog.listSupplies.execute({}),
-      this.settings.getSettings.execute(),
+      this.listSupplies.execute({}),
+      this.getSettings.execute(),
     ]);
     this.supplies.set(supplies);
     this.adjustmentTypes.set([...settings.adjustmentTypes]);
@@ -82,7 +85,7 @@ export class InventoryScreen {
   protected async reloadKardex(): Promise<void> {
     const filter = this.supplyFilter();
     this.movements.set(
-      await this.inventory.listStockMovements.execute(filter ? { supplyId: filter } : {}),
+      await this.listStockMovements.execute(filter ? { supplyId: filter } : {}),
     );
   }
 
@@ -121,7 +124,7 @@ export class InventoryScreen {
       return;
     }
     try {
-      const r = await this.inventory.previewAdjustment.execute({
+      const r = await this.previewAdjustment.execute({
         supplyId: m.supplyId,
         type: m.type,
         quantity: m.quantity,
@@ -147,7 +150,7 @@ export class InventoryScreen {
       this.notice.set(null);
       try {
         const m = this.model();
-        const r = await this.inventory.adjustInventory.execute({
+        const r = await this.adjustInventory.execute({
           supplyId: m.supplyId,
           type: m.type,
           quantity: m.quantity,
