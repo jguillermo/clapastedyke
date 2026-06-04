@@ -1,251 +1,171 @@
-# Diseño UX — "Tu Pastelería": el mundo-pueblo
+# Diseño UX — "Tu Pastelería": de la cocina de casa al pueblo
 
-Documento de diseño de la interfaz del juego. Define el concepto, el mapa
-edificio↔feature, la progresión, el modelo de interacción y el lenguaje visual.
-Acompaña al prototipo navegable ya implementado (`/town`).
+Documento de diseño de la interfaz del juego. Define el concepto, el lugar donde
+ocurre cada fase, la progresión por objetivos, la cinemática y el lenguaje
+visual.
 
-> Fuentes que respeta: `.claude/doc/plan_de_negocio.md` (modelo de negocio),
-> `doc/diseno_visual_interfaz.html` (lenguaje visual), y la arquitectura Angular
-> DDD existente (`core/` casos de uso sobre IndexedDB, `platform/three`).
+> Fuentes que respeta: `.claude/doc/plan_de_negocio.md` (fases y modelo de
+> negocio), `doc/diseno_visual_interfaz.html` (lenguaje visual), y `design_manual.md`
+> (principios de animación).
 
 ---
 
 ## 1. Concepto
 
-La aplicación **es** la pastelería hecha lugar. Una sola escena 3D low-poly —
-mismo facetado/`flatShading` y paleta cálida que las islas y el chef actuales —
-muestra un pueblo que el jugador opera entrando a sus edificios. No hay un "modo
-mapa" y un "modo sistema" separados: hay **un mundo** y dentro de él se trabaja.
+La aplicación **es** la pastelería hecha lugar, y ese lugar **crece con el
+negocio**. El mundo no empieza siendo un pueblo: empieza siendo la **cocina de
+una casa**. Una sola escena 3D low-poly —mismo facetado/`flatShading` y paleta
+cálida que el chef actual— muestra primero el interior de esa cocina pequeña, y
+solo cuando el negocio progresa el mundo se abre a la **ciudad y al pueblo de
+edificios**.
 
-La hoja **Resumen** del plan de negocio deja de ser pantalla y se vuelve el
-**ambiente del pueblo**: los KPIs encabezan la vista y las alertas flotan como
-pines sobre el edificio que les corresponde. El estado del negocio se *ve* sin
-abrir nada.
+No hay un "modo mapa" y un "modo sistema" separados, ni un tutorial que enseñe a
+operar una hoja de cálculo. Hay **un mundo** y dentro de él se trabaja; las
+funciones aparecen conforme se desbloquean (ver progresión en `plan_de_negocio.md`).
 
----
-
-## 2. Mapa edificio ↔ feature
-
-Cinco edificios cubren todo el modelo de negocio. Fuente de verdad en código:
-`src/app/features/game/model/buildings.ts`.
-
-| Edificio | Nivel | Rol | Acciones (pantallas reales montadas) | Alertas (pines) |
-|---|---|---|---|---|
-| **La Oficina** | básico | Preparar el negocio | Configuración · Clientes · Reglas de empaque | — |
-| **La Bodega** | básico | Inventario | Insumos · Ajustar inventario | stock en rojo / bajo mínimo |
-| **La Tienda** | intermedio | Vender | Nuevo presupuesto · Ver presupuestos | presupuestos por vencer / vencidos |
-| **El Obrador** | intermedio | Producir y entregar | Ver pedidos · Recetas | pedidos por entregar |
-| **El Mercado** | avanzado | Abastecerse | Comprar materiales · Proveedores | — |
-
-Cada acción monta la **pantalla operativa real** (`features/*/...-screen`), que
-inyecta casos de uso y persiste en IndexedDB — no la maqueta del tutorial.
+El estado del negocio se *ve* sin abrir nada: en la cocina, los **almacenes de
+ingredientes** muestran su semáforo (rojo/amarillo/verde); en el pueblo, los KPIs
+encabezan la vista y las alertas flotan como pines sobre el edificio que les
+corresponde.
 
 ---
 
-## 3. Progresión básico → avanzado
+## 2. Mapa lugar ↔ fase
 
-Se reutiliza el contenido de 3 niveles tal cual (`content.ts`). Cada nivel
-**abre edificios**. Un edificio queda operativo cuando todos los niveles
-anteriores al suyo están al 100% (`isBuildingOperational`):
+El **lugar** del juego cambia según la fase. La fuente de verdad de la progresión
+es `plan_de_negocio.md`.
 
-```
-Reset ─────────────► Oficina + Bodega operativas (nivel básico)
-Básico 100% ───────► + Tienda + Obrador (nivel intermedio)
-Intermedio 100% ───► + Mercado (nivel avanzado) → pueblo completo
-```
-
-Un edificio bloqueado se ve "en obra" (gris, sin luz en la puerta) y, al tocarlo,
-enruta a la misión guiada que lo abre (`/mission/:unlockMissionId`).
-
----
-
-## 4. Tutorial vs. operación: una sola puerta
-
-- **Primera vez** (flujo no aprendido / edificio bloqueado) → modo **guiado**:
-  el tutorial existente (chef + `GuideCursor` + valores de muestra).
-- **Reingreso** (edificio operativo) → modo **libre**: la pantalla real con data
-  real, sin guía. Entras a la Tienda y vendes.
-
----
-
-## 5. Modelo de interacción (estados y wireframes)
-
-### 4bis. Escena de calle viva
-
-El mundo es una **ciudad en cuadrícula**: cada edificio ocupa su propia cuadra,
-separadas por una **grilla de calles** (asfalto sólido elevado sobre el pasto —
-sin parpadeo/z-fighting), con autos circulando en **ambos ejes** (calles
-horizontales y verticales) y wrap en los bordes.
-- **La Tienda (bakery) al frente-centro**; el resto en la fila de atrás, todos
-  mirando a la cámara. Junto a la bakery: un **parque** (pasto, pinos, banca) a
-  un lado y un **estacionamiento** (bahías marcadas + auto estacionado) al otro.
-- **Todos los edificios texturizados**; los bloqueados se marcan con un **candado
-  flotante 🔒** (sprite de canvas), no con material gris.
-- **Autos** `car/taxi/suv` a escala (~1.4u, ~½ del ancho de un edificio) y **gente
-  low-poly** pequeña (~0.5u, por primitivas — el pack no trae personajes).
-- **El chef** (geometría reutilizable en `chef-mesh.ts`, compartida con el
-  tutorial) frente a la pastelería **saludando** con el brazo en alto.
-- Cámara más alejada (`z 14.5`, `y 7`, fov 42) para que toda la cuadrícula se lea.
-
-Capturas: `docs/town-street-preview.png` y `docs/town-street-detail.png`.
-
-### 5.0 Layout a pantalla completa
-
-El mundo 3D ocupa el **100% del viewport** y todo flota dentro como capas (no hay
-página con scroll). `TownShell` es `:host { position: fixed; inset: 0 }` con:
-- **`.mundo`** (z 0): `<app-town-3d>` a `inset:0` (canvas full-bleed).
-- **`.hud-top`** (z 2): chip de marca (izq.) + KPI chips translúcidos (der.).
-- **`.dock`** (z 2): tira inferior de chips de edificio — selección rápida y
-  **ruta accesible / sin-WebGL** (siempre presente).
-- **Overlays** (z 60): room-menu y pantallas reales como **panel de vidrio
-  flotante** (`backdrop-filter: blur`), con el mundo difuminado detrás.
-
-En rutas `/town*` el shell global (`App`) oculta el HUD del tutorial y el fondo
-decorativo (señal `immersive`); el tutorial (`/mission`, `/level`) conserva su
-HUD sticky y scroll normal.
-
-### 5.1 Vista pueblo (hub orbital)
-
-```
-┌──────────────────────────────────────────────────────────┐
-│  TU PASTELERÍA                                             │
-│  El pueblo de tu negocio                                   │
-│  ( 3 pend. ) ( 1 por vencer ) ( 2 por entregar ) ( 1 rojo )│   ← KPIs ambientales
-│                                                            │
-│            🔺Bodega          🔺Tienda(●)   🔺Obrador        │
-│        🏠 Oficina        ▢ plaza ▢        🏠 Mercado🔒     │   ← canvas 3D (cámara orbita)
-│                  · · partículas · ·                        │
-│                                                            │
-│  [ La Oficina ][ La Bodega ][ La Tienda ][ Obrador ][Merc.]│   ← lista accesible (sin WebGL)
-└──────────────────────────────────────────────────────────┘
-   (●) = pin de alerta flotando · 🔒 = bloqueado/en obra
-```
-
-La cámara orbita lento con parallax al puntero. Hover sobre un edificio: se eleva
-y agranda, cursor `pointer`.
-
-### 5.2 Clic en edificio operativo → zoom + room-menu
-
-La cámara hace dolly hacia la puerta (`focusBuilding`) y el pueblo se difumina;
-sube un panel:
-
-```
-        ┌───────────────────────────────────┐
-        │ ENTRASTE A                      ✕  │
-        │ La Tienda                          │
-        │ El corazón: arma presupuestos…     │
-        │                                    │
-        │   [ Nuevo presupuesto      → ]     │
-        │   [ Ver presupuestos       → ]     │
-        └───────────────────────────────────┘
-```
-
-### 5.3 Acción → pantalla real (la data carga aquí)
-
-```
-┌──────────────────────────────────────────────────────────┐
-│ ← Volver        La Tienda                           ✕ Cerrar│
-├──────────────────────────────────────────────────────────┤
-│  (QuoterScreen real: clientes/recetas de IndexedDB,        │
-│   cálculo de precio en vivo, guardar)                      │
-└──────────────────────────────────────────────────────────┘
-```
-
-Las pantallas reales son **rutas hijas de `/town`** (p. ej. `/town/quotes/new`)
-renderizadas en un `<router-outlet>` dentro del overlay. `← Volver` vuelve al
-room-menu (`/town`, cámara sigue enfocada); `✕ Cerrar` sale del edificio
-(zoom-out + recarga de KPIs). Al guardar un presupuesto el `QuoterScreen` navega
-a `/town/quotes` — **se queda dentro del pueblo** (ya no salta a `/system`).
-
-### 5.4 Clic en edificio bloqueado
-
-Enruta a la misión guiada que lo abre. El jugador aprende el flujo y, al
-completar el nivel, el edificio queda operativo.
-
----
-
-## 5bis. Modelos 3D (SimplePoly City)
-
-El pueblo usa el pack **SimplePoly City** (FBX) cargado en runtime con
-`FBXLoader`. Mapeo edificio→modelo:
-
-| Edificio | Modelo FBX | Textura |
+| Fase | Lugar | Qué se ve y se hace |
 |---|---|---|
-| La Tienda | `bakery.fbx` | `bakery.png` |
-| El Mercado | `super-market.fbx` | `super-market.png` |
-| La Bodega | `factory.fbx` | `factory.png` |
-| El Obrador | `restaurant.fbx` | `restaurant.png` |
-| La Oficina | `books-shop.fbx` | `books-shop.png` |
-
-Decorado no interactivo: árboles (`tree-fir`, `tree-cube`), farolas
-(`street-light`) alrededor de una plaza. Assets servidos desde
-`public/assets/city/` (copiados y renombrados a kebab-case desde
-`3d/SimplePoly City.FBX/`).
-
-Detalles técnicos:
-- Cada modelo es **una sola malla** → se le aplica su atlas PNG como `map` de un
-  único `MeshStandardMaterial`, y el raycast acierta en cualquier punto.
-- **Normalización por bounding box**: los FBX vienen en escalas dispares (bakery
-  ~13 u, factory ~27 u); el motor escala cada uno a una huella de ~2.7 u y lo
-  apoya en el suelo, así conviven al mismo tamaño.
-- **Carga asíncrona con caché**: una plantilla por url, clonada por uso; mientras
-  carga se ve un pad de plot para no romper el layout.
-- **Bloqueado** = mismas mallas con material gris (`under construction`);
-  **operativo** = textura a color. Pines de alerta flotan encima.
-
-## 6. Lenguaje visual
-
-Idéntico a `doc/diseno_visual_interfaz.html`:
-paper `#f6efe5`, tinta `#241d18`, acento rust `#bb5530`/`#9a4324`, verde
-`#4f8a5b`, ámbar `#cf9a32`, rojo `#bf412c`; Fraunces (títulos) / Figtree (texto) /
-Space Mono (números, badges). Edificios `MeshStandardMaterial`+`flatShading` con
-iluminación hemisférica+direccional cálida. Overlays = paneles "sheet" con sombra
-suave. Color de cada edificio: Oficina ámbar, Bodega taupe, Tienda rust (el
-corazón), Obrador verde, Mercado azul.
-
-Accesibilidad: respeta `prefers-reduced-motion` (dibuja un frame, sin órbita) y
-degrada sin WebGL (la lista de edificios opera todo igual). El canvas es
-`aria-hidden`; la ruta accesible es la lista.
+| **1 — Cocina en casa** | Interior de la cocina | Elegir receta, revisar ingredientes, comprar y registrar, cocinar. Almacenes simples con semáforo. |
+| **2 — Redes sociales** | Cocina | Producir para mostrar; popularidad/visibilidad; pedidos informales. |
+| **3 — Primer cliente** | Cocina | Cliente → pedido → producción → entrega → cobro (mínimo). |
+| **4 — Primeras ventas** | Casa → **Ciudad** | Al completar 5 ventas: cinemática de salida; aparece la **pastelería**; la cocina crece. |
+| **5+ — Avanzado** | **Pueblo de edificios** | Las funciones avanzadas se distribuyen en edificios (ver §3). |
 
 ---
 
-## 7. Arquitectura del prototipo (resumen)
+## 3. El pueblo de edificios (Fase 4+)
 
-| Pieza | Archivo |
-|---|---|
-| Motor 3D del pueblo (orquestador delgado) | `src/app/platform/three/town-engine.ts` |
-| ↳ módulos: layout, loader, scenery (+veredas), traffic, buildings, camera-rig | `src/app/platform/three/{town-layout,model-loader,town-scenery,town-traffic,town-buildings,camera-rig}.ts` |
-| Assets de ciudad | `public/assets/city/*.fbx` + `*.png` |
-| Canvas Angular | `src/app/features/game/components/town/town-3d.ts` |
-| Home unificado | `src/app/features/game/components/town/town-shell.{ts,html,scss}` |
-| Mapa edificio↔feature | `src/app/features/game/model/buildings.ts` (+ `.spec.ts`) |
-| Ruta | `/town` (home por defecto) en `src/app/app.routes.ts` |
-| i18n | bloque `town.*` en `public/i18n/game/{es,en}.json` |
+El pueblo es el mundo del **modo avanzado**: aparece recién cuando se desbloquea
+la tienda física. Cinco edificios alojan los flujos avanzados de la pastelería.
+Cada edificio se va abriendo conforme se desbloquea su función (no por completar
+un nivel-tutorial, sino por cumplir el **hito** correspondiente de la progresión).
 
-El dominio (`core/`) y los formularios **no se tocan**: el cambio es de capa de
-presentación/navegación. Reutiliza el `WorldEngine`/`ChefEngine` como hermanos.
+| Edificio | Rol | Funciones que aloja | Alertas (pines) |
+|---|---|---|---|
+| **La Oficina** | Preparar el negocio | Configuración · Clientes · Reglas de empaque | — |
+| **La Bodega** | Inventario | Insumos · Ajustar inventario | stock en rojo / bajo mínimo |
+| **La Tienda** | Vender | Nuevo presupuesto · Ver presupuestos | presupuestos por vencer / vencidos |
+| **El Obrador** | Producir y entregar | Ver pedidos · Recetas | pedidos por entregar |
+| **El Mercado** | Abastecerse | Comprar materiales · Proveedores | — |
+
+Cada acción monta la **pantalla operativa real**, que persiste en IndexedDB. Un
+edificio cuya función aún no se desbloquea se ve "en obra" (candado flotante 🔒).
+
+> Nota: la cocina de la casa (Fases 1–3) es el origen del **Obrador**; al
+> desbloquear la tienda física, la producción pasa de la cocina de casa al pueblo,
+> donde la cocina "crece" para soportar más pedidos.
 
 ---
 
-## 8. Camino completo
+## 4. Progresión por objetivos
 
-1. ~~Plegar `/system/*` dentro del pueblo~~ ✅ **Hecho.** Las pantallas operativas
-   son rutas hijas de `/town` y se renderizan en el `<router-outlet>` del overlay
-   (`TownShell` es ahora layout). `/system/*` redirige a `/town/*`; el
-   `QuoterScreen` y el HUD apuntan a `/town`. `dashboard-screen` y el layout
-   `System` quedan huérfanos (sin ruta) — candidatos a borrar.
-2. ~~Retirar `/map`~~ ✅ **Hecho.** La ruta `/map` ahora redirige a `/town`; las
-   navegaciones del tutorial (guards, `challenge-card`, `level-completed`, `hud`)
-   apuntan a `/town`. Borrados los huérfanos: `world-map/` (WorldMap + Map3d),
-   `platform/three/world-engine.ts`, `features/system/` y `features/dashboard/`
-   (el dashboard vive como KPIs ambientales en `TownShell`). El tutorial
-   (misiones + `level-completed`) sigue vivo y su "casa" es el pueblo.
-3. Animaciones de ambiente y transición de cámara — ✅ **Parcial.** Hecho: humo
-   de chimenea (sprites que suben y se desvanecen) sobre los edificios
-   operativos, balanceo suave de árboles, y una **transición de cámara
-   cinematográfica** (dolly con `easeInOut`, ~0.9s al entrar / ~0.8s al salir) con
-   leve "idle sway" mientras estás enfocado. Pendiente: mini-celebración al abrir
-   un edificio nuevo (reusar confetti de `level-completed`).
-4. `GetDashboard` aún devuelve `route: '/system/...'` en las alertas (no se usa
-   en el pueblo: las alertas son pines). Actualizar a `/town/...` si se hacen
-   clicables.
+La progresión **no** son tres niveles fijos que abren edificios al completar un
+tutorial. Son **fases con objetivos medibles** (definidas en `plan_de_negocio.md`):
+cumplir los objetivos de una fase abre la siguiente y sus funciones.
+
+```
+Inicio ─────────────► Cocina de casa (Fase 1: cocinar la 1ª receta)
+Fase 1 lograda ─────► Producción para redes (Fase 2: popularidad)
+Fase 2 lograda ─────► Clientes y pedidos (Fase 3: 1ª venta a cliente)
+Fase 3 lograda ─────► Objetivo de ventas (Fase 4: completar 5 ventas)
+5 ventas ───────────► Tienda física → pueblo de edificios (Fase 5+)
+Fase 5+ ────────────► Cada función avanzada se desbloquea por su propio hito
+```
+
+Una función bloqueada (un edificio "en obra", una sección oculta) se abre al
+cumplir su hito, no antes. La guía del jugador ocurre **dentro del mundo** (el
+chef acompaña), no sobre maquetas de menús de Google Sheets.
+
+---
+
+## 5. Cinemática y transiciones
+
+### 5.1 Arranque (Fase 1)
+
+- **Vista aérea de la ciudad.** La cámara comienza alto, sobre la ciudad.
+- **Zoom progresivo a la casa.** Desciende con un *dolly* suave hasta la casa del
+  jugador.
+- **Entrada a la cocina.** La cámara entra al interior; se ve la cocina pequeña.
+- **Tutorial inicial.** Comienza la guía de Fase 1.
+
+### 5.2 Desbloqueo de la tienda física (Fase 4)
+
+Al completar las 5 ventas:
+
+- El jugador **sale de su casa**.
+- Se muestra **la ciudad** nuevamente.
+- Aparece su **pequeña pastelería**.
+- La cocina **mejora y crece**; el mundo pasa al pueblo de edificios.
+
+### 5.3 Reglas de la cámara
+
+La cámara orbita lento con parallax al puntero en las vistas abiertas; hace
+*dolly* cinematográfico al enfocar una estación de la cocina o un edificio del
+pueblo, y se retira al salir. Respeta `prefers-reduced-motion` (salta sin
+animación) y degrada sin WebGL (la ruta accesible —lista de acciones/edificios—
+opera todo igual).
+
+---
+
+## 6. Modelo de interacción
+
+### 6.1 Cocina (Fases 1–3)
+
+El interior de la cocina ocupa el viewport; las acciones (elegir receta, revisar
+ingredientes, comprar/registrar, cocinar) suben como **paneles de vidrio
+flotantes** (`backdrop-filter: blur`) sobre la escena. Los **almacenes de
+ingredientes** se ven en la escena con su semáforo (vacío→rojo, poco→amarillo,
+suficiente→verde). Una **ruta accesible** (lista de acciones) siempre está
+disponible y opera todo sin depender del 3D.
+
+### 6.2 Pueblo (Fase 4+)
+
+El mundo 3D ocupa el 100% del viewport; encima flotan el HUD con KPIs ambientales
+y un dock de edificios (también ruta accesible). Clic en un edificio operativo →
+la cámara hace *dolly* a la puerta y sube un **room-menu** con sus acciones; cada
+acción monta la **pantalla operativa real**. Clic en un edificio bloqueado →
+indica el hito que falta para desbloquearlo.
+
+---
+
+## 7. Lenguaje visual
+
+Idéntico a `doc/diseno_visual_interfaz.html`: paper `#f6efe5`, tinta `#241d18`,
+acento rust `#bb5530`/`#9a4324`, verde `#4f8a5b`, ámbar `#cf9a32`, rojo `#bf412c`;
+Fraunces (títulos) / Figtree (texto) / Space Mono (números, badges). Geometría
+low-poly `MeshStandardMaterial`+`flatShading` con iluminación cálida. Overlays =
+paneles "sheet" con sombra suave.
+
+Semáforos: el rojo/amarillo/verde de los almacenes y de los pines de alerta usa la
+misma paleta (rojo `#bf412c`, ámbar `#cf9a32`, verde `#4f8a5b`).
+
+Accesibilidad: respeta `prefers-reduced-motion` y degrada sin WebGL; el canvas es
+`aria-hidden` y la ruta accesible (lista de acciones/edificios) opera el juego
+completo.
+
+---
+
+## 8. Qué cambia respecto al diseño anterior
+
+- **El inicio ya no es el pueblo ni un tutorial de hoja de cálculo.** El juego
+  empieza en la **cocina de casa**, con la cinemática aérea → casa → cocina.
+- **El pueblo de 5 edificios es contenido de Fase 4+**, no el punto de partida; se
+  alcanza tras desbloquear la tienda física (completar 5 ventas).
+- **La progresión es por objetivos**, no por tres niveles fijos
+  (básico/intermedio/avanzado) que abren edificios al completar un tutorial.
+- **Se retira la maqueta de menús/hojas de Google Sheets** como mecanismo de
+  enseñanza: el juego es autocontenido y la guía sucede dentro del mundo.
+- **Se conservan** el lenguaje visual, el motor 3D low-poly, el chef como guía y
+  las pantallas operativas reales (ahora reservadas al modo avanzado).
