@@ -1,0 +1,120 @@
+<!-- Mundo 3D de la cocina (fondo) -->
+<app-home-3d class="mundo" (stationChosen)="onStation($event)"></app-home-3d>
+
+<!-- HUD superior -->
+<header class="hud">
+  <span class="hud__brand">Tu Pastelería</span>
+  <span class="hud__level">Nivel {{ level() }} · Cocina en casa</span>
+  <button type="button" class="btn btn--ghost" (click)="openGoals()">Metas</button>
+</header>
+
+<!-- Dock inferior (ruta accesible, opera todo sin 3D) -->
+<nav class="dock" aria-label="Estaciones de la cocina">
+  <button type="button" class="dock__chip" (click)="openRecipes()">Recetas</button>
+  <button type="button" class="dock__chip" (click)="onStation('pantry')">Despensa</button>
+  <button type="button" class="dock__chip" (click)="openRecipes()">Cocinar</button>
+</nav>
+
+@if (overlay() !== 'none') {
+  <div class="scrim" (click)="close()"></div>
+
+  <!-- Metas del nivel -->
+  @if (overlay() === 'goals') {
+    <section class="panel" role="dialog" aria-label="Metas del nivel">
+      <header class="panel__head">
+        <h2>Metas del nivel</h2>
+        <button type="button" class="icon-btn" (click)="close()" aria-label="Cerrar">✕</button>
+      </header>
+      <div class="panel__body">
+        @if (anyGoal()) {
+          <app-goal-tracker [goals]="goals()"></app-goal-tracker>
+        } @else {
+          <p class="muted">¡Completaste todas las metas de esta etapa!</p>
+        }
+      </div>
+    </section>
+  }
+
+  <!-- Elegir receta -->
+  @if (overlay() === 'recipes') {
+    <section class="panel" role="dialog" aria-label="Elegir receta">
+      <header class="panel__head">
+        <h2>¿Qué preparamos?</h2>
+        <button type="button" class="icon-btn" (click)="close()" aria-label="Cerrar">✕</button>
+      </header>
+      <div class="panel__body">
+        @for (r of recipes(); track r.id) {
+          <div class="card">
+            <div>
+              <strong>{{ r.name }}</strong>
+              <span class="muted"> · {{ r.ingredients.length }} ingredientes</span>
+            </div>
+            <button type="button" class="btn btn--primary" [disabled]="busy()" (click)="choose(r)">Preparar</button>
+          </div>
+        } @empty {
+          <p class="muted">Aún no hay recetas.</p>
+        }
+      </div>
+    </section>
+  }
+
+  <!-- Revisar ingredientes -->
+  @if (overlay() === 'check' && review(); as rev) {
+    <section class="panel" role="dialog" aria-label="Revisar ingredientes">
+      <header class="panel__head">
+        <h2>Para «{{ rev.recipeName }}»</h2>
+        <button type="button" class="icon-btn" (click)="close()" aria-label="Cerrar">✕</button>
+      </header>
+      <div class="panel__body">
+        <table class="check">
+          <thead>
+            <tr><th>Ingrediente</th><th>Necesito</th><th>Tengo</th><th>Estado</th><th></th></tr>
+          </thead>
+          <tbody>
+            @for (it of rev.items; track it.supplyId) {
+              <tr>
+                <td>{{ it.name }}</td>
+                <td class="num">{{ it.needed }} {{ it.unit }}</td>
+                <td class="num">{{ it.have }} {{ it.unit }}</td>
+                <td><app-status-badge [status]="it.status"></app-status-badge></td>
+                <td>
+                  @if (!it.enough) {
+                    <button type="button" class="btn btn--mini" [disabled]="busy()" (click)="buyMissing(it)">Comprar</button>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      <footer class="panel__foot">
+        <button type="button" class="btn btn--primary" [disabled]="!rev.canCook || busy()" (click)="cookNow()">
+          Cocinar
+        </button>
+      </footer>
+    </section>
+  }
+
+  <!-- Cocinado -->
+  @if (overlay() === 'cooked') {
+    <section class="panel panel--celebrate" role="dialog" aria-label="Listo">
+      <div class="celebrate">
+        <span class="celebrate__emoji">🍪</span>
+        <h2>¡Cocinaste {{ cookedName() }}!</h2>
+        <button type="button" class="btn btn--primary" (click)="close()">Seguir</button>
+      </div>
+    </section>
+  }
+
+  <!-- Nivel completado -->
+  @if (overlay() === 'levelup') {
+    <section class="panel panel--celebrate" role="dialog" aria-label="Nivel completado">
+      <div class="celebrate">
+        <span class="celebrate__emoji">🎉</span>
+        <h2>¡Nivel completado!</h2>
+        <p>{{ unlockedLabel() }}</p>
+        <button type="button" class="btn btn--primary" (click)="close()">Continuar</button>
+      </div>
+    </section>
+  }
+}

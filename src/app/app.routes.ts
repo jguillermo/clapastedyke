@@ -1,12 +1,21 @@
 import { Routes } from '@angular/router';
 import { missionRedirectGuard, unlockGuard } from './features/game/unlock.guard';
+import { physicalStoreGuard } from './features/_common/guards/physical-store.guard';
 
 export const routes: Routes = [
-  { path: '', pathMatch: 'full', redirectTo: 'town' },
+  // El juego arranca en la cocina de casa (Fase 1). El pueblo (/town) es el
+  // mundo de la Fase 4+ y se abre solo con PHYSICAL_STORE.
+  { path: '', pathMatch: 'full', redirectTo: 'home' },
   {
-    // The town is the unified app. The operational screens (formerly /system/*)
-    // are its children, rendered in the town's overlay outlet.
+    path: 'home',
+    loadComponent: () =>
+      import('./features/game/components/home/home-shell').then(m => m.HomeShell),
+  },
+  {
+    // The town is the advanced world (Fase 4+). Its operational screens are its
+    // children, rendered in the town's overlay outlet.
     path: 'town',
+    canActivate: [physicalStoreGuard],
     loadComponent: () =>
       import('./features/game/components/town/town-shell').then(m => m.TownShell),
     children: [
@@ -46,5 +55,5 @@ export const routes: Routes = [
   { path: 'system', redirectTo: 'town', pathMatch: 'full' },
   { path: 'system/quotes/new', redirectTo: 'town/quotes/new' },
   { path: 'system/:section', redirectTo: 'town/:section' },
-  { path: '**', redirectTo: 'town' },
+  { path: '**', redirectTo: 'home' },
 ];
