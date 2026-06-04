@@ -38,6 +38,8 @@ export const ROAD_W = 1.5;
  * and the traffic (walks people on it).
  */
 export const WALK_LANES = [2.25, -2.05] as const;
+/** `x` of the sidewalks flanking the vertical roads, where z-walkers walk. */
+export const WALK_LANES_Z = [-2.9, 2.9] as const;
 export const SIDEWALK_W = 0.7;
 export const SIDEWALK_COLOR = 0xded4c0;
 

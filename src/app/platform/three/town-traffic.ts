@@ -8,6 +8,7 @@ import {
   PEOPLE_TONES,
   PERSON_SCALE,
   WALK_LANES,
+  WALK_LANES_Z,
   X_SPAN,
   Z_MAX,
   Z_MIN,
@@ -97,6 +98,16 @@ export class TownTraffic {
         min: -X_SPAN - 1,
         max: X_SPAN + 1,
       });
+    });
+
+    // Pedestrians walking the sidewalks along the vertical roads.
+    WALK_LANES_Z.forEach((x, i) => {
+      const c = PEOPLE_TONES[(i + 2) % PEOPLE_TONES.length];
+      const dir = i % 2 ? -1 : 1;
+      const person = buildPerson(c[0], c[1]);
+      person.position.set(x, 0, Z_MIN + i * 3);
+      this.scene.add(person);
+      this.people.push({ obj: person, axisZ: true, dir, speed: 0.5 + i * 0.15, min: Z_MIN, max: Z_MAX });
     });
   }
 

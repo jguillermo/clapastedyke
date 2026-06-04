@@ -104,13 +104,24 @@ export class TownScenery {
     }
   }
 
-  /** Walkable sidewalks in front of each block row, where pedestrians walk. */
+  /** Walkable sidewalks: along the block rows (x) and flanking the cross streets (z). */
   private buildSidewalks(): void {
     const walk = solid(SIDEWALK_COLOR);
     for (const z of WALK_LANES) {
       const strip = new THREE.Mesh(new THREE.BoxGeometry(X_SPAN * 2 + 2, 0.05, SIDEWALK_W), walk);
       strip.position.set(0, 0.05, z);
       this.scene.add(strip);
+    }
+    // Sidewalks flanking each vertical road (run along z); slightly lower so the
+    // crossings with the horizontal sidewalks don't z-fight.
+    const offset = ROAD_W / 2 + SIDEWALK_W / 2;
+    const zLen = Z_MAX - Z_MIN;
+    for (const x of ROADS_Z) {
+      for (const side of [-1, 1]) {
+        const strip = new THREE.Mesh(new THREE.BoxGeometry(SIDEWALK_W, 0.05, zLen), walk);
+        strip.position.set(x + side * offset, 0.048, (Z_MIN + Z_MAX) / 2);
+        this.scene.add(strip);
+      }
     }
   }
 
