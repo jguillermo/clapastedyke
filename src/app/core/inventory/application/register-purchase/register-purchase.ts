@@ -1,12 +1,13 @@
-import { EventBus } from '../../../_common/application/event-bus';
+import { Injectable, inject } from '@angular/core';
 import { UseCase } from '../../../_common/application/use-case';
+import { EventBusToken } from '../../../_common/core.tokens';
 import { Money } from '../../../_common/domain/money';
 import { NotFoundError, ValidationError } from '../../../_common/domain/errors';
 import { EntityId } from '../../../_common/domain/entity-id';
-import { SupplyRepository } from '../../../catalog/domain/supply/supply-repository';
-import { SupplierRepository } from '../../../catalog/domain/supplier/supplier-repository';
+import { SUPPLY_REPOSITORY } from '../../../catalog/domain/supply/supply-repository';
+import { SUPPLIER_REPOSITORY } from '../../../catalog/domain/supplier/supplier-repository';
 import { Purchase } from '../../domain/purchase/purchase';
-import { PurchaseRepository } from '../../domain/purchase/purchase-repository';
+import { PURCHASE_REPOSITORY } from '../../domain/purchase/purchase-repository';
 import { StockService } from '../../domain/stock-service';
 
 export interface PurchaseLineRequest {
@@ -28,14 +29,13 @@ export interface RegisterPurchaseRequest {
  * one paid (recomputing the price per base unit) and the 'purchase' movement
  * is left in the kardex. The CMP- purchase is immutable history.
  */
+@Injectable({ providedIn: 'root' })
 export class RegisterPurchase implements UseCase<RegisterPurchaseRequest, { id: string }> {
-  constructor(
-    private readonly purchases: PurchaseRepository,
-    private readonly supplies: SupplyRepository,
-    private readonly suppliers: SupplierRepository,
-    private readonly stock: StockService,
-    private readonly bus: EventBus,
-  ) {}
+  private readonly purchases = inject(PURCHASE_REPOSITORY);
+  private readonly supplies = inject(SUPPLY_REPOSITORY);
+  private readonly suppliers = inject(SUPPLIER_REPOSITORY);
+  private readonly stock = inject(StockService);
+  private readonly bus = inject(EventBusToken);
 
   async execute(request: RegisterPurchaseRequest): Promise<{ id: string }> {
     const supplier = await this.suppliers.byId(EntityId.of(request.supplierId));

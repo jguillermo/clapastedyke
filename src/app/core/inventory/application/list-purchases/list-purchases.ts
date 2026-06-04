@@ -1,7 +1,8 @@
+import { Injectable, inject } from '@angular/core';
 import { UseCase } from '../../../_common/application/use-case';
 import { formatDate } from '../../../_common/application/formats';
 import { Money } from '../../../_common/domain/money';
-import { PurchaseRepository } from '../../domain/purchase/purchase-repository';
+import { PURCHASE_REPOSITORY } from '../../domain/purchase/purchase-repository';
 
 export interface PurchaseListItem {
   id: string;
@@ -19,8 +20,9 @@ export interface PurchaseListItem {
 }
 
 /** Purchase history, ready to paint (most recent first). */
+@Injectable({ providedIn: 'root' })
 export class ListPurchases implements UseCase<void, PurchaseListItem[]> {
-  constructor(private readonly purchases: PurchaseRepository) {}
+  private readonly purchases = inject(PURCHASE_REPOSITORY);
 
   async execute(): Promise<PurchaseListItem[]> {
     const all = await this.purchases.all();

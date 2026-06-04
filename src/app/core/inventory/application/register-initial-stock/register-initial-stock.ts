@@ -1,15 +1,17 @@
+import { Injectable, inject } from '@angular/core';
 import { DomainEvent } from '../../../_common/domain/domain-event';
 import { EntityId } from '../../../_common/domain/entity-id';
 import { StockMovement } from '../../domain/stock-movement/stock-movement';
-import { StockMovementRepository } from '../../domain/stock-movement/stock-movement-repository';
+import { STOCK_MOVEMENT_REPOSITORY } from '../../domain/stock-movement/stock-movement-repository';
 
 /**
  * Subscriber for SupplyCreated: if the creation brings initial stock, it
  * leaves the 'initial' movement in the kardex (the supply's stock is already
  * set by the aggregate — here we only record the fact, as the GAS does).
  */
+@Injectable({ providedIn: 'root' })
 export class RegisterInitialStock {
-  constructor(private readonly movements: StockMovementRepository) {}
+  private readonly movements = inject(STOCK_MOVEMENT_REPOSITORY);
 
   /** Wire it like: bus.subscribe('SupplyCreated', e => subscriber.handle(e)) */
   async handle(event: DomainEvent): Promise<void> {

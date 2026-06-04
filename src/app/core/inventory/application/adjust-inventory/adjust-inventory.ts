@@ -1,11 +1,12 @@
-import { EventBus } from '../../../_common/application/event-bus';
+import { Injectable, inject } from '@angular/core';
 import { UseCase } from '../../../_common/application/use-case';
+import { EventBusToken } from '../../../_common/core.tokens';
 import { domainEvent } from '../../../_common/domain/domain-event';
 import { NotFoundError } from '../../../_common/domain/errors';
 import { EntityId } from '../../../_common/domain/entity-id';
 import { StockLight } from '../../../catalog/domain/supply/supply';
-import { SupplyRepository } from '../../../catalog/domain/supply/supply-repository';
-import { SettingsRepository } from '../../../settings/domain/settings-repository';
+import { SUPPLY_REPOSITORY } from '../../../catalog/domain/supply/supply-repository';
+import { SETTINGS_REPOSITORY } from '../../../settings/domain/settings-repository';
 import { StockService } from '../../domain/stock-service';
 
 export interface AdjustInventoryRequest {
@@ -25,13 +26,12 @@ export interface AdjustmentResponse {
  * settings (waste always subtracts, return adds, count keeps your sign).
  * The movement is left in the kardex.
  */
+@Injectable({ providedIn: 'root' })
 export class AdjustInventory implements UseCase<AdjustInventoryRequest, AdjustmentResponse> {
-  constructor(
-    private readonly supplies: SupplyRepository,
-    private readonly settings: SettingsRepository,
-    private readonly stock: StockService,
-    private readonly bus: EventBus,
-  ) {}
+  private readonly supplies = inject(SUPPLY_REPOSITORY);
+  private readonly settings = inject(SETTINGS_REPOSITORY);
+  private readonly stock = inject(StockService);
+  private readonly bus = inject(EventBusToken);
 
   async execute(request: AdjustInventoryRequest): Promise<AdjustmentResponse> {
     const supply = await this.supplies.byId(EntityId.of(request.supplyId));
@@ -61,13 +61,12 @@ export class AdjustInventory implements UseCase<AdjustInventoryRequest, Adjustme
 }
 
 /** Adjustment preview (previsualizarAjuste in GAS): persists nothing. */
+@Injectable({ providedIn: 'root' })
 export class PreviewAdjustment
   implements UseCase<AdjustInventoryRequest, AdjustmentResponse & { currentStock: number }>
 {
-  constructor(
-    private readonly supplies: SupplyRepository,
-    private readonly settings: SettingsRepository,
-  ) {}
+  private readonly supplies = inject(SUPPLY_REPOSITORY);
+  private readonly settings = inject(SETTINGS_REPOSITORY);
 
   async execute(request: AdjustInventoryRequest) {
     const supply = await this.supplies.byId(EntityId.of(request.supplyId));

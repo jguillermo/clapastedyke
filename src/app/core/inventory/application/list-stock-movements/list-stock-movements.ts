@@ -1,6 +1,7 @@
+import { Injectable, inject } from '@angular/core';
 import { UseCase } from '../../../_common/application/use-case';
 import { formatDate } from '../../../_common/application/formats';
-import { StockMovementRepository } from '../../domain/stock-movement/stock-movement-repository';
+import { STOCK_MOVEMENT_REPOSITORY } from '../../domain/stock-movement/stock-movement-repository';
 
 export interface StockMovementListItem {
   id: string;
@@ -19,10 +20,11 @@ export interface ListStockMovementsRequest {
 }
 
 /** The kardex, ready to paint (most recent first). */
+@Injectable({ providedIn: 'root' })
 export class ListStockMovements
   implements UseCase<ListStockMovementsRequest, StockMovementListItem[]>
 {
-  constructor(private readonly movements: StockMovementRepository) {}
+  private readonly movements = inject(STOCK_MOVEMENT_REPOSITORY);
 
   async execute(request: ListStockMovementsRequest = {}): Promise<StockMovementListItem[]> {
     let list = await this.movements.all();

@@ -1,8 +1,9 @@
+import { Injectable, inject } from '@angular/core';
 import { EntityId } from '../../_common/domain/entity-id';
 import { Supply } from '../../catalog/domain/supply/supply';
 import { StockMovement, MovementType } from './stock-movement/stock-movement';
-import { StockMovementRepository } from './stock-movement/stock-movement-repository';
-import { SupplyRepository } from '../../catalog/domain/supply/supply-repository';
+import { STOCK_MOVEMENT_REPOSITORY, StockMovementRepository } from './stock-movement/stock-movement-repository';
+import { SUPPLY_REPOSITORY } from '../../catalog/domain/supply/supply-repository';
 
 /**
  * StockService domain service: the ONLY path to change the stock
@@ -10,11 +11,10 @@ import { SupplyRepository } from '../../catalog/domain/supply/supply-repository'
  * quantity to the supply and leaves the movement in the kardex with the
  * resulting stock.
  */
+@Injectable({ providedIn: 'root' })
 export class StockService {
-  constructor(
-    private readonly supplies: SupplyRepository,
-    private readonly movements: StockMovementRepository,
-  ) {}
+  private readonly supplies = inject(SUPPLY_REPOSITORY);
+  private readonly movements = inject(STOCK_MOVEMENT_REPOSITORY);
 
   async move(
     supply: Supply,

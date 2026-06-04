@@ -1,9 +1,10 @@
+import { Injectable, inject } from '@angular/core';
 import { UseCase } from '../../../_common/application/use-case';
 import { NotFoundError } from '../../../_common/domain/errors';
 import { EntityId } from '../../../_common/domain/entity-id';
-import { SupplyRepository } from '../../../catalog/domain/supply/supply-repository';
-import { SupplierRepository } from '../../../catalog/domain/supplier/supplier-repository';
-import { OrderRepository } from '../../../sales/domain/order/order-repository';
+import { SUPPLY_REPOSITORY } from '../../../catalog/domain/supply/supply-repository';
+import { SUPPLIER_REPOSITORY } from '../../../catalog/domain/supplier/supplier-repository';
+import { ORDER_REPOSITORY } from '../../../sales/domain/order/order-repository';
 
 /** A supply to buy, with its recommended supplier and the WhatsApp link. */
 export interface ShoppingListItem {
@@ -18,12 +19,11 @@ export interface ShoppingListItem {
 }
 
 /** Automatic mode (Flow 05.1): an order's shortages, by supplier. */
+@Injectable({ providedIn: 'root' })
 export class OrderShortages implements UseCase<{ orderId: string }, ShoppingListItem[]> {
-  constructor(
-    private readonly orders: OrderRepository,
-    private readonly supplies: SupplyRepository,
-    private readonly suppliers: SupplierRepository,
-  ) {}
+  private readonly orders = inject(ORDER_REPOSITORY);
+  private readonly supplies = inject(SUPPLY_REPOSITORY);
+  private readonly suppliers = inject(SUPPLIER_REPOSITORY);
 
   async execute({ orderId }: { orderId: string }): Promise<ShoppingListItem[]> {
     const order = await this.orders.byId(EntityId.of(orderId));
@@ -59,11 +59,10 @@ export class OrderShortages implements UseCase<{ orderId: string }, ShoppingList
 }
 
 /** Manual mode (Flow 05.1): everything below the minimum, pre-checked. */
+@Injectable({ providedIn: 'root' })
 export class SuppliesBelowMinimum implements UseCase<void, ShoppingListItem[]> {
-  constructor(
-    private readonly supplies: SupplyRepository,
-    private readonly suppliers: SupplierRepository,
-  ) {}
+  private readonly supplies = inject(SUPPLY_REPOSITORY);
+  private readonly suppliers = inject(SUPPLIER_REPOSITORY);
 
   async execute(): Promise<ShoppingListItem[]> {
     const all = await this.supplies.all();
