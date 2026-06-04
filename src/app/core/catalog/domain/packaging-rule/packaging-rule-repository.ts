@@ -1,3 +1,4 @@
+import { InjectionToken } from '@angular/core';
 import { EntityId } from '../../../_common/domain/entity-id';
 import { PackagingRule } from './packaging-rule';
 
@@ -18,3 +19,6 @@ export interface PackagingRuleRepository {
 export interface AvailableSizes {
   names(): Promise<string[]>;
 }
+
+export const PACKAGING_RULE_REPOSITORY = new InjectionToken<PackagingRuleRepository>('PackagingRuleRepository');
+export const AVAILABLE_SIZES_TOKEN = new InjectionToken<AvailableSizes>('AvailableSizes');

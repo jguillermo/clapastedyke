@@ -1,3 +1,4 @@
+import { InjectionToken } from '@angular/core';
 import { EntityId } from '../../../_common/domain/entity-id';
 import { Order } from './order';
 
@@ -7,3 +8,5 @@ export interface OrderRepository {
   save(order: Order): Promise<void>;
   all(): Promise<Order[]>;
 }
+
+export const ORDER_REPOSITORY = new InjectionToken<OrderRepository>('OrderRepository');

@@ -1,3 +1,4 @@
+import { InjectionToken } from '@angular/core';
 import { EntityId } from '../../../_common/domain/entity-id';
 import { Supply, SupplyType } from './supply';
 
@@ -10,3 +11,5 @@ export interface SupplyRepository {
   /** Filtered catalog: 'packaging' for packaging rules and quotes. */
   byType(type: SupplyType): Promise<Supply[]>;
 }
+
+export const SUPPLY_REPOSITORY = new InjectionToken<SupplyRepository>('SupplyRepository');

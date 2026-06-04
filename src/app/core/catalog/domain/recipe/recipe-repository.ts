@@ -1,3 +1,4 @@
+import { InjectionToken } from '@angular/core';
 import { EntityId } from '../../../_common/domain/entity-id';
 import { Recipe } from './recipe';
 
@@ -8,3 +9,5 @@ export interface RecipeRepository {
   save(recipe: Recipe): Promise<void>;
   all(): Promise<Recipe[]>;
 }
+
+export const RECIPE_REPOSITORY = new InjectionToken<RecipeRepository>('RecipeRepository');

@@ -1,3 +1,4 @@
+import { InjectionToken } from '@angular/core';
 import { BusinessSettings } from './business-settings';
 
 /**
@@ -9,3 +10,5 @@ export interface SettingsRepository {
   get(): Promise<BusinessSettings>;
   save(settings: BusinessSettings): Promise<void>;
 }
+
+export const SETTINGS_REPOSITORY = new InjectionToken<SettingsRepository>('SettingsRepository');

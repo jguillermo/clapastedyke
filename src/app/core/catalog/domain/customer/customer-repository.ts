@@ -1,3 +1,4 @@
+import { InjectionToken } from '@angular/core';
 import { EntityId } from '../../../_common/domain/entity-id';
 import { Customer } from './customer';
 
@@ -13,3 +14,5 @@ export interface CustomerRepository {
   save(customer: Customer): Promise<void>;
   all(): Promise<Customer[]>;
 }
+
+export const CUSTOMER_REPOSITORY = new InjectionToken<CustomerRepository>('CustomerRepository');

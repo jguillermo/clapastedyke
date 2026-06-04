@@ -1,3 +1,4 @@
+import { InjectionToken } from '@angular/core';
 import { EntityId } from '../../../_common/domain/entity-id';
 import { Purchase } from './purchase';
 
@@ -7,3 +8,5 @@ export interface PurchaseRepository {
   save(purchase: Purchase): Promise<void>;
   all(): Promise<Purchase[]>;
 }
+
+export const PURCHASE_REPOSITORY = new InjectionToken<PurchaseRepository>('PurchaseRepository');

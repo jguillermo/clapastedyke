@@ -1,3 +1,4 @@
+import { InjectionToken } from '@angular/core';
 import { EntityId } from '../../../_common/domain/entity-id';
 import { StockMovement, MovementType } from './stock-movement';
 
@@ -8,3 +9,5 @@ export interface StockMovementRepository {
   /** An order's consumptions, to reverse them on cancellation. */
   byReferenceAndType(reference: string, type: MovementType): Promise<StockMovement[]>;
 }
+
+export const STOCK_MOVEMENT_REPOSITORY = new InjectionToken<StockMovementRepository>('StockMovementRepository');
