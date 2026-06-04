@@ -1,9 +1,10 @@
+import { Injectable, inject } from '@angular/core';
 import { UseCase } from '../../../_common/application/use-case';
 import { formatLongDate } from '../../../_common/application/formats';
-import { SettingsRepository } from '../../../settings/domain/settings-repository';
-import { SupplyRepository } from '../../../catalog/domain/supply/supply-repository';
-import { OrderRepository } from '../../../sales/domain/order/order-repository';
-import { QuoteRepository } from '../../../sales/domain/quote/quote-repository';
+import { SETTINGS_REPOSITORY, SettingsRepository } from '../../../settings/domain/settings-repository';
+import { SUPPLY_REPOSITORY, SupplyRepository } from '../../../catalog/domain/supply/supply-repository';
+import { ORDER_REPOSITORY, OrderRepository } from '../../../sales/domain/order/order-repository';
+import { QUOTE_REPOSITORY, QuoteRepository } from '../../../sales/domain/quote/quote-repository';
 
 /**
  * READ projection of the Home panel (the GAS «Resumen»): the day's KPIs and the
@@ -48,13 +49,12 @@ export interface DashboardData {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+@Injectable({ providedIn: 'root' })
 export class GetDashboard implements UseCase<void, DashboardData> {
-  constructor(
-    private readonly quotes: QuoteRepository,
-    private readonly orders: OrderRepository,
-    private readonly supplies: SupplyRepository,
-    private readonly settings: SettingsRepository,
-  ) {}
+  private readonly quotes = inject<QuoteRepository>(QUOTE_REPOSITORY);
+  private readonly orders = inject<OrderRepository>(ORDER_REPOSITORY);
+  private readonly supplies = inject<SupplyRepository>(SUPPLY_REPOSITORY);
+  private readonly settings = inject<SettingsRepository>(SETTINGS_REPOSITORY);
 
   async execute(): Promise<DashboardData> {
     const today = new Date();
