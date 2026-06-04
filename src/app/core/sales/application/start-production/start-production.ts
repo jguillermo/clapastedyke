@@ -1,9 +1,10 @@
-import { EventBus } from '../../../_common/application/event-bus';
+import { Injectable, inject } from '@angular/core';
+import { EventBusToken } from '../../../_common/core.tokens';
 import { UseCase } from '../../../_common/application/use-case';
 import { NotFoundError } from '../../../_common/domain/errors';
 import { EntityId } from '../../../_common/domain/entity-id';
 import { StockService } from '../../../inventory/domain/stock-service';
-import { OrderRepository } from '../../domain/order/order-repository';
+import { ORDER_REPOSITORY } from '../../domain/order/order-repository';
 import { deductOrderStock } from '../order-stock-deduction';
 
 export interface StartProductionRequest {
@@ -15,12 +16,11 @@ export interface StartProductionRequest {
  * ON_PRODUCTION (idempotent: if it already went down on approval, it does not
  * go down again).
  */
+@Injectable({ providedIn: 'root' })
 export class StartProduction implements UseCase<StartProductionRequest, void> {
-  constructor(
-    private readonly orders: OrderRepository,
-    private readonly stock: StockService,
-    private readonly bus: EventBus,
-  ) {}
+  private readonly orders = inject(ORDER_REPOSITORY);
+  private readonly stock = inject(StockService);
+  private readonly bus = inject(EventBusToken);
 
   async execute(request: StartProductionRequest): Promise<void> {
     const order = await this.orders.byId(EntityId.of(request.orderId));

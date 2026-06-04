@@ -1,13 +1,14 @@
-import { EventBus } from '../../../_common/application/event-bus';
+import { Injectable, inject } from '@angular/core';
+import { EventBusToken } from '../../../_common/core.tokens';
 import { UseCase } from '../../../_common/application/use-case';
 import { NotFoundError } from '../../../_common/domain/errors';
 import { EntityId } from '../../../_common/domain/entity-id';
-import { CustomerRepository } from '../../../catalog/domain/customer/customer-repository';
-import { SupplyRepository } from '../../../catalog/domain/supply/supply-repository';
-import { RecipeRepository } from '../../../catalog/domain/recipe/recipe-repository';
-import { SettingsRepository } from '../../../settings/domain/settings-repository';
+import { CUSTOMER_REPOSITORY } from '../../../catalog/domain/customer/customer-repository';
+import { SUPPLY_REPOSITORY } from '../../../catalog/domain/supply/supply-repository';
+import { RECIPE_REPOSITORY } from '../../../catalog/domain/recipe/recipe-repository';
+import { SETTINGS_REPOSITORY } from '../../../settings/domain/settings-repository';
 import { Quote } from '../../domain/quote/quote';
-import { QuoteRepository } from '../../domain/quote/quote-repository';
+import { QUOTE_REPOSITORY } from '../../domain/quote/quote-repository';
 import {
   CalculateQuoteRequest,
   calculateWithCatalog,
@@ -28,15 +29,14 @@ export interface SaveQuoteResponse {
  * fixes them forever in the aggregate. It is born Pending, expiring after the
  * settings days. It does not touch inventory yet.
  */
+@Injectable({ providedIn: 'root' })
 export class SaveQuote implements UseCase<SaveQuoteRequest, SaveQuoteResponse> {
-  constructor(
-    private readonly quotes: QuoteRepository,
-    private readonly customers: CustomerRepository,
-    private readonly recipes: RecipeRepository,
-    private readonly supplies: SupplyRepository,
-    private readonly settings: SettingsRepository,
-    private readonly bus: EventBus,
-  ) {}
+  private readonly quotes = inject(QUOTE_REPOSITORY);
+  private readonly customers = inject(CUSTOMER_REPOSITORY);
+  private readonly recipes = inject(RECIPE_REPOSITORY);
+  private readonly supplies = inject(SUPPLY_REPOSITORY);
+  private readonly settings = inject(SETTINGS_REPOSITORY);
+  private readonly bus = inject(EventBusToken);
 
   async execute(request: SaveQuoteRequest): Promise<SaveQuoteResponse> {
     const customer = await this.customers.byId(EntityId.of(request.customerId));

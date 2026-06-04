@@ -1,12 +1,13 @@
+import { Injectable, inject } from '@angular/core';
 import { UseCase } from '../../../_common/application/use-case';
 import { Money } from '../../../_common/domain/money';
 import { NotFoundError } from '../../../_common/domain/errors';
 import { EntityId } from '../../../_common/domain/entity-id';
 import { Supply } from '../../../catalog/domain/supply/supply';
-import { SupplyRepository } from '../../../catalog/domain/supply/supply-repository';
+import { SUPPLY_REPOSITORY, SupplyRepository } from '../../../catalog/domain/supply/supply-repository';
 import { Recipe } from '../../../catalog/domain/recipe/recipe';
-import { RecipeRepository } from '../../../catalog/domain/recipe/recipe-repository';
-import { SettingsRepository } from '../../../settings/domain/settings-repository';
+import { RECIPE_REPOSITORY, RecipeRepository } from '../../../catalog/domain/recipe/recipe-repository';
+import { SETTINGS_REPOSITORY, SettingsRepository } from '../../../settings/domain/settings-repository';
 import {
   CalculatedLine,
   CalculationRequest,
@@ -118,12 +119,11 @@ export async function calculateWithCatalog(
 }
 
 /** Calculation preview (persists nothing): the form's «recalc». */
+@Injectable({ providedIn: 'root' })
 export class CalculateQuote implements UseCase<CalculateQuoteRequest, QuoteCalculationDto> {
-  constructor(
-    private readonly recipes: RecipeRepository,
-    private readonly supplies: SupplyRepository,
-    private readonly settings: SettingsRepository,
-  ) {}
+  private readonly recipes = inject(RECIPE_REPOSITORY);
+  private readonly supplies = inject(SUPPLY_REPOSITORY);
+  private readonly settings = inject(SETTINGS_REPOSITORY);
 
   async execute(request: CalculateQuoteRequest): Promise<QuoteCalculationDto> {
     const { calculation } = await calculateWithCatalog(this.recipes, this.supplies, this.settings, request);

@@ -1,7 +1,8 @@
+import { Injectable, inject } from '@angular/core';
 import { UseCase } from '../../../_common/application/use-case';
 import { formatDate } from '../../../_common/application/formats';
 import { OrderPrimitives, OrderStatus } from '../../domain/order/order';
-import { OrderRepository } from '../../domain/order/order-repository';
+import { ORDER_REPOSITORY } from '../../domain/order/order-repository';
 
 export interface ListOrdersRequest {
   status?: OrderStatus;
@@ -13,8 +14,9 @@ export interface OrderListItem extends OrderPrimitives {
   deliveredAtFormatted: string; // '—' if not delivered yet
 }
 
+@Injectable({ providedIn: 'root' })
 export class ListOrders implements UseCase<ListOrdersRequest, OrderListItem[]> {
-  constructor(private readonly orders: OrderRepository) {}
+  private readonly orders = inject(ORDER_REPOSITORY);
 
   async execute(request: ListOrdersRequest = {}): Promise<OrderListItem[]> {
     let list = (await this.orders.all()).map(o => {

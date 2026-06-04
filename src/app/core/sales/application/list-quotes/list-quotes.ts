@@ -1,8 +1,9 @@
+import { Injectable, inject } from '@angular/core';
 import { UseCase } from '../../../_common/application/use-case';
 import { formatDate } from '../../../_common/application/formats';
 import { Money } from '../../../_common/domain/money';
 import { QuotePrimitives, VisibleQuoteStatus } from '../../domain/quote/quote';
-import { QuoteRepository } from '../../domain/quote/quote-repository';
+import { QUOTE_REPOSITORY } from '../../domain/quote/quote-repository';
 
 export interface QuoteListItem extends QuotePrimitives {
   /** What the list shows: a Pending quote past its date appears «Expired». */
@@ -17,8 +18,9 @@ export interface ListQuotesRequest {
   customerId?: string;
 }
 
+@Injectable({ providedIn: 'root' })
 export class ListQuotes implements UseCase<ListQuotesRequest, QuoteListItem[]> {
-  constructor(private readonly quotes: QuoteRepository) {}
+  private readonly quotes = inject(QUOTE_REPOSITORY);
 
   async execute(request: ListQuotesRequest = {}): Promise<QuoteListItem[]> {
     const today = new Date();

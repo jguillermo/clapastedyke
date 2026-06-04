@@ -1,13 +1,14 @@
-import { EventBus } from '../../../_common/application/event-bus';
+import { Injectable, inject } from '@angular/core';
+import { EventBusToken } from '../../../_common/core.tokens';
 import { UseCase } from '../../../_common/application/use-case';
 import { NotFoundError } from '../../../_common/domain/errors';
 import { EntityId } from '../../../_common/domain/entity-id';
-import { SupplyRepository } from '../../../catalog/domain/supply/supply-repository';
-import { SettingsRepository } from '../../../settings/domain/settings-repository';
+import { SUPPLY_REPOSITORY } from '../../../catalog/domain/supply/supply-repository';
+import { SETTINGS_REPOSITORY } from '../../../settings/domain/settings-repository';
 import { StockService } from '../../../inventory/domain/stock-service';
 import { Order, OrderRequirement } from '../../domain/order/order';
-import { OrderRepository } from '../../domain/order/order-repository';
-import { QuoteRepository } from '../../domain/quote/quote-repository';
+import { ORDER_REPOSITORY } from '../../domain/order/order-repository';
+import { QUOTE_REPOSITORY } from '../../domain/quote/quote-repository';
 import { deductOrderStock } from '../order-stock-deduction';
 
 export interface ApproveQuoteRequest {
@@ -25,15 +26,14 @@ export interface ApproveQuoteResponse {
  * requirements (required and shortage = today's snapshot) and, if settings say
  * ON_APPROVAL, stock goes down already with 'consumption' movements.
  */
+@Injectable({ providedIn: 'root' })
 export class ApproveQuote implements UseCase<ApproveQuoteRequest, ApproveQuoteResponse> {
-  constructor(
-    private readonly quotes: QuoteRepository,
-    private readonly orders: OrderRepository,
-    private readonly supplies: SupplyRepository,
-    private readonly stock: StockService,
-    private readonly settings: SettingsRepository,
-    private readonly bus: EventBus,
-  ) {}
+  private readonly quotes = inject(QUOTE_REPOSITORY);
+  private readonly orders = inject(ORDER_REPOSITORY);
+  private readonly supplies = inject(SUPPLY_REPOSITORY);
+  private readonly stock = inject(StockService);
+  private readonly settings = inject(SETTINGS_REPOSITORY);
+  private readonly bus = inject(EventBusToken);
 
   async execute(request: ApproveQuoteRequest): Promise<ApproveQuoteResponse> {
     const quote = await this.quotes.byId(EntityId.of(request.quoteId));
