@@ -1,7 +1,0 @@
-  .stbadge{font-family:"Space Mono",monospace;font-size:10px;text-transform:uppercase;padding:2px 8px;border-radius:999px}
-  .st-Pendiente{background:#f0ece4;color:#7a7166}
-  .st-Aprobado{background:var(--green-soft);color:var(--green)}
-  .st-Rechazado{background:var(--red-soft);color:var(--red)}
-  .st-Vencido{background:var(--amber-soft);color:#9c7415}
-  .filtros{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px}
-  @media(max-width:620px){ .filtros{grid-template-columns:1fr 1fr} }

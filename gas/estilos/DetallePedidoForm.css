@@ -1,8 +1,0 @@
-  .meta{display:grid;grid-template-columns:1fr 1fr;gap:6px 18px;font-size:13px}
-  .meta b{font-family:"Space Mono",monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);display:block}
-  .stbadge{font-family:"Space Mono",monospace;font-size:11px;text-transform:uppercase;padding:3px 10px;border-radius:999px}
-  .st-Pendiente{background:#f0ece4;color:#7a7166}
-  .st-Producción{background:var(--accent-soft);color:var(--accent-deep)}
-  .st-Entregado{background:var(--green-soft);color:var(--green)}
-  .st-Cancelado{background:var(--red-soft);color:var(--red)}
-  .falta{color:var(--red);font-weight:700}
