@@ -1,24 +1,32 @@
 import { EnvironmentProviders, inject, makeEnvironmentProviders, provideAppInitializer } from '@angular/core';
 import { EventBusToken } from './_common/core.tokens';
-import { InventoryService } from './inventory/inventory.service';
-import { SettingsService } from './settings/settings.service';
+import { RegisterInitialStock } from './inventory/application/register-initial-stock/register-initial-stock';
+import { SyncLanguage } from './settings/application/sync-language/sync-language';
+import { provideSettings } from './settings/settings.providers';
+import { provideCatalog } from './catalog/catalog.providers';
+import { provideInventory } from './inventory/inventory.providers';
+import { provideSales } from './sales/sales.providers';
 
 /**
  * Registers the core domain at app startup:
+ *  - Aggregates all context providers (settings, catalog, inventory, sales)
  *  - Event subscribers (SupplyCreated → RegisterInitialStock)
  *  - UI language sync from persisted settings
  */
 export function provideCore(): EnvironmentProviders {
   return makeEnvironmentProviders([
+    provideSettings(),
+    provideCatalog(),
+    provideInventory(),
+    provideSales(),
     provideAppInitializer(() => {
       const bus = inject(EventBusToken);
-      const inventory = inject(InventoryService);
-      const settings = inject(SettingsService);
+      const registerInitialStock = inject(RegisterInitialStock);
+      const syncLanguage = inject(SyncLanguage);
 
-      bus.subscribe('SupplyCreated', e => inventory.registerInitialStock.handle(e));
-
-      void settings.syncLanguage();
-      bus.subscribe('SettingsUpdated', () => settings.syncLanguage());
+      bus.subscribe('SupplyCreated', e => registerInitialStock.handle(e));
+      void syncLanguage.execute();
+      bus.subscribe('SettingsUpdated', () => syncLanguage.execute());
     }),
   ]);
 }
