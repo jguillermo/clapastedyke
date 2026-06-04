@@ -1,16 +1,29 @@
 import * as THREE from 'three';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 
 /**
- * Loads SimplePoly FBX models: applies the texture atlas, normalizes the model
- * to a target footprint sitting on the ground, and caches by url. Callers clone
- * the returned template (geometry/material are shared, which is intended).
+ * Carga modelos 3D y los cachea por url (los llamadores clonan la plantilla —
+ * geometría/material compartidos, intencional):
+ *  - FBX (pack SimplePoly de la ciudad): aplica el atlas de textura y normaliza
+ *    a una huella sobre el suelo.
+ *  - GLB (cocina, Draco+WebP): conserva sus propios materiales; sin normalizar
+ *    (la escena los coloca con las transformaciones reales del layout).
  */
 export class ModelLoader {
   private readonly fbx = new FBXLoader();
+  private readonly gltf = new GLTFLoader();
   private readonly textures = new THREE.TextureLoader();
   private readonly cache = new Map<string, Promise<THREE.Object3D>>();
 
+  constructor() {
+    const draco = new DRACOLoader();
+    draco.setDecoderPath('assets/draco/');
+    this.gltf.setDRACOLoader(draco);
+  }
+
+  /** FBX con atlas, normalizado a `footprint` (huella sobre el suelo). */
   load(url: string, textureUrl: string, footprint: number): Promise<THREE.Object3D> {
     const cached = this.cache.get(url);
     if (cached) return cached;
@@ -30,7 +43,16 @@ export class ModelLoader {
     return promise;
   }
 
-  /** Scales to a target footprint (max of x/z) and sits it on the ground, centered. */
+  /** GLB con sus materiales originales; el llamador lo posiciona (sin normalizar). */
+  loadGlb(url: string): Promise<THREE.Object3D> {
+    const cached = this.cache.get(url);
+    if (cached) return cached;
+    const promise = this.gltf.loadAsync(url).then(gltf => gltf.scene);
+    this.cache.set(url, promise);
+    return promise;
+  }
+
+  /** Escala a una huella objetivo (máx de x/z) y lo apoya en el suelo, centrado. */
   static normalize(obj: THREE.Object3D, footprint: number): void {
     const size = new THREE.Box3().setFromObject(obj).getSize(new THREE.Vector3());
     const maxXZ = Math.max(size.x, size.z) || 1;

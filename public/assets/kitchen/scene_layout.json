@@ -1,0 +1,1967 @@
+{
+  "components": {
+    "kitchen": {
+      "file": "kitchen.glb",
+      "group": "fixed",
+      "fixed": true,
+      "dimensions": {
+        "x": 11.74982,
+        "y": 7.75438,
+        "z": 11.74982
+      },
+      "instances": [
+        {
+          "blenderObject": "kitchen",
+          "position": [
+            0.0,
+            0.0028,
+            -0.0
+          ],
+          "quaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "rotationYDeg": 0,
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      ]
+    },
+    "table": {
+      "file": "table.glb",
+      "group": "table",
+      "fixed": false,
+      "dimensions": {
+        "x": 2.05065,
+        "y": 1.07397,
+        "z": 2.2127
+      },
+      "instances": [
+        {
+          "blenderObject": "table",
+          "position": [
+            0.95198,
+            0.38228,
+            0.74141
+          ],
+          "quaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "rotationYDeg": 0,
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      ]
+    },
+    "coffee_maker": {
+      "file": "coffee_maker.glb",
+      "group": "coffee maker",
+      "fixed": false,
+      "dimensions": {
+        "x": 0.31806,
+        "y": 0.74662,
+        "z": 0.43882
+      },
+      "instances": [
+        {
+          "blenderObject": "coffee_maker",
+          "position": [
+            0.10694,
+            1.60465,
+            -1.75118
+          ],
+          "quaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "rotationYDeg": 0,
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      ]
+    },
+    "flowerpot": {
+      "file": "flowerpot.glb",
+      "group": "flowerpot",
+      "fixed": false,
+      "dimensions": {
+        "x": 5.57581,
+        "y": 1.21209,
+        "z": 2.61488
+      },
+      "instances": [
+        {
+          "blenderObject": "flowerpot",
+          "position": [
+            1.01682,
+            2.26383,
+            -2.71617
+          ],
+          "quaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "rotationYDeg": 0,
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      ]
+    },
+    "frying_pan": {
+      "file": "frying_pan.glb",
+      "group": "frying pan",
+      "fixed": false,
+      "dimensions": {
+        "x": 0.52495,
+        "y": 0.07841,
+        "z": 0.70657
+      },
+      "instances": [
+        {
+          "blenderObject": "frying_pan",
+          "position": [
+            1.03101,
+            1.62694,
+            -1.22295
+          ],
+          "quaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "rotationYDeg": 0,
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      ]
+    },
+    "paper": {
+      "file": "paper.glb",
+      "group": "paper",
+      "fixed": false,
+      "dimensions": {
+        "x": 0.31973,
+        "y": 0.51769,
+        "z": 0.31973
+      },
+      "instances": [
+        {
+          "blenderObject": "paper",
+          "position": [
+            -1.66286,
+            1.6047,
+            -1.5677
+          ],
+          "quaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "rotationYDeg": 0,
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      ]
+    },
+    "toaster": {
+      "file": "toaster.glb",
+      "group": "toaster",
+      "fixed": false,
+      "dimensions": {
+        "x": 0.27374,
+        "y": 0.17736,
+        "z": 0.39314
+      },
+      "instances": [
+        {
+          "blenderObject": "toaster",
+          "position": [
+            -0.32531,
+            1.60468,
+            -1.31524
+          ],
+          "quaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "rotationYDeg": 0,
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      ]
+    },
+    "jar": {
+      "file": "jar.glb",
+      "group": "jars",
+      "fixed": false,
+      "dimensions": {
+        "x": 0.21284,
+        "y": 0.25756,
+        "z": 0.21284
+      },
+      "instances": [
+        {
+          "blenderObject": "jar",
+          "position": [
+            -0.55503,
+            3.74218,
+            -1.7228
+          ],
+          "quaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "rotationYDeg": 0,
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      ]
+    },
+    "jar_2": {
+      "file": "jar_2.glb",
+      "group": "jars",
+      "fixed": false,
+      "dimensions": {
+        "x": 0.21284,
+        "y": 0.36689,
+        "z": 0.21284
+      },
+      "instances": [
+        {
+          "blenderObject": "jar_2",
+          "position": [
+            -1.18803,
+            3.74218,
+            -1.72091
+          ],
+          "quaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "rotationYDeg": 0,
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      ]
+    },
+    "jar_3": {
+      "file": "jar_3.glb",
+      "group": "jars",
+      "fixed": false,
+      "dimensions": {
+        "x": 0.21284,
+        "y": 0.3103,
+        "z": 0.21284
+      },
+      "instances": [
+        {
+          "blenderObject": "jar_3",
+          "position": [
+            -0.873,
+            3.74218,
+            -1.76042
+          ],
+          "quaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "rotationYDeg": 0,
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      ]
+    },
+    "egg": {
+      "file": "egg.glb",
+      "group": "eggs",
+      "fixed": false,
+      "dimensions": {
+        "x": 0.24729,
+        "y": 0.02013,
+        "z": 0.32194
+      },
+      "instances": [
+        {
+          "blenderObject": "egg",
+          "position": [
+            1.0436,
+            1.6272,
+            -1.2982
+          ],
+          "quaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "rotationYDeg": 0,
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      ]
+    },
+    "egg_2": {
+      "file": "egg_2.glb",
+      "group": "eggs",
+      "fixed": false,
+      "dimensions": {
+        "x": 0.19026,
+        "y": 0.01047,
+        "z": 0.19153
+      },
+      "instances": [
+        {
+          "blenderObject": "egg_2",
+          "position": [
+            0.99211,
+            1.45104,
+            0.29403
+          ],
+          "quaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "rotationYDeg": 0,
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      ]
+    },
+    "chair": {
+      "file": "chair.glb",
+      "group": "chair",
+      "fixed": false,
+      "dimensions": {
+        "x": 0.846,
+        "y": 1.40726,
+        "z": 0.81581
+      },
+      "instances": [
+        {
+          "blenderObject": "Cube.040",
+          "position": [
+            0.21653,
+            0.28711,
+            1.38834
+          ],
+          "quaternion": [
+            0.03024,
+            -0.52098,
+            0.01523,
+            0.8529
+          ],
+          "rotationYDeg": -62.83,
+          "scale": [
+            4.18345,
+            4.0189,
+            4.11655
+          ],
+          "dimensions": null,
+          "material": {
+            "name": "Tauari wood.001",
+            "color": null
+          }
+        },
+        {
+          "blenderObject": "Cube.026",
+          "position": [
+            1.54903,
+            0.28711,
+            1.47288
+          ],
+          "quaternion": [
+            0.0328,
+            0.16763,
+            -0.00839,
+            0.98527
+          ],
+          "rotationYDeg": 19.32,
+          "scale": [
+            4.18345,
+            4.0189,
+            4.11655
+          ],
+          "dimensions": null,
+          "material": {
+            "name": "Tauari wood.001",
+            "color": null
+          }
+        }
+      ]
+    },
+    "plate": {
+      "file": "plate.glb",
+      "group": "plate",
+      "fixed": false,
+      "dimensions": {
+        "x": 0.33719,
+        "y": 0.05087,
+        "z": 0.33719
+      },
+      "instances": [
+        {
+          "blenderObject": "Cylinder.043",
+          "position": [
+            1.00217,
+            1.44121,
+            0.31501
+          ],
+          "quaternion": [
+            0.0,
+            0.32407,
+            -0.0,
+            0.94603
+          ],
+          "rotationYDeg": 37.82,
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "dimensions": {
+            "x": 0.33719,
+            "y": 0.05087,
+            "z": 0.33719
+          },
+          "material": {
+            "name": "plate.001",
+            "color": "#365d52"
+          }
+        },
+        {
+          "blenderObject": "Cylinder.026",
+          "position": [
+            0.53099,
+            1.44112,
+            0.65434
+          ],
+          "quaternion": [
+            0.0,
+            0.32407,
+            -0.0,
+            0.94603
+          ],
+          "rotationYDeg": 37.82,
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "dimensions": {
+            "x": 0.33719,
+            "y": 0.05087,
+            "z": 0.33719
+          },
+          "material": {
+            "name": "plate.001",
+            "color": "#365d52"
+          }
+        },
+        {
+          "blenderObject": "Cylinder.015",
+          "position": [
+            1.32361,
+            1.44116,
+            0.97057
+          ],
+          "quaternion": [
+            0.0,
+            0.32407,
+            -0.0,
+            0.94603
+          ],
+          "rotationYDeg": 37.82,
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "dimensions": {
+            "x": 0.33719,
+            "y": 0.05087,
+            "z": 0.33719
+          },
+          "material": {
+            "name": "plate.001",
+            "color": "#365d52"
+          }
+        },
+        {
+          "blenderObject": "Cylinder.050",
+          "position": [
+            -0.93834,
+            3.42659,
+            -1.76591
+          ],
+          "quaternion": [
+            0.0,
+            0.0,
+            -0.0,
+            1.0
+          ],
+          "rotationYDeg": 0.0,
+          "scale": [
+            0.65419,
+            0.65419,
+            0.65419
+          ],
+          "dimensions": {
+            "x": 0.22059,
+            "y": 0.03328,
+            "z": 0.22059
+          },
+          "material": {
+            "name": "plate smal",
+            "color": "#b2577b"
+          }
+        },
+        {
+          "blenderObject": "Cylinder.049",
+          "position": [
+            -0.93834,
+            3.40218,
+            -1.76591
+          ],
+          "quaternion": [
+            0.0,
+            0.0,
+            -0.0,
+            1.0
+          ],
+          "rotationYDeg": 0.0,
+          "scale": [
+            0.65419,
+            0.65419,
+            0.65419
+          ],
+          "dimensions": {
+            "x": 0.22059,
+            "y": 0.03328,
+            "z": 0.22059
+          },
+          "material": {
+            "name": "plate smal",
+            "color": "#b2577b"
+          }
+        },
+        {
+          "blenderObject": "Cylinder.048",
+          "position": [
+            -0.93834,
+            3.37866,
+            -1.76591
+          ],
+          "quaternion": [
+            0.0,
+            0.0,
+            -0.0,
+            1.0
+          ],
+          "rotationYDeg": 0.0,
+          "scale": [
+            0.65419,
+            0.65419,
+            0.65419
+          ],
+          "dimensions": {
+            "x": 0.22059,
+            "y": 0.03328,
+            "z": 0.22059
+          },
+          "material": {
+            "name": "plate smal",
+            "color": "#b2577b"
+          }
+        },
+        {
+          "blenderObject": "Cylinder.047",
+          "position": [
+            -0.93834,
+            3.3536,
+            -1.76591
+          ],
+          "quaternion": [
+            0.0,
+            0.0,
+            -0.0,
+            1.0
+          ],
+          "rotationYDeg": 0.0,
+          "scale": [
+            0.65419,
+            0.65419,
+            0.65419
+          ],
+          "dimensions": {
+            "x": 0.22059,
+            "y": 0.03328,
+            "z": 0.22059
+          },
+          "material": {
+            "name": "plate.002",
+            "color": "#aaa9a5"
+          }
+        },
+        {
+          "blenderObject": "Cylinder.046",
+          "position": [
+            -0.9344,
+            3.35223,
+            -1.76591
+          ],
+          "quaternion": [
+            0.0,
+            0.0,
+            -0.0,
+            1.0
+          ],
+          "rotationYDeg": 0.0,
+          "scale": [
+            1.08718,
+            1.08718,
+            1.08718
+          ],
+          "dimensions": {
+            "x": 0.36659,
+            "y": 0.05531,
+            "z": 0.36659
+          },
+          "material": {
+            "name": "plate.002",
+            "color": "#aaa9a5"
+          }
+        },
+        {
+          "blenderObject": "Cylinder.045",
+          "position": [
+            -0.9344,
+            3.31507,
+            -1.76591
+          ],
+          "quaternion": [
+            0.0,
+            0.0,
+            -0.0,
+            1.0
+          ],
+          "rotationYDeg": 0.0,
+          "scale": [
+            1.08718,
+            1.08718,
+            1.08718
+          ],
+          "dimensions": {
+            "x": 0.36659,
+            "y": 0.05531,
+            "z": 0.36659
+          },
+          "material": {
+            "name": "plate.002",
+            "color": "#aaa9a5"
+          }
+        },
+        {
+          "blenderObject": "Cylinder.044",
+          "position": [
+            -0.9344,
+            3.27422,
+            -1.76591
+          ],
+          "quaternion": [
+            0.0,
+            0.0,
+            -0.0,
+            1.0
+          ],
+          "rotationYDeg": 0.0,
+          "scale": [
+            1.08718,
+            1.08718,
+            1.08718
+          ],
+          "dimensions": {
+            "x": 0.36659,
+            "y": 0.05531,
+            "z": 0.36659
+          },
+          "material": {
+            "name": "plate.002",
+            "color": "#aaa9a5"
+          }
+        },
+        {
+          "blenderObject": "Cylinder.025",
+          "position": [
+            -1.1144,
+            2.89001,
+            -1.76591
+          ],
+          "quaternion": [
+            0.0,
+            0.0,
+            -0.0,
+            1.0
+          ],
+          "rotationYDeg": 0.0,
+          "scale": [
+            0.65419,
+            0.65419,
+            0.65419
+          ],
+          "dimensions": {
+            "x": 0.22059,
+            "y": 0.03328,
+            "z": 0.22059
+          },
+          "material": {
+            "name": "plate",
+            "color": "#71c490"
+          }
+        },
+        {
+          "blenderObject": "Cylinder.024",
+          "position": [
+            -1.1144,
+            2.86559,
+            -1.76591
+          ],
+          "quaternion": [
+            0.0,
+            0.0,
+            -0.0,
+            1.0
+          ],
+          "rotationYDeg": 0.0,
+          "scale": [
+            0.65419,
+            0.65419,
+            0.65419
+          ],
+          "dimensions": {
+            "x": 0.22059,
+            "y": 0.03328,
+            "z": 0.22059
+          },
+          "material": {
+            "name": "plate",
+            "color": "#71c490"
+          }
+        },
+        {
+          "blenderObject": "Cylinder.023",
+          "position": [
+            -1.1144,
+            2.84208,
+            -1.76591
+          ],
+          "quaternion": [
+            0.0,
+            0.0,
+            -0.0,
+            1.0
+          ],
+          "rotationYDeg": 0.0,
+          "scale": [
+            0.65419,
+            0.65419,
+            0.65419
+          ],
+          "dimensions": {
+            "x": 0.22059,
+            "y": 0.03328,
+            "z": 0.22059
+          },
+          "material": {
+            "name": "plate",
+            "color": "#71c490"
+          }
+        },
+        {
+          "blenderObject": "Cylinder.022",
+          "position": [
+            -1.1144,
+            2.81702,
+            -1.76591
+          ],
+          "quaternion": [
+            0.0,
+            0.0,
+            -0.0,
+            1.0
+          ],
+          "rotationYDeg": 0.0,
+          "scale": [
+            0.65419,
+            0.65419,
+            0.65419
+          ],
+          "dimensions": {
+            "x": 0.22059,
+            "y": 0.03328,
+            "z": 0.22059
+          },
+          "material": {
+            "name": "plate",
+            "color": "#71c490"
+          }
+        },
+        {
+          "blenderObject": "Cylinder.021",
+          "position": [
+            -1.1144,
+            2.7928,
+            -1.76591
+          ],
+          "quaternion": [
+            0.0,
+            0.0,
+            -0.0,
+            1.0
+          ],
+          "rotationYDeg": 0.0,
+          "scale": [
+            0.65419,
+            0.65419,
+            0.65419
+          ],
+          "dimensions": {
+            "x": 0.22059,
+            "y": 0.03328,
+            "z": 0.22059
+          },
+          "material": {
+            "name": "plate",
+            "color": "#71c490"
+          }
+        },
+        {
+          "blenderObject": "Cylinder.020",
+          "position": [
+            -0.65945,
+            2.91514,
+            -1.76591
+          ],
+          "quaternion": [
+            0.0,
+            0.0,
+            -0.0,
+            1.0
+          ],
+          "rotationYDeg": 0.0,
+          "scale": [
+            1.08718,
+            1.08718,
+            1.08718
+          ],
+          "dimensions": {
+            "x": 0.36659,
+            "y": 0.05531,
+            "z": 0.36659
+          },
+          "material": {
+            "name": "plate.001",
+            "color": "#365d52"
+          }
+        },
+        {
+          "blenderObject": "Cylinder.019",
+          "position": [
+            -0.65945,
+            2.87812,
+            -1.76591
+          ],
+          "quaternion": [
+            0.0,
+            0.0,
+            -0.0,
+            1.0
+          ],
+          "rotationYDeg": 0.0,
+          "scale": [
+            1.08718,
+            1.08718,
+            1.08718
+          ],
+          "dimensions": {
+            "x": 0.36659,
+            "y": 0.05531,
+            "z": 0.36659
+          },
+          "material": {
+            "name": "plate.001",
+            "color": "#365d52"
+          }
+        },
+        {
+          "blenderObject": "Cylinder.018",
+          "position": [
+            -0.65945,
+            2.84095,
+            -1.76591
+          ],
+          "quaternion": [
+            0.0,
+            0.0,
+            -0.0,
+            1.0
+          ],
+          "rotationYDeg": 0.0,
+          "scale": [
+            1.08718,
+            1.08718,
+            1.08718
+          ],
+          "dimensions": {
+            "x": 0.36659,
+            "y": 0.05531,
+            "z": 0.36659
+          },
+          "material": {
+            "name": "plate.001",
+            "color": "#365d52"
+          }
+        },
+        {
+          "blenderObject": "Cylinder.017",
+          "position": [
+            -0.65945,
+            2.80011,
+            -1.76591
+          ],
+          "quaternion": [
+            0.0,
+            0.0,
+            -0.0,
+            1.0
+          ],
+          "rotationYDeg": 0.0,
+          "scale": [
+            1.08718,
+            1.08718,
+            1.08718
+          ],
+          "dimensions": {
+            "x": 0.36659,
+            "y": 0.05531,
+            "z": 0.36659
+          },
+          "material": {
+            "name": "plate.001",
+            "color": "#365d52"
+          }
+        }
+      ]
+    },
+    "cup": {
+      "file": "cup.glb",
+      "group": "cup",
+      "fixed": false,
+      "dimensions": {
+        "x": 0.20737,
+        "y": 0.1661,
+        "z": 0.14215
+      },
+      "instances": [
+        {
+          "blenderObject": "Circle.046",
+          "position": [
+            -1.32091,
+            2.00028,
+            -1.80378
+          ],
+          "quaternion": [
+            0.44823,
+            0.88383,
+            0.06056,
+            0.11942
+          ],
+          "rotationYDeg": 164.61,
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "dimensions": {
+            "x": 0.20737,
+            "y": 0.1661,
+            "z": 0.14215
+          },
+          "material": {
+            "name": "Material.096",
+            "color": "#258605"
+          }
+        },
+        {
+          "blenderObject": "Circle.002",
+          "position": [
+            -1.04279,
+            2.00167,
+            -1.797
+          ],
+          "quaternion": [
+            0.45167,
+            0.89062,
+            0.02389,
+            0.04711
+          ],
+          "rotationYDeg": 173.94,
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "dimensions": {
+            "x": 0.20737,
+            "y": 0.1661,
+            "z": 0.14215
+          },
+          "material": {
+            "name": "Material.096",
+            "color": "#258605"
+          }
+        },
+        {
+          "blenderObject": "Circle.003",
+          "position": [
+            -0.75744,
+            2.00213,
+            -1.80955
+          ],
+          "quaternion": [
+            0.44018,
+            0.86795,
+            0.10403,
+            0.20514
+          ],
+          "rotationYDeg": 153.4,
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "dimensions": {
+            "x": 0.20737,
+            "y": 0.1661,
+            "z": 0.14215
+          },
+          "material": {
+            "name": "Material.096",
+            "color": "#258605"
+          }
+        }
+      ]
+    },
+    "glass": {
+      "file": "glass.glb",
+      "group": "glass",
+      "fixed": false,
+      "dimensions": {
+        "x": 0.11716,
+        "y": 0.0734,
+        "z": 0.11716
+      },
+      "instances": [
+        {
+          "blenderObject": "Cylinder.053",
+          "position": [
+            0.63318,
+            1.44185,
+            0.92704
+          ],
+          "quaternion": [
+            0.0,
+            0.32407,
+            -0.0,
+            0.94603
+          ],
+          "rotationYDeg": 37.82,
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "dimensions": {
+            "x": 0.11716,
+            "y": 0.0734,
+            "z": 0.11716
+          },
+          "material": {
+            "name": "Material.008",
+            "color": "#cccccc"
+          }
+        },
+        {
+          "blenderObject": "Cylinder.052",
+          "position": [
+            1.32413,
+            1.44249,
+            0.66583
+          ],
+          "quaternion": [
+            0.0,
+            0.32407,
+            -0.0,
+            0.94603
+          ],
+          "rotationYDeg": 37.82,
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "dimensions": {
+            "x": 0.11716,
+            "y": 0.0734,
+            "z": 0.11716
+          },
+          "material": {
+            "name": "Material.008",
+            "color": "#cccccc"
+          }
+        }
+      ]
+    },
+    "glass_2": {
+      "file": "glass_2.glb",
+      "group": "glass",
+      "fixed": false,
+      "dimensions": {
+        "x": 0.11994,
+        "y": 0.12046,
+        "z": 0.11994
+      },
+      "instances": [
+        {
+          "blenderObject": "Cylinder.027",
+          "position": [
+            0.63318,
+            1.44045,
+            0.92704
+          ],
+          "quaternion": [
+            0.0,
+            0.32407,
+            -0.0,
+            0.94603
+          ],
+          "rotationYDeg": 37.82,
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "dimensions": {
+            "x": 0.11994,
+            "y": 0.12046,
+            "z": 0.11994
+          },
+          "material": {
+            "name": "Material.007",
+            "color": "#cccccc"
+          }
+        },
+        {
+          "blenderObject": "Cylinder.010",
+          "position": [
+            1.32413,
+            1.4411,
+            0.66583
+          ],
+          "quaternion": [
+            0.0,
+            0.32407,
+            -0.0,
+            0.94603
+          ],
+          "rotationYDeg": 37.82,
+          "scale": [
+            1.00645,
+            1.00209,
+            1.00645
+          ],
+          "dimensions": {
+            "x": 0.12071,
+            "y": 0.12071,
+            "z": 0.12071
+          },
+          "material": {
+            "name": "Material.007",
+            "color": "#cccccc"
+          }
+        }
+      ]
+    },
+    "spoons": {
+      "file": "spoons.glb",
+      "group": "spoons",
+      "fixed": false,
+      "dimensions": {
+        "x": 0.09159,
+        "y": 0.25863,
+        "z": 0.03411
+      },
+      "instances": [
+        {
+          "blenderObject": "Cube.081",
+          "position": [
+            0.48787,
+            1.7256,
+            -1.70769
+          ],
+          "quaternion": [
+            -0.00671,
+            0.13656,
+            0.12731,
+            0.98239
+          ],
+          "rotationYDeg": 16.19,
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "dimensions": {
+            "x": 0.09159,
+            "y": 0.25863,
+            "z": 0.03411
+          },
+          "material": {
+            "name": "spoon",
+            "color": "#ae460a"
+          }
+        },
+        {
+          "blenderObject": "Cube.078",
+          "position": [
+            0.48288,
+            1.67414,
+            -1.72887
+          ],
+          "quaternion": [
+            -0.06419,
+            0.39413,
+            -0.11036,
+            0.91014
+          ],
+          "rotationYDeg": 46.6,
+          "scale": [
+            0.91868,
+            0.91868,
+            0.91868
+          ],
+          "dimensions": {
+            "x": 0.08415,
+            "y": 0.2376,
+            "z": 0.03133
+          },
+          "material": {
+            "name": "spoon",
+            "color": "#ae460a"
+          }
+        },
+        {
+          "blenderObject": "Cube.076",
+          "position": [
+            0.47235,
+            1.70357,
+            -1.77533
+          ],
+          "quaternion": [
+            0.00597,
+            0.29207,
+            0.08449,
+            0.95264
+          ],
+          "rotationYDeg": 34.27,
+          "scale": [
+            1.47462,
+            1.47462,
+            1.47462
+          ],
+          "dimensions": {
+            "x": 0.13507,
+            "y": 0.38138,
+            "z": 0.05029
+          },
+          "material": {
+            "name": "spoon",
+            "color": "#ae460a"
+          }
+        }
+      ]
+    },
+    "toasts": {
+      "file": "toasts.glb",
+      "group": "toasts",
+      "fixed": false,
+      "dimensions": {
+        "x": 0.12986,
+        "y": 0.02285,
+        "z": 0.16998
+      },
+      "instances": [
+        {
+          "blenderObject": "Plane.005",
+          "position": [
+            0.51091,
+            1.47066,
+            0.65034
+          ],
+          "quaternion": [
+            0.07654,
+            -0.07429,
+            0.13034,
+            0.98571
+          ],
+          "rotationYDeg": -9.89,
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "dimensions": {
+            "x": 0.12986,
+            "y": 0.02285,
+            "z": 0.16998
+          },
+          "material": {
+            "name": "Material.029",
+            "color": "#b58552"
+          }
+        },
+        {
+          "blenderObject": "Plane.004",
+          "position": [
+            0.56104,
+            1.44542,
+            0.64733
+          ],
+          "quaternion": [
+            0.0,
+            0.25149,
+            -0.0,
+            0.96786
+          ],
+          "rotationYDeg": 29.13,
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "dimensions": {
+            "x": 0.12986,
+            "y": 0.02285,
+            "z": 0.16998
+          },
+          "material": {
+            "name": "Material.029",
+            "color": "#b58552"
+          }
+        },
+        {
+          "blenderObject": "Plane.002",
+          "position": [
+            1.29079,
+            1.46029,
+            0.96536
+          ],
+          "quaternion": [
+            -0.01334,
+            0.28383,
+            0.12133,
+            0.95107
+          ],
+          "rotationYDeg": 33.86,
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "dimensions": {
+            "x": 0.12986,
+            "y": 0.02285,
+            "z": 0.16998
+          },
+          "material": {
+            "name": "Material.029",
+            "color": "#b58552"
+          }
+        },
+        {
+          "blenderObject": "Plane.003",
+          "position": [
+            1.36462,
+            1.44547,
+            0.96826
+          ],
+          "quaternion": [
+            0.0,
+            0.03721,
+            -0.0,
+            0.99931
+          ],
+          "rotationYDeg": 4.26,
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "dimensions": {
+            "x": 0.12986,
+            "y": 0.02285,
+            "z": 0.16998
+          },
+          "material": {
+            "name": "Material.029",
+            "color": "#b58552"
+          }
+        },
+        {
+          "blenderObject": "Plane.023",
+          "position": [
+            -0.37272,
+            1.79015,
+            -1.32909
+          ],
+          "quaternion": [
+            0.15364,
+            -0.02546,
+            -0.73102,
+            0.66434
+          ],
+          "rotationYDeg": -249.83,
+          "scale": [
+            1.1629,
+            1.1629,
+            1.1629
+          ],
+          "dimensions": {
+            "x": 0.15101,
+            "y": 0.02657,
+            "z": 0.19767
+          },
+          "material": {
+            "name": "Material.004",
+            "color": "#b58552"
+          }
+        },
+        {
+          "blenderObject": "Plane.024",
+          "position": [
+            -0.30081,
+            1.77296,
+            -1.31318
+          ],
+          "quaternion": [
+            -0.01292,
+            -0.16214,
+            -0.71721,
+            0.67761
+          ],
+          "rotationYDeg": -108.85,
+          "scale": [
+            0.07933,
+            0.07933,
+            0.07933
+          ],
+          "dimensions": {
+            "x": 0.14354,
+            "y": 0.02526,
+            "z": 0.18788
+          },
+          "material": {
+            "name": "Material.004",
+            "color": "#b58552"
+          }
+        }
+      ]
+    },
+    "sausages": {
+      "file": "sausages.glb",
+      "group": "sausages",
+      "fixed": false,
+      "dimensions": {
+        "x": 0.15123,
+        "y": 0.03208,
+        "z": 0.05162
+      },
+      "instances": [
+        {
+          "blenderObject": "NurbsCurve.027",
+          "position": [
+            1.06235,
+            1.45104,
+            0.3782
+          ],
+          "quaternion": [
+            0.0,
+            0.45292,
+            -0.0,
+            0.89155
+          ],
+          "rotationYDeg": -306.14,
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "dimensions": {
+            "x": 0.15123,
+            "y": 0.03208,
+            "z": 0.05162
+          },
+          "material": {
+            "name": "Material.022",
+            "color": "#572104"
+          }
+        },
+        {
+          "blenderObject": "NurbsCurve.026",
+          "position": [
+            0.99647,
+            1.45066,
+            0.37538
+          ],
+          "quaternion": [
+            0.0,
+            0.13579,
+            -0.0,
+            0.99074
+          ],
+          "rotationYDeg": -344.39,
+          "scale": [
+            0.99706,
+            1.0,
+            1.00004
+          ],
+          "dimensions": {
+            "x": 0.15079,
+            "y": 0.03208,
+            "z": 0.05162
+          },
+          "material": {
+            "name": "Material.022",
+            "color": "#572104"
+          }
+        }
+      ]
+    },
+    "dishwashing_detergent": {
+      "file": "dishwashing_detergent.glb",
+      "group": "dishwashing detergent",
+      "fixed": false,
+      "dimensions": {
+        "x": 0.10496,
+        "y": 0.28623,
+        "z": 0.08524
+      },
+      "instances": [
+        {
+          "blenderObject": "Cube.065",
+          "position": [
+            -1.52416,
+            1.60469,
+            -0.72464
+          ],
+          "quaternion": [
+            0.0,
+            -0.59015,
+            -0.0,
+            0.8073
+          ],
+          "rotationYDeg": -72.33,
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "dimensions": null,
+          "material": {
+            "name": "bottle.001",
+            "color": "#cc1c1d"
+          }
+        },
+        {
+          "blenderObject": "Cube.064",
+          "position": [
+            -1.64339,
+            1.65156,
+            -0.60606
+          ],
+          "quaternion": [
+            0.0,
+            0.07929,
+            -0.0,
+            0.99685
+          ],
+          "rotationYDeg": 9.1,
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "dimensions": null,
+          "material": {
+            "name": "bottle",
+            "color": "#397f2c"
+          }
+        }
+      ]
+    },
+    "dishwashing_detergent_2": {
+      "file": "dishwashing_detergent_2.glb",
+      "group": "dishwashing detergent",
+      "fixed": false,
+      "dimensions": {
+        "x": 0.32648,
+        "y": 0.47825,
+        "z": 0.12246
+      },
+      "instances": [
+        {
+          "blenderObject": "Plane.038",
+          "position": [
+            -1.69152,
+            1.60476,
+            -0.94207
+          ],
+          "quaternion": [
+            0.0,
+            0.47939,
+            -0.0,
+            0.8776
+          ],
+          "rotationYDeg": 57.29,
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "dimensions": null,
+          "material": {
+            "name": "Material.049",
+            "color": "#1c86cc"
+          }
+        }
+      ]
+    },
+    "sphere_017": {
+      "file": "sphere_017.glb",
+      "group": "loose",
+      "fixed": false,
+      "dimensions": {
+        "x": 0.34355,
+        "y": 0.18677,
+        "z": 0.34355
+      },
+      "instances": [
+        {
+          "blenderObject": "Sphere.017",
+          "position": [
+            -1.58997,
+            3.74292,
+            -1.76312
+          ],
+          "quaternion": [
+            0.0,
+            0.0,
+            -0.0,
+            1.0
+          ],
+          "rotationYDeg": 0.0,
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "dimensions": {
+            "x": 0.34355,
+            "y": 0.18677,
+            "z": 0.34355
+          },
+          "material": {
+            "name": "plate.004",
+            "color": "#1b7f02"
+          }
+        }
+      ]
+    },
+    "circle_001": {
+      "file": "circle_001.glb",
+      "group": "loose",
+      "fixed": false,
+      "dimensions": {
+        "x": 0.20901,
+        "y": 0.19797,
+        "z": 0.20901
+      },
+      "instances": [
+        {
+          "blenderObject": "Circle.001",
+          "position": [
+            0.48375,
+            1.60512,
+            -1.73995
+          ],
+          "quaternion": [
+            0.0,
+            0.0,
+            -0.0,
+            1.0
+          ],
+          "rotationYDeg": 0.0,
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "dimensions": {
+            "x": 0.20901,
+            "y": 0.19797,
+            "z": 0.20901
+          },
+          "material": {
+            "name": "Material.036",
+            "color": "#982a33"
+          }
+        }
+      ]
+    },
+    "cube_013": {
+      "file": "cube_013.glb",
+      "group": "loose",
+      "fixed": false,
+      "dimensions": {
+        "x": 0.21739,
+        "y": 0.4031,
+        "z": 0.17148
+      },
+      "instances": [
+        {
+          "blenderObject": "Cube.013",
+          "position": [
+            -0.45959,
+            1.73846,
+            -1.83597
+          ],
+          "quaternion": [
+            0.17054,
+            -0.0,
+            -0.0,
+            0.98535
+          ],
+          "rotationYDeg": 0.0,
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "dimensions": {
+            "x": 0.21739,
+            "y": 0.4031,
+            "z": 0.17148
+          },
+          "material": {
+            "name": "Material.010",
+            "color": "#913104"
+          }
+        }
+      ]
+    },
+    "cylinder_028": {
+      "file": "cylinder_028.glb",
+      "group": "loose",
+      "fixed": false,
+      "dimensions": {
+        "x": 0.51896,
+        "y": 0.32325,
+        "z": 0.51896
+      },
+      "instances": [
+        {
+          "blenderObject": "Cylinder.028",
+          "position": [
+            -0.90217,
+            1.63961,
+            -1.34131
+          ],
+          "quaternion": [
+            0.0,
+            0.0,
+            -0.0,
+            1.0
+          ],
+          "rotationYDeg": 0.0,
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "dimensions": null,
+          "material": {
+            "name": "plate.003",
+            "color": "#c17904"
+          }
+        }
+      ]
+    },
+    "cube_048": {
+      "file": "cube_048.glb",
+      "group": "loose",
+      "fixed": false,
+      "dimensions": {
+        "x": 0.37807,
+        "y": 0.03622,
+        "z": 0.48765
+      },
+      "instances": [
+        {
+          "blenderObject": "Cube.048",
+          "position": [
+            -0.91646,
+            1.60465,
+            -1.34901
+          ],
+          "quaternion": [
+            0.0,
+            0.70711,
+            -0.0,
+            0.70711
+          ],
+          "rotationYDeg": 90.0,
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "dimensions": {
+            "x": 0.37807,
+            "y": 0.03622,
+            "z": 0.48765
+          },
+          "material": {
+            "name": "Material.021",
+            "color": "#69cc06"
+          }
+        }
+      ]
+    },
+    "plane_031": {
+      "file": "plane_031.glb",
+      "group": "loose",
+      "fixed": false,
+      "dimensions": {
+        "x": 0.16049,
+        "y": 0.0202,
+        "z": 0.1968
+      },
+      "instances": [
+        {
+          "blenderObject": "Plane.031",
+          "position": [
+            0.10099,
+            2.9489,
+            -1.52215
+          ],
+          "quaternion": [
+            -0.0,
+            -0.70711,
+            -0.70711,
+            0.0
+          ],
+          "rotationYDeg": -180.0,
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "dimensions": {
+            "x": 0.16049,
+            "y": 0.0202,
+            "z": 0.1968
+          },
+          "material": {
+            "name": "Material.038",
+            "color": "#878787"
+          }
+        }
+      ]
+    }
+  },
+  "meta": {
+    "source": "Isometric Kitchen Scene.blend",
+    "coordinates": "three.js (Y up). Origen de cada GLB = centro de su base.",
+    "units": "metros",
+    "compression": "Draco + WebP (usar DRACOLoader)",
+    "references": {
+      "floorTopY": 0.3859,
+      "tableTopY": 1.4562,
+      "counterTopY": 1.6046,
+      "stoveTopY": 1.8494,
+      "fridgeTopY": 2.8871,
+      "shelfTopsY": [
+        2.7978,
+        3.2704,
+        3.7422
+      ],
+      "hoodBottomY": 2.7083
+    }
+  }
+}

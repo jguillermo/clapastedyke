@@ -29,6 +29,13 @@ export class App {
    */
   protected readonly immersive = computed(() => {
     const u = this.url();
-    return u === '/' || u === '' || u === '/town' || u.startsWith('/town/');
+    return (
+      u === '/' ||
+      u === '' ||
+      u === '/home' ||
+      u.startsWith('/home/') ||
+      u === '/town' ||
+      u.startsWith('/town/')
+    );
   });
 }
