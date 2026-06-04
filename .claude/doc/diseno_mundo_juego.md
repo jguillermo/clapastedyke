@@ -72,17 +72,20 @@ enruta a la misión guiada que lo abre (`/mission/:unlockMissionId`).
 
 ### 4bis. Escena de calle viva
 
-El mundo es una **calle** vista de frente, no un diorama estático:
-- **La Tienda (bakery) al frente-centro**; el resto de edificios flanquean detrás
-  en una V poco profunda, todos mirando a la cámara.
+El mundo es una **ciudad en cuadrícula**: cada edificio ocupa su propia cuadra,
+separadas por una **grilla de calles** (asfalto sólido elevado sobre el pasto —
+sin parpadeo/z-fighting), con autos circulando en **ambos ejes** (calles
+horizontales y verticales) y wrap en los bordes.
+- **La Tienda (bakery) al frente-centro**; el resto en la fila de atrás, todos
+  mirando a la cámara. Junto a la bakery: un **parque** (pasto, pinos, banca) a
+  un lado y un **estacionamiento** (bahías marcadas + auto estacionado) al otro.
 - **Todos los edificios texturizados**; los bloqueados se marcan con un **candado
-  flotante 🔒** encima (sprite de canvas), no con material gris.
-- **Calle** al frente (tejas `road-tile` + acera) con **autos en movimiento**
-  (`car/taxi/suv`, dos carriles, wrap en los bordes) y **gente caminando**
-  (personas low-poly por primitivas, ya que el pack no trae personajes).
+  flotante 🔒** (sprite de canvas), no con material gris.
+- **Autos** `car/taxi/suv` a escala (~1.4u, ~½ del ancho de un edificio) y **gente
+  low-poly** pequeña (~0.5u, por primitivas — el pack no trae personajes).
 - **El chef** (geometría reutilizable en `chef-mesh.ts`, compartida con el
-  tutorial) parado frente a la pastelería **saludando** con el brazo en alto.
-- Cámara más alejada (`z 13.5`, fov 42) para que toda la calle se lea.
+  tutorial) frente a la pastelería **saludando** con el brazo en alto.
+- Cámara más alejada (`z 14.5`, `y 7`, fov 42) para que toda la cuadrícula se lea.
 
 Capturas: `docs/town-street-preview.png` y `docs/town-street-detail.png`.
 
@@ -210,7 +213,8 @@ degrada sin WebGL (la lista de edificios opera todo igual). El canvas es
 
 | Pieza | Archivo |
 |---|---|
-| Motor 3D del pueblo (FBXLoader, normalización, decor) | `src/app/platform/three/town-engine.ts` |
+| Motor 3D del pueblo (orquestador delgado) | `src/app/platform/three/town-engine.ts` |
+| ↳ módulos: layout, loader, scenery (+veredas), traffic, buildings, camera-rig | `src/app/platform/three/{town-layout,model-loader,town-scenery,town-traffic,town-buildings,camera-rig}.ts` |
 | Assets de ciudad | `public/assets/city/*.fbx` + `*.png` |
 | Canvas Angular | `src/app/features/game/components/town/town-3d.ts` |
 | Home unificado | `src/app/features/game/components/town/town-shell.{ts,html,scss}` |
