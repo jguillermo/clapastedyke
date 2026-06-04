@@ -1,33 +1,39 @@
 {
-  "name": "clapastedyke",
-  "version": "1.0.0",
-  "appVersion": 8,
-  "description": "",
-  "main": "index.js",
-  "directories": {
-    "doc": "doc"
-  },
+  "name": "manual-juego",
+  "version": "0.0.0",
   "scripts": {
-    "login": "clasp login",
-    "logout": "clasp logout",
-    "push": "cd src && clasp push",
-    "pull": "node test/e2e/publish.js prod && cd src && clasp pull",
-    "open": "cd src && clasp open-script",
-    "preview": "node scripts/render-preview.js",
-    "test": "node test/unitarios/run.js",
-    "build:forms": "cd manual-juego && npm run exportar:formularios",
-    "publish:test": "npm run build:forms && npm test && node test/e2e/publish.js test && npm run push && node test/e2e/publish.js clear",
-    "publish:prod": "npm run build:forms && npm test && node test/e2e/publish.js prod && npm run push && node test/e2e/publish.js clear"
+    "ng": "ng",
+    "start": "ng serve",
+    "build": "ng build",
+    "build:pages": "ng build --configuration production --base-href /juego/",
+    "watch": "ng build --watch --configuration development",
+    "test": "ng test"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/jguillermo/clapastedyke.git"
+  "private": true,
+  "packageManager": "npm@10.9.4",
+  "dependencies": {
+    "@angular/common": "^21.2.0",
+    "@angular/compiler": "^21.2.0",
+    "@angular/core": "^21.2.0",
+    "@angular/forms": "^21.2.0",
+    "@angular/platform-browser": "^21.2.0",
+    "@angular/router": "^21.2.0",
+    "@jsverse/transloco": "^8.3.0",
+    "@tailwindcss/postcss": "^4.3.0",
+    "postcss": "^8.5.15",
+    "rxjs": "~7.8.0",
+    "tailwindcss": "^4.3.0",
+    "three": "^0.184.0",
+    "tslib": "^2.3.0"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "bugs": {
-    "url": "https://github.com/jguillermo/clapastedyke/issues"
-  },
-  "homepage": "https://github.com/jguillermo/clapastedyke#readme"
+  "devDependencies": {
+    "@angular/build": "^21.2.7",
+    "@angular/cli": "^21.2.7",
+    "@angular/compiler-cli": "^21.2.0",
+    "@types/three": "^0.184.1",
+    "jsdom": "^28.0.0",
+    "prettier": "^3.8.1",
+    "typescript": "~5.9.2",
+    "vitest": "^4.0.8"
+  }
 }

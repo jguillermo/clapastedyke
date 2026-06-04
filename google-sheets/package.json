@@ -1,0 +1,31 @@
+{
+  "name": "clapastedyke",
+  "version": "1.0.0",
+  "appVersion": 8,
+  "description": "",
+  "main": "index.js",
+  "directories": {
+    "doc": "doc"
+  },
+  "scripts": {
+    "g:login": "clasp login",
+    "g:logout": "clasp logout",
+    "g:push": "cd src && clasp push",
+    "g:pull": "node test/e2e/publish.js prod && cd src && clasp pull",
+    "g:open": "cd src && clasp open-script",
+    "g:test": "node test/unitarios/run.js",
+    "g:publish:test": "node test/e2e/publish.js test && npm run push && node test/e2e/publish.js clear",
+    "g:publish:prod": "node test/e2e/publish.js prod && npm run push && node test/e2e/publish.js clear"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jguillermo/clapastedyke.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/jguillermo/clapastedyke/issues"
+  },
+  "homepage": "https://github.com/jguillermo/clapastedyke#readme"
+}
