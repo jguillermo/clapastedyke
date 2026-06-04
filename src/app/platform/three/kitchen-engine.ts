@@ -128,9 +128,9 @@ export class KitchenEngine {
     // Chef: pequeño, en la esquina frontal izquierda (no tapa el centro).
     const chef = buildChef();
     const chefH = new THREE.Box3().setFromObject(chef).getSize(new THREE.Vector3()).y || 1;
-    chef.scale.setScalar((h * 0.34) / chefH);
-    chef.position.set(-halfX * 0.6, 0, halfZ + 0.3);
-    chef.rotation.y = 0.5;
+    chef.scale.setScalar((h * 0.22) / chefH);
+    chef.position.set(-halfX * 0.78, 0, halfZ + 0.6);
+    chef.rotation.y = 0.6;
     this.scene.add(chef);
     this.chef = chef;
 
