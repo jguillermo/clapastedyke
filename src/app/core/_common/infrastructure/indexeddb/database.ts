@@ -8,9 +8,9 @@
  */
 
 export const DB_NAME = 'bakery-costing';
-export const DB_VERSION = 1;
+export const DB_VERSION = 2;
 
-const STORES_V1 = [
+const STORES = [
   'customers',
   'suppliers',
   'supplies',
@@ -22,9 +22,11 @@ const STORES_V1 = [
   'sales',
   'purchases',
   'stock_movements',
+  'progress', // v2: progresión del juego (singleton 'PROGRESS')
+  'productions', // v2: registro de lo cocinado (kitchen)
 ] as const;
 
-export type StoreName = (typeof STORES_V1)[number] | 'counters';
+export type StoreName = (typeof STORES)[number] | 'counters';
 
 let connection: Promise<IDBDatabase> | null = null;
 
@@ -34,7 +36,7 @@ export function openDatabase(): Promise<IDBDatabase> {
 
     request.onupgradeneeded = () => {
       const db = request.result;
-      for (const name of STORES_V1) {
+      for (const name of STORES) {
         if (!db.objectStoreNames.contains(name)) {
           db.createObjectStore(name, { keyPath: 'id' });
         }

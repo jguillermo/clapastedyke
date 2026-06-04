@@ -19,6 +19,7 @@ export const ID_PREFIXES = {
   purchaseLine: 'CDL',
   stockMovement: 'MV',
   sale: 'VT',
+  production: 'PRD',
 } as const;
 
 export type IdPrefix = (typeof ID_PREFIXES)[keyof typeof ID_PREFIXES];

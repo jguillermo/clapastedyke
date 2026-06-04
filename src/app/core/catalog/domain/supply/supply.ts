@@ -6,7 +6,25 @@ import { domainEvent } from '../../../_common/domain/domain-event';
 import { EntityId } from '../../../_common/domain/entity-id';
 
 export type SupplyType = 'ingredient' | 'packaging';
+
+/**
+ * Estado de stock de un almacén. Fuente de verdad: .claude/doc (StockStatus).
+ * EMPTY: agotado (≤ 0) · LOW: poco (≤ mínimo) · OK: suficiente.
+ */
+export enum StockStatus {
+  EMPTY = 'EMPTY',
+  LOW = 'LOW',
+  OK = 'OK',
+}
+
+/** Alias heredado (rojo/amarillo/verde) mapeado desde StockStatus. */
 export type StockLight = 'red' | 'yellow' | 'green';
+
+const LIGHT_BY_STATUS: Record<StockStatus, StockLight> = {
+  [StockStatus.EMPTY]: 'red',
+  [StockStatus.LOW]: 'yellow',
+  [StockStatus.OK]: 'green',
+};
 
 /**
  * Presentation VO: how the supply is bought (a 1000 g bag at S/ 5).
@@ -22,8 +40,10 @@ export class Presentation {
     if (!Number.isFinite(size) || size <= 0) {
       throw new ValidationError(`Invalid presentation size: ${size}.`);
     }
-    if (!price.isGreaterThan(Money.zero())) {
-      throw new ValidationError('The presentation price must be greater than 0.');
+    // En modo básico el precio puede ser 0 (oculto); el cálculo avanzado (QUOTING)
+    // exige un precio real, validado en ese caso por SaveSupply/quoter.
+    if (price.isNegative()) {
+      throw new ValidationError('The presentation price cannot be negative.');
     }
     return new Presentation(size, price);
   }
@@ -177,11 +197,16 @@ export class Supply extends AggregateRoot {
     return this._presentation.pricePerBaseUnit;
   }
 
-  /** red: stock ≤ 0 · yellow: stock ≤ minimum · green: rest. */
+  /** EMPTY: stock ≤ 0 · LOW: stock ≤ minimum · OK: rest. */
+  get stockStatus(): StockStatus {
+    if (this._stock <= 0) return StockStatus.EMPTY;
+    if (this._stock <= this._minStock) return StockStatus.LOW;
+    return StockStatus.OK;
+  }
+
+  /** Alias heredado (rojo/amarillo/verde) derivado de stockStatus. */
   get stockLight(): StockLight {
-    if (this._stock <= 0) return 'red';
-    if (this._stock <= this._minStock) return 'yellow';
-    return 'green';
+    return LIGHT_BY_STATUS[this.stockStatus];
   }
 
   get belowMinimum(): boolean {

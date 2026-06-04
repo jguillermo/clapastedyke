@@ -1,9 +1,9 @@
 /* ============================================================
- * Form design tokens — pure Tailwind v4.
- * Templates use ONLY utilities over these tokens (bg-paper,
- * text-ink, rounded-field, shadow-card…), applied via the
- * directivas de src/app/features/_common/ui/ui.ts.
- * NO Preflight: the global reset lives in src/styles.scss.
+ * Design tokens — Tailwind v4. Fuente de verdad: .claude/doc/diseno_visual.md.
+ * Plantillas usan SOLO utilities sobre estos tokens (bg-paper, text-ink,
+ * rounded-md, shadow-card…), vía las directivas de
+ * src/app/features/_common/ui/ui.ts. NO Preflight: el reset global vive en
+ * src/styles.scss. Identificadores en inglés, descripción en español.
  * ============================================================ */
 
 @layer theme, base, components, utilities;
@@ -11,51 +11,89 @@
 @import 'tailwindcss/utilities.css' layer(utilities);
 
 @theme {
-  /* Base colors — brand identity */
-  --color-paper: #f7f1e8;
-  --color-sheet: #ffffff;
-  --color-ink: #2a2420;
-  --color-muted: #8c8278;
-  --color-line: #e7ddcf;
-  --color-line-soft: #f0e8db;
-  --color-cream: #fbf6ef;
-  --color-accent: #bb5530;
-  --color-accent-deep: #9a4324;
-  --color-accent-soft: #f6e3d6;
-  --color-green: #4f8a5b;
-  --color-green-soft: #e1efe2;
-  --color-amber: #cf9a32;
-  --color-amber-soft: #f7ecd1;
-  --color-red: #bf412c;
-  --color-red-soft: #f7ddd6;
+  /* ---- Marca ---- */
+  --color-primary: #b8472a;        /* caramelo/rust — CTA principal */
+  --color-primary-hover: #9e3c22;
+  --color-primary-press: #893420;
+  --color-primary-soft: #f7e4d8;
+  --color-on-primary: #ffffff;
 
-  /* Typography */
+  --color-honey: #c98a12;          /* miel/ámbar — secundario, datos */
+  --color-honey-soft: #fbebd0;
+  --color-berry: #c63f73;          /* frambuesa/glaseado — acento */
+  --color-berry-soft: #f8e1eb;
+
+  /* ---- Neutros cálidos ---- */
+  --color-ink: #2a211b;            /* texto principal */
+  --color-ink-soft: #6b5d52;       /* texto secundario */
+  --color-ink-faint: #9a8b7d;      /* terciario / placeholder */
+  --color-paper: #fbf6ee;          /* fondo de la app */
+  --color-surface: #ffffff;        /* tarjetas/paneles sólidos */
+  --color-surface-2: #fffbf4;
+  --color-border: #e7dccd;
+  --color-border-strong: #d8c7b2;
+
+  /* ---- Semánticos (también estados de stock) ---- */
+  --color-success: #4f8a5b;        /* StockStatus.OK */
+  --color-success-soft: #e3f0e5;
+  --color-warning: #c98a12;        /* StockStatus.LOW */
+  --color-warning-soft: #fbebd0;
+  --color-danger: #c7402f;         /* StockStatus.EMPTY / destructivo */
+  --color-danger-soft: #f8e0dc;
+  --color-info: #3f6f9c;           /* informativo / foco */
+  --color-info-soft: #e1ecf4;
+
+  /* ---- Aliases heredados (no romper directivas/SCSS existentes) ---- */
+  --color-sheet: #ffffff;          /* = surface */
+  --color-muted: #6b5d52;          /* = ink-soft */
+  --color-line: #e7dccd;           /* = border */
+  --color-line-soft: #f0e8db;
+  --color-cream: #fffbf4;          /* = surface-2 */
+  --color-accent: #b8472a;         /* = primary */
+  --color-accent-deep: #9e3c22;    /* = primary-hover */
+  --color-accent-soft: #f7e4d8;    /* = primary-soft */
+  --color-green: #4f8a5b;
+  --color-green-soft: #e3f0e5;
+  --color-amber: #c98a12;
+  --color-amber-soft: #fbebd0;
+  --color-red: #c7402f;
+  --color-red-soft: #f8e0dc;
+
+  /* ---- Tipografía ---- */
   --font-heading: 'Fraunces', serif;
   --font-body: 'Figtree', sans-serif;
   --font-mono: 'Space Mono', monospace;
 
-  /* Radii */
-  --radius-field: 10px;
-  --radius-card: 14px;
+  /* ---- Radios ---- */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
   --radius-pill: 999px;
+  --radius-field: 12px;            /* = md (alias heredado) */
+  --radius-card: 12px;             /* = md (alias heredado) */
 
-  /* Shadows */
-  --shadow-card: 0 2px 10px -4px rgba(60, 40, 25, .22);
-  --shadow-floating: 0 12px 34px -14px rgba(60, 40, 25, .30);
+  /* ---- Sombras ---- */
+  --shadow-sm: 0 1px 2px rgba(42, 33, 27, .06), 0 1px 3px rgba(42, 33, 27, .08);
+  --shadow-md: 0 4px 12px rgba(42, 33, 27, .10);
+  --shadow-lg: 0 12px 32px rgba(42, 33, 27, .16);
+  --shadow-glass: 0 8px 40px rgba(42, 33, 27, .18);
+  --shadow-card: 0 1px 2px rgba(42, 33, 27, .06), 0 1px 3px rgba(42, 33, 27, .08);
+  --shadow-floating: 0 12px 32px rgba(42, 33, 27, .16);
 }
 
-/* Tutorial-game state: target field/button with pulsing ring.
-   A utility so it can toggle via [class.highlighted]; !important to win
-   over the field focus ring. */
+/* Tutorial-game state: target field/button con anillo pulsante.
+   Utility para alternar vía [class.highlighted]; !important para ganar
+   sobre el focus ring del campo. */
 @utility highlighted {
-  border-color: var(--color-accent) !important;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 18%, transparent) !important;
+  border-color: var(--color-primary) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 18%, transparent) !important;
   animation: highlight-pulse 1.6s ease-in-out infinite;
 }
 
 @keyframes highlight-pulse {
   50% {
-    box-shadow: 0 0 0 7px color-mix(in srgb, var(--color-accent) 26%, transparent) !important;
+    box-shadow: 0 0 0 7px color-mix(in srgb, var(--color-primary) 26%, transparent) !important;
   }
 }
 
