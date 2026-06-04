@@ -11,8 +11,15 @@ import { CheckIngredients } from '../../../../core/kitchen/application/check-ing
 import { CookRecipe } from '../../../../core/kitchen/application/cook-recipe/cook-recipe';
 import { BuyIngredient } from '../../../../core/kitchen/application/buy-ingredient/buy-ingredient';
 import { RecipeCheck, IngredientCheck } from '../../../../core/kitchen/domain/ingredient-check';
+import { PublishProduction } from '../../../../core/reputation/application/publish-production/publish-production';
+import { GetPopularity } from '../../../../core/reputation/application/get-popularity/get-popularity';
+import { AttendInformalOrder } from '../../../../core/reputation/application/attend-informal-order/attend-informal-order';
+import { Feature } from '../../../../core/progression/domain/feature';
 
-type Overlay = 'none' | 'goals' | 'recipes' | 'check' | 'cooked' | 'levelup';
+type Overlay = 'none' | 'goals' | 'recipes' | 'check' | 'cooked' | 'levelup' | 'social';
+
+/** Popularidad a partir de la cual llega un pedido informal. */
+const INFORMAL_ORDER_THRESHOLD = 60;
 
 /**
  * Hub de la Fase 1 (cocina en casa). Mundo 3D de fondo + overlays de vidrio
@@ -33,6 +40,9 @@ export class HomeShell {
   private readonly check = inject(CheckIngredients);
   private readonly cook = inject(CookRecipe);
   private readonly buy = inject(BuyIngredient);
+  private readonly publishProduction = inject(PublishProduction);
+  private readonly getPopularity = inject(GetPopularity);
+  private readonly attendInformalOrder = inject(AttendInformalOrder);
 
   protected readonly overlay = signal<Overlay>('none');
   protected readonly recipes = signal<RecipePrimitives[]>([]);
@@ -40,10 +50,18 @@ export class HomeShell {
   protected readonly busy = signal(false);
   protected readonly cookedName = signal('');
   protected readonly unlockedLabel = signal('');
+  protected readonly popularity = signal(0);
+  private readonly lastCooked = signal<{ id: string; name: string } | null>(null);
 
   protected readonly level = this.facade.currentLevel;
   protected readonly goals = this.facade.goals;
   protected readonly anyGoal = computed(() => this.goals().length > 0);
+
+  /** Fase 2: redes desbloqueadas. */
+  protected readonly social = computed(() => this.facade.isFeatureUnlocked(Feature.SOCIAL));
+  protected readonly canPublish = computed(() => this.social() && this.lastCooked() !== null);
+  protected readonly lastCookedName = computed(() => this.lastCooked()?.name ?? '');
+  protected readonly informalReady = computed(() => this.social() && this.popularity() >= INFORMAL_ORDER_THRESHOLD);
 
   constructor() {
     void this.init();
@@ -53,6 +71,11 @@ export class HomeShell {
     await this.ensureSeed();
     this.recipes.set(await this.listRecipes.execute());
     await this.facade.refresh();
+    await this.refreshPopularity();
+  }
+
+  private async refreshPopularity(): Promise<void> {
+    this.popularity.set((await this.getPopularity.execute()).points);
   }
 
   /* ---------- flujo ---------- */
@@ -101,6 +124,7 @@ export class HomeShell {
     await this.facade.refresh();
     this.busy.set(false);
     this.cookedName.set(current.recipeName);
+    this.lastCooked.set({ id: current.recipeId, name: current.recipeName });
 
     if (this.facade.currentLevel() > before) {
       this.unlockedLabel.set('¡Desbloqueaste la siguiente etapa!');
@@ -108,6 +132,30 @@ export class HomeShell {
     } else {
       this.overlay.set('cooked');
     }
+  }
+
+  /* ---------- Fase 2: redes ---------- */
+
+  protected async openSocial(): Promise<void> {
+    await this.refreshPopularity();
+    this.overlay.set('social');
+  }
+
+  protected async publish(): Promise<void> {
+    const last = this.lastCooked();
+    if (!last) return;
+    this.busy.set(true);
+    const { points } = await this.publishProduction.execute({ recipeId: last.id, recipeName: last.name });
+    this.popularity.set(points);
+    await this.facade.refresh();
+    this.busy.set(false);
+  }
+
+  protected async attendInformal(): Promise<void> {
+    this.busy.set(true);
+    await this.attendInformalOrder.execute({ recipeName: this.lastCooked()?.name ?? 'pastel' });
+    await this.facade.refresh();
+    this.busy.set(false);
   }
 
   /* ---------- seed (solo si la cocina está vacía) ---------- */

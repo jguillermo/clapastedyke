@@ -5,6 +5,9 @@
 <header class="hud">
   <span class="hud__brand">Tu Pastelería</span>
   <span class="hud__level">Nivel {{ level() }} · Cocina en casa</span>
+  @if (social()) {
+    <span class="hud__pop" title="Popularidad">★ {{ popularity() }}</span>
+  }
   <button type="button" class="btn btn--ghost" (click)="openGoals()">Metas</button>
 </header>
 
@@ -13,6 +16,9 @@
   <button type="button" class="dock__chip" (click)="openRecipes()">Recetas</button>
   <button type="button" class="dock__chip" (click)="onStation('pantry')">Despensa</button>
   <button type="button" class="dock__chip" (click)="openRecipes()">Cocinar</button>
+  @if (social()) {
+    <button type="button" class="dock__chip" (click)="openSocial()">Redes</button>
+  }
 </nav>
 
 @if (overlay() !== 'none') {
@@ -101,7 +107,36 @@
       <div class="celebrate">
         <span class="celebrate__emoji">🍪</span>
         <h2>¡Cocinaste {{ cookedName() }}!</h2>
-        <button type="button" class="btn btn--primary" (click)="close()">Seguir</button>
+        <div class="celebrate__actions">
+          @if (social()) {
+            <button type="button" class="btn btn--ghost" [disabled]="busy()" (click)="openSocial()">Publicar en redes</button>
+          }
+          <button type="button" class="btn btn--primary" (click)="close()">Seguir</button>
+        </div>
+      </div>
+    </section>
+  }
+
+  <!-- Redes (Fase 2) -->
+  @if (overlay() === 'social') {
+    <section class="panel" role="dialog" aria-label="Redes">
+      <header class="panel__head">
+        <h2>Redes sociales</h2>
+        <button type="button" class="icon-btn" (click)="close()" aria-label="Cerrar">✕</button>
+      </header>
+      <div class="panel__body">
+        <p class="pop-big">★ {{ popularity() }} <span class="muted">de popularidad</span></p>
+        <p class="muted">Publica lo que cocinas para ganar visibilidad. Con suficiente popularidad llegan pedidos informales.</p>
+        <div class="social-actions">
+          <button type="button" class="btn btn--primary" [disabled]="!canPublish() || busy()" (click)="publish()">
+            @if (canPublish()) { Publicar «{{ lastCookedName() }}» } @else { Cocina algo para publicar }
+          </button>
+          @if (informalReady()) {
+            <button type="button" class="btn btn--secondary" [disabled]="busy()" (click)="attendInformal()">
+              Atender pedido informal
+            </button>
+          }
+        </div>
       </div>
     </section>
   }

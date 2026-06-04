@@ -8,6 +8,7 @@ import { provideInventory } from './inventory/inventory.providers';
 import { provideSales } from './sales/sales.providers';
 import { provideProgression } from './progression/progression.providers';
 import { provideKitchen } from './kitchen/kitchen.providers';
+import { provideReputation } from './reputation/reputation.providers';
 import { RecordProgress } from './progression/application/record-progress/record-progress';
 import { GoalType } from './progression/domain/goal-type';
 import { SUPPLY_REPOSITORY } from './catalog/domain/supply/supply-repository';
@@ -27,6 +28,7 @@ export function provideCore(): EnvironmentProviders {
     provideSales(),
     provideProgression(),
     provideKitchen(),
+    provideReputation(),
     provideAppInitializer(() => {
       const bus = inject(EventBusToken);
       const registerInitialStock = inject(RegisterInitialStock);
@@ -60,6 +62,13 @@ export function provideCore(): EnvironmentProviders {
       bus.subscribe('CustomerCreated', () => record.execute({ type: GoalType.CUSTOMERS_REGISTERED }));
       bus.subscribe('OrderCreated', () => record.execute({ type: GoalType.ORDERS_CREATED }));
       bus.subscribe('OrderDelivered', () => record.execute({ type: GoalType.SALES_COMPLETED }));
+
+      // Reputation (Fase 2).
+      bus.subscribe('ProductionPublished', () => record.execute({ type: GoalType.POSTS_PUBLISHED }));
+      bus.subscribe('PopularityUpdated', e =>
+        record.execute({ type: GoalType.POPULARITY, value: Number(e.data['points'] ?? 0) }),
+      );
+      bus.subscribe('InformalOrderReceived', () => record.execute({ type: GoalType.INFORMAL_ORDERS }));
     }),
   ]);
 }
