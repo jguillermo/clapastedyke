@@ -1,384 +1,461 @@
-# Plan de negocio — Simulador de pastelería que crece por fases
+# Plan de negocio — Lógica de un simulador de pastelería que crece contigo
 
-Este documento define **qué es el sistema y cómo crece**. Ya no es un sistema de gestión empresarial que se presenta completo desde el primer minuto. Es un **simulador de emprendimiento gradual**: el jugador empieza desde lo más básico, en la cocina de su casa, y va **desbloqueando funciones únicamente cuando su negocio realmente las necesita**.
+Este documento define **solo la lógica de negocio**: qué se modela, qué datos se piden en cada etapa, qué reglas se aplican y cómo se avanza de nivel. Lo visual —cómo se mueve el personaje, las casas, los edificios, qué se ve y cómo se ve— vive en `diseno_mundo_juego.md`.
 
-La primera mitad del documento describe la **progresión y las fases**. La segunda mitad (§7 en adelante) recupera, con todo su detalle, la **lógica de negocio avanzada** —presupuestos, IGV, márgenes, pedidos, compras, inventario, configuración, fórmulas y validaciones—, ahora ubicada como **contenido que se desbloquea en las fases avanzadas**, no como el punto de partida.
+La idea central: el jugador empieza en su casa con **pocos campos y pocas tablas**, y el sistema **crece con él**. Cada necesidad nueva desbloquea exactamente la función y los datos que hacen falta, ni antes ni de más.
 
-> Fuentes hermanas: `diseno_mundo_juego.md` (mundo, lugar y cámara por fase), `diseno_visual_interfaz.html` (lenguaje visual) y `design_manual.md` (animación).
+> **Convención de implementación.** Al desarrollar, **el código se escribe en inglés** (bounded contexts, entidades, campos, casos de uso, eventos, enums) y **los comentarios y textos de interfaz, en español**. Por eso, en este documento **todo identificador que existirá en el código va en inglés** y su **descripción va en español**. Los nombres de fase, las explicaciones y la narrativa quedan en español.
 
 ---
 
 ## 1. Concepto
 
-La idea rectora es simple: **el sistema nunca abrume al usuario desde el inicio**. Las funciones avanzadas aparecen solo cuando tienen sentido dentro de la evolución del negocio. Todo se construye paso a paso, como una evolución natural del emprendimiento.
+El negocio crece en dos grandes modos, y se pasa de uno a otro sin darse cuenta:
 
-El jugador inicia literalmente desde su casa, en una cocina pequeña, sin conocimientos avanzados ni herramientas empresariales complejas. A medida que su negocio crece, el juego revela nuevas mecánicas.
-
-Hay dos grandes modos, y se transita del primero al segundo de forma imperceptible:
-
-- **Modo básico (Fases 1–4).** Solo compras ingredientes y vendes productos. La ganancia es **simple y directa** (precio de venta − lo que gastaste). No existe gestión financiera avanzada, **no existe IGV**, no existen pérdidas, deterioro, vencimientos ni costos operativos. El inventario es mínimo: una validación básica de ingredientes disponibles.
-- **Modo avanzado (Fase 5+).** Conforme el negocio crece, se suman, **una a una**, las mecánicas reales de una pastelería: IGV, costos operativos, mermas, proveedores, empleados, equipamiento, producción masiva, delivery, marketing, finanzas, impuestos y sucursales.
-
-La frontera entre ambos modos no es un interruptor: es la suma de pequeños desbloqueos que ocurren a lo largo de las fases.
+- **Modo básico (Fases 1–4).** Solo compras ingredientes y vendes productos. La ganancia es **simple y directa**: precio de venta menos lo que gastaste. **No hay** IGV, ni costos operativos, ni mermas, ni vencimientos. El inventario es una simple validación de "¿me alcanza para cocinar?".
+- **Modo avanzado (Fase 5+).** Se suman, **una a una**, las funciones reales de una pastelería: IGV, costos, mermas, proveedores, empleados, equipamiento, producción masiva, delivery, marketing, finanzas, impuestos y sucursales.
 
 ---
 
-## 2. Arranque y cinemática
+## 2. Principio rector de diseño
 
-El juego inicia con una transición visual que ubica al jugador en su mundo:
+**Prioridad: el juego te ayuda a crecer, no te complica el trabajo.** De ahí, cuatro reglas que mandan sobre todo:
 
-1. Una **vista aérea de la ciudad**.
-2. Un **zoom progresivo** que desciende hasta la **casa del usuario**.
-3. La cámara **entra a la cocina**.
-4. Ahí comienza el **tutorial inicial**.
-
-No hay menús de instalación ni configuración de parámetros empresariales al empezar. El primer contacto del jugador con el sistema es su propia cocina. El detalle técnico de la cámara está en `diseno_mundo_juego.md`.
+1. **Empieza mínimo.** En la primera etapa hay pocos campos y pocas tablas. Lo que el sistema puede asumir, lo asume.
+2. **Divulgación progresiva.** Las entidades son las mismas durante todo el juego; lo que cambia es **cuántos de sus campos se piden**. Un campo puede estar **oculto** en la Fase 1 (con un valor por defecto), volverse **opcional** después y ser **obligatorio** solo cuando su ausencia ya tendría consecuencias.
+3. **Configuración just-in-time.** No hay una pantalla de "Configuración" que te reciba con cincuenta parámetros. **Cada parámetro aparece junto a la función que lo necesita**, en la fase en que esa función se desbloquea.
+4. **El sistema crece contigo.** Cada meta cumplida suma una tabla, un campo o una función. Nunca se pide entender algo que el negocio todavía no vive.
 
 ---
 
-## 3. Las fases y sus objetivos medibles
+## 3. Arquitectura del dominio
 
-Cada fase introduce una mecánica nueva y define **objetivos medibles**. Solo cuando se cumplen todos los objetivos de una fase se abre la siguiente. Los valores numéricos son la meta de diseño por defecto; son **parámetros ajustables** del balance del juego.
+El dominio se divide en **bounded contexts**. No todos están activos desde el inicio: cada fase **enciende** los que necesita.
 
-### Fase 1 — Cocina en casa ("Nivel Básico 1")
+| Bounded context | Para qué sirve | Entidades | Se enciende en |
+|---|---|---|---|
+| **`progression`** | Define las **metas** de cada nivel y decide cuándo se avanza | `PlayerProgress`, `Level`, `Goal` | Siempre (es el motor de la progresión) |
+| **`kitchen`** | Elegir receta, revisar disponibilidad, cocinar | `Production` | Fase 1 |
+| **`catalog`** | Recetas e insumos | `Recipe` (+ `RecipeIngredient`), `Supply` | Fase 1 (mínimo) → crece |
+| **`inventory`** | Stock y todos sus movimientos | `StockMovement`, `Purchase` | Fase 1 (compra simple) → crece |
+| **`reputation`** | Popularidad y visibilidad | `SocialPost`, `Popularity` | Fase 2 |
+| **`sales`** | Clientes, pedidos y ventas | `Customer`, `Order`, `Sale` | Fase 3 |
+| **`quoting`** | Presupuestos con costo y margen | `Quote` (+ `QuoteDetail`) | Fase 5 |
+| **`supply-chain`** | Proveedores y compras formales | `Supplier`, `PackagingRule` | Fase 5 |
+| **`settings`** | Parámetros del negocio, **por bloques** | `Settings` | Repartido: cada bloque aparece con su función |
+| **`dashboard`** | KPIs y alertas (solo lectura) | — | Fase 4 |
+| **`_common`** | Identificadores, dinero, cantidades, errores, event bus | VOs compartidos | Siempre |
 
-Estás en una cocina. Piensas en una receta. Seleccionas qué deseas preparar. Antes de cocinar, revisas si tienes ingredientes suficientes.
+**Casos de uso (una intención del usuario, un caso de uso):**
 
-Flujo: **elegir receta → revisar ingredientes → si falta, comprar → registrar lo comprado → almacenes simples por categoría → cocinar.**
+- `progression`: `RecordProgress`, `EvaluateLevelUp`, `UnlockFeature`, `ListGoals`, `ForceLevelUp`, `LoadProgress`, `ResetProgress`.
+- `kitchen`: `ChooseRecipe`, `CheckIngredients`, `CookRecipe`.
+- `catalog`: `ListRecipes`, `SaveRecipe`, `ListSupplies`, `SaveSupply`.
+- `inventory`: `RegisterPurchase`, `UpdateStock`, `AdjustInventory` (F5), `ListStockMovements`.
+- `reputation`: `PublishProduction`, `UpdatePopularity`, `ReceiveInformalOrder`.
+- `sales`: `SaveCustomer`, `CreateOrder`, `StartOrderProduction`, `DeliverOrder`, `CollectSale`, `CancelOrder`.
+- `quoting`: `CalculateQuote`, `SaveQuote`, `ApproveQuote`, `RejectQuote`.
+- `supply-chain`: `SaveSupplier`, `SavePackagingRule`.
+- `settings`: `ReadSettings`, `SaveSettings`.
+- `dashboard`: `GetDashboard`.
 
-- Validación básica de ingredientes: ¿cuántos huevos tienes? ¿hay harina suficiente? ¿falta azúcar?
-- Si falta algo, el sistema solo indica "te falta esto, cómpralo". Sin proveedores ni precios complejos.
-- Al volver de comprar, el jugador **registra manualmente** lo que trajo.
-- Los ingredientes se guardan en **almacenes simples**, uno por ingrediente (almacén de huevos, de harina, de azúcar).
-- **Semáforo:** vacío → rojo · poco → amarillo · suficiente → verde.
+Las entidades existen desde que su contexto se enciende, pero **la tabla solo se crea cuando hace falta** y **solo se piden los campos del nivel actual**. La Fase 1 vive con dos tablas (`Recipe`, `Supply`) más el registro de `Production`; en la Fase 5 pueden estar activas todas. Nunca al revés.
 
-**Objetivos medibles (todos para avanzar):**
-- Registrar al menos **1 compra** de ingredientes.
-- Tener los **3 almacenes básicos** (huevos, harina, azúcar) en verde al menos una vez.
-- **Cocinar 1 receta con éxito** (1 producción completada).
+---
+
+## 4. Progresión y metas (bounded context `progression`)
+
+El avance de nivel **no** es algo suelto: lo gobierna un contexto dedicado. Aquí se definen las **metas claras** que hay que superar para pasar de un nivel al siguiente. Para subir de nivel siempre queda explícito *qué falta hacer*.
+
+### 4.1 Enums del contexto
+
+`GoalType` — la lista canónica y cerrada de "qué cuenta el juego":
+
+```
+enum GoalType {
+  PURCHASES_REGISTERED   // compras de ingredientes anotadas
+  WAREHOUSES_STOCKED     // almacenes con stock suficiente a la vez
+  PRODUCTIONS_COOKED     // recetas preparadas con éxito
+  POSTS_PUBLISHED        // producciones publicadas en redes
+  POPULARITY             // puntos de popularidad acumulados
+  INFORMAL_ORDERS        // pedidos informales atendidos
+  CUSTOMERS_REGISTERED   // clientes dados de alta
+  ORDERS_CREATED         // pedidos formales creados
+  SALES_COMPLETED        // pedidos entregados y cobrados
+  SUPPLIES_IN_STOCK      // insumos distintos en inventario
+  SIZES_SOLD             // tamaños distintos vendidos de un producto
+  ORDERS_PER_WEEK        // pedidos atendidos en una semana
+  CONCURRENT_ORDERS      // pedidos en producción al mismo tiempo
+  ACCUMULATED_REVENUE    // ingreso total acumulado
+  MONTHS_OPERATING       // meses con la tienda en operación
+}
+```
+
+`GoalMode` — cómo se actualiza el progreso de una meta:
+
+```
+enum GoalMode {
+  INCREMENT   // acumulativa: suma cada vez que ocurre el hecho
+  SNAPSHOT    // instantánea: mide el valor actual y conserva el máximo alcanzado
+}
+```
+
+`Feature` — qué puede encender la progresión (lo que se desbloquea):
+
+```
+enum Feature {
+  KITCHEN  SOCIAL  CUSTOMERS  ORDERS  PHYSICAL_STORE
+  QUOTING  TAX  SUPPLIERS  OPERATING_COSTS  SPOILAGE
+  PACKAGING_RULES  ADVANCED_ORDERS  EQUIPMENT  EMPLOYEES
+  DELIVERY  MARKETING  FINANCE  BRANCHES
+}
+```
+
+### 4.2 Entidades
+
+- **`Goal`** (value object) — una condición medible:
+  - `type: GoalType`
+  - `target: number` — número a alcanzar
+  - `progress: number` — cuánto se lleva
+  - `mode: GoalMode`
+  - derivado `met: boolean` → `progress >= target`
+- **`Level`** (value object) — un nivel/fase del juego:
+  - `order: number`
+  - `goals: Goal[]` — las metas que cierran el nivel
+  - `unlocks: Feature[]` — qué se enciende al completarlo
+  - derivado `completed: boolean` → todas sus `goals` cumplidas
+- **`PlayerProgress`** (aggregate root) — el estado de la partida y dueño de las reglas:
+  - `currentLevel: number`
+  - `progressByType: Map<GoalType, number>`
+  - `completedLevels: number[]`
+  - `unlockedFeatures: Feature[]`
+  - **Invariantes:** una meta `INCREMENT` nunca decrece; una `SNAPSHOT` guarda el valor máximo observado; un nivel solo se cierra cuando **todas** sus metas están `met`; las funciones desbloqueadas no se apagan.
+
+### 4.3 Casos de uso
+
+- **`ListGoals()`** — metas del nivel actual con su progreso, para que **siempre sea claro qué falta**.
+- **`RecordProgress(type, value)`** — aplica el avance según el `mode` de la meta (suma si es `INCREMENT`, guarda el máximo si es `SNAPSHOT`).
+- **`EvaluateLevelUp()`** — si **todas** las metas del nivel están `met`, sube de nivel y dispara los desbloqueos.
+- **`UnlockFeature(feature)`** — enciende un contexto/campo/pantalla.
+- **`ForceLevelUp(targetLevel)`** — el **atajo** (ver §4.5).
+- **`LoadProgress()` / `ResetProgress()`** — cargar al iniciar / reiniciar la partida.
+
+### 4.4 Metas por nivel (el contrato de la progresión)
+
+| Nivel | Mecánica nueva | Metas para pasar al siguiente (`GoalType` × `target`) | Desbloquea (`Feature`) |
+|---|---|---|---|
+| **1 — Cocina en casa** | Elegir receta · revisar · comprar y registrar · cocinar | `PURCHASES_REGISTERED` ≥ 1 · `WAREHOUSES_STOCKED` ≥ 3 · `PRODUCTIONS_COOKED` ≥ 1 | `SOCIAL` |
+| **2 — Redes sociales** | Producir para mostrar · popularidad · pedidos informales | `PRODUCTIONS_COOKED` ≥ 4 · `POSTS_PUBLISHED` ≥ 3 · `POPULARITY` ≥ 100 · `INFORMAL_ORDERS` ≥ 1 | `CUSTOMERS`, `ORDERS` |
+| **3 — Primer cliente** | Cliente → pedido → producción → entrega → cobro | `CUSTOMERS_REGISTERED` ≥ 1 · `ORDERS_CREATED` ≥ 1 · `SALES_COMPLETED` ≥ 1 | — (no enciende una Feature nueva; habilita el objetivo de 5 ventas de la Fase 4) |
+| **4 — Primeras ventas** | Objetivos de venta · tienda física | `SALES_COMPLETED` ≥ 5 | `PHYSICAL_STORE` |
+| **5+ — Avanzado** | Las funciones reales, una a una | Una meta propia por función (ver §8) | `QUOTING`, `TAX`, `SUPPLIERS`, … |
+
+Los `target` son la meta de diseño por defecto y son **parámetros ajustables** del balance del juego.
+
+### 4.5 Dos caminos para avanzar
+
+1. **Natural (recomendado).** Cumplir todas las metas del nivel. `ListGoals` siempre muestra qué falta, así que el camino nunca es ambiguo.
+2. **Atajo (`ForceLevelUp`).** El jugador puede **saltarse pasos y forzar el avance** hasta un nivel destino. Al hacerlo, las metas de los niveles intermedios se marcan como satisfechas y se desbloquean sus funciones de golpe. Está pensado para **usuarios que ya conocen el uso** y quieren llegar directo al nivel real de su negocio, sin repetir el tutorial. El camino natural y el atajo conviven: nada obliga a recorrer la progresión paso a paso.
+
+### 4.6 Cómo se persiste el progreso
+
+El contexto guarda **un único registro** (el avance de la partida) mediante `ProgressRepository` (`load()` / `save(progress)`), en el mismo almacén local del juego que el resto de los datos. El registro es pequeño y se reescribe completo en cada cambio (última escritura gana):
+
+```
+ProgressRecord {                            // snapshot de PlayerProgress
+  version: number                           // versión del contenido de progresión
+  currentLevel: number                      // orden del nivel en curso
+  progressByType: Record<GoalType, number>  // progreso por cada tipo de meta
+  completedLevels: number[]                 // órdenes de niveles ya cerrados
+  unlockedFeatures: Feature[]               // qué está encendido hoy
+}
+```
+
+Reglas de persistencia:
+- **Al iniciar**, `LoadProgress` reconstruye el estado. Si `version` no coincide con la versión actual del contenido (cambiaron las metas o su significado), el progreso se **descarta** y se empieza limpio: es estructura del juego, no un dato del negocio que debamos conservar.
+- **Cada `RecordProgress`** y **cada avance de nivel** (natural o por atajo) escriben el registro. Si el almacén no está disponible, el juego sigue en memoria, solo sin persistir.
+- El registro guarda el **progreso por tipo**, no cada evento. El historial detallado de hechos del negocio (ventas, compras, movimientos) vive en sus propios contextos; `progression` solo lleva los contadores que deciden el avance.
+
+### 4.7 Qué dispara cada `RecordProgress`
+
+`progression` **no se acopla** a los otros contextos: cada acción del negocio **emite un evento de dominio** y `progression` tiene suscriptores que lo traducen en `RecordProgress(type, value)`. El `mode` lo define la meta (§4.1).
+
+| `GoalType` | Acción que lo dispara | `mode` | `value` |
+|---|---|---|---|
+| `PURCHASES_REGISTERED` | `RegisterPurchase` completada | INCREMENT | +1 |
+| `WAREHOUSES_STOCKED` | tras cualquier `StockMovement`: almacenes en estado `OK` | SNAPSHOT | n.º actual |
+| `PRODUCTIONS_COOKED` | `CookRecipe` completada | INCREMENT | +1 |
+| `POSTS_PUBLISHED` | `PublishProduction` | INCREMENT | +1 |
+| `POPULARITY` | `UpdatePopularity` (al publicar o vender) | SNAPSHOT | puntos actuales |
+| `INFORMAL_ORDERS` | `ReceiveInformalOrder` atendido | INCREMENT | +1 |
+| `CUSTOMERS_REGISTERED` | `SaveCustomer` (alta nueva) | INCREMENT | +1 |
+| `ORDERS_CREATED` | `CreateOrder` | INCREMENT | +1 |
+| `SALES_COMPLETED` | `CollectSale` (pedido entregado y cobrado) | INCREMENT | +1 |
+| `ACCUMULATED_REVENUE` | `CollectSale` | INCREMENT | + monto de la venta |
+| `SUPPLIES_IN_STOCK` | `SaveSupply` (alta): insumos distintos con stock | SNAPSHOT | n.º actual |
+| `SIZES_SOLD` | venta de un tamaño no vendido antes | SNAPSHOT | n.º de tamaños distintos |
+| `ORDERS_PER_WEEK` | ventana semanal de pedidos atendidos | SNAPSHOT | máx. en la ventana |
+| `CONCURRENT_ORDERS` | al pasar pedidos a producción: en producción a la vez | SNAPSHOT | máx. concurrente |
+| `MONTHS_OPERATING` | paso del tiempo de juego con la tienda activa | INCREMENT | + meses |
+
+Tras cada `RecordProgress`, el contexto llama internamente a `EvaluateLevelUp`: si todas las metas del nivel quedaron cumplidas, avanza y `UnlockFeature` enciende lo nuevo. Así el progreso es **reactivo**: el jugador hace su trabajo normal y el sistema detecta solo cuándo toca crecer.
+
+### 4.8 Eventos de dominio por contexto
+
+Cada contexto **publica eventos** cuando ocurre un hecho del negocio; los demás reaccionan sin acoplarse. Los eventos viajan por el **event bus** de `_common`. Convención: nombre en **pasado**, en inglés, con su carga (payload) mínima.
+
+**`kitchen`**
+- `RecipeCooked { recipeId, date }`
+
+**`catalog`**
+- `SupplySaved { supplyId, isNew }`
+- `RecipeSaved { recipeId, isNew }`
+
+**`inventory`**
+- `PurchaseRegistered { purchaseId, lines }`
+- `StockMoved { supplyId, type, quantity, resultingStock, status }` — lo emite **todo** cambio de stock (compra, consumo al cocinar, corrección, ajuste); `type` indica el origen.
+- `InventoryAdjusted { supplyId, adjustmentType, quantity }` — solo en el flujo formal de mermas (además del `StockMoved`).
+
+**`reputation`**
+- `ProductionPublished { postId, recipeId }`
+- `PopularityUpdated { points }`
+- `InformalOrderReceived { informalOrderId }`
+
+**`sales`**
+- `CustomerSaved { customerId, isNew }`
+- `OrderCreated { orderId, customerId }`
+- `OrderInProduction { orderId }`
+- `OrderDelivered { orderId }`
+- `SaleCollected { saleId, orderId, amount, size }`
+- `OrderCancelled { orderId, reason }`
+
+**`quoting`**
+- `QuoteSaved { quoteId }`
+- `QuoteApproved { quoteId, orderId }`
+- `QuoteRejected { quoteId, reason }`
+
+**`supply-chain`**
+- `SupplierSaved { supplierId, isNew }`
+- `PackagingRuleSaved { ruleId }`
+
+**Reloj del juego** (no es un contexto de negocio; marca el paso del tiempo)
+- `MonthClosed { month }` — con la tienda activa.
+
+**`progression`** (también publica, para que el mundo reaccione)
+- `ProgressRecorded { type, value }`
+- `LevelAdvanced { previousLevel, newLevel, forced }`
+- `FeatureUnlocked { feature }`
+
+### 4.9 Mapa de suscripción de `progression`
+
+`progression` se suscribe a los eventos anteriores y los traduce en `RecordProgress`:
+
+| Evento escuchado | `RecordProgress(type, …)` |
+|---|---|
+| `PurchaseRegistered` | `PURCHASES_REGISTERED`, +1 |
+| `StockMoved` | `WAREHOUSES_STOCKED` = almacenes en estado `OK`; `SUPPLIES_IN_STOCK` = insumos con stock |
+| `RecipeCooked` | `PRODUCTIONS_COOKED`, +1 |
+| `ProductionPublished` | `POSTS_PUBLISHED`, +1 |
+| `PopularityUpdated` | `POPULARITY` = puntos actuales |
+| `InformalOrderReceived` | `INFORMAL_ORDERS`, +1 |
+| `CustomerSaved` (isNew) | `CUSTOMERS_REGISTERED`, +1 |
+| `OrderCreated` | `ORDERS_CREATED`, +1 |
+| `OrderInProduction` / `OrderDelivered` | `CONCURRENT_ORDERS` = pedidos en producción a la vez (máximo) |
+| `SaleCollected` | `SALES_COMPLETED` +1 · `ACCUMULATED_REVENUE` +amount · `SIZES_SOLD` = tamaños distintos · `ORDERS_PER_WEEK` = atendidos en la ventana |
+| `SupplySaved` (isNew) | reevalúa `SUPPLIES_IN_STOCK` |
+| `MonthClosed` | `MONTHS_OPERATING`, +1 |
+
+Los eventos que no mueven ninguna meta (p. ej. `QuoteRejected`, `OrderCancelled`, `PackagingRuleSaved`) igual existen para otros usos (auditoría, dashboard, mundo), pero `progression` no se suscribe a ellos.
+
+---
+
+## 5. Divulgación progresiva de campos
+
+Mismo modelo, distinta exigencia según la fase. Los **campos van con su nombre de código (inglés)** y su descripción en español. Estado de cada campo: `oculto` (no se muestra; el sistema usa un valor por defecto), `opcional` u `obligatorio`.
+
+### `Recipe`
+
+| Campo | Descripción | Fase 1 | Fases 2–4 | Fase 5+ | Por defecto si oculto |
+|---|---|---|---|---|---|
+| `name` | nombre de la receta | obligatorio | obligatorio | obligatorio | — |
+| `ingredients` (≥ 1) | líneas insumo + cantidad | obligatorio | obligatorio | obligatorio | — |
+| `category` | categoría | oculto | opcional | opcional | "General" |
+| `baseType` | tipo de base (personas/tamaño) | oculto | oculto | obligatorio | `people` |
+| `baseServings` | cuánto rinde la base | oculto | opcional | obligatorio | 1 |
+| `laborHours` | tiempo de mano de obra | oculto | oculto | obligatorio | 0 |
+
+### `Supply` (el "almacén" de cada ingrediente)
+
+| Campo | Descripción | Fase 1 | Fases 2–4 | Fase 5+ | Por defecto si oculto |
+|---|---|---|---|---|---|
+| `name` | nombre del insumo | obligatorio | obligatorio | obligatorio | — |
+| `stock` | stock actual | obligatorio | obligatorio | obligatorio | — |
+| `type` | tipo (ingrediente/empaque) | oculto | oculto | obligatorio | `ingredient` |
+| `baseUnit` | unidad base (g / unidad) | oculto | opcional | obligatorio | `unit` |
+| `minStock` | umbral del estado de stock | oculto (automático) | opcional | obligatorio | automático |
+| `presentationSize` | tamaño de presentación | oculto | oculto | obligatorio | 1 |
+| `presentationPrice` | precio de presentación | oculto | opcional | obligatorio | 0 |
+| `recommendedSupplierId` | proveedor recomendado | oculto | oculto | opcional | — |
+
+### `Customer`
+
+| Campo | Descripción | Fase 3 | Fase 5+ (con delivery) | Por defecto |
+|---|---|---|---|---|
+| `name` | nombre del cliente | obligatorio | obligatorio | — |
+| `phone` | teléfono / contacto | opcional | obligatorio | — |
+| `notes` | notas | opcional | opcional | — |
+
+### `Order`
+
+| Campo | Descripción | Fase 3 (simple) | Fase 5+ | Por defecto |
+|---|---|---|---|---|
+| `customerId` | cliente | obligatorio | obligatorio | — |
+| `recipeId` | producto / receta | obligatorio | obligatorio | — |
+| `salePrice` | precio de venta | obligatorio (a mano) | derivado del presupuesto | — |
+| `quoteId` | presupuesto de origen | oculto | obligatorio | — |
+| `materialRequirements` | requerimientos de materiales | oculto | calculado | — |
+
+Idea clave: los campos que en la Fase 1 son ruido (`presentationPrice`, `baseType`, `laborHours`) viven **ocultos con un valor por defecto**; reaparecen como **opcionales** cuando empiezan a importar y se vuelven **obligatorios** solo cuando el cálculo o la operación dependen de ellos.
+
+---
+
+## 6. Cómo se actualiza el inventario (contexto `inventory`)
+
+Todo cambio de stock queda como un **`StockMovement`**: así siempre se puede ver de dónde salió y entró cada cosa. El flujo de actualizar inventario existe desde la Fase 1, pero crece con el negocio.
+
+El estado de un almacén es un `StockStatus`:
+
+```
+enum StockStatus {
+  EMPTY   // agotado: stock en cero o por debajo
+  LOW     // bajo mínimo: por encima de cero pero bajo el umbral
+  OK      // suficiente: por encima del umbral
+}
+```
+
+### En el modo básico (Fases 1–4)
+
+- **Entrada por compra** — `RegisterPurchase`: cuando el jugador vuelve de comprar y anota lo que trajo, se crea un `StockMovement` de **entrada (+)** y el almacén sube. Es lo único que necesita para pasar de `EMPTY` a `OK`.
+- **Salida por cocinar** — `CookRecipe`: al preparar una receta, se descuenta del almacén lo que consume; se crea un `StockMovement` de **salida (−)**.
+- **Corrección simple** — `UpdateStock`: si el jugador se equivocó al registrar, corrige la cantidad del almacén y queda el movimiento de ajuste. Sin tipos ni motivos: solo "dejarlo en la cantidad correcta".
+
+El `StockStatus` se recalcula solo tras cada movimiento. (Su representación visual se define aparte, en `diseno_mundo_juego.md`.)
+
+### En el modo avanzado (Fase 5+)
+
+Cuando aparecen las mermas y el deterioro, la corrección simple se reemplaza por un flujo formal:
+
+- **Ajustar inventario** — `AdjustInventory`: el jugador elige un **tipo de ajuste** (`adjustmentType`: merma, daño, vencimiento, conteo, devolución). Cada tipo trae un **signo** (merma/daño/vencimiento restan; conteo puede sumar o restar; devolución suma). Se registra cantidad, motivo opcional y fecha; el stock se mueve y su `StockStatus` se recalcula.
+- **Historial de movimientos** — `ListStockMovements`: el kardex completo de un insumo (entradas por compra, salidas por consumo, ajustes), para auditar qué pasó con el stock.
+
+**Configuración que aparece con esta función:** la lista editable de tipos de ajuste y su signo (contexto `settings`).
+
+---
+
+## 7. Flujos de negocio del modo básico (Fases 1–4)
+
+### Fase 1 — Cocina en casa
+
+**Contextos activos:** `progression`, `kitchen`, `catalog` (mínimo), `inventory` (compra y consumo). **Tablas:** `Recipe`, `Supply` y el registro de `Production`.
+
+**Campos que se usan, y solo estos:** `Recipe`(`name` + `ingredients`), `Supply`(`name` + `stock`). El umbral (`minStock`) es automático.
+
+**Flujo:**
+1. `ChooseRecipe` — el jugador decide qué preparar.
+2. `CheckIngredients` — compara la receta contra los almacenes y marca el `StockStatus` de cada uno. Si falta algo, dice "te falta esto, cómpralo".
+3. `RegisterPurchase` — el jugador anota lo que trajo; el almacén pasa a `OK` (ver §6).
+4. `CookRecipe` — consume del almacén y registra la `Production`.
+
+**Configuración a la vista:** ninguna. El sistema fija solo los valores por defecto.
 
 ### Fase 2 — Producción para redes sociales
 
-El usuario aún no tiene clientes formales. Produce más pasteles para mostrarlos en redes. Se introduce la idea de **popularidad / visibilidad**, y como consecuencia aparecen **pequeños pedidos informales**.
-
-**Objetivos medibles:**
-- **Cocinar 3 producciones** adicionales (acumulado de producción ≥ 4).
-- **Publicar 3 veces** en redes (cada publicación requiere una producción terminada).
-- Alcanzar **popularidad ≥ 100 puntos** (cada publicación suma popularidad).
-- Recibir y atender **1 pedido informal**.
+**Contexto nuevo:** `reputation`. **Entidades:** `SocialPost`, `Popularity`.
+**Casos de uso:** `PublishProduction` (necesita una producción terminada), `UpdatePopularity`, `ReceiveInformalOrder`.
+**Campos nuevos:** la publicación (`recipeId`, `date`) y los puntos de `Popularity`. En `Recipe`, `category` pasa a opcional.
+**Configuración a la vista:** opcional, un nombre de marca para las publicaciones.
 
 ### Fase 3 — Primer cliente
 
-Se desbloquea el **módulo de clientes**. Flujo mínimo: **Cliente → Pedido → Producción → Entrega → Cobro.** La ganancia sigue siendo directa (sin IGV ni costos).
+**Contexto nuevo:** `sales`. **Entidades:** `Customer`, `Order`, `Sale`.
+**Flujo mínimo:** Cliente → Pedido → Producción → Entrega → Cobro.
+**Campos que se usan:** `Customer`(`name`; `phone`/`notes` opcionales); `Order`(`customerId`, `recipeId`, `salePrice` a mano). La ganancia sigue directa: precio − gasto.
+**Configuración a la vista:** ninguna obligatoria.
 
-**Objetivos medibles:**
-- **Registrar 1 cliente.**
-- **Crear 1 pedido** asociado a ese cliente.
-- **Completar 1 venta** (pedido entregado y cobrado).
+### Fase 4 — Primeras ventas y la tienda física
 
-### Fase 4 — Primeras ventas y gamificación
-
-El sistema introduce objetivos de venta. Al alcanzarlos se **desbloquea la primera tienda física** y el mundo pasa de la casa al pueblo de edificios (ver `diseno_mundo_juego.md`).
-
-**Objetivos medibles:**
-- **Completar 5 ventas** en total (a clientes registrados).
-- (Al cumplirlo) se dispara la transición visual: salir de casa → ciudad → aparece la pastelería; la cocina crece.
-
-### Fase 5+ — Avanzado
-
-Cada función avanzada se desbloquea **por su propio hito**, solo cuando el negocio la necesita. Hitos medibles propuestos:
-
-| Función avanzada | Hito que la desbloquea |
-|---|---|
-| **Configuración del negocio** (tarifas, margen por defecto) | Abrir la tienda física (Fase 4 completada). |
-| **Presupuestos / cotización con costo y margen** | Acumular **10 ventas**. |
-| **Proveedores y compra por proveedor** | Registrar **3 compras** de ingredientes. |
-| **IGV / formalización** | Acumular **20 ventas** o **ingresos ≥ S/ 2 000**. |
-| **Costos operativos** (indirecto, depreciación) | Operar la tienda durante **15 pedidos**. |
-| **Mermas y deterioro de productos** | Tener **≥ 8 insumos** distintos en bodega. |
-| **Reglas de empaque** | Vender **3 tamaños distintos** del mismo producto. |
-| **Equipamiento / producción masiva** | Superar **10 pedidos en una semana**. |
-| **Empleados** | Tener **≥ 5 pedidos simultáneos** en producción. |
-| **Delivery** | Acumular **30 ventas**. |
-| **Marketing** | Popularidad **≥ 1 000 puntos**. |
-| **Finanzas / impuestos** | Cerrar **3 meses** de operación con la tienda. |
-| **Sucursales** | Ingresos acumulados **≥ S/ 20 000**. |
+**Contexto nuevo:** `dashboard` (KPIs y alertas aparecen con la tienda).
+Al completar **5 ventas** se desbloquea `PHYSICAL_STORE` y se entra al modo avanzado.
+**Primera y única configuración real hasta aquí:** el nombre del negocio. Todavía sin IGV ni costos.
 
 ---
 
-## 4. Modelo de desbloqueo (resumen)
+## 8. Funciones avanzadas (Fase 5+): cada una con su meta y su configuración
 
-El desbloqueo es acumulativo: lo abierto no se pierde.
+Cada función llega **cuando el negocio la necesita**, con sus campos (que recién ahí se vuelven obligatorios) y su bloque de configuración al lado.
 
-| Fase | Lugar | Mecánica nueva | Objetivo para avanzar | Desbloquea |
-|---|---|---|---|---|
-| **1 — Cocina en casa** | Casa / cocina | Elegir receta · revisar · comprar y registrar · cocinar | 1 compra + 3 almacenes en verde + 1 producción | Producción para redes (Fase 2) |
-| **2 — Redes sociales** | Cocina | Producir para mostrar · popularidad · pedidos informales | 3 producciones + 3 publicaciones + 100 popularidad + 1 pedido informal | Clientes y pedidos (Fase 3) |
-| **3 — Primer cliente** | Cocina | Cliente → pedido → producción → entrega → cobro | 1 cliente + 1 pedido + 1 venta | Objetivo de ventas (Fase 4) |
-| **4 — Primeras ventas** | Casa → Ciudad | Objetivos de venta · tienda física | **5 ventas** | Tienda física + pueblo (Fase 5+) |
-| **5+ — Avanzado** | Pueblo | IGV · costos · mermas · proveedores · empleados · equipamiento · producción masiva · delivery · marketing · finanzas · impuestos · sucursales | Hito propio de cada función (ver §3) | Cada mecánica, una a una |
+### 8.1 `QUOTING` — presupuestos con costo y margen — meta: 10 ventas
 
-Tramos de complejidad:
-- **Inicial:** compra · producción · venta simple.
-- **Intermedio:** clientes · pedidos · mayor stock · más recetas · organización básica.
-- **Avanzado:** IGV · costos · deterioro · mermas · proveedores · empleados · equipamiento · producción masiva · delivery · marketing · finanzas · impuestos · sucursales.
+**Contexto:** `quoting` (`Quote` + `QuoteDetail`). Se vuelven obligatorios en `Recipe` los campos `baseType`, `baseServings` y `laborHours`; en `Supply`, `presentationSize`, `presentationPrice` y `minStock`.
+**Casos de uso:** `CalculateQuote`, `SaveQuote`, `ApproveQuote`, `RejectQuote`. Al guardar, **congela** los precios (cambiar un insumo luego no afecta presupuestos ya guardados).
+**Configuración que aparece:** tarifa de mano de obra por hora, margen por defecto, lista de tamaños y factores de escalado.
 
----
+### 8.2 `TAX` — IGV / formalización — meta: 20 ventas o ingresos ≥ S/ 2 000
 
-## 5. Detalle del modo básico (Fases 1–4)
+Se activa el impuesto. **Configuración que aparece:** aplicar IGV, tasa de IGV (18 % por defecto) y modo de redondeo.
 
-En el modo básico no hay pantallas empresariales: hay acciones simples sobre la cocina.
+### 8.3 `SUPPLIERS` — proveedores y compra formal — meta: 3 compras registradas
 
-- **Recetas (básico).** Un nombre y su lista de ingredientes con cantidades. Sin categoría, sin tipo de base, sin mano de obra.
-- **Ingredientes / almacenes (básico).** Cada ingrediente es un almacén con una cantidad y un semáforo. No hay precio por unidad ni proveedor ni stock mínimo manual: el umbral del semáforo es automático.
-- **Comprar (básico).** Cuando falta un ingrediente para la receta elegida, el sistema lo señala. El jugador registra manualmente la cantidad que trajo y el almacén pasa de rojo a verde.
-- **Cocinar (básico).** Consume del almacén las cantidades que pide la receta y cuenta como una producción.
-- **Vender (básico, Fases 2–4).** Precio de venta puesto a mano; **ganancia = precio − gasto**, sin impuestos ni costos. El pedido informal (Fase 2) y el pedido a cliente (Fase 3+) comparten el flujo mínimo cliente/pedido → producción → entrega → cobro.
+**Contexto:** `supply-chain` (`Supplier`). `RegisterPurchase` se enriquece (proveedor, fecha, precio de presentación). Aparece la lista de compras agrupada por proveedor con enlace de WhatsApp.
+**Configuración que aparece:** datos del proveedor (nombre, WhatsApp).
 
----
+### 8.4 `OPERATING_COSTS` — costos operativos — meta: 15 pedidos
 
-## 6. El mundo avanzado: dónde viven los flujos (Fase 5+)
+Entran al costo el costo indirecto por pedido y la depreciación por pedido (montos fijos).
+**Configuración que aparece:** esos dos parámetros.
 
-Cuando se desbloquea la tienda física, el mundo pasa al **pueblo de edificios** (detalle en `diseno_mundo_juego.md`). Los flujos avanzados se reparten así:
+### 8.5 `SPOILAGE` — mermas y deterioro — meta: ≥ 8 insumos en bodega
 
-| Edificio | Funciones avanzadas que aloja |
-|---|---|
-| **La Oficina** | Configuración · Clientes · Reglas de empaque |
-| **La Bodega** | Insumos · Ajustar inventario |
-| **La Tienda** | Nuevo presupuesto · Ver presupuestos |
-| **El Obrador** | Ver pedidos · Recetas |
-| **El Mercado** | Comprar materiales · Proveedores |
+Se desbloquea el flujo formal de `AdjustInventory` (ver §6). **Configuración que aparece:** la lista de tipos de ajuste y su signo.
 
-Las pantallas y campos de cada función están en §7–§13.
+### 8.6 `PACKAGING_RULES` — reglas de empaque — meta: vender 3 tamaños distintos
+
+**Entidad:** `PackagingRule` (receta + tamaño → empaque + cantidad), para prellenar los empaques sugeridos del presupuesto.
+
+### 8.7 `ADVANCED_ORDERS` — pedidos avanzados — con la tienda en marcha
+
+`Order` gana `quoteId` y `materialRequirements`. Estados: **Pendiente → Producción → Entregado**, con **cancelar** (devuelve stock) antes de entregar.
+**Configuración que aparece:** días de vencimiento del presupuesto y momento de descuento de stock (al aprobar o al iniciar producción).
+
+### 8.8 Resto de metas
+
+`EQUIPMENT`/producción masiva (10 pedidos/semana), `EMPLOYEES` (≥ 5 pedidos simultáneos), `DELIVERY` (30 ventas), `MARKETING` (popularidad ≥ 1 000), `FINANCE`/impuestos (3 meses de operación) y `BRANCHES` (ingresos ≥ S/ 20 000). Cada una trae su entidad, su caso de uso y su configuración **en el momento del desbloqueo**.
 
 ---
 
-## 7. Presupuestos (cotización avanzada)
+## 9. Reglas de cálculo del precio (modo avanzado)
 
-Se desbloquea cuando el negocio necesita cotizar con precisión (hito: 10 ventas). Es la pantalla central del modo avanzado: una ventana grande dividida en secciones que se recorren de arriba hacia abajo; las secciones de cálculo se actualizan solas.
-
-**Sección 1 — Cliente y producto:**
-
-| Campo | Obligatorio | Tipo y comportamiento |
-|---|---|---|
-| Cliente | Sí | Autocompletado sobre Clientes. Botón "Nuevo cliente" para crear sin salir. |
-| Producto o receta | Sí | Autocompletado sobre Recetas. Al elegir, autocompleta ingredientes y tiempo de mano de obra. |
-
-**Sección 2 — Escalado:**
-
-| Campo | Obligatorio | Tipo y comportamiento |
-|---|---|---|
-| Modo de escalado | Sí | Dropdown: por cantidad, por tamaño, por número de personas, por factor directo. |
-| Valor | Sí | Número > 0. La etiqueta cambia según el modo. Al cambiarlo, los ingredientes se reescalan al instante. |
-
-**Sección 3 — Ingredientes (solo lectura):** tabla que el sistema arma solo: cada ingrediente, la cantidad ya escalada, el precio por gramo/unidad y el subtotal. Al pie, el costo total de ingredientes.
-
-**Sección 4 — Empaque y materiales:**
-
-| Campo | Obligatorio | Tipo y comportamiento |
-|---|---|---|
-| Empaques sugeridos | No | Checkboxes prellenados según receta y tamaño; cada uno con cantidad editable. |
-| Agregar empaque o insumo | No | Autocompletado sobre Insumos de tipo empaque + cantidad, para sumar lo no sugerido. Varias filas. |
-
-Al pie, el costo total de materiales (solo lectura).
-
-**Sección 5 — Otros costos (solo lectura):** tres líneas calculadas desde Configuración y la receta: **mano de obra** (tiempo × tarifa), **costo indirecto** (monto fijo por pedido) y **depreciación** (monto fijo por pedido).
-
-**Sección 6 — Ganancia y precio:**
-
-| Campo | Obligatorio | Tipo y comportamiento |
-|---|---|---|
-| Margen de ganancia | Sí | Porcentaje, prellenado desde Configuración, editable para este presupuesto. |
-| Aplicar IGV | No | Casilla; si está marcada suma el IGV después de la ganancia. |
-| Notas | No | Texto libre. |
-
-Al pie, en solo lectura, el desglose final: costo total de producción, precio con la ganancia, IGV si corresponde, redondeo y **precio final** resaltado.
-
-**Guardar:** congela todos los precios y parámetros, asigna fecha de emisión y vencimiento (días configurables), guarda en el histórico con estado **Pendiente** y registra auditoría. Cambiar luego un precio de insumo **no** afecta a este presupuesto.
+- **Costo total** = `ingredients + materials + labor + fixedOverhead + fixedDepreciation`.
+- **Margen sobre la venta** (no sobre el costo): `priceWithMargin = totalCost / (1 - margin/100)`.
+- **IGV** (cuando está activo): se suma **encima** del precio con margen → `taxAmount = priceWithMargin × (taxRate/100)`. Tasa por defecto 18 %.
+- **Redondeo** (cuando es múltiplo de 5): `finalPrice = ceil((priceWithMargin + taxAmount)/5) × 5`. Si es "ninguno", `finalPrice = priceWithMargin + taxAmount`.
+- **Escalado:** los ingredientes escalan por el factor; el empaque **no** escala (se fija a mano).
 
 ---
 
-## 8. Reglas de cálculo del precio (avanzado)
+## 10. Validaciones y comportamientos transversales (avanzado)
 
-Las fórmulas exactas del modo avanzado:
-
-- **Costo total** = `ingredientes + materiales + mano_obra + indirecto_fijo + depreciacion_fija`.
-- **Margen sobre el precio de venta** (no sobre el costo): `precio_con_margen = costo_total / (1 - margen/100)`.
-- **IGV** (cuando está activado): se aplica **encima** del precio con margen → `monto_igv = precio_con_margen × (tasa_igv/100)`. Tasa por defecto **18 %**.
-- **Redondeo:** al múltiplo de 5 hacia arriba cuando el modo es `MULTIPLO_5` → `precio_final = ceil((precio_con_margen + monto_igv) / 5) × 5`. Si el redondeo es "ninguno", `precio_final = precio_con_margen + monto_igv`.
-
-Reglas de escalado:
-- Las cantidades de **ingredientes escalan por el factor**; las de **empaque no escalan** (se fijan a mano por presupuesto).
-- El factor se obtiene del modo de escalado: por factor directo (valor tal cual), por tamaño (factor del tamaño en Configuración), por cantidad/personas (`valor / base de la receta`).
+- Antes de aprobar un presupuesto, avisa cuánto stock quedará en negativo.
+- No se aprueba dos veces el mismo presupuesto ni se entrega un pedido que no está en producción; los botones que no aplican no aparecen. No se cancela un pedido ya entregado.
+- Cada guardado escribe **auditoría** (fecha, usuario, qué cambió, antes/después).
+- Mover stock o crear pedidos usa **bloqueo** para que un doble clic no descuente dos veces.
+- Los obligatorios se marcan; los números no aceptan letras; precios, cantidades y stock no son negativos; los desplegables se alimentan de los catálogos.
 
 ---
 
-## 9. Pedidos (ciclo de producción avanzado)
+## 11. Nota técnica: cálculos vivos vs. transacciones congeladas
 
-Un presupuesto aprobado se convierte en pedido.
+- **Cálculo vivo:** mira datos actuales y los muestra (precio por unidad, `StockStatus`, contadores del resumen). Se recalcula solo.
+- **Transacción congelada:** escribe un hecho que debe quedar fijo en el tiempo (guardar un presupuesto con su precio, descontar stock al aprobar, registrar la venta al entregar, devolver stock al cancelar, subir stock al comprar, auditoría). Lo escribe el código y no se recalcula.
 
-**Estados y transiciones:**
-
-| Acción | Cuándo | Comportamiento |
-|---|---|---|
-| Iniciar producción | Pendiente | Confirma y pasa a **Producción**. |
-| Marcar entregado | Producción | Confirma, pasa a **Entregado**, genera el registro de **venta** y refresca métricas. |
-| Cancelar | Pendiente o Producción | Motivo opcional; pasa a **Cancelado** y **devuelve** el stock descontado. |
-
-**Momento de descuento de stock** (configurable): al **aprobar** el presupuesto o al **iniciar producción**. El descuento es idempotente (un doble clic no descuenta dos veces). Antes de aprobar, el sistema avisa cuánto stock quedará en negativo, para saber qué comprar.
-
----
-
-## 10. Comprar materiales y registrar compra (avanzado)
-
-Se desbloquea con los proveedores. Comprar deja de ser "te falta esto" y pasa a ser una operación con proveedor.
-
-**Comprar materiales (lista de compras), dos modos:**
-- **Automático (desde un pedido):** se elige un pedido con faltantes y aparece lo que falta.
-- **Manual:** checkboxes sobre Insumos (los que están bajo el mínimo vienen marcados) + cantidad por producto.
-- **Resultado:** lista agrupada por proveedor con cantidad a comprar, último precio y proveedor recomendado; botón de WhatsApp con mensaje listo; botón "Registrar compra".
-
-**Registrar compra (recepción):** sube stock y actualiza precios.
-
-| Campo | Obligatorio | Comportamiento |
-|---|---|---|
-| Proveedor | Sí | Autocompletado sobre Proveedores. |
-| Fecha | Sí | Hoy por defecto. |
-| Producto (línea) | Sí | Autocompletado sobre Insumos. |
-| Cantidad recibida | Sí | Número > 0, en la unidad de presentación. |
-| Precio pagado por la presentación | Sí | Número > 0 (precio del empaque completo, no del gramo). |
-
-Al guardar, por cada línea: suma al stock, actualiza el precio de la presentación, recalcula y guarda el precio por gramo/unidad, y registra auditoría.
-
----
-
-## 11. Ajustar inventario (mermas y ajustes, avanzado)
-
-Se desbloquea junto con el deterioro y las mermas.
-
-| Campo | Obligatorio | Comportamiento |
-|---|---|---|
-| Producto | Sí | Autocompletado sobre Insumos. |
-| Tipo de ajuste | Sí | Dropdown: merma, daño, vencimiento, ajuste por conteo, devolución. |
-| Cantidad | Sí | Número; el **signo lo define el tipo** (merma/daño/vencimiento restan; conteo puede sumar o restar; devolución suma). |
-| Motivo | No | Texto libre (recomendado en mermas grandes). |
-| Fecha | Sí | Hoy por defecto. |
-
-Al guardar, mueve el stock, evalúa el semáforo y registra auditoría. Los tipos de ajuste y su signo se leen de Configuración.
-
----
-
-## 12. Catálogos (avanzado)
-
-### 12.1 Clientes
-
-| Campo | Obligatorio | Comportamiento |
-|---|---|---|
-| Nombre | Sí | Texto libre, único. |
-| Teléfono o contacto | No | Texto libre. |
-| Notas | No | Texto libre. |
-
-### 12.2 Recetas
-
-**Cabecera:**
-
-| Campo | Obligatorio | Comportamiento |
-|---|---|---|
-| Nombre | Sí | Texto libre, único. |
-| Categoría | No | Dropdown o texto libre. |
-| Tipo de base | Sí | Dropdown: por personas o por tamaño (define cómo escala). |
-| Valor de la base | Sí | Número > 0 (para cuántas personas/qué tamaño rinde tal cual). |
-| Tiempo de mano de obra | Sí | Número en horas (alimenta el cálculo de mano de obra). |
-
-**Ingredientes (filas):** Insumo (autocompletado), Cantidad base (> 0), Unidad (se toma del insumo, solo lectura). Valida ≥ 1 ingrediente.
-
-### 12.3 Insumos
-
-| Campo | Obligatorio | Comportamiento |
-|---|---|---|
-| Nombre | Sí | Texto libre, único. |
-| Tipo | Sí | Dropdown: ingrediente o empaque. |
-| Unidad base | Sí | Dropdown: gramos o unidad. |
-| Tamaño de la presentación | Sí | Número > 0 (p. ej. 1000 g, o 16 u el cartón). |
-| Precio de la presentación | Sí | Número > 0 (último precio del empaque completo). |
-| Precio por gramo o unidad | No | Solo lectura; lo calcula el sistema al crear y en cada compra. |
-| Stock inicial | No | Número; solo al crear. Después lo mueven las funciones. |
-| Stock mínimo | Sí | Número; umbral del semáforo. |
-| Proveedor recomendado | No | Autocompletado sobre Proveedores. |
-
-### 12.4 Proveedores
-
-| Campo | Obligatorio | Comportamiento |
-|---|---|---|
-| Nombre | Sí | Texto libre, único. |
-| WhatsApp | Sí | Número con código de país, validado para armar el enlace. |
-| Notas | No | Texto libre. |
-
-### 12.5 Reglas de empaque
-
-Define qué empaque se sugiere por receta y tamaño (prellena los presupuestos).
-
-| Campo | Obligatorio | Comportamiento |
-|---|---|---|
-| Receta | Sí | Autocompletado sobre Recetas. |
-| Tamaño | Sí | Dropdown sobre la lista de tamaños. |
-| Empaque | Sí | Autocompletado sobre Insumos de tipo empaque. |
-| Cantidad | Sí | Número > 0. |
-
-Una misma receta y tamaño puede tener varias filas.
-
----
-
-## 13. Configuración avanzada
-
-Todos los parámetros del negocio. Cambiar algo aquí afecta los presupuestos **nuevos**, nunca los ya guardados. Nada de esto se pide en el modo básico: cada parámetro aparece con la función que lo usa.
-
-| Campo | Comportamiento |
-|---|---|
-| Tarifa de mano de obra por hora | Número. |
-| Costo indirecto por pedido | Número (monto fijo). |
-| Depreciación por pedido | Número (monto fijo). |
-| Margen por defecto | Porcentaje. |
-| Aplicar IGV | Casilla. |
-| Tasa de IGV | Número, por defecto 18. |
-| Redondeo del precio | Dropdown: ninguno, o múltiplo de 5 hacia arriba. |
-| Días de vencimiento | Número, por defecto 15. |
-| Momento de descuento de stock | Dropdown: al aprobar, o al iniciar producción. |
-| Lista de tamaños | Tamaños y su factor de escalado. |
-| Factores de escalado | Lista de factores con su etiqueta. |
-| Tipos de ajuste de inventario | Lista de tipos con su signo (merma/daño/vencimiento restan, conteo neutro, devolución suma). |
-
----
-
-## 14. Validaciones y comportamientos transversales (avanzado)
-
-- Antes de aprobar un presupuesto, el sistema avisa cuánto stock quedará en negativo.
-- No se puede aprobar dos veces el mismo presupuesto ni entregar un pedido que no está en producción; los botones que no aplican no aparecen.
-- Cancelar un pedido entregado no se permite; la cancelación solo está disponible antes de la entrega.
-- Cada guardado escribe **auditoría** con fecha, usuario, qué cambió, valor anterior y valor nuevo.
-- Las funciones que mueven stock o crean pedidos usan **bloqueo**, para que un doble clic no descuente dos veces.
-- Campos obligatorios marcados; números no aceptan letras; precios/cantidades/stock no negativos; dropdowns y autocompletados se alimentan de los catálogos (nunca eliges algo que no existe).
-- Tras guardar, aviso corto de éxito y refresco; si algo falla, el aviso explica qué pasó y no se pierde lo escrito.
-
----
-
-## 15. Recorrido de uso
-
-### 15.1 Modo básico (Fase 1)
-
-La cámara baja desde la ciudad hasta tu casa y entra a la cocina. Eliges una receta; el sistema compara sus ingredientes con tus almacenes: el de azúcar está en rojo. Sales a comprar, vuelves y registras el azúcar; el almacén pasa a verde. Cocinas la receta. Cumpliste el objetivo de la fase y se abre la siguiente.
-
-### 15.2 Modo avanzado (Fase 5+)
-
-Con tienda física y clientes, el día se parece al de una pastelería real: revisas pedidos, cotizas con presupuesto (costo + margen + IGV + redondeo), lo apruebas para generar el pedido y descontar stock, compras lo que falte a proveedores, produces, entregas y cobras. Las funciones avanzadas (IGV, costos, mermas, finanzas) intervienen solo si ya las desbloqueaste.
-
----
-
-## 16. Nota técnica: cálculos vivos vs. transacciones congeladas
-
-Aplica al modo avanzado y guía dónde vive cada cálculo:
-
-- **Cálculo de referencia (vivo):** mira datos actuales y los muestra; va en fórmula viva (precio por unidad de un insumo, semáforo de stock, contadores de resumen, búsquedas de nombre por código).
-- **Transacción (congelada):** escribe un hecho del negocio que debe quedar fijo en el tiempo; lo hace el código (guardar un presupuesto con su precio congelado, descontar stock al aprobar, registrar la venta al entregar, devolver stock al cancelar, subir stock al registrar una compra, escribir auditoría).
-
-La frontera: si el valor debe quedar congelado tal como estaba el día en que se guardó, es transacción; si debe reflejar siempre el estado actual, es cálculo vivo. Esto preserva la trazabilidad de presupuestos y pedidos mientras los catálogos y el resumen se leen solos.
+Frontera: si el valor debe quedar igual al día en que se guardó, es transacción; si debe reflejar siempre el estado actual, es cálculo vivo. Así se preserva la trazabilidad de presupuestos y pedidos mientras catálogos y resumen se leen solos.
