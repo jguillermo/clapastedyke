@@ -1,5 +1,4 @@
 import { IndexedDbStore } from '../../_common/infrastructure/indexeddb/store';
-import { AvailableSizes } from '../../catalog/domain/packaging-rule/packaging-rule-repository';
 import { BusinessSettings, SettingsPrimitives } from '../domain/business-settings';
 import { SettingsRepository } from '../domain/settings-repository';
 
@@ -20,17 +19,5 @@ export class IndexedDbSettingsRepository implements SettingsRepository {
 
   async save(settings: BusinessSettings): Promise<void> {
     await this.store.put(settings.toPrimitives());
-  }
-}
-
-/**
- * Adapter for the CATALOG's AvailableSizes port: packaging rules validate their
- * sizes against the real settings.
- */
-export class SizesFromSettings implements AvailableSizes {
-  constructor(private readonly settings: SettingsRepository) {}
-
-  async names(): Promise<string[]> {
-    return (await this.settings.get()).sizes.map(s => s.name);
   }
 }

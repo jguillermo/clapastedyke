@@ -1,13 +1,14 @@
-import { EventBus } from '../../../_common/application/event-bus';
+import { Injectable, inject } from '@angular/core';
+import { EventBusToken } from '../../../_common/core.tokens';
 import { UseCase } from '../../../_common/application/use-case';
 import { DuplicateError, NotFoundError, ValidationError } from '../../../_common/domain/errors';
 import { EntityId } from '../../../_common/domain/entity-id';
-import { SupplyRepository } from '../../domain/supply/supply-repository';
-import { RecipeRepository } from '../../domain/recipe/recipe-repository';
+import { SUPPLY_REPOSITORY } from '../../domain/supply/supply-repository';
+import { RECIPE_REPOSITORY } from '../../domain/recipe/recipe-repository';
 import { PackagingRule } from '../../domain/packaging-rule/packaging-rule';
 import {
-  AvailableSizes,
-  PackagingRuleRepository,
+  AVAILABLE_SIZES_TOKEN,
+  PACKAGING_RULE_REPOSITORY,
 } from '../../domain/packaging-rule/packaging-rule-repository';
 
 export interface SavePackagingRuleRequest {
@@ -23,16 +24,15 @@ export interface SavePackagingRuleRequest {
  * packaging must exist (and be of type 'packaging'), the size must be defined
  * in configuration, and the (recipe, size, packaging) triple is unique.
  */
+@Injectable({ providedIn: 'root' })
 export class SavePackagingRule
   implements UseCase<SavePackagingRuleRequest, { id: string }>
 {
-  constructor(
-    private readonly rules: PackagingRuleRepository,
-    private readonly recipes: RecipeRepository,
-    private readonly supplies: SupplyRepository,
-    private readonly sizes: AvailableSizes,
-    private readonly bus: EventBus,
-  ) {}
+  private readonly rules = inject(PACKAGING_RULE_REPOSITORY);
+  private readonly recipes = inject(RECIPE_REPOSITORY);
+  private readonly supplies = inject(SUPPLY_REPOSITORY);
+  private readonly sizes = inject(AVAILABLE_SIZES_TOKEN);
+  private readonly bus = inject(EventBusToken);
 
   async execute(request: SavePackagingRuleRequest): Promise<{ id: string }> {
     const recipeId = EntityId.of(request.recipeId);

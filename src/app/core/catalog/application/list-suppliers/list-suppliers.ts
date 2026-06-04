@@ -1,9 +1,11 @@
+import { Injectable, inject } from '@angular/core';
 import { UseCase } from '../../../_common/application/use-case';
 import { SupplierPrimitives } from '../../domain/supplier/supplier';
-import { SupplierRepository } from '../../domain/supplier/supplier-repository';
+import { SUPPLIER_REPOSITORY } from '../../domain/supplier/supplier-repository';
 
+@Injectable({ providedIn: 'root' })
 export class ListSuppliers implements UseCase<void, SupplierPrimitives[]> {
-  constructor(private readonly suppliers: SupplierRepository) {}
+  private readonly suppliers = inject(SUPPLIER_REPOSITORY);
 
   async execute(): Promise<SupplierPrimitives[]> {
     const all = await this.suppliers.all();

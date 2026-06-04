@@ -1,9 +1,10 @@
-import { EventBus } from '../../../_common/application/event-bus';
+import { Injectable, inject } from '@angular/core';
+import { EventBusToken } from '../../../_common/core.tokens';
 import { UseCase } from '../../../_common/application/use-case';
 import { DuplicateError, NotFoundError } from '../../../_common/domain/errors';
 import { EntityId } from '../../../_common/domain/entity-id';
 import { Supplier } from '../../domain/supplier/supplier';
-import { SupplierRepository } from '../../domain/supplier/supplier-repository';
+import { SUPPLIER_REPOSITORY } from '../../domain/supplier/supplier-repository';
 
 export interface SaveSupplierRequest {
   id?: string;
@@ -12,11 +13,10 @@ export interface SaveSupplierRequest {
   notes?: string;
 }
 
+@Injectable({ providedIn: 'root' })
 export class SaveSupplier implements UseCase<SaveSupplierRequest, { id: string }> {
-  constructor(
-    private readonly suppliers: SupplierRepository,
-    private readonly bus: EventBus,
-  ) {}
+  private readonly suppliers = inject(SUPPLIER_REPOSITORY);
+  private readonly bus = inject(EventBusToken);
 
   async execute(request: SaveSupplierRequest): Promise<{ id: string }> {
     const existing = await this.suppliers.byName(request.name);

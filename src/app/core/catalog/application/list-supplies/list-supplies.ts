@@ -1,6 +1,7 @@
+import { Injectable, inject } from '@angular/core';
 import { UseCase } from '../../../_common/application/use-case';
 import { StockLight, SupplyPrimitives, SupplyType } from '../../domain/supply/supply';
-import { SupplyRepository } from '../../domain/supply/supply-repository';
+import { SUPPLY_REPOSITORY } from '../../domain/supply/supply-repository';
 
 export interface ListSuppliesRequest {
   type?: SupplyType;
@@ -20,8 +21,9 @@ export interface SupplyListItem extends SupplyPrimitives {
   pricePerBaseUnitFormatted: string;
 }
 
+@Injectable({ providedIn: 'root' })
 export class ListSupplies implements UseCase<ListSuppliesRequest, SupplyListItem[]> {
-  constructor(private readonly supplies: SupplyRepository) {}
+  private readonly supplies = inject(SUPPLY_REPOSITORY);
 
   async execute(request: ListSuppliesRequest = {}): Promise<SupplyListItem[]> {
     const list = request.type

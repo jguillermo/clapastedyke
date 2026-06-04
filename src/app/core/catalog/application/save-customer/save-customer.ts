@@ -1,9 +1,10 @@
-import { EventBus } from '../../../_common/application/event-bus';
+import { Injectable, inject } from '@angular/core';
+import { EventBusToken } from '../../../_common/core.tokens';
 import { UseCase } from '../../../_common/application/use-case';
 import { DuplicateError, NotFoundError } from '../../../_common/domain/errors';
 import { EntityId } from '../../../_common/domain/entity-id';
 import { Customer } from '../../domain/customer/customer';
-import { CustomerRepository } from '../../domain/customer/customer-repository';
+import { CUSTOMER_REPOSITORY } from '../../domain/customer/customer-repository';
 
 export interface SaveCustomerRequest {
   /** Empty = create; with id = edit. */
@@ -18,11 +19,10 @@ export interface SaveCustomerResponse {
 }
 
 /** Create or edit a customer with name uniqueness (src/Clientes.js). */
+@Injectable({ providedIn: 'root' })
 export class SaveCustomer implements UseCase<SaveCustomerRequest, SaveCustomerResponse> {
-  constructor(
-    private readonly customers: CustomerRepository,
-    private readonly bus: EventBus,
-  ) {}
+  private readonly customers = inject(CUSTOMER_REPOSITORY);
+  private readonly bus = inject(EventBusToken);
 
   async execute(request: SaveCustomerRequest): Promise<SaveCustomerResponse> {
     const existing = await this.customers.byName(request.name);

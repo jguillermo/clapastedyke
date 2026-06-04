@@ -1,9 +1,11 @@
+import { Injectable, inject } from '@angular/core';
 import { UseCase } from '../../../_common/application/use-case';
 import { RecipePrimitives } from '../../domain/recipe/recipe';
-import { RecipeRepository } from '../../domain/recipe/recipe-repository';
+import { RECIPE_REPOSITORY } from '../../domain/recipe/recipe-repository';
 
+@Injectable({ providedIn: 'root' })
 export class ListRecipes implements UseCase<void, RecipePrimitives[]> {
-  constructor(private readonly recipes: RecipeRepository) {}
+  private readonly recipes = inject(RECIPE_REPOSITORY);
 
   async execute(): Promise<RecipePrimitives[]> {
     const all = await this.recipes.all();

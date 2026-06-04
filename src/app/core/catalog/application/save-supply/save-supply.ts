@@ -1,11 +1,12 @@
-import { EventBus } from '../../../_common/application/event-bus';
+import { Injectable, inject } from '@angular/core';
+import { EventBusToken } from '../../../_common/core.tokens';
 import { UseCase } from '../../../_common/application/use-case';
 import { BaseUnit } from '../../../_common/domain/quantity';
 import { Money } from '../../../_common/domain/money';
 import { DuplicateError, NotFoundError } from '../../../_common/domain/errors';
 import { EntityId } from '../../../_common/domain/entity-id';
 import { Supply, SupplyType } from '../../domain/supply/supply';
-import { SupplyRepository } from '../../domain/supply/supply-repository';
+import { SUPPLY_REPOSITORY } from '../../domain/supply/supply-repository';
 
 export interface SaveSupplyRequest {
   id?: string;
@@ -25,11 +26,10 @@ export interface SaveSupplyRequest {
  * (it rises with purchases and is adjusted with inventory); type and base unit
  * do not change either (they define the supply's nature).
  */
+@Injectable({ providedIn: 'root' })
 export class SaveSupply implements UseCase<SaveSupplyRequest, { id: string }> {
-  constructor(
-    private readonly supplies: SupplyRepository,
-    private readonly bus: EventBus,
-  ) {}
+  private readonly supplies = inject(SUPPLY_REPOSITORY);
+  private readonly bus = inject(EventBusToken);
 
   async execute(request: SaveSupplyRequest): Promise<{ id: string }> {
     const existing = await this.supplies.byName(request.name);

@@ -1,10 +1,11 @@
-import { EventBus } from '../../../_common/application/event-bus';
+import { Injectable, inject } from '@angular/core';
+import { EventBusToken } from '../../../_common/core.tokens';
 import { UseCase } from '../../../_common/application/use-case';
 import { DuplicateError, NotFoundError, ValidationError } from '../../../_common/domain/errors';
 import { EntityId } from '../../../_common/domain/entity-id';
-import { SupplyRepository } from '../../domain/supply/supply-repository';
+import { SUPPLY_REPOSITORY } from '../../domain/supply/supply-repository';
 import { BaseType, Recipe, RecipeIngredient } from '../../domain/recipe/recipe';
-import { RecipeRepository } from '../../domain/recipe/recipe-repository';
+import { RECIPE_REPOSITORY } from '../../domain/recipe/recipe-repository';
 
 export interface SaveRecipeRequest {
   id?: string;
@@ -21,12 +22,11 @@ export interface SaveRecipeRequest {
  * (the aggregate invariant) and every referenced supply must exist and be of
  * type 'ingredient'.
  */
+@Injectable({ providedIn: 'root' })
 export class SaveRecipe implements UseCase<SaveRecipeRequest, { id: string }> {
-  constructor(
-    private readonly recipes: RecipeRepository,
-    private readonly supplies: SupplyRepository,
-    private readonly bus: EventBus,
-  ) {}
+  private readonly recipes = inject(RECIPE_REPOSITORY);
+  private readonly supplies = inject(SUPPLY_REPOSITORY);
+  private readonly bus = inject(EventBusToken);
 
   async execute(request: SaveRecipeRequest): Promise<{ id: string }> {
     await this.requireValidSupplies(request.ingredients);
