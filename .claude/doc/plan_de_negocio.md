@@ -1,6 +1,6 @@
 # Plan de negocio — Lógica de un simulador de pastelería que crece contigo
 
-Este documento define **solo la lógica de negocio**: qué se modela, qué datos se piden en cada etapa, qué reglas se aplican y cómo se avanza de nivel. Lo visual —cómo se mueve el personaje, las casas, los edificios, qué se ve y cómo se ve— vive en `diseno_mundo_juego.md`.
+Este documento define **solo la lógica de negocio**: qué se modela, qué datos se piden en cada etapa, qué reglas se aplican y cómo se avanza de nivel. Lo visual —cómo se mueve el personaje, las casas, los edificios, qué se ve y cómo se ve— vive en `diseno_mundo_juego.md` y en la **suite de diseño visual**: `diseno_visual.md` (tokens), `diseno_componentes.md` (componentes), `diseno_pantallas_flujos.md` (pantallas y formularios) y `diseno_iconografia.md` (iconos).
 
 La idea central: el jugador empieza en su casa con **pocos campos y pocas tablas**, y el sistema **crece con él**. Cada necesidad nueva desbloquea exactamente la función y los datos que hacen falta, ni antes ni de más.
 
@@ -327,9 +327,9 @@ El estado de un almacén es un `StockStatus`:
 
 ```
 enum StockStatus {
-  EMPTY   // agotado: stock en cero o por debajo
-  LOW     // bajo mínimo: por encima de cero pero bajo el umbral
-  OK      // suficiente: por encima del umbral
+  EMPTY   // "Agotado": stock en cero o por debajo
+  LOW     // "Poco": por encima de cero pero bajo el umbral mínimo
+  OK      // "Suficiente": por encima del umbral
 }
 ```
 
@@ -339,7 +339,7 @@ enum StockStatus {
 - **Salida por cocinar** — `CookRecipe`: al preparar una receta, se descuenta del almacén lo que consume; se crea un `StockMovement` de **salida (−)**.
 - **Corrección simple** — `UpdateStock`: si el jugador se equivocó al registrar, corrige la cantidad del almacén y queda el movimiento de ajuste. Sin tipos ni motivos: solo "dejarlo en la cantidad correcta".
 
-El `StockStatus` se recalcula solo tras cada movimiento. (Su representación visual se define aparte, en `diseno_mundo_juego.md`.)
+El `StockStatus` se recalcula solo tras cada movimiento. Las etiquetas para el jugador son **Agotado / Poco / Suficiente**. Su representación visual (color, icono, `StatusBadge`) se define en `diseno_componentes.md` y `diseno_iconografia.md`; su lugar en el mundo, en `diseno_mundo_juego.md`.
 
 ### En el modo avanzado (Fase 5+)
 

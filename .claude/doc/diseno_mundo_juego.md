@@ -4,7 +4,7 @@ Este documento define **el mundo del videojuego**: qué lugares existen, cómo s
 
 > **Convención de implementación.** Al desarrollar, **el código se escribe en inglés** (escenas, estaciones, edificios, estados, métodos de cámara, eventos) y **los comentarios y textos de interfaz, en español**. Por eso, en este documento **todo identificador que existirá en el código va en inglés** y su **descripción va en español**; la narrativa queda en español.
 
-> Fuentes hermanas: `plan_de_negocio.md` (qué hace el juego) y, más adelante, la guía visual.
+> Fuentes hermanas: `plan_de_negocio.md` (qué hace el juego) y la **suite de diseño visual** — `diseno_visual.md` (tokens), `diseno_componentes.md` (componentes), `diseno_pantallas_flujos.md` (pantallas/formularios) y `diseno_iconografia.md` (iconos).
 
 ---
 
@@ -69,6 +69,7 @@ enum KitchenStation {
 
 ```
 flyIn()                 // secuencia de arranque: ciudad → casa → cocina
+flyOut()                // transición de salida: casa → ciudad → aparece la pastelería (Fase 4)
 focusStation(station)   // acercar a una estación de la cocina
 focusBuilding(id)       // acercar a un edificio del pueblo
 resetView()             // volver a la vista general
@@ -105,7 +106,7 @@ Con `prefers-reduced-motion` o sin WebGL, `flyIn` se omite y se llega directo a 
 
 ## 6. La transición a la tienda física (Fase 4)
 
-Cuando se cumplen las metas del nivel 4 (`SALES_COMPLETED` ≥ 5; ver `plan_de_negocio.md`), la progresión emite `FeatureUnlocked { PHYSICAL_STORE }` y el mundo reacciona:
+Cuando se cumplen las metas del nivel 4 (`SALES_COMPLETED` ≥ 5; ver `plan_de_negocio.md`), la progresión emite `FeatureUnlocked { PHYSICAL_STORE }` y el mundo reacciona con la secuencia `flyOut()`:
 
 1. El jugador **sale de su casa**.
 2. Se muestra **la ciudad** otra vez.
