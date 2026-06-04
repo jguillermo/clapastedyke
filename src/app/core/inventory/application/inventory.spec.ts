@@ -1,15 +1,21 @@
+import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { InMemoryEventBus } from '../../_common/application/event-bus';
+import { EventBusToken } from '../../_common/core.tokens';
 import { ValidationError } from '../../_common/domain/errors';
 import { EntityId } from '../../_common/domain/entity-id';
+import { SUPPLY_REPOSITORY } from '../../catalog/domain/supply/supply-repository';
+import { SUPPLIER_REPOSITORY } from '../../catalog/domain/supplier/supplier-repository';
 import { SaveSupply } from '../../catalog/application/save-supply/save-supply';
 import { SaveSupplier } from '../../catalog/application/save-supplier/save-supplier';
 import {
   MemorySupplyRepository,
   MemorySupplierRepository,
 } from '../../catalog/infrastructure/memory-repositories';
+import { SETTINGS_REPOSITORY } from '../../settings/domain/settings-repository';
 import { MemorySettingsRepository } from '../../settings/infrastructure/memory-settings-repository';
-import { StockService } from '../domain/stock-service';
+import { STOCK_MOVEMENT_REPOSITORY } from '../domain/stock-movement/stock-movement-repository';
+import { PURCHASE_REPOSITORY } from '../domain/purchase/purchase-repository';
 import {
   MemoryPurchaseRepository,
   MemoryStockMovementRepository,
@@ -37,12 +43,22 @@ describe('Inventory (purchases and adjustments — manual scenario)', () => {
     settings = new MemorySettingsRepository();
     const suppliers = new MemorySupplierRepository();
     bus = new InMemoryEventBus();
-    const stock = new StockService(supplies, movements);
+
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: SUPPLY_REPOSITORY, useValue: supplies },
+        { provide: SUPPLIER_REPOSITORY, useValue: suppliers },
+        { provide: STOCK_MOVEMENT_REPOSITORY, useValue: movements },
+        { provide: PURCHASE_REPOSITORY, useValue: purchases },
+        { provide: SETTINGS_REPOSITORY, useValue: settings },
+        { provide: EventBusToken, useValue: bus },
+      ],
+    });
 
     supplierId = (
-      await new SaveSupplier(suppliers, bus).execute({ name: 'Molinos SAC', whatsapp: '51999111222' })
+      await TestBed.inject(SaveSupplier).execute({ name: 'Molinos SAC', whatsapp: '51999111222' })
     ).id;
-    const ss = new SaveSupply(supplies, bus);
+    const ss = TestBed.inject(SaveSupply);
     flourId = (
       await ss.execute({
         name: 'Harina', type: 'ingredient', baseUnit: 'g',
@@ -57,8 +73,8 @@ describe('Inventory (purchases and adjustments — manual scenario)', () => {
       })
     ).id;
 
-    registerPurchase = new RegisterPurchase(purchases, supplies, suppliers, stock, bus);
-    adjust = new AdjustInventory(supplies, settings, stock, bus);
+    registerPurchase = TestBed.inject(RegisterPurchase);
+    adjust = TestBed.inject(AdjustInventory);
   });
 
   it('the manual purchase: 5 bags at 5.50 → stock +5000 g, price 0.0055, green light', async () => {
@@ -105,7 +121,7 @@ describe('Inventory (purchases and adjustments — manual scenario)', () => {
   });
 
   it('preview persists nothing and anticipates the stock light', async () => {
-    const preview = new PreviewAdjustment(supplies, settings);
+    const preview = TestBed.inject(PreviewAdjustment);
     const r = await preview.execute({ supplyId: boxId, type: 'waste', quantity: 45 });
     expect(r.currentStock).toBe(50);
     expect(r.resultingStock).toBe(5);
@@ -115,7 +131,7 @@ describe('Inventory (purchases and adjustments — manual scenario)', () => {
 
   it('supplies below minimum build the shopping list', async () => {
     // Flour (stock 0 ≤ minimum 2000) comes out pre-checked; the box does not.
-    const list = await new SuppliesBelowMinimum(supplies, new MemorySupplierRepository()).execute();
+    const list = await TestBed.inject(SuppliesBelowMinimum).execute();
     expect(list.map(i => i.supplyName)).toEqual(['Harina']);
     expect(list[0].suggestedQuantity).toBe(2000);
   });

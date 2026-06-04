@@ -1,15 +1,31 @@
-import { describe, expect, it } from 'vitest';
+import { TestBed } from '@angular/core/testing';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { InMemoryEventBus } from '../../../_common/application/event-bus';
+import { EventBusToken } from '../../../_common/core.tokens';
+import { SETTINGS_REPOSITORY } from '../../domain/settings-repository';
 import { MemorySettingsRepository } from '../../infrastructure/memory-settings-repository';
 import { GetSettings } from '../get-settings/get-settings';
 import { UpdateSettings } from './update-settings';
 
 describe('Settings (use cases)', () => {
-  it('get seeds the defaults the first time and update persists them', async () => {
-    const repo = new MemorySettingsRepository();
-    const get = new GetSettings(repo);
-    const update = new UpdateSettings(repo, new InMemoryEventBus());
+  let get: GetSettings;
+  let update: UpdateSettings;
 
+  beforeEach(() => {
+    const repo = new MemorySettingsRepository();
+    const bus = new InMemoryEventBus();
+
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: SETTINGS_REPOSITORY, useValue: repo },
+        { provide: EventBusToken, useValue: bus },
+      ],
+    });
+    get = TestBed.inject(GetSettings);
+    update = TestBed.inject(UpdateSettings);
+  });
+
+  it('get seeds the defaults the first time and update persists them', async () => {
     expect((await get.execute()).general.defaultMargin).toBe(35);
 
     await update.execute({
@@ -29,10 +45,6 @@ describe('Settings (use cases)', () => {
   });
 
   it('updates the language and persists it', async () => {
-    const repo = new MemorySettingsRepository();
-    const get = new GetSettings(repo);
-    const update = new UpdateSettings(repo, new InMemoryEventBus());
-
     expect((await get.execute()).general.language).toBe('es'); // default
 
     await update.execute({ general: { language: 'en' } });

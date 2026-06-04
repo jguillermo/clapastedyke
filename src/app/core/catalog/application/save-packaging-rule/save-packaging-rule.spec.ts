@@ -1,6 +1,14 @@
+import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { InMemoryEventBus } from '../../../_common/application/event-bus';
+import { EventBusToken } from '../../../_common/core.tokens';
 import { DuplicateError, ValidationError } from '../../../_common/domain/errors';
+import { RECIPE_REPOSITORY } from '../../domain/recipe/recipe-repository';
+import {
+  AVAILABLE_SIZES_TOKEN,
+  PACKAGING_RULE_REPOSITORY,
+} from '../../domain/packaging-rule/packaging-rule-repository';
+import { SUPPLY_REPOSITORY } from '../../domain/supply/supply-repository';
 import {
   MemoryPackagingRuleRepository,
   MemoryRecipeRepository,
@@ -25,9 +33,20 @@ describe('SavePackagingRule (use case)', () => {
     supplies = new MemorySupplyRepository();
     const bus = new InMemoryEventBus();
     const sizes = { names: async () => ['chico', 'mediano', 'grande'] };
-    useCase = new SavePackagingRule(rules, recipes, supplies, sizes, bus);
 
-    const saveSupply = new SaveSupply(supplies, bus);
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: PACKAGING_RULE_REPOSITORY, useValue: rules },
+        { provide: RECIPE_REPOSITORY, useValue: recipes },
+        { provide: SUPPLY_REPOSITORY, useValue: supplies },
+        { provide: AVAILABLE_SIZES_TOKEN, useValue: sizes },
+        { provide: EventBusToken, useValue: bus },
+      ],
+    });
+    useCase = TestBed.inject(SavePackagingRule);
+    const saveSupply = TestBed.inject(SaveSupply);
+    const saveRecipe = TestBed.inject(SaveRecipe);
+
     flourId = (
       await saveSupply.execute({
         name: 'Harina', type: 'ingredient', baseUnit: 'g',
@@ -41,7 +60,7 @@ describe('SavePackagingRule (use case)', () => {
       })
     ).id;
     recipeId = (
-      await new SaveRecipe(recipes, supplies, bus).execute({
+      await saveRecipe.execute({
         name: 'Torta chocolate', baseType: 'people', baseServings: 10,
         ingredients: [{ supplyId: flourId, baseQuantity: 300 }],
       })

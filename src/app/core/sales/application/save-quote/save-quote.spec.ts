@@ -1,7 +1,12 @@
+import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { InMemoryEventBus } from '../../../_common/application/event-bus';
+import { EventBusToken } from '../../../_common/core.tokens';
 import { ValidationError } from '../../../_common/domain/errors';
 import { EntityId } from '../../../_common/domain/entity-id';
+import { CUSTOMER_REPOSITORY } from '../../../catalog/domain/customer/customer-repository';
+import { RECIPE_REPOSITORY } from '../../../catalog/domain/recipe/recipe-repository';
+import { SUPPLY_REPOSITORY } from '../../../catalog/domain/supply/supply-repository';
 import {
   MemoryCustomerRepository,
   MemorySupplyRepository,
@@ -10,9 +15,11 @@ import {
 import { SaveCustomer } from '../../../catalog/application/save-customer/save-customer';
 import { SaveSupply } from '../../../catalog/application/save-supply/save-supply';
 import { SaveRecipe } from '../../../catalog/application/save-recipe/save-recipe';
+import { SETTINGS_REPOSITORY } from '../../../settings/domain/settings-repository';
 import { UpdateSettings } from '../../../settings/application/update-settings/update-settings';
 import { MemorySettingsRepository } from '../../../settings/infrastructure/memory-settings-repository';
 import { MemoryQuoteRepository } from '../../infrastructure/memory-repositories';
+import { QUOTE_REPOSITORY } from '../../domain/quote/quote-repository';
 import { ListQuotes } from '../list-quotes/list-quotes';
 import { RejectQuote } from '../reject-quote/reject-quote';
 import { SaveQuote } from './save-quote';
@@ -34,8 +41,19 @@ describe('SaveQuote (use case, Flow 01-02 cycle)', () => {
     quotes = new MemoryQuoteRepository();
     bus = new InMemoryEventBus();
 
-    customerId = (await new SaveCustomer(customers, bus).execute({ name: 'Ana Torres' })).id;
-    const ss = new SaveSupply(supplies, bus);
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: CUSTOMER_REPOSITORY, useValue: customers },
+        { provide: SUPPLY_REPOSITORY, useValue: supplies },
+        { provide: RECIPE_REPOSITORY, useValue: recipes },
+        { provide: SETTINGS_REPOSITORY, useValue: settings },
+        { provide: QUOTE_REPOSITORY, useValue: quotes },
+        { provide: EventBusToken, useValue: bus },
+      ],
+    });
+
+    customerId = (await TestBed.inject(SaveCustomer).execute({ name: 'Ana Torres' })).id;
+    const ss = TestBed.inject(SaveSupply);
     const flourId = (
       await ss.execute({ name: 'Flour', type: 'ingredient', baseUnit: 'g', presentationSize: 1000, presentationPriceSoles: 5 })
     ).id;
@@ -43,7 +61,7 @@ describe('SaveQuote (use case, Flow 01-02 cycle)', () => {
       await ss.execute({ name: 'Egg', type: 'ingredient', baseUnit: 'u', presentationSize: 30, presentationPriceSoles: 15 })
     ).id;
     recipeId = (
-      await new SaveRecipe(recipes, supplies, bus).execute({
+      await TestBed.inject(SaveRecipe).execute({
         name: 'Chocolate cake', baseType: 'people', baseServings: 10, laborHours: 2,
         ingredients: [
           { supplyId: flourId, baseQuantity: 300 },
@@ -51,11 +69,11 @@ describe('SaveQuote (use case, Flow 01-02 cycle)', () => {
         ],
       })
     ).id;
-    await new UpdateSettings(settings, bus).execute({ general: { defaultMargin: 30 } });
+    await TestBed.inject(UpdateSettings).execute({ general: { defaultMargin: 30 } });
 
-    save = new SaveQuote(quotes, customers, recipes, supplies, settings, bus);
-    reject = new RejectQuote(quotes, bus);
-    list = new ListQuotes(quotes);
+    save = TestBed.inject(SaveQuote);
+    reject = TestBed.inject(RejectQuote);
+    list = TestBed.inject(ListQuotes);
   });
 
   it('freezes P-0001 Pending with the manual price and emits the event', async () => {

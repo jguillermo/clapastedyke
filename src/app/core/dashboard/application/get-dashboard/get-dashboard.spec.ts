@@ -1,5 +1,10 @@
+import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { InMemoryEventBus } from '../../../_common/application/event-bus';
+import { EventBusToken } from '../../../_common/core.tokens';
+import { CUSTOMER_REPOSITORY } from '../../../catalog/domain/customer/customer-repository';
+import { RECIPE_REPOSITORY } from '../../../catalog/domain/recipe/recipe-repository';
+import { SUPPLY_REPOSITORY } from '../../../catalog/domain/supply/supply-repository';
 import { SaveCustomer } from '../../../catalog/application/save-customer/save-customer';
 import { SaveSupply } from '../../../catalog/application/save-supply/save-supply';
 import { SaveRecipe } from '../../../catalog/application/save-recipe/save-recipe';
@@ -8,8 +13,9 @@ import {
   MemorySupplyRepository,
   MemoryRecipeRepository,
 } from '../../../catalog/infrastructure/memory-repositories';
+import { SETTINGS_REPOSITORY } from '../../../settings/domain/settings-repository';
 import { MemorySettingsRepository } from '../../../settings/infrastructure/memory-settings-repository';
-import { StockService } from '../../../inventory/domain/stock-service';
+import { STOCK_MOVEMENT_REPOSITORY } from '../../../inventory/domain/stock-movement/stock-movement-repository';
 import { MemoryStockMovementRepository } from '../../../inventory/infrastructure/memory-repositories';
 import { ApproveQuote } from '../../../sales/application/approve-quote/approve-quote';
 import { SaveQuote } from '../../../sales/application/save-quote/save-quote';
@@ -18,6 +24,8 @@ import {
   MemoryQuoteRepository,
   MemoryOrderRepository,
 } from '../../../sales/infrastructure/memory-repositories';
+import { QUOTE_REPOSITORY } from '../../../sales/domain/quote/quote-repository';
+import { ORDER_REPOSITORY } from '../../../sales/domain/order/order-repository';
 import { GetDashboard } from './get-dashboard';
 
 describe('GetDashboard (Home panel projection)', () => {
@@ -33,29 +41,43 @@ describe('GetDashboard (Home panel projection)', () => {
     const orders = new MemoryOrderRepository();
     const movements = new MemoryStockMovementRepository();
     const bus = new InMemoryEventBus();
-    const stock = new StockService(supplies, movements);
 
-    dashboard = new GetDashboard(quotes, orders, supplies, settings);
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: CUSTOMER_REPOSITORY, useValue: customers },
+        { provide: SUPPLY_REPOSITORY, useValue: supplies },
+        { provide: RECIPE_REPOSITORY, useValue: recipes },
+        { provide: SETTINGS_REPOSITORY, useValue: settings },
+        { provide: QUOTE_REPOSITORY, useValue: quotes },
+        { provide: ORDER_REPOSITORY, useValue: orders },
+        { provide: STOCK_MOVEMENT_REPOSITORY, useValue: movements },
+        { provide: EventBusToken, useValue: bus },
+      ],
+    });
+
+    dashboard = TestBed.inject(GetDashboard);
 
     seed = async () => {
-      const customerId = (await new SaveCustomer(customers, bus).execute({ name: 'María Quispe' })).id;
-      const ss = new SaveSupply(supplies, bus);
+      const saveCustomer = TestBed.inject(SaveCustomer);
+      const saveSupply = TestBed.inject(SaveSupply);
+      const saveRecipe = TestBed.inject(SaveRecipe);
+      const save = TestBed.inject(SaveQuote);
+      const approve = TestBed.inject(ApproveQuote);
+      const produce = TestBed.inject(StartProduction);
+
+      const customerId = (await saveCustomer.execute({ name: 'María Quispe' })).id;
       // Cocoa out of stock (red) and butter below minimum (yellow)
-      await ss.execute({ name: 'Cacao en polvo', type: 'ingredient', baseUnit: 'g', presentationSize: 500, presentationPriceSoles: 20, initialStock: 0, minStock: 100 });
-      await ss.execute({ name: 'Mantequilla', type: 'ingredient', baseUnit: 'g', presentationSize: 500, presentationPriceSoles: 10, initialStock: 180, minStock: 500 });
+      await saveSupply.execute({ name: 'Cacao en polvo', type: 'ingredient', baseUnit: 'g', presentationSize: 500, presentationPriceSoles: 20, initialStock: 0, minStock: 100 });
+      await saveSupply.execute({ name: 'Mantequilla', type: 'ingredient', baseUnit: 'g', presentationSize: 500, presentationPriceSoles: 10, initialStock: 180, minStock: 500 });
       const flourId = (
-        await ss.execute({ name: 'Harina', type: 'ingredient', baseUnit: 'g', presentationSize: 1000, presentationPriceSoles: 5, initialStock: 9000, minStock: 100 })
+        await saveSupply.execute({ name: 'Harina', type: 'ingredient', baseUnit: 'g', presentationSize: 1000, presentationPriceSoles: 5, initialStock: 9000, minStock: 100 })
       ).id;
       const recipeId = (
-        await new SaveRecipe(recipes, supplies, bus).execute({
+        await saveRecipe.execute({
           name: 'Torta', baseType: 'people', baseServings: 10,
           ingredients: [{ supplyId: flourId, baseQuantity: 300 }],
         })
       ).id;
-
-      const save = new SaveQuote(quotes, customers, recipes, supplies, settings, bus);
-      const approve = new ApproveQuote(quotes, orders, supplies, stock, settings, bus);
-      const produce = new StartProduction(orders, stock, bus);
 
       // Q1 pending (expires in 15 days → counts in pending but NOT in «expiring this week»)
       await save.execute({ customerId, recipeId, scalingMode: 'people', scalingValue: 10, packaging: [], margin: 30, applyIgv: false });

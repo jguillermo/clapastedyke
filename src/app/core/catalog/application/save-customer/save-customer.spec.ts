@@ -1,7 +1,10 @@
+import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { InMemoryEventBus } from '../../../_common/application/event-bus';
+import { EventBusToken } from '../../../_common/core.tokens';
 import { DuplicateError } from '../../../_common/domain/errors';
 import { DomainEvent } from '../../../_common/domain/domain-event';
+import { CUSTOMER_REPOSITORY } from '../../domain/customer/customer-repository';
 import { MemoryCustomerRepository } from '../../infrastructure/memory-repositories';
 import { SaveCustomer } from './save-customer';
 
@@ -17,7 +20,14 @@ describe('SaveCustomer (use case)', () => {
     published = [];
     bus.subscribe('CustomerCreated', e => void published.push(e));
     bus.subscribe('CustomerEdited', e => void published.push(e));
-    useCase = new SaveCustomer(customers, bus);
+
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: CUSTOMER_REPOSITORY, useValue: customers },
+        { provide: EventBusToken, useValue: bus },
+      ],
+    });
+    useCase = TestBed.inject(SaveCustomer);
   });
 
   it('create: generates CL-0001, persists and publishes CustomerCreated', async () => {

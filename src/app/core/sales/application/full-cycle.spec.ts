@@ -1,7 +1,12 @@
+import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { InMemoryEventBus } from '../../_common/application/event-bus';
+import { EventBusToken } from '../../_common/core.tokens';
 import { ValidationError } from '../../_common/domain/errors';
 import { EntityId } from '../../_common/domain/entity-id';
+import { CUSTOMER_REPOSITORY } from '../../catalog/domain/customer/customer-repository';
+import { RECIPE_REPOSITORY } from '../../catalog/domain/recipe/recipe-repository';
+import { SUPPLY_REPOSITORY } from '../../catalog/domain/supply/supply-repository';
 import { SaveCustomer } from '../../catalog/application/save-customer/save-customer';
 import { SaveSupply } from '../../catalog/application/save-supply/save-supply';
 import { SaveRecipe } from '../../catalog/application/save-recipe/save-recipe';
@@ -10,15 +15,19 @@ import {
   MemorySupplyRepository,
   MemoryRecipeRepository,
 } from '../../catalog/infrastructure/memory-repositories';
+import { SETTINGS_REPOSITORY } from '../../settings/domain/settings-repository';
 import { UpdateSettings } from '../../settings/application/update-settings/update-settings';
 import { MemorySettingsRepository } from '../../settings/infrastructure/memory-settings-repository';
-import { StockService } from '../../inventory/domain/stock-service';
+import { STOCK_MOVEMENT_REPOSITORY } from '../../inventory/domain/stock-movement/stock-movement-repository';
 import { MemoryStockMovementRepository } from '../../inventory/infrastructure/memory-repositories';
 import { MemoryQuoteRepository } from '../infrastructure/memory-repositories';
 import {
   MemoryOrderRepository,
   MemorySaleRepository,
 } from '../infrastructure/memory-repositories';
+import { QUOTE_REPOSITORY } from '../domain/quote/quote-repository';
+import { ORDER_REPOSITORY } from '../domain/order/order-repository';
+import { SALE_REPOSITORY } from '../domain/sale/sale-repository';
 import { ApproveQuote } from './approve-quote/approve-quote';
 import { CancelOrder } from './cancel-order/cancel-order';
 import { SaveQuote } from './save-quote/save-quote';
@@ -60,10 +69,23 @@ describe('Quote → order → sale cycle (use case integration)', () => {
     orders = new MemoryOrderRepository();
     sales = new MemorySaleRepository();
     bus = new InMemoryEventBus();
-    const stock = new StockService(supplies, movements);
 
-    customerId = (await new SaveCustomer(customers, bus).execute({ name: 'Ana Torres' })).id;
-    const ss = new SaveSupply(supplies, bus);
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: CUSTOMER_REPOSITORY, useValue: customers },
+        { provide: SUPPLY_REPOSITORY, useValue: supplies },
+        { provide: RECIPE_REPOSITORY, useValue: recipes },
+        { provide: SETTINGS_REPOSITORY, useValue: settings },
+        { provide: STOCK_MOVEMENT_REPOSITORY, useValue: movements },
+        { provide: QUOTE_REPOSITORY, useValue: quotes },
+        { provide: ORDER_REPOSITORY, useValue: orders },
+        { provide: SALE_REPOSITORY, useValue: sales },
+        { provide: EventBusToken, useValue: bus },
+      ],
+    });
+
+    customerId = (await TestBed.inject(SaveCustomer).execute({ name: 'Ana Torres' })).id;
+    const ss = TestBed.inject(SaveSupply);
     flourId = (
       await ss.execute({
         name: 'Flour', type: 'ingredient', baseUnit: 'g',
@@ -77,7 +99,7 @@ describe('Quote → order → sale cycle (use case integration)', () => {
       })
     ).id;
     recipeId = (
-      await new SaveRecipe(recipes, supplies, bus).execute({
+      await TestBed.inject(SaveRecipe).execute({
         name: 'Chocolate cake', baseType: 'people', baseServings: 10, laborHours: 2,
         ingredients: [
           { supplyId: flourId, baseQuantity: 300 },
@@ -85,13 +107,13 @@ describe('Quote → order → sale cycle (use case integration)', () => {
         ],
       })
     ).id;
-    await new UpdateSettings(settings, bus).execute({ general: { defaultMargin: 30 } });
+    await TestBed.inject(UpdateSettings).execute({ general: { defaultMargin: 30 } });
 
-    saveQuote = new SaveQuote(quotes, customers, recipes, supplies, settings, bus);
-    approve = new ApproveQuote(quotes, orders, supplies, stock, settings, bus);
-    produce = new StartProduction(orders, stock, bus);
-    deliver = new MarkDelivered(orders, quotes, sales, bus);
-    cancel = new CancelOrder(orders, movements, stock, bus);
+    saveQuote = TestBed.inject(SaveQuote);
+    approve = TestBed.inject(ApproveQuote);
+    produce = TestBed.inject(StartProduction);
+    deliver = TestBed.inject(MarkDelivered);
+    cancel = TestBed.inject(CancelOrder);
   });
 
   async function quoteTwentyPeople(): Promise<string> {
@@ -141,7 +163,7 @@ describe('Quote → order → sale cycle (use case integration)', () => {
   });
 
   it('with ON_PRODUCTION moment stock goes down when production starts (idempotent)', async () => {
-    await new UpdateSettings(settings, bus).execute({
+    await TestBed.inject(UpdateSettings).execute({
       general: { stockDeductionMoment: 'ON_PRODUCTION' },
     });
     const quoteId = await quoteTwentyPeople();
