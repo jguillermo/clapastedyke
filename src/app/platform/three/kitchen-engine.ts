@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { ModelLoader } from './model-loader';
-import { CameraRig, CameraPose } from './camera-rig';
+import { CameraRig } from './camera-rig';
 import { buildChef } from './chef-mesh';
 import { solid } from './town-layout';
 
@@ -10,35 +10,21 @@ interface KitchenOptions {
   onStationClick?: (stationId: string) => void;
 }
 
-/** Estación clicable de la cocina (id alineado con KitchenStation). */
-interface Station {
-  id: string;
-  color: number;
-  pos: THREE.Vector3;
-}
+/** Huella objetivo de la sala (ancho/profundo en unidades de escena). */
+const ROOM_FOOTPRINT = 7;
 
-const KITCHEN_HOME = {
-  pos: new THREE.Vector3(0, 3.2, 7.5),
-  look: new THREE.Vector3(0, 1.4, -1),
-};
-
-/** Pasos de la cinemática de arranque: ciudad arriba → casa → cocina. */
-const FLY_IN: CameraPose[] = [
-  { x: 0, y: 26, z: 16, lookX: 0, lookY: 2, lookZ: 0, dur: 1.4 },
-  { x: 0, y: 8, z: 11, lookX: 0, lookY: 2, lookZ: -1, dur: 1.2 },
-  { x: KITCHEN_HOME.pos.x, y: KITCHEN_HOME.pos.y, z: KITCHEN_HOME.pos.z, lookX: -1, lookY: 1.4, lookZ: -1, dur: 1.0 },
-];
-
-const STATIONS: Station[] = [
-  { id: 'recipe', color: 0xc98a12, pos: new THREE.Vector3(-2.4, 1.7, -2.4) }, // tablero de recetas
-  { id: 'pantry', color: 0x4f8a5b, pos: new THREE.Vector3(0, 1.5, -3.0) }, // despensa
-  { id: 'oven', color: 0xb8472a, pos: new THREE.Vector3(2.4, 1.7, -2.4) }, // horno
-];
+/** Estaciones clicables (id alineado con KitchenStation), de izq. a der. */
+const STATIONS = [
+  { id: 'recipe', color: 0xc98a12 }, // tablero de recetas
+  { id: 'pantry', color: 0x4f8a5b }, // despensa
+  { id: 'oven', color: 0xb8472a }, // horno
+] as const;
 
 /**
- * Escena de la cocina de casa (WorldScene.KITCHEN). Carga kitchen.glb, coloca
- * al chef y unas estaciones clicables (tablero, despensa, horno) e inicia con
- * la cinemática flyIn. El estado del stock se muestra en la UI (overlay/dock).
+ * Escena de la cocina de casa (WorldScene.KITCHEN). Carga kitchen.glb, mide la
+ * sala y coloca TODO relativo a ella (cámara, estaciones, chef), inicia con la
+ * cinemática flyIn y mantiene una luz cálida sin zonas negras. El estado del
+ * stock se muestra en la UI (overlay/dock).
  */
 export class KitchenEngine {
   private readonly renderer: THREE.WebGLRenderer;
@@ -63,12 +49,15 @@ export class KitchenEngine {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
 
-    this.camera = new THREE.PerspectiveCamera(45, 1, 0.1, 200);
-    this.rig = new CameraRig(this.camera, options.animate, KITCHEN_HOME);
+    this.scene.background = new THREE.Color(0xf3e7d3); // crema cálida, sin vacío oscuro
+
+    this.camera = new THREE.PerspectiveCamera(42, 1, 0.1, 200);
+    this.rig = new CameraRig(this.camera, options.animate, {
+      pos: new THREE.Vector3(0, 3.2, ROOM_FOOTPRINT),
+      look: new THREE.Vector3(0, 1.5, 0),
+    });
 
     this.buildLights();
-    this.buildStations();
-    this.buildChefMascot();
     void this.loadRoom();
 
     this.resize();
@@ -82,56 +71,83 @@ export class KitchenEngine {
       canvas.removeEventListener('pointerdown', onClick);
     };
 
-    if (options.animate) {
-      this.rig.flyThrough(FLY_IN);
-      this.loop();
-    } else {
-      this.camera.position.copy(KITCHEN_HOME.pos);
-      this.camera.lookAt(KITCHEN_HOME.look);
-      this.renderer.render(this.scene, this.camera);
-    }
+    if (options.animate) this.loop();
   }
 
   /* ---------- construcción ---------- */
 
   private buildLights(): void {
-    this.scene.add(new THREE.HemisphereLight(0xfff3e0, 0x6b5d52, 1.1));
-    const sun = new THREE.DirectionalLight(0xffe8c8, 1.0);
+    this.scene.add(new THREE.AmbientLight(0xfff4e6, 0.65)); // relleno: nada en negro
+    this.scene.add(new THREE.HemisphereLight(0xfff3e0, 0xb89b7a, 0.9));
+    const sun = new THREE.DirectionalLight(0xffe8c8, 0.85);
     sun.position.set(4, 9, 6);
     this.scene.add(sun);
   }
 
   private async loadRoom(): Promise<void> {
+    let box: THREE.Box3;
     try {
       const room = (await this.loader.loadGlb('assets/kitchen/kitchen.glb')).clone(true);
-      ModelLoader.normalize(room, 7);
+      ModelLoader.normalize(room, ROOM_FOOTPRINT);
       this.scene.add(room);
+      box = new THREE.Box3().setFromObject(room);
     } catch {
-      // Sin el GLB el flujo sigue por la UI; dejamos un suelo simple.
-      const floor = new THREE.Mesh(new THREE.CircleGeometry(5, 32), solid(0xf0e2cc));
+      const floor = new THREE.Mesh(new THREE.CircleGeometry(ROOM_FOOTPRINT / 2, 32), solid(0xf0e2cc));
       floor.rotation.x = -Math.PI / 2;
       this.scene.add(floor);
+      box = new THREE.Box3(
+        new THREE.Vector3(-ROOM_FOOTPRINT / 2, 0, -ROOM_FOOTPRINT / 2),
+        new THREE.Vector3(ROOM_FOOTPRINT / 2, 3, ROOM_FOOTPRINT / 2),
+      );
     }
+
+    this.layout(box);
     this.renderIfStatic();
   }
 
-  private buildStations(): void {
-    for (const s of STATIONS) {
+  /** Coloca cámara, estaciones y chef en función de la sala medida. */
+  private layout(box: THREE.Box3): void {
+    const h = Math.max(2, box.max.y);
+    const halfX = (box.max.x - box.min.x) / 2 || ROOM_FOOTPRINT / 2;
+    const halfZ = (box.max.z - box.min.z) / 2 || ROOM_FOOTPRINT / 2;
+
+    // Estaciones: marcadores pequeños flotando sobre la encimera, dentro de la sala.
+    const y = h * 0.52;
+    const xs = [-halfX * 0.55, 0, halfX * 0.55];
+    STATIONS.forEach((s, i) => {
       const mesh = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.42, 0.42, 0.18, 24),
-        new THREE.MeshStandardMaterial({ color: s.color, emissive: s.color, emissiveIntensity: 0.35, roughness: 0.6 }),
+        new THREE.CylinderGeometry(0.18, 0.18, 0.08, 24),
+        new THREE.MeshStandardMaterial({ color: s.color, emissive: s.color, emissiveIntensity: 0.4, roughness: 0.5 }),
       );
-      mesh.position.copy(s.pos);
+      mesh.position.set(xs[i], y, -halfZ * 0.45);
       mesh.userData['stationId'] = s.id;
       this.scene.add(mesh);
       this.stationMeshes.set(s.id, mesh);
-    }
-  }
+    });
 
-  private buildChefMascot(): void {
-    this.chef = buildChef();
-    this.chef.position.set(0, 0, 1.4);
-    this.scene.add(this.chef);
+    // Chef: pequeño, en la esquina frontal izquierda (no tapa el centro).
+    const chef = buildChef();
+    const chefH = new THREE.Box3().setFromObject(chef).getSize(new THREE.Vector3()).y || 1;
+    chef.scale.setScalar((h * 0.34) / chefH);
+    chef.position.set(-halfX * 0.6, 0, halfZ + 0.3);
+    chef.rotation.y = 0.5;
+    this.scene.add(chef);
+    this.chef = chef;
+
+    // Cámara: enmarca la sala centrada.
+    const home = new THREE.Vector3(0, h * 0.85, halfZ + ROOM_FOOTPRINT * 0.85);
+    const look = new THREE.Vector3(0, h * 0.45, 0);
+    this.rig.setHome(home, look);
+    if (this.options.animate) {
+      this.rig.flyThrough([
+        { x: 0, y: h + 20, z: halfZ + 13, lookX: 0, lookY: look.y, lookZ: 0, dur: 1.4 },
+        { x: 0, y: h + 5, z: halfZ + 9, lookX: 0, lookY: look.y, lookZ: 0, dur: 1.1 },
+        { x: home.x, y: home.y, z: home.z, lookX: look.x, lookY: look.y, lookZ: look.z, dur: 1.0 },
+      ]);
+    } else {
+      this.camera.position.copy(home);
+      this.camera.lookAt(look);
+    }
   }
 
   /* ---------- loop & input ---------- */
@@ -141,10 +157,9 @@ export class KitchenEngine {
     const t = this.clock.getElapsedTime();
 
     for (const mesh of this.stationMeshes.values()) {
-      mesh.position.y += Math.sin(t * 2 + mesh.position.x) * 0.0015;
       mesh.rotation.y = t * 0.6;
     }
-    if (this.chef) this.chef.position.y = Math.sin(t * 1.8) * 0.04;
+    if (this.chef) this.chef.position.y = Math.sin(t * 1.8) * 0.03;
     this.rig.update(t, this.pointer);
 
     if (!this.rig.tweening) {

@@ -61,6 +61,16 @@ export class CameraRig {
     return this.tween !== null || this.queue.length > 0;
   }
 
+  /** Reubica el "home" (p. ej. tras medir la sala); si está en reposo, lo adopta. */
+  setHome(pos: THREE.Vector3, look: THREE.Vector3): void {
+    this.homePos.copy(pos);
+    this.homeLook.copy(look);
+    if (!this.flying && !this.tween && !this.focusedId && !this.queue.length) {
+      this.desiredPos.copy(pos);
+      this.desiredLook.copy(look);
+    }
+  }
+
   /** Dolly hacia la puerta de un edificio (o estación de la cocina). */
   focus(id: string, x: number, z: number): void {
     this.focusedId = id;
