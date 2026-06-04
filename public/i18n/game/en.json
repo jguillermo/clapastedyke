@@ -1,4 +1,42 @@
 {
+  "town": {
+    "kicker": "Your pastry shop",
+    "title": "The town of your business",
+    "sub": "Step into each building to operate: sell at the Shop, manage the Warehouse, bake in the Workshop. Whatever needs your attention floats over the town.",
+    "kpisLabel": "Today at a glance",
+    "roomKicker": "You entered",
+    "enter": "Enter",
+    "unlock": "Locked",
+    "back": "Back",
+    "close": "Close",
+    "kpi": {
+      "pendingQuotes": "pending quotes",
+      "expiringThisWeek": "expiring this week",
+      "pendingOrders": "pending orders",
+      "toDeliver": "to deliver",
+      "suppliesInRed": "supplies in red"
+    },
+    "buildings": {
+      "oficina": { "name": "The Office", "tagline": "Set up the business, your customers and packaging rules." },
+      "bodega": { "name": "The Warehouse", "tagline": "Your supplies and stock. Adjust waste and counts." },
+      "tienda": { "name": "The Shop", "tagline": "The heart: build quotes and sell them." },
+      "obrador": { "name": "The Workshop", "tagline": "Produce orders and keep your recipes." },
+      "mercado": { "name": "The Market", "tagline": "Buy materials and manage suppliers." }
+    },
+    "actions": {
+      "settings": "Settings",
+      "customers": "Customers",
+      "packagingRules": "Packaging rules",
+      "supplies": "Supplies",
+      "adjustInventory": "Adjust inventory",
+      "newQuote": "New quote",
+      "viewQuotes": "View quotes",
+      "viewOrders": "View orders",
+      "recipes": "Recipes",
+      "buyMaterials": "Buy materials",
+      "suppliers": "Suppliers"
+    }
+  },
   "hud": {
     "brand": "Costing system",
     "subtitle": "The manual game",

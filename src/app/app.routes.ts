@@ -2,7 +2,12 @@ import { Routes } from '@angular/router';
 import { missionRedirectGuard, unlockGuard } from './features/game/unlock.guard';
 
 export const routes: Routes = [
-  { path: '', pathMatch: 'full', redirectTo: 'map' },
+  { path: '', pathMatch: 'full', redirectTo: 'town' },
+  {
+    path: 'town',
+    loadComponent: () =>
+      import('./features/game/components/town/town-shell').then(m => m.TownShell),
+  },
   {
     path: 'map',
     loadComponent: () => import('./features/game/components/world-map/world-map').then(m => m.WorldMap),

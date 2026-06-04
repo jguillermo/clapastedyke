@@ -1,4 +1,42 @@
 {
+  "town": {
+    "kicker": "Tu pastelería",
+    "title": "El pueblo de tu negocio",
+    "sub": "Entra a cada edificio para operar: vende en la Tienda, controla la Bodega, produce en el Obrador. Lo que pide tu atención aparece flotando sobre el pueblo.",
+    "kpisLabel": "Resumen del día",
+    "roomKicker": "Entraste a",
+    "enter": "Entrar",
+    "unlock": "Bloqueado",
+    "back": "Volver",
+    "close": "Cerrar",
+    "kpi": {
+      "pendingQuotes": "presupuestos pendientes",
+      "expiringThisWeek": "por vencer esta semana",
+      "pendingOrders": "pedidos pendientes",
+      "toDeliver": "por entregar",
+      "suppliesInRed": "insumos en rojo"
+    },
+    "buildings": {
+      "oficina": { "name": "La Oficina", "tagline": "Configura el negocio, tus clientes y las reglas de empaque." },
+      "bodega": { "name": "La Bodega", "tagline": "Tus insumos y el stock. Ajusta mermas y conteos." },
+      "tienda": { "name": "La Tienda", "tagline": "El corazón: arma presupuestos y véndelos." },
+      "obrador": { "name": "El Obrador", "tagline": "Produce los pedidos y guarda tus recetas." },
+      "mercado": { "name": "El Mercado", "tagline": "Compra materiales y administra proveedores." }
+    },
+    "actions": {
+      "settings": "Configuración",
+      "customers": "Clientes",
+      "packagingRules": "Reglas de empaque",
+      "supplies": "Insumos",
+      "adjustInventory": "Ajustar inventario",
+      "newQuote": "Nuevo presupuesto",
+      "viewQuotes": "Ver presupuestos",
+      "viewOrders": "Ver pedidos",
+      "recipes": "Recetas",
+      "buyMaterials": "Comprar materiales",
+      "suppliers": "Proveedores"
+    }
+  },
   "hud": {
     "brand": "Sistema de costeo",
     "subtitle": "El juego del manual",

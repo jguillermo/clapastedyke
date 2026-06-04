@@ -1,0 +1,98 @@
+<section class="pueblo">
+  <header class="portada">
+    <p class="kick">{{ 'game.town.kicker' | transloco }}</p>
+    <h1>{{ 'game.town.title' | transloco }}</h1>
+    <p class="sub">{{ 'game.town.sub' | transloco }}</p>
+
+    @if (dashboard(); as d) {
+      <div class="kpis" aria-label="{{ 'game.town.kpisLabel' | transloco }}">
+        @for (k of d.kpis; track k.key) {
+          <div class="kpi" [class]="'kpi--' + k.color">
+            <b>{{ k.value }}</b>
+            <span>{{ 'game.town.kpi.' + k.key | transloco }}</span>
+          </div>
+        }
+      </div>
+    }
+  </header>
+
+  <app-town-3d
+    [buildings]="buildingStates()"
+    [focus]="focusId()"
+    (buildingChosen)="onChosen($event)"
+  />
+
+  <!-- Accessible / no-WebGL path: every building reachable without the canvas. -->
+  <div class="edificios">
+    @for (b of buildings; track b.id) {
+      @let op = operational(b);
+      @let alerts = alertCount(b);
+      <button
+        type="button"
+        class="edificio"
+        [class.bloqueado]="!op"
+        [style.--acento]="'#' + b.color.toString(16).padStart(6, '0')"
+        (click)="onChosen(b.id)"
+      >
+        <span class="edificio-cabeza">
+          <b>{{ 'game.town.buildings.' + b.nameKey + '.name' | transloco }}</b>
+          @if (alerts > 0) {
+            <span class="badge">{{ alerts }}</span>
+          }
+        </span>
+        <span class="edificio-lema">{{ 'game.town.buildings.' + b.nameKey + '.tagline' | transloco }}</span>
+        <span class="edificio-pie">
+          @if (op) {
+            {{ 'game.town.enter' | transloco }} →
+          } @else {
+            🔒 {{ 'game.town.unlock' | transloco }}
+          }
+        </span>
+      </button>
+    }
+  </div>
+</section>
+
+@if (selected(); as b) {
+  <div class="velo" role="dialog" aria-modal="true">
+    @if (action(); as a) {
+      <!-- Real operational screen mounted in place -->
+      <div class="hoja hoja--ancha">
+        <div class="hoja-barra">
+          <button type="button" class="boton fantasma" (click)="closeAction()">
+            ← {{ 'game.town.back' | transloco }}
+          </button>
+          <b>{{ 'game.town.buildings.' + b.nameKey + '.name' | transloco }} ·
+            {{ 'game.town.actions.' + a.labelKey | transloco }}</b>
+          <button type="button" class="boton fantasma" (click)="closeBuilding()">
+            ✕ {{ 'game.town.close' | transloco }}
+          </button>
+        </div>
+        <div class="hoja-cuerpo">
+          <ng-container [ngComponentOutlet]="a.screen" />
+        </div>
+      </div>
+    } @else {
+      <!-- Room menu: the actions available inside the building -->
+      <div class="sala">
+        <header class="sala-cabeza">
+          <div>
+            <p class="kick">{{ 'game.town.roomKicker' | transloco }}</p>
+            <h2>{{ 'game.town.buildings.' + b.nameKey + '.name' | transloco }}</h2>
+            <p class="sala-lema">{{ 'game.town.buildings.' + b.nameKey + '.tagline' | transloco }}</p>
+          </div>
+          <button type="button" class="boton fantasma" (click)="closeBuilding()">
+            ✕ {{ 'game.town.close' | transloco }}
+          </button>
+        </header>
+        <div class="sala-acciones">
+          @for (a of b.actions; track a.labelKey) {
+            <button type="button" class="boton solido grande" (click)="openAction(a)">
+              {{ 'game.town.actions.' + a.labelKey | transloco }} →
+            </button>
+          }
+        </div>
+      </div>
+    }
+  </div>
+}
