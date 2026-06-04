@@ -110,16 +110,18 @@ sube un panel:
 
 ```
 ┌──────────────────────────────────────────────────────────┐
-│ ← Volver        La Tienda · Nuevo presupuesto       ✕ Cerrar│
+│ ← Volver        La Tienda                           ✕ Cerrar│
 ├──────────────────────────────────────────────────────────┤
 │  (QuoterScreen real: clientes/recetas de IndexedDB,        │
 │   cálculo de precio en vivo, guardar)                      │
 └──────────────────────────────────────────────────────────┘
 ```
 
-Al guardar: toast de éxito y vuelta (zoom-out al pueblo). **Salvedad conocida**:
-`QuoterScreen` navega a `/system/quotes` tras guardar (sale del pueblo); es la
-única costura del prototipo, se elimina al plegar `/system` (ver §8).
+Las pantallas reales son **rutas hijas de `/town`** (p. ej. `/town/quotes/new`)
+renderizadas en un `<router-outlet>` dentro del overlay. `← Volver` vuelve al
+room-menu (`/town`, cámara sigue enfocada); `✕ Cerrar` sale del edificio
+(zoom-out + recarga de KPIs). Al guardar un presupuesto el `QuoterScreen` navega
+a `/town/quotes` — **se queda dentro del pueblo** (ya no salta a `/system`).
 
 ### 5.4 Clic en edificio bloqueado
 
@@ -190,12 +192,25 @@ presentación/navegación. Reutiliza el `WorldEngine`/`ChefEngine` como hermanos
 
 ---
 
-## 8. Camino completo (post-prototipo)
+## 8. Camino completo
 
-1. Plegar `/system/*` dentro del pueblo (las pantallas dejan de navegar a rutas
-   `/system`; emiten un evento de "hecho" que el overlay traduce en zoom-out).
-2. Retirar `/map` como pantalla; el contenido del tutorial pasa a ser el "modo
-   guiado" de cada edificio (primera visita).
-3. Animaciones de ambiente por edificio (humo, luz), transición de cámara
-   pulida, y mini-celebración al abrir un edificio nuevo (reusar confetti de
-   `level-completed`).
+1. ~~Plegar `/system/*` dentro del pueblo~~ ✅ **Hecho.** Las pantallas operativas
+   son rutas hijas de `/town` y se renderizan en el `<router-outlet>` del overlay
+   (`TownShell` es ahora layout). `/system/*` redirige a `/town/*`; el
+   `QuoterScreen` y el HUD apuntan a `/town`. `dashboard-screen` y el layout
+   `System` quedan huérfanos (sin ruta) — candidatos a borrar.
+2. ~~Retirar `/map`~~ ✅ **Hecho.** La ruta `/map` ahora redirige a `/town`; las
+   navegaciones del tutorial (guards, `challenge-card`, `level-completed`, `hud`)
+   apuntan a `/town`. Borrados los huérfanos: `world-map/` (WorldMap + Map3d),
+   `platform/three/world-engine.ts`, `features/system/` y `features/dashboard/`
+   (el dashboard vive como KPIs ambientales en `TownShell`). El tutorial
+   (misiones + `level-completed`) sigue vivo y su "casa" es el pueblo.
+3. Animaciones de ambiente y transición de cámara — ✅ **Parcial.** Hecho: humo
+   de chimenea (sprites que suben y se desvanecen) sobre los edificios
+   operativos, balanceo suave de árboles, y una **transición de cámara
+   cinematográfica** (dolly con `easeInOut`, ~0.9s al entrar / ~0.8s al salir) con
+   leve "idle sway" mientras estás enfocado. Pendiente: mini-celebración al abrir
+   un edificio nuevo (reusar confetti de `level-completed`).
+4. `GetDashboard` aún devuelve `route: '/system/...'` en las alertas (no se usa
+   en el pueblo: las alertas son pines). Actualizar a `/town/...` si se hacen
+   clicables.

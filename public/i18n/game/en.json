@@ -66,9 +66,9 @@
   "levelDone": {
     "kicker": "Level completed",
     "sub": "You completed the {{missions}} missions of this level. You have {{done}} of {{total}} challenges ({{percent}}%).",
-    "seeMap": "See the map",
+    "seeMap": "Go to the town",
     "nextLevel": "Next level: {{title}}",
-    "backToMap": "Back to the map",
+    "backToMap": "Back to the town",
     "gameFinished": "🏆 You finished the game! You now master the system."
   },
   "challenge": {

@@ -28,6 +28,6 @@ export class Hud {
   protected confirmReset(): void {
     this.state.reset();
     this.askingReset.set(false);
-    this.router.navigateByUrl('/map');
+    this.router.navigateByUrl('/town');
   }
 }

@@ -53,46 +53,49 @@
   </div>
 </section>
 
-@if (selected(); as b) {
+@if (overlayActive()) {
+  <!-- A real operational screen (child route) rendered over the town -->
   <div class="velo" role="dialog" aria-modal="true">
-    @if (action(); as a) {
-      <!-- Real operational screen mounted in place -->
-      <div class="hoja hoja--ancha">
-        <div class="hoja-barra">
-          <button type="button" class="boton fantasma" (click)="closeAction()">
-            ← {{ 'game.town.back' | transloco }}
-          </button>
-          <b>{{ 'game.town.buildings.' + b.nameKey + '.name' | transloco }} ·
-            {{ 'game.town.actions.' + a.labelKey | transloco }}</b>
-          <button type="button" class="boton fantasma" (click)="closeBuilding()">
-            ✕ {{ 'game.town.close' | transloco }}
-          </button>
-        </div>
-        <div class="hoja-cuerpo">
-          <ng-container [ngComponentOutlet]="a.screen" />
-        </div>
+    <div class="hoja">
+      <div class="hoja-barra">
+        <button type="button" class="boton fantasma" (click)="backToRoom()">
+          ← {{ 'game.town.back' | transloco }}
+        </button>
+        @if (selected(); as b) {
+          <b>{{ 'game.town.buildings.' + b.nameKey + '.name' | transloco }}</b>
+        } @else {
+          <b>{{ 'game.town.title' | transloco }}</b>
+        }
+        <button type="button" class="boton fantasma" (click)="closeBuilding()">
+          ✕ {{ 'game.town.close' | transloco }}
+        </button>
       </div>
-    } @else {
-      <!-- Room menu: the actions available inside the building -->
-      <div class="sala">
-        <header class="sala-cabeza">
-          <div>
-            <p class="kick">{{ 'game.town.roomKicker' | transloco }}</p>
-            <h2>{{ 'game.town.buildings.' + b.nameKey + '.name' | transloco }}</h2>
-            <p class="sala-lema">{{ 'game.town.buildings.' + b.nameKey + '.tagline' | transloco }}</p>
-          </div>
-          <button type="button" class="boton fantasma" (click)="closeBuilding()">
-            ✕ {{ 'game.town.close' | transloco }}
-          </button>
-        </header>
-        <div class="sala-acciones">
-          @for (a of b.actions; track a.labelKey) {
-            <button type="button" class="boton solido grande" (click)="openAction(a)">
-              {{ 'game.town.actions.' + a.labelKey | transloco }} →
-            </button>
-          }
-        </div>
+      <div class="hoja-cuerpo">
+        <router-outlet />
       </div>
-    }
+    </div>
+  </div>
+} @else if (selected(); as b) {
+  <!-- Room menu: the actions available inside the building -->
+  <div class="velo" role="dialog" aria-modal="true">
+    <div class="sala">
+      <header class="sala-cabeza">
+        <div>
+          <p class="kick">{{ 'game.town.roomKicker' | transloco }}</p>
+          <h2>{{ 'game.town.buildings.' + b.nameKey + '.name' | transloco }}</h2>
+          <p class="sala-lema">{{ 'game.town.buildings.' + b.nameKey + '.tagline' | transloco }}</p>
+        </div>
+        <button type="button" class="boton fantasma" (click)="closeBuilding()">
+          ✕ {{ 'game.town.close' | transloco }}
+        </button>
+      </header>
+      <div class="sala-acciones">
+        @for (a of b.actions; track a.labelKey) {
+          <a class="boton solido grande" [routerLink]="townLink(a.path)">
+            {{ 'game.town.actions.' + a.labelKey | transloco }} →
+          </a>
+        }
+      </div>
+    </div>
   </div>
 }

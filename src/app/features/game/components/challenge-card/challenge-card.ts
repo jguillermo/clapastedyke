@@ -152,7 +152,7 @@ export class ChallengeCard {
     }
     const next = this.state.nextStep(step.id);
     if (!next) {
-      this.router.navigateByUrl('/map');
+      this.router.navigateByUrl('/town');
       return;
     }
     const mission = this.state.missionOf(next.id);
@@ -162,7 +162,7 @@ export class ChallengeCard {
   protected back(): void {
     const previous = this.state.previousStep(this.stepId());
     if (!previous) {
-      this.router.navigateByUrl('/map');
+      this.router.navigateByUrl('/town');
       return;
     }
     const mission = this.state.missionOf(previous.id);

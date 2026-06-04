@@ -10,11 +10,12 @@ describe('BUILDINGS map', () => {
     }
   });
 
-  it('every action mounts a real screen component', () => {
+  it('every action routes to a non-empty path under /town', () => {
     for (const b of BUILDINGS) {
       expect(b.actions.length, `${b.id} has actions`).toBeGreaterThan(0);
       for (const a of b.actions) {
-        expect(typeof a.screen, `${b.id}/${a.labelKey} screen`).toBe('function');
+        expect(a.path, `${b.id}/${a.labelKey} path`).toBeTruthy();
+        expect(a.path.startsWith('/'), `${b.id}/${a.labelKey} path is relative`).toBe(false);
       }
     }
   });

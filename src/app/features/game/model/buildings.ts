@@ -1,26 +1,11 @@
-import { Type } from '@angular/core';
 import { Difficulty } from './tutorial-types';
 import { AlertType } from '../../../core/dashboard/application/get-dashboard/get-dashboard';
-
-// Real operational screens (standalone, wired to use cases over IndexedDB).
-// The town mounts these inside the building overlay — they ARE the daily
-// operation, not the tutorial mockups in `forms/`.
-import { QuoterScreen } from '../../quotes/quoter-screen';
-import { QuotesScreen } from '../../quotes/quotes-screen';
-import { OrdersScreen } from '../../orders/orders-screen';
-import { RecipesScreen } from '../../recipes/recipes-screen';
-import { SuppliesScreen } from '../../supplies/supplies-screen';
-import { InventoryScreen } from '../../inventory/inventory-screen';
-import { PurchasesScreen } from '../../purchases/purchases-screen';
-import { SuppliersScreen } from '../../suppliers/suppliers-screen';
-import { SettingsScreen } from '../../settings/settings-screen';
-import { CustomersScreen } from '../../customers/customers-screen';
-import { PackagingRulesScreen } from '../../packaging-rules/packaging-rules-screen';
 
 /**
  * The town = the business made place. Five buildings, each one a domain of the
  * pastry shop. A building opens (becomes operational) when its level is reached;
- * entering it mounts its real operational screens in an overlay.
+ * entering it routes to its real operational screen, rendered in the town's
+ * overlay outlet (the former `/system/*` screens, now children of `/town`).
  *
  * This file is the single source of truth for the building↔feature map
  * (see `.claude/doc/diseno_mundo_juego.md`). The 3D layout (plot positions) is
@@ -37,18 +22,12 @@ export interface BuildingModel {
   texture: string;
 }
 
-/** One action available inside a building: a real screen mounted in the overlay. */
+/** One action inside a building: a route segment under `/town`. */
 export interface BuildingAction {
   /** i18n key under `game.town.actions.*`. */
   labelKey: string;
-  /** Real standalone screen component, mounted via NgComponentOutlet. */
-  screen: Type<unknown>;
-  /**
-   * The screen self-navigates away on success (e.g. the quoter jumps to the
-   * quotes list). The overlay closes the town when this happens — acceptable
-   * for the prototype; folded away when /system is retired.
-   */
-  navigatesAway?: boolean;
+  /** Route relative to `/town`, e.g. 'quotes' or 'quotes/new'. */
+  path: string;
 }
 
 export interface Building {
@@ -80,9 +59,9 @@ export const BUILDINGS: Building[] = [
     model: { url: 'assets/city/books-shop.fbx', texture: 'assets/city/books-shop.png' },
     unlockMissionId: 'f12',
     actions: [
-      { labelKey: 'settings', screen: SettingsScreen },
-      { labelKey: 'customers', screen: CustomersScreen },
-      { labelKey: 'packagingRules', screen: PackagingRulesScreen },
+      { labelKey: 'settings', path: 'settings' },
+      { labelKey: 'customers', path: 'customers' },
+      { labelKey: 'packagingRules', path: 'packaging-rules' },
     ],
     alertTypes: [],
   },
@@ -94,8 +73,8 @@ export const BUILDINGS: Building[] = [
     model: { url: 'assets/city/factory.fbx', texture: 'assets/city/factory.png' },
     unlockMissionId: 'f08',
     actions: [
-      { labelKey: 'supplies', screen: SuppliesScreen },
-      { labelKey: 'adjustInventory', screen: InventoryScreen },
+      { labelKey: 'supplies', path: 'supplies' },
+      { labelKey: 'adjustInventory', path: 'inventory' },
     ],
     alertTypes: ['outOfStock', 'belowMinimum'],
   },
@@ -107,8 +86,8 @@ export const BUILDINGS: Building[] = [
     model: { url: 'assets/city/bakery.fbx', texture: 'assets/city/bakery.png' },
     unlockMissionId: 'f01',
     actions: [
-      { labelKey: 'newQuote', screen: QuoterScreen, navigatesAway: true },
-      { labelKey: 'viewQuotes', screen: QuotesScreen },
+      { labelKey: 'newQuote', path: 'quotes/new' },
+      { labelKey: 'viewQuotes', path: 'quotes' },
     ],
     alertTypes: ['expiringQuote', 'expiredQuote'],
   },
@@ -120,8 +99,8 @@ export const BUILDINGS: Building[] = [
     model: { url: 'assets/city/restaurant.fbx', texture: 'assets/city/restaurant.png' },
     unlockMissionId: 'f03',
     actions: [
-      { labelKey: 'viewOrders', screen: OrdersScreen },
-      { labelKey: 'recipes', screen: RecipesScreen },
+      { labelKey: 'viewOrders', path: 'orders' },
+      { labelKey: 'recipes', path: 'recipes' },
     ],
     alertTypes: ['toDeliver'],
   },
@@ -133,8 +112,8 @@ export const BUILDINGS: Building[] = [
     model: { url: 'assets/city/super-market.fbx', texture: 'assets/city/super-market.png' },
     unlockMissionId: 'f05',
     actions: [
-      { labelKey: 'buyMaterials', screen: PurchasesScreen },
-      { labelKey: 'suppliers', screen: SuppliersScreen },
+      { labelKey: 'buyMaterials', path: 'purchases' },
+      { labelKey: 'suppliers', path: 'suppliers' },
     ],
     alertTypes: [],
   },

@@ -42,7 +42,7 @@ export class LevelCompleted {
   protected continue(): void {
     const next = this.nextLevel();
     if (!next) {
-      this.router.navigateByUrl('/map');
+      this.router.navigateByUrl('/town');
       return;
     }
     const mission = next.missions[0];

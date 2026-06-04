@@ -1,5 +1,5 @@
 <header class="topbar">
-  <a class="brand" routerLink="/map">
+  <a class="brand" routerLink="/town">
     <b>{{ 'game.hud.brand' | transloco }}</b><span>{{ 'game.hud.subtitle' | transloco }}</span>
   </a>
 
@@ -7,7 +7,7 @@
     <span class="avance" aria-live="polite">
       {{ 'game.hud.challenges' | transloco: { done: state.completedCount(), total: state.totalSteps } }}
     </span>
-    <a class="boton fantasma" routerLink="/system">⚙ {{ 'nav.system' | transloco }}</a>
+    <a class="boton fantasma" routerLink="/town">⚙ {{ 'nav.system' | transloco }}</a>
     <a class="boton fantasma" href="../Manual_de_usuario.html">{{ 'nav.fullManual' | transloco }} →</a>
     <button type="button" class="boton fantasma peligro" (click)="askReset()">
       ⟲ {{ 'game.hud.reset' | transloco }}

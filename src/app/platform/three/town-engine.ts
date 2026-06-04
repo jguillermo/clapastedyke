@@ -45,8 +45,15 @@ interface BuildingNode {
   model: THREE.Object3D | null;
   /** Holder for the floating alert pins (rebuilt on state change). */
   pins: THREE.Group;
+  /** Chimney smoke puffs — present only while operational. */
+  smoke: THREE.Group | null;
   operational: boolean | null;
   modelRequested: boolean;
+}
+
+/** Eased 0→1 for the cinematic camera dolly. */
+function easeInOut(p: number): number {
+  return p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;
 }
 
 /**
@@ -56,7 +63,7 @@ interface BuildingNode {
  * the overlay can open over it, and `resetView` pulls back to the town.
  *
  * Models load asynchronously via FBXLoader; a plot pad keeps the layout visible
- * until each one arrives. Same lifecycle discipline as `world-engine.ts`.
+ * until each one arrives. Disposes geometries/materials on teardown.
  */
 export class TownEngine {
   private readonly renderer: THREE.WebGLRenderer;
@@ -78,6 +85,8 @@ export class TownEngine {
 
   private readonly nodes = new Map<string, BuildingNode>();
   private particles!: THREE.Points;
+  private readonly decor: THREE.Object3D[] = [];
+  private readonly smokeTexture = this.makeSmokeTexture();
   private animationId = 0;
   private hovered: BuildingNode | null = null;
   private readonly removeListeners: () => void;
@@ -86,6 +95,15 @@ export class TownEngine {
   private readonly look = LOOK_HOME.clone();
   private readonly desiredPos = new THREE.Vector3(CAMERA_HOME.x, CAMERA_HOME.y, CAMERA_HOME.z);
   private readonly desiredLook = LOOK_HOME.clone();
+  /** Active eased camera move (focus/reset); null once it settles. */
+  private camTween: {
+    fromPos: THREE.Vector3;
+    toPos: THREE.Vector3;
+    fromLook: THREE.Vector3;
+    toLook: THREE.Vector3;
+    start: number;
+    dur: number;
+  } | null = null;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -171,7 +189,10 @@ export class TownEngine {
         const tree = t.clone(true);
         tree.position.set(x, 0, z);
         tree.rotation.y = Math.random() * Math.PI;
+        tree.userData['phase'] = x - z;
+        tree.userData['sway'] = 0.02 + Math.random() * 0.025;
         this.scene.add(tree);
+        this.decor.push(tree);
         this.requestRender();
       });
     }
@@ -205,6 +226,12 @@ export class TownEngine {
         node.operational = data.operational;
         this.applyLockTint(node, data.operational);
       }
+      // Chimney smoke only while operational (the building is "alive").
+      if (data.operational && !node.smoke) node.smoke = this.addSmoke(node.group);
+      else if (!data.operational && node.smoke) {
+        node.group.remove(node.smoke);
+        node.smoke = null;
+      }
       this.rebuildPins(node, data);
     });
     this.requestRender();
@@ -228,7 +255,7 @@ export class TownEngine {
     group.add(pins);
 
     this.scene.add(group);
-    return { group, model: null, pins, operational: null, modelRequested: false };
+    return { group, model: null, pins, smoke: null, operational: null, modelRequested: false };
   }
 
   private ensureModel(node: BuildingNode, data: BuildingState): void {
@@ -319,6 +346,44 @@ export class TownEngine {
     }
   }
 
+  /* ---------- Ambient: chimney smoke ---------- */
+
+  private makeSmokeTexture(): THREE.Texture {
+    const c = document.createElement('canvas');
+    c.width = c.height = 64;
+    const ctx = c.getContext('2d')!;
+    const g = ctx.createRadialGradient(32, 32, 1, 32, 32, 30);
+    g.addColorStop(0, 'rgba(255,255,255,0.95)');
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 64, 64);
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
+  }
+
+  private addSmoke(group: THREE.Group): THREE.Group {
+    const smoke = new THREE.Group();
+    const PUFFS = 6;
+    for (let i = 0; i < PUFFS; i++) {
+      const material = new THREE.SpriteMaterial({
+        map: this.smokeTexture,
+        color: 0xb3aa9b,
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+      });
+      const puff = new THREE.Sprite(material);
+      const x = (Math.random() - 0.5) * 0.3;
+      puff.position.set(x, 1.9, (Math.random() - 0.5) * 0.3);
+      puff.userData['baseX'] = x;
+      puff.userData['phase'] = i / PUFFS;
+      smoke.add(puff);
+    }
+    group.add(smoke);
+    return smoke;
+  }
+
   /* ---------- Focus / reset (the «zoom» into a building) ---------- */
 
   focusBuilding(id: string): void {
@@ -328,14 +393,28 @@ export class TownEngine {
     const { x, z } = node.group.position;
     this.desiredPos.set(x * 0.6, 2.9, z + 5);
     this.desiredLook.set(x, 1, z);
-    if (!this.options.animate) this.snapCamera();
+    if (this.options.animate) this.startTween(0.9);
+    else this.snapCamera();
   }
 
   resetView(): void {
     this.focusedId = null;
     this.desiredPos.set(CAMERA_HOME.x, CAMERA_HOME.y, CAMERA_HOME.z);
     this.desiredLook.copy(LOOK_HOME);
-    if (!this.options.animate) this.snapCamera();
+    if (this.options.animate) this.startTween(0.8);
+    else this.snapCamera();
+  }
+
+  /** Begins an eased camera move from where it is now to the desired view. */
+  private startTween(dur: number): void {
+    this.camTween = {
+      fromPos: this.camera.position.clone(),
+      toPos: this.desiredPos.clone(),
+      fromLook: this.look.clone(),
+      toLook: this.desiredLook.clone(),
+      start: this.clock.getElapsedTime(),
+      dur,
+    };
   }
 
   private snapCamera(): void {
@@ -387,29 +466,26 @@ export class TownEngine {
     this.animationId = requestAnimationFrame(this.loop);
     const t = this.clock.getElapsedTime();
 
+    // Pins bob; chimney smoke rises and fades on operational buildings.
     this.nodes.forEach(node => {
       node.pins.children.forEach(pin => {
         pin.position.y = 3.2 + Math.sin(t * 2 + (pin.userData['phase'] as number)) * 0.14;
         pin.rotation.y = t * 1.2;
       });
+      if (node.smoke) this.animateSmoke(node.smoke, t);
     });
     this.particles.rotation.y = t * 0.02;
 
-    if (!this.focusedId) {
-      // Parallax only when the pointer is actually over the canvas; the
-      // off-canvas sentinel (-9,-9) must not drag the camera away.
-      const px = Math.abs(this.pointer.x) <= 1 ? this.pointer.x : 0;
-      const py = Math.abs(this.pointer.y) <= 1 ? this.pointer.y : 0;
-      const orbit = Math.sin(t * 0.05) * 1.4;
-      this.desiredPos.x = CAMERA_HOME.x + orbit + px * 0.9;
-      this.desiredPos.y = CAMERA_HOME.y + py * 0.4;
-      this.desiredPos.z = CAMERA_HOME.z;
+    // Trees lean gently in the breeze.
+    for (const tree of this.decor) {
+      const sway = tree.userData['sway'] as number;
+      tree.rotation.z = Math.sin(t * 0.8 + (tree.userData['phase'] as number)) * sway;
     }
-    this.camera.position.lerp(this.desiredPos, 0.05);
-    this.look.lerp(this.desiredLook, 0.08);
-    this.camera.lookAt(this.look);
 
-    if (!this.focusedId) {
+    this.updateCamera(t);
+
+    // Hover only at home (not mid-dolly, not zoomed in).
+    if (!this.focusedId && !this.camTween) {
       const node = this.pickNode();
       if (node !== this.hovered) {
         this.hovered?.group.scale.setScalar(1);
@@ -421,6 +497,49 @@ export class TownEngine {
 
     this.renderer.render(this.scene, this.camera);
   };
+
+  /** Eased dolly while tweening; soft orbit at home; tiny idle sway when focused. */
+  private updateCamera(t: number): void {
+    if (this.camTween) {
+      const tw = this.camTween;
+      const p = Math.min(1, (t - tw.start) / tw.dur);
+      const e = easeInOut(p);
+      this.camera.position.lerpVectors(tw.fromPos, tw.toPos, e);
+      this.look.lerpVectors(tw.fromLook, tw.toLook, e);
+      if (p >= 1) this.camTween = null;
+    } else if (!this.focusedId) {
+      // Parallax only when the pointer is over the canvas; the off-canvas
+      // sentinel (-9,-9) must not drag the camera away.
+      const px = Math.abs(this.pointer.x) <= 1 ? this.pointer.x : 0;
+      const py = Math.abs(this.pointer.y) <= 1 ? this.pointer.y : 0;
+      const orbit = Math.sin(t * 0.05) * 1.4;
+      this.desiredPos.x = CAMERA_HOME.x + orbit + px * 0.9;
+      this.desiredPos.y = CAMERA_HOME.y + py * 0.4;
+      this.desiredPos.z = CAMERA_HOME.z;
+      this.camera.position.lerp(this.desiredPos, 0.05);
+      this.look.lerp(this.desiredLook, 0.08);
+    } else {
+      this.camera.position.set(
+        this.desiredPos.x + Math.sin(t * 0.7) * 0.05,
+        this.desiredPos.y + Math.sin(t * 0.9) * 0.04,
+        this.desiredPos.z,
+      );
+      this.look.copy(this.desiredLook);
+    }
+    this.camera.lookAt(this.look);
+  }
+
+  private animateSmoke(smoke: THREE.Group, t: number): void {
+    smoke.children.forEach(child => {
+      const puff = child as THREE.Sprite;
+      const phase = puff.userData['phase'] as number;
+      const life = (t * 0.35 + phase) % 1;
+      puff.position.y = 1.9 + life * 1.6;
+      puff.position.x = (puff.userData['baseX'] as number) + Math.sin(life * 6 + phase) * 0.14;
+      puff.scale.setScalar(0.3 + life * 0.7);
+      (puff.material as THREE.SpriteMaterial).opacity = Math.sin(life * Math.PI) * 0.7;
+    });
+  }
 
   /* ---------- Lifecycle ---------- */
 

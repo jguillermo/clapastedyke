@@ -1,26 +1,28 @@
-import { NgComponentOutlet } from '@angular/common';
 import { Component, afterNextRender, computed, inject, signal } from '@angular/core';
-import { Router } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { ActivatedRoute, NavigationEnd, Router, RouterLink, RouterOutlet } from '@angular/router';
+import { filter } from 'rxjs/operators';
 import { TranslocoPipe, provideTranslocoScope } from '@jsverse/transloco';
 import { GameState } from '../../state/game-state';
-import { BUILDINGS, Building, BuildingAction, findBuilding, isBuildingOperational } from '../../model/buildings';
+import { BUILDINGS, Building, findBuilding, isBuildingOperational } from '../../model/buildings';
 import { BuildingState } from '../../../../platform/three/town-engine';
 import { GetDashboard, DashboardData } from '../../../../core/dashboard/application/get-dashboard/get-dashboard';
 import { Difficulty } from '../../model/tutorial-types';
 import { Town3d } from './town-3d';
 
 /**
- * The unified home: the pastry shop as a living town. The 3D town is the hub;
- * entering an operational building dollies the camera in and mounts its REAL
- * operational screen (use cases over IndexedDB) in an overlay. Locked buildings
- * route to the guided mission that opens them.
+ * The unified home AND layout: the pastry shop as a living town. The 3D town is
+ * the hub; entering an operational building dollies the camera in and shows its
+ * room-menu, whose actions route to the real operational screens (children of
+ * `/town`) rendered in the overlay outlet. Locked buildings route to the guided
+ * mission that opens them.
  *
  * The dashboard (the old «Resumen») is the town's ambience: its KPIs head the
  * page and its alerts become pins floating over the matching building.
  */
 @Component({
   selector: 'app-town-shell',
-  imports: [Town3d, NgComponentOutlet, TranslocoPipe],
+  imports: [Town3d, RouterOutlet, RouterLink, TranslocoPipe],
   providers: [provideTranslocoScope('game', 'tutorial')],
   templateUrl: './town-shell.html',
   styleUrl: './town-shell.scss',
@@ -29,15 +31,16 @@ export class TownShell {
   protected readonly state = inject(GameState);
   private readonly getDashboard = inject(GetDashboard);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
 
   protected readonly buildings = BUILDINGS;
   protected readonly dashboard = signal<DashboardData | null>(null);
 
-  /** Building whose overlay is open (camera focused), and the mounted action. */
+  /** Building whose room-menu/screen is open (drives the camera zoom). */
   protected readonly selected = signal<Building | null>(null);
-  protected readonly action = signal<BuildingAction | null>(null);
+  /** True when a child route (an operational screen) is rendered in the outlet. */
+  protected readonly overlayActive = signal(false);
 
-  /** Drives the cinematic camera zoom in `Town3d`. */
   protected readonly focusId = computed(() => this.selected()?.id ?? null);
 
   /** Snapshot the 3D engine draws: operational state + alert pins per building. */
@@ -59,6 +62,21 @@ export class TownShell {
 
   constructor() {
     afterNextRender(() => this.reloadDashboard());
+
+    this.router.events
+      .pipe(
+        filter(e => e instanceof NavigationEnd),
+        takeUntilDestroyed(),
+      )
+      .subscribe(() => this.syncOverlay());
+    this.syncOverlay();
+  }
+
+  /** Tracks whether an operational screen is mounted; refreshes KPIs on close. */
+  private syncOverlay(): void {
+    const open = !!this.route.firstChild;
+    if (this.overlayActive() && !open) this.reloadDashboard();
+    this.overlayActive.set(open);
   }
 
   protected operational(b: Building): boolean {
@@ -70,6 +88,11 @@ export class TownShell {
     return (dash?.alerts ?? []).filter(a => b.alertTypes.includes(a.type)).length;
   }
 
+  /** Absolute router link for an action path relative to /town. */
+  protected townLink(path: string): string[] {
+    return ['/town', ...path.split('/')];
+  }
+
   /** A building was clicked (3D or accessible list). */
   protected onChosen(id: string): void {
     const building = findBuilding(id);
@@ -78,22 +101,18 @@ export class TownShell {
       void this.router.navigate(['/mission', building.unlockMissionId]);
       return;
     }
-    this.action.set(null);
     this.selected.set(building);
   }
 
-  protected openAction(a: BuildingAction): void {
-    this.action.set(a);
+  /** Back from a screen to the building's room-menu (keeps the camera zoomed). */
+  protected backToRoom(): void {
+    void this.router.navigate(['/town']);
   }
 
-  protected closeAction(): void {
-    this.action.set(null);
-  }
-
+  /** Leave the building entirely: close the overlay and pull the camera back. */
   protected closeBuilding(): void {
     this.selected.set(null);
-    this.action.set(null);
-    this.reloadDashboard();
+    void this.router.navigate(['/town']);
   }
 
   private reloadDashboard(): void {

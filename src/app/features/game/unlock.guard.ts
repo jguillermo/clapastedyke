@@ -14,7 +14,7 @@ export const unlockGuard: CanActivateFn = route => {
   if (state.isUnlocked(stepId)) return true;
 
   const current = state.currentStep();
-  if (!current) return router.parseUrl('/map');
+  if (!current) return router.parseUrl('/town');
   const mission = state.missionOf(current.id);
   return router.parseUrl(`/mission/${mission?.id}/${current.id}`);
 };
@@ -29,5 +29,5 @@ export const missionRedirectGuard: CanActivateFn = route => {
   if (target && state.isUnlocked(target.id)) {
     return router.parseUrl(`/mission/${missionId}/${target.id}`);
   }
-  return router.parseUrl('/map');
+  return router.parseUrl('/town');
 };

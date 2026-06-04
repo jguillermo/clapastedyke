@@ -28,7 +28,7 @@
   </p>
 
   <div class="acciones">
-    <a class="boton fantasma" routerLink="/map">{{ 'game.levelDone.seeMap' | transloco }}</a>
+    <a class="boton fantasma" routerLink="/town">{{ 'game.levelDone.seeMap' | transloco }}</a>
     @if (nextLevel(); as nxt) {
       <button type="button" class="boton solido grande" (click)="continue()">
         {{ 'game.levelDone.nextLevel' | transloco: { title: (nxt.titleKey | transloco) } }} →

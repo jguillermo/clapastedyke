@@ -18,8 +18,8 @@ import { BuildingState, TownEngine } from '../../../../platform/three/town-engin
  * but NOT the only path: the accessible building list lives in the shell.
  * Without WebGL or with prefers-reduced-motion it degrades on its own.
  *
- * Mirrors `world-map-3d.ts` (Map3d): WebGL probe, reduced-motion, ResizeObserver,
- * engine created outside NgZone, redraw on input change, dispose on destroy.
+ * WebGL probe, reduced-motion, ResizeObserver, engine created outside NgZone,
+ * redraw on input change, dispose on destroy.
  */
 @Component({
   selector: 'app-town-3d',

@@ -210,7 +210,7 @@ export class QuoterScreen {
   }
 
   protected back(): void {
-    void this.router.navigateByUrl('/system/quotes');
+    void this.router.navigateByUrl('/town/quotes');
   }
 
   protected save(): void {
@@ -235,7 +235,7 @@ export class QuoterScreen {
           kind: 'ok',
           text: this.transloco.translate('sales.quoter.saved', { id: r.id, price }),
         });
-        void this.router.navigateByUrl('/system/quotes');
+        void this.router.navigateByUrl('/town/quotes');
       } catch (error) {
         const text =
           error instanceof DomainError ? error.message : this.transloco.translate('common.couldNotSave');
