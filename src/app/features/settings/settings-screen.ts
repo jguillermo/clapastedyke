@@ -1,8 +1,10 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { FormField, applyEach, form, max, min, required, submit } from '@angular/forms/signals';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
 import { GetSettings } from '../../core/settings/application/get-settings/get-settings';
 import { UpdateSettings } from '../../core/settings/application/update-settings/update-settings';
+import { ProgressionFacade } from '../_common/progression/progression-facade';
+import { Feature } from '../../core/progression/domain/feature';
 import { DomainError } from '../../core/_common/domain/errors';
 import {
   Language,
@@ -48,6 +50,11 @@ export class SettingsScreen {
   private readonly getSettings = inject(GetSettings);
   private readonly updateSettings = inject(UpdateSettings);
   private readonly transloco = inject(TranslocoService);
+  private readonly progression = inject(ProgressionFacade);
+
+  /** Divulgación progresiva: estos parámetros aparecen al desbloquear su función. */
+  protected readonly showTax = computed(() => this.progression.isFeatureUnlocked(Feature.TAX));
+  protected readonly showCosts = computed(() => this.progression.isFeatureUnlocked(Feature.OPERATING_COSTS));
 
   protected readonly loading = signal(true);
   protected readonly saving = signal(false);
@@ -90,6 +97,7 @@ export class SettingsScreen {
 
   private async load(): Promise<void> {
     this.loading.set(true);
+    await this.progression.refresh();
     const settings = await this.getSettings.execute();
     const g = settings.general;
     this.model.set({
