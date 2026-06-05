@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { UseCase } from '../../../_common/application/use-case';
-import { StockLight, SupplyPrimitives, SupplyType } from '../../domain/supply/supply';
+import { StockLight, StockStatus, SupplyPrimitives, SupplyType } from '../../domain/supply/supply';
 import { SUPPLY_REPOSITORY } from '../../domain/supply/supply-repository';
 
 export interface ListSuppliesRequest {
@@ -15,6 +15,7 @@ export interface ListSuppliesRequest {
 export interface SupplyListItem extends SupplyPrimitives {
   pricePerBaseUnitSoles: number;
   stockLight: StockLight;
+  stockStatus: StockStatus;
   /** 'S/ 5.00' — ready for the table. */
   presentationPriceFormatted: string;
   /** '0.0050' — 4 decimals, like the GAS num4. */
@@ -34,6 +35,7 @@ export class ListSupplies implements UseCase<ListSuppliesRequest, SupplyListItem
         ...s.toPrimitives(),
         pricePerBaseUnitSoles: s.pricePerBaseUnit.soles,
         stockLight: s.stockLight,
+        stockStatus: s.stockStatus,
         presentationPriceFormatted: s.presentation.price.format(),
         pricePerBaseUnitFormatted: s.pricePerBaseUnit.format4(),
       }))

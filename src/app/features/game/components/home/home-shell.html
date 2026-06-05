@@ -194,6 +194,29 @@
     </section>
   }
 
+  <!-- Despensa (almacenes con semáforo) -->
+  @if (overlay() === 'pantry') {
+    <section class="panel" role="dialog" aria-label="Despensa">
+      <header class="panel__head">
+        <h2>Despensa</h2>
+        <button type="button" class="icon-btn" (click)="close()" aria-label="Cerrar">✕</button>
+      </header>
+      <div class="panel__body">
+        @for (s of pantry(); track s.id) {
+          <div class="card">
+            <div>
+              <strong>{{ s.name }}</strong>
+              <span class="muted"> · {{ s.stock }} {{ s.baseUnit }}</span>
+            </div>
+            <app-status-badge [status]="s.stockStatus"></app-status-badge>
+          </div>
+        } @empty {
+          <p class="muted">Aún no tienes ingredientes.</p>
+        }
+      </div>
+    </section>
+  }
+
   <!-- Nivel completado -->
   @if (overlay() === 'levelup') {
     <section class="panel panel--celebrate" role="dialog" aria-label="Nivel completado">

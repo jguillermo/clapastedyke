@@ -8,6 +8,7 @@ import { ListRecipes } from '../../../../core/catalog/application/list-recipes/l
 import { SaveRecipe } from '../../../../core/catalog/application/save-recipe/save-recipe';
 import { SaveSupply } from '../../../../core/catalog/application/save-supply/save-supply';
 import { RecipePrimitives } from '../../../../core/catalog/domain/recipe/recipe';
+import { ListSupplies, SupplyListItem } from '../../../../core/catalog/application/list-supplies/list-supplies';
 import { CheckIngredients } from '../../../../core/kitchen/application/check-ingredients/check-ingredients';
 import { CookRecipe } from '../../../../core/kitchen/application/cook-recipe/cook-recipe';
 import { BuyIngredient } from '../../../../core/kitchen/application/buy-ingredient/buy-ingredient';
@@ -24,7 +25,7 @@ import { DeliverBasicOrder } from '../../../../core/sales/application/deliver-ba
 import { ListBasicOrders } from '../../../../core/sales/application/list-basic-orders/list-basic-orders';
 import { BasicOrderPrimitives } from '../../../../core/sales/domain/basic-order/basic-order';
 
-type Overlay = 'none' | 'goals' | 'recipes' | 'check' | 'cooked' | 'levelup' | 'social' | 'orders' | 'store';
+type Overlay = 'none' | 'goals' | 'recipes' | 'check' | 'cooked' | 'levelup' | 'social' | 'orders' | 'store' | 'pantry';
 
 /** Popularidad a partir de la cual llega un pedido informal. */
 const INFORMAL_ORDER_THRESHOLD = 60;
@@ -43,6 +44,7 @@ const INFORMAL_ORDER_THRESHOLD = 60;
 export class HomeShell {
   private readonly facade = inject(ProgressionFacade);
   private readonly listRecipes = inject(ListRecipes);
+  private readonly listSupplies = inject(ListSupplies);
   private readonly saveRecipe = inject(SaveRecipe);
   private readonly saveSupply = inject(SaveSupply);
   private readonly check = inject(CheckIngredients);
@@ -61,6 +63,7 @@ export class HomeShell {
 
   protected readonly overlay = signal<Overlay>('none');
   protected readonly recipes = signal<RecipePrimitives[]>([]);
+  protected readonly pantry = signal<SupplyListItem[]>([]);
   protected readonly review = signal<RecipeCheck | null>(null);
   protected readonly busy = signal(false);
   protected readonly cookedName = signal('');
@@ -94,8 +97,13 @@ export class HomeShell {
   private async init(): Promise<void> {
     await this.ensureSeed();
     this.recipes.set(await this.listRecipes.execute());
+    await this.refreshPantry();
     await this.facade.refresh();
     await this.refreshPopularity();
+  }
+
+  private async refreshPantry(): Promise<void> {
+    this.pantry.set(await this.listSupplies.execute({ type: 'ingredient' }));
   }
 
   private async refreshPopularity(): Promise<void> {
@@ -105,9 +113,14 @@ export class HomeShell {
   /* ---------- flujo ---------- */
 
   protected onStation(id: string): void {
-    // recipe/oven → elegir y cocinar; pantry → revisión de la última receta.
-    if (id === 'pantry' && this.review()) this.overlay.set('check');
+    // recipe/oven → elegir y cocinar; pantry → despensa (estado de almacenes).
+    if (id === 'pantry') void this.openPantry();
     else this.openRecipes();
+  }
+
+  protected async openPantry(): Promise<void> {
+    await this.refreshPantry();
+    this.overlay.set('pantry');
   }
 
   protected openRecipes(): void {
@@ -135,6 +148,7 @@ export class HomeShell {
     await this.buy.execute({ supplyId: item.supplyId, quantity: amount });
     const current = this.review();
     if (current) this.review.set(await this.check.execute({ recipeId: current.recipeId, servings: current.servings }));
+    await this.refreshPantry();
     await this.facade.refresh();
     this.busy.set(false);
   }
@@ -145,6 +159,7 @@ export class HomeShell {
     this.busy.set(true);
     const before = this.facade.currentLevel();
     await this.cook.execute({ recipeId: current.recipeId, servings: current.servings });
+    await this.refreshPantry();
     await this.facade.refresh();
     this.busy.set(false);
     this.cookedName.set(current.recipeName);
