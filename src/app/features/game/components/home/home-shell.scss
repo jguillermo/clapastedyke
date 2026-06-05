@@ -65,6 +65,45 @@
 }
 .dock__chip:hover { color: var(--color-primary); }
 
+/* ---- Panel de progreso persistente ---- */
+.progreso {
+  position: absolute;
+  top: calc(env(safe-area-inset-top) + 64px);
+  right: 16px;
+  z-index: var(--z-hud);
+  width: min(300px, calc(100vw - 32px));
+  padding: 14px 16px;
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px) saturate(1.2);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+}
+.progreso__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.progreso__title {
+  font: 600 13px/1.2 var(--font-body);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--color-ink-soft);
+}
+.progreso__reward {
+  margin: 12px 0 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--color-border);
+  font: 400 13px/1.4 var(--font-body);
+  color: var(--color-ink-soft);
+}
+.progreso__reward b { color: var(--color-primary); }
+
+@media (max-width: 600px) {
+  .progreso { left: 16px; right: 16px; width: auto; }
+}
+
 /* ---- Overlays ---- */
 .scrim {
   position: fixed;

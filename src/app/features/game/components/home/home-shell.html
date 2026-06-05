@@ -8,8 +8,22 @@
   @if (social()) {
     <span class="hud__pop" [title]="'game.home.popularity' | transloco">★ {{ popularity() }}</span>
   }
-  <button type="button" class="btn btn--ghost" (click)="openGoals()">{{ 'game.home.goalsBtn' | transloco }}</button>
+  <button type="button" class="btn btn--ghost" (click)="toggleGoals()">{{ 'game.home.goalsBtn' | transloco }}</button>
 </header>
+
+<!-- Panel de progreso SIEMPRE visible: qué falta para avanzar -->
+@if (goalsPanelOpen() && anyGoal()) {
+  <aside class="progreso" [attr.aria-label]="'game.home.advanceTitle' | transloco">
+    <div class="progreso__head">
+      <span class="progreso__title">{{ 'game.home.advanceTitle' | transloco }}</span>
+      <button type="button" class="icon-btn" (click)="toggleGoals()" [attr.aria-label]="'game.home.close' | transloco">–</button>
+    </div>
+    <app-goal-tracker [goals]="goals()"></app-goal-tracker>
+    <p class="progreso__reward">
+      {{ 'game.home.reward' | transloco }} <b>{{ nextRewardKey() | transloco }}</b>
+    </p>
+  </aside>
+}
 
 <!-- Dock inferior (ruta accesible, opera todo sin 3D) -->
 <nav class="dock" [attr.aria-label]="'game.home.dock.recipes' | transloco">
@@ -26,23 +40,6 @@
 
 @if (overlay() !== 'none') {
   <div class="scrim" (click)="close()"></div>
-
-  <!-- Metas del nivel -->
-  @if (overlay() === 'goals') {
-    <section class="panel" role="dialog" [attr.aria-label]="'game.home.goalsTitle' | transloco">
-      <header class="panel__head">
-        <h2>{{ 'game.home.goalsTitle' | transloco }}</h2>
-        <button type="button" class="icon-btn" (click)="close()" [attr.aria-label]="'game.home.close' | transloco">✕</button>
-      </header>
-      <div class="panel__body">
-        @if (anyGoal()) {
-          <app-goal-tracker [goals]="goals()"></app-goal-tracker>
-        } @else {
-          <p class="muted">{{ 'game.home.goalsDone' | transloco }}</p>
-        }
-      </div>
-    </section>
-  }
 
   <!-- Elegir receta -->
   @if (overlay() === 'recipes') {

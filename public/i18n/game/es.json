@@ -204,6 +204,15 @@
       "CUSTOMERS_REGISTERED": "Registrar clientes",
       "ORDERS_CREATED": "Crear pedidos",
       "SALES_COMPLETED": "Completar ventas"
+    },
+    "advanceTitle": "Para avanzar",
+    "reward": "Al completar:",
+    "rewards": {
+      "1": "Producción para redes",
+      "2": "Clientes y pedidos",
+      "3": "Tu primer objetivo de ventas",
+      "4": "¡Tu pastelería en la ciudad!",
+      "5": "Funciones avanzadas"
     }
   }
 }

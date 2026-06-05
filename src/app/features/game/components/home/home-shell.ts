@@ -26,7 +26,7 @@ import { DeliverBasicOrder } from '../../../../core/sales/application/deliver-ba
 import { ListBasicOrders } from '../../../../core/sales/application/list-basic-orders/list-basic-orders';
 import { BasicOrderPrimitives } from '../../../../core/sales/domain/basic-order/basic-order';
 
-type Overlay = 'none' | 'goals' | 'recipes' | 'check' | 'cooked' | 'levelup' | 'social' | 'orders' | 'store' | 'pantry';
+type Overlay = 'none' | 'recipes' | 'check' | 'cooked' | 'levelup' | 'social' | 'orders' | 'store' | 'pantry';
 
 /** Popularidad a partir de la cual llega un pedido informal. */
 const INFORMAL_ORDER_THRESHOLD = 60;
@@ -75,6 +75,11 @@ export class HomeShell {
   protected readonly level = this.facade.currentLevel;
   protected readonly goals = this.facade.goals;
   protected readonly anyGoal = computed(() => this.goals().length > 0);
+
+  /** Panel de metas siempre visible (qué falta para avanzar). */
+  protected readonly goalsPanelOpen = signal(true);
+  /** Clave i18n de lo que se desbloquea al completar el nivel actual. */
+  protected readonly nextRewardKey = computed(() => 'game.home.rewards.' + Math.min(this.level(), 5));
 
   /** Fase 2: redes desbloqueadas. */
   protected readonly social = computed(() => this.facade.isFeatureUnlocked(Feature.SOCIAL));
@@ -128,8 +133,8 @@ export class HomeShell {
     this.overlay.set('recipes');
   }
 
-  protected openGoals(): void {
-    this.overlay.set('goals');
+  protected toggleGoals(): void {
+    this.goalsPanelOpen.update(v => !v);
   }
 
   protected close(): void {

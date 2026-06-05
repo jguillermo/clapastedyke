@@ -204,6 +204,15 @@
       "CUSTOMERS_REGISTERED": "Register customers",
       "ORDERS_CREATED": "Create orders",
       "SALES_COMPLETED": "Complete sales"
+    },
+    "advanceTitle": "To advance",
+    "reward": "On completing:",
+    "rewards": {
+      "1": "Social media production",
+      "2": "Customers and orders",
+      "3": "Your first sales goal",
+      "4": "Your bakery in the city!",
+      "5": "Advanced features"
     }
   }
 }
