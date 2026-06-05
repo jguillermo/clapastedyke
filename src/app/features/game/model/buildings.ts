@@ -41,7 +41,7 @@ export const BUILDINGS: Building[] = [
     id: 'oficina',
     nameKey: 'oficina',
     requires: Feature.PHYSICAL_STORE,
-    color: 0xcf9a32,
+    color: 0xc98a12, // honey (token)
     model: { url: 'assets/city/books-shop.fbx', texture: 'assets/city/books-shop.png' },
     actions: [
       { labelKey: 'settings', path: 'settings' },
@@ -66,7 +66,7 @@ export const BUILDINGS: Building[] = [
     id: 'tienda',
     nameKey: 'tienda',
     requires: Feature.PHYSICAL_STORE,
-    color: 0xbb5530,
+    color: 0xb8472a, // primary (token)
     model: { url: 'assets/city/bakery.fbx', texture: 'assets/city/bakery.png' },
     actions: [
       { labelKey: 'newQuote', path: 'quotes/new' },

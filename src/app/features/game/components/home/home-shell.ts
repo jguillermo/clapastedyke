@@ -1,4 +1,5 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal, viewChild } from '@angular/core';
+import { Router } from '@angular/router';
 import { Home3d } from './home-3d';
 import { StatusBadge } from '../../../_common/ui/status-badge';
 import { GoalTracker } from '../../../_common/ui/goal-tracker';
@@ -23,7 +24,7 @@ import { DeliverBasicOrder } from '../../../../core/sales/application/deliver-ba
 import { ListBasicOrders } from '../../../../core/sales/application/list-basic-orders/list-basic-orders';
 import { BasicOrderPrimitives } from '../../../../core/sales/domain/basic-order/basic-order';
 
-type Overlay = 'none' | 'goals' | 'recipes' | 'check' | 'cooked' | 'levelup' | 'social' | 'orders';
+type Overlay = 'none' | 'goals' | 'recipes' | 'check' | 'cooked' | 'levelup' | 'social' | 'orders' | 'store';
 
 /** Popularidad a partir de la cual llega un pedido informal. */
 const INFORMAL_ORDER_THRESHOLD = 60;
@@ -55,6 +56,8 @@ export class HomeShell {
   private readonly placeBasicOrder = inject(PlaceBasicOrder);
   private readonly deliverBasicOrder = inject(DeliverBasicOrder);
   private readonly listBasicOrders = inject(ListBasicOrders);
+  private readonly router = inject(Router);
+  private readonly home3d = viewChild(Home3d);
 
   protected readonly overlay = signal<Overlay>('none');
   protected readonly recipes = signal<RecipePrimitives[]>([]);
@@ -222,11 +225,22 @@ export class HomeShell {
   }
 
   protected async deliverOrder(order: BasicOrderPrimitives): Promise<void> {
+    const hadStore = this.facade.isFeatureUnlocked(Feature.PHYSICAL_STORE);
     this.busy.set(true);
     await this.deliverBasicOrder.execute({ orderId: order.id });
     await this.facade.refresh();
     this.basicOrders.set(await this.listBasicOrders.execute());
     this.busy.set(false);
+
+    // Fase 4: la 5ª venta abre la tienda física → cinemática de salida al pueblo.
+    if (!hadStore && this.facade.isFeatureUnlocked(Feature.PHYSICAL_STORE)) {
+      this.home3d()?.flyOut();
+      this.overlay.set('store');
+    }
+  }
+
+  protected goToTown(): void {
+    void this.router.navigate(['/town']);
   }
 
   /* ---------- seed (solo si la cocina está vacía) ---------- */

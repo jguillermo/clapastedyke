@@ -159,6 +159,12 @@ export class KitchenEngine {
     }
   }
 
+  /** Cinemática de salida (Fase 4): la cámara se eleva hacia la ciudad. */
+  flyOut(onDone?: () => void): void {
+    this.rig.flyThrough([{ x: 0, y: 30, z: 18, lookX: 0, lookY: 2, lookZ: 0, dur: 1.3 }], onDone);
+    if (!this.options.animate) this.renderIfStatic();
+  }
+
   /* ---------- loop & input ---------- */
 
   private loop = (): void => {

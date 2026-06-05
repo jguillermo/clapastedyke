@@ -34,7 +34,7 @@ import { BuildingState, TownEngine } from '../../../../platform/three/town-engin
       inset: 0;
       display: block;
       overflow: hidden;
-      background: linear-gradient(180deg, #f7efe0, #e9dcc4);
+      background: linear-gradient(180deg, #fbf6ee, #efe0c9);
     }
     :host.hidden { display: none; }
     canvas { width: 100%; height: 100%; display: block; touch-action: none; }

@@ -74,6 +74,12 @@ export class Home3d implements OnDestroy {
     });
   }
 
+  /** Cinemática de salida hacia la ciudad (Fase 4). */
+  flyOut(onDone?: () => void): void {
+    if (this.engine) this.engine.flyOut(onDone);
+    else onDone?.();
+  }
+
   ngOnDestroy(): void {
     this.observer?.disconnect();
     this.engine?.dispose();

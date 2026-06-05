@@ -205,4 +205,16 @@
       </div>
     </section>
   }
+
+  <!-- Tienda física desbloqueada (Fase 4) -->
+  @if (overlay() === 'store') {
+    <section class="panel panel--celebrate" role="dialog" aria-label="Tienda física">
+      <div class="celebrate">
+        <span class="celebrate__emoji">🏪</span>
+        <h2>¡Abriste tu pastelería!</h2>
+        <p class="muted">Completaste 5 ventas. Sal de casa: tu negocio ahora vive en la ciudad.</p>
+        <button type="button" class="btn btn--primary" (click)="goToTown()">Ir a tu pastelería →</button>
+      </div>
+    </section>
+  }
 }
