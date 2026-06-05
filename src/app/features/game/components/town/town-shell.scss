@@ -242,6 +242,48 @@
   &.grande { font-size: 15px; padding: 12px 18px; text-align: left; }
 }
 
+// Panel "Para crecer": funciones avanzadas y su hito de desbloqueo.
+.progreso {
+  position: absolute;
+  top: 76px;
+  right: 16px;
+  z-index: 2;
+  width: min(290px, calc(100vw - 32px));
+  padding: 14px 16px;
+  background: var(--glass-bg, rgba(255, 251, 244, .72));
+  backdrop-filter: blur(20px) saturate(1.2);
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, .55));
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+}
+.progreso-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.progreso-title {
+  font: 600 12px/1.2 var(--font-body);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--muted);
+}
+.progreso-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.progreso-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font: 500 14px/1.3 var(--font-body);
+  color: var(--ink);
+}
+.progreso-item .progreso-hint { margin-left: auto; font-size: 11px; color: var(--muted); white-space: nowrap; }
+.progreso-item.hecho { color: var(--green); }
+.progreso-item.hecho .progreso-nombre { text-decoration: line-through; opacity: .8; }
+
+@media (max-width: 600px) {
+  .progreso { left: 16px; right: 16px; width: auto; }
+}
+
 // Acción avanzada bloqueada (Fase 5): visible pero no operable, con la meta.
 .accion-bloqueada {
   display: flex;

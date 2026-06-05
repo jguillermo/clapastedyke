@@ -106,10 +106,22 @@ export const BUILDINGS: Building[] = [
 /** Texto corto de la meta que abre cada función avanzada (para el room-menu). */
 export const FEATURE_HINT: Partial<Record<Feature, string>> = {
   [Feature.QUOTING]: 'Con 10 ventas',
+  [Feature.TAX]: 'Con 20 ventas',
   [Feature.SUPPLIERS]: 'Con 3 compras registradas',
+  [Feature.OPERATING_COSTS]: 'Con 15 pedidos',
   [Feature.SPOILAGE]: 'Con 8 insumos en bodega',
   [Feature.PACKAGING_RULES]: 'Vendiendo 3 tamaños distintos',
 };
+
+/** Funciones avanzadas que se rastrean en el panel "Para crecer" del pueblo. */
+export const ADVANCED_FEATURES: readonly Feature[] = [
+  Feature.QUOTING,
+  Feature.TAX,
+  Feature.SUPPLIERS,
+  Feature.OPERATING_COSTS,
+  Feature.SPOILAGE,
+  Feature.PACKAGING_RULES,
+];
 
 /** Operativo cuando su `Feature` está desbloqueada. */
 export function isBuildingOperational(

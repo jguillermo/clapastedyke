@@ -50,6 +50,15 @@
       "recipes": "Recetas",
       "buyMaterials": "Comprar materiales",
       "suppliers": "Proveedores"
+    },
+    "advanceTitle": "Para crecer",
+    "features": {
+      "QUOTING": "Presupuestos",
+      "TAX": "IGV",
+      "SUPPLIERS": "Proveedores",
+      "OPERATING_COSTS": "Costos operativos",
+      "SPOILAGE": "Mermas e inventario",
+      "PACKAGING_RULES": "Reglas de empaque"
     }
   },
   "hud": {

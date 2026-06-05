@@ -50,6 +50,15 @@
       "recipes": "Recipes",
       "buyMaterials": "Buy materials",
       "suppliers": "Suppliers"
+    },
+    "advanceTitle": "To grow",
+    "features": {
+      "QUOTING": "Quotes",
+      "TAX": "VAT",
+      "SUPPLIERS": "Suppliers",
+      "OPERATING_COSTS": "Operating costs",
+      "SPOILAGE": "Waste & inventory",
+      "PACKAGING_RULES": "Packaging rules"
     }
   },
   "hud": {

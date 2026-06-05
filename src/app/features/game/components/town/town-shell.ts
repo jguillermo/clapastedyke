@@ -4,7 +4,7 @@ import { ActivatedRoute, NavigationEnd, Router, RouterLink, RouterOutlet } from 
 import { filter } from 'rxjs/operators';
 import { TranslocoPipe, provideTranslocoScope } from '@jsverse/transloco';
 import { ProgressionFacade } from '../../../_common/progression/progression-facade';
-import { BUILDINGS, Building, BuildingAction, FEATURE_HINT, findBuilding, isBuildingOperational } from '../../model/buildings';
+import { ADVANCED_FEATURES, BUILDINGS, Building, BuildingAction, FEATURE_HINT, findBuilding, isBuildingOperational } from '../../model/buildings';
 import { BuildingState } from '../../../../platform/three/town-engine';
 import { GetDashboard, DashboardData } from '../../../../core/dashboard/application/get-dashboard/get-dashboard';
 import { Feature } from '../../../../core/progression/domain/feature';
@@ -42,6 +42,20 @@ export class TownShell {
   protected readonly overlayActive = signal(false);
 
   protected readonly focusId = computed(() => this.selected()?.id ?? null);
+
+  /** Panel "Para crecer": funciones avanzadas y su hito de desbloqueo. */
+  protected readonly goalsPanelOpen = signal(true);
+  protected readonly advancedItems = computed(() =>
+    ADVANCED_FEATURES.map(f => ({
+      feature: f,
+      unlocked: this.progression.isFeatureUnlocked(f),
+      hint: FEATURE_HINT[f] ?? '',
+    })),
+  );
+
+  protected toggleGoals(): void {
+    this.goalsPanelOpen.update(v => !v);
+  }
 
   /** Snapshot the 3D engine draws: operational state + alert pins per building. */
   protected readonly buildingStates = computed<BuildingState[]>(() => {

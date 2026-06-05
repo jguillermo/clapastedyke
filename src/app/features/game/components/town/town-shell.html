@@ -23,7 +23,27 @@
       }
     </div>
   }
+  <button type="button" class="boton fantasma" (click)="toggleGoals()">{{ 'game.town.advanceTitle' | transloco }}</button>
 </header>
+
+<!-- Panel "Para crecer": funciones avanzadas y qué falta para abrirlas -->
+@if (goalsPanelOpen()) {
+  <aside class="progreso" [attr.aria-label]="'game.town.advanceTitle' | transloco">
+    <div class="progreso-head">
+      <span class="progreso-title">{{ 'game.town.advanceTitle' | transloco }}</span>
+      <button type="button" class="boton fantasma" (click)="toggleGoals()" aria-label="–">–</button>
+    </div>
+    <ul class="progreso-list">
+      @for (it of advancedItems(); track it.feature) {
+        <li class="progreso-item" [class.hecho]="it.unlocked">
+          <span class="progreso-icono" aria-hidden="true">{{ it.unlocked ? '✓' : '🔒' }}</span>
+          <span class="progreso-nombre">{{ 'game.town.features.' + it.feature | transloco }}</span>
+          @if (!it.unlocked) { <small class="progreso-hint">{{ it.hint }}</small> }
+        </li>
+      }
+    </ul>
+  </aside>
+}
 
 <!-- Bottom dock: a chip per building — quick select AND the accessible /
      no-WebGL path (every building reachable without the canvas). -->
