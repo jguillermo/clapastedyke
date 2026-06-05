@@ -88,9 +88,16 @@
       </header>
       <div class="sala-acciones">
         @for (a of b.actions; track a.labelKey) {
-          <a class="boton solido grande" [routerLink]="townLink(a.path)">
-            {{ 'game.town.actions.' + a.labelKey | transloco }} →
-          </a>
+          @if (actionUnlocked(a)) {
+            <a class="boton solido grande" [routerLink]="townLink(a.path)">
+              {{ 'game.town.actions.' + a.labelKey | transloco }} →
+            </a>
+          } @else {
+            <span class="boton solido grande accion-bloqueada" aria-disabled="true">
+              🔒 {{ 'game.town.actions.' + a.labelKey | transloco }}
+              <small>{{ actionHint(a) }}</small>
+            </span>
+          }
         }
       </div>
     </div>

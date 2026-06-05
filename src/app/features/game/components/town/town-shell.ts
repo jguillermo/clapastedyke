@@ -4,7 +4,7 @@ import { ActivatedRoute, NavigationEnd, Router, RouterLink, RouterOutlet } from 
 import { filter } from 'rxjs/operators';
 import { TranslocoPipe, provideTranslocoScope } from '@jsverse/transloco';
 import { ProgressionFacade } from '../../../_common/progression/progression-facade';
-import { BUILDINGS, Building, findBuilding, isBuildingOperational } from '../../model/buildings';
+import { BUILDINGS, Building, BuildingAction, FEATURE_HINT, findBuilding, isBuildingOperational } from '../../model/buildings';
 import { BuildingState } from '../../../../platform/three/town-engine';
 import { GetDashboard, DashboardData } from '../../../../core/dashboard/application/get-dashboard/get-dashboard';
 import { Feature } from '../../../../core/progression/domain/feature';
@@ -75,15 +75,28 @@ export class TownShell {
     this.syncOverlay();
   }
 
-  /** Tracks whether an operational screen is mounted; refreshes KPIs on close. */
+  /** Tracks whether an operational screen is mounted; refreshes KPIs/progreso on close. */
   private syncOverlay(): void {
     const open = !!this.route.firstChild;
-    if (this.overlayActive() && !open) this.reloadDashboard();
+    if (this.overlayActive() && !open) {
+      this.reloadDashboard();
+      void this.progression.refresh(); // refleja funciones recién desbloqueadas
+    }
     this.overlayActive.set(open);
   }
 
   protected operational(b: Building): boolean {
     return isBuildingOperational(b, (f: Feature) => this.progression.isFeatureUnlocked(f));
+  }
+
+  /** ¿La acción está disponible? (las avanzadas dependen de su Feature). */
+  protected actionUnlocked(a: BuildingAction): boolean {
+    return !a.requires || this.progression.isFeatureUnlocked(a.requires);
+  }
+
+  /** Meta que abre una acción avanzada bloqueada. */
+  protected actionHint(a: BuildingAction): string {
+    return a.requires ? (FEATURE_HINT[a.requires] ?? '') : '';
   }
 
   protected alertCount(b: Building): number {
