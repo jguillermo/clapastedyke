@@ -1,5 +1,6 @@
 import { Component, computed, inject, signal, viewChild } from '@angular/core';
 import { Router } from '@angular/router';
+import { TranslocoPipe, provideTranslocoScope } from '@jsverse/transloco';
 import { Home3d } from './home-3d';
 import { StatusBadge } from '../../../_common/ui/status-badge';
 import { GoalTracker } from '../../../_common/ui/goal-tracker';
@@ -37,7 +38,8 @@ const INFORMAL_ORDER_THRESHOLD = 60;
  */
 @Component({
   selector: 'app-home-shell',
-  imports: [Home3d, StatusBadge, GoalTracker],
+  imports: [Home3d, StatusBadge, GoalTracker, TranslocoPipe],
+  providers: [provideTranslocoScope('game')],
   templateUrl: './home-shell.html',
   styleUrl: './home-shell.scss',
 })
@@ -67,7 +69,6 @@ export class HomeShell {
   protected readonly review = signal<RecipeCheck | null>(null);
   protected readonly busy = signal(false);
   protected readonly cookedName = signal('');
-  protected readonly unlockedLabel = signal('');
   protected readonly popularity = signal(0);
   private readonly lastCooked = signal<{ id: string; name: string } | null>(null);
 
@@ -166,7 +167,6 @@ export class HomeShell {
     this.lastCooked.set({ id: current.recipeId, name: current.recipeName });
 
     if (this.facade.currentLevel() > before) {
-      this.unlockedLabel.set('¡Desbloqueaste la siguiente etapa!');
       this.overlay.set('levelup');
     } else {
       this.overlay.set('cooked');

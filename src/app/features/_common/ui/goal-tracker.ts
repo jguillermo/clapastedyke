@@ -1,6 +1,6 @@
-import { Component, computed, input } from '@angular/core';
+import { Component, input } from '@angular/core';
+import { TranslocoPipe, provideTranslocoScope } from '@jsverse/transloco';
 import { Goal } from '../../../core/progression/domain/goal';
-import { GoalType } from '../../../core/progression/domain/goal-type';
 
 /**
  * Progreso de las metas del nivel actual (cuánto falta), sin abrumar.
@@ -8,12 +8,14 @@ import { GoalType } from '../../../core/progression/domain/goal-type';
  */
 @Component({
   selector: 'app-goal-tracker',
+  imports: [TranslocoPipe],
+  providers: [provideTranslocoScope('game')],
   template: `
     <ul class="goals">
       @for (g of goals(); track g.type) {
         <li class="goal" [class.goal--done]="g.met">
           <div class="goal__row">
-            <span class="goal__label">{{ label(g) }}</span>
+            <span class="goal__label">{{ 'game.home.goal.' + g.type | transloco }}</span>
             <span class="goal__count">{{ shown(g) }} / {{ g.target }}</span>
           </div>
           <div class="goal__bar"><div class="goal__fill" [style.width.%]="percent(g)"></div></div>
@@ -35,9 +37,6 @@ import { GoalType } from '../../../core/progression/domain/goal-type';
 export class GoalTracker {
   readonly goals = input.required<Goal[]>();
 
-  protected label(g: Goal): string {
-    return LABELS[g.type] ?? g.type;
-  }
   protected shown(g: Goal): number {
     return Math.min(g.progress, g.target);
   }
@@ -45,16 +44,3 @@ export class GoalTracker {
     return g.target > 0 ? Math.min(100, Math.round((g.progress / g.target) * 100)) : 0;
   }
 }
-
-/** Etiqueta amable en español por tipo de meta. */
-const LABELS: Partial<Record<GoalType, string>> = {
-  [GoalType.PURCHASES_REGISTERED]: 'Comprar ingredientes',
-  [GoalType.WAREHOUSES_STOCKED]: 'Almacenes abastecidos',
-  [GoalType.PRODUCTIONS_COOKED]: 'Cocinar recetas',
-  [GoalType.POSTS_PUBLISHED]: 'Publicar en redes',
-  [GoalType.POPULARITY]: 'Popularidad',
-  [GoalType.INFORMAL_ORDERS]: 'Pedidos informales',
-  [GoalType.CUSTOMERS_REGISTERED]: 'Registrar clientes',
-  [GoalType.ORDERS_CREATED]: 'Crear pedidos',
-  [GoalType.SALES_COMPLETED]: 'Completar ventas',
-};

@@ -17,11 +17,26 @@
       "suppliesInRed": "insumos en rojo"
     },
     "buildings": {
-      "oficina": { "name": "La Oficina", "tagline": "Configura el negocio, tus clientes y las reglas de empaque." },
-      "bodega": { "name": "La Bodega", "tagline": "Tus insumos y el stock. Ajusta mermas y conteos." },
-      "tienda": { "name": "La Tienda", "tagline": "El corazón: arma presupuestos y véndelos." },
-      "obrador": { "name": "El Obrador", "tagline": "Produce los pedidos y guarda tus recetas." },
-      "mercado": { "name": "El Mercado", "tagline": "Compra materiales y administra proveedores." }
+      "oficina": {
+        "name": "La Oficina",
+        "tagline": "Configura el negocio, tus clientes y las reglas de empaque."
+      },
+      "bodega": {
+        "name": "La Bodega",
+        "tagline": "Tus insumos y el stock. Ajusta mermas y conteos."
+      },
+      "tienda": {
+        "name": "La Tienda",
+        "tagline": "El corazón: arma presupuestos y véndelos."
+      },
+      "obrador": {
+        "name": "El Obrador",
+        "tagline": "Produce los pedidos y guarda tus recetas."
+      },
+      "mercado": {
+        "name": "El Mercado",
+        "tagline": "Compra materiales y administra proveedores."
+      }
     },
     "actions": {
       "settings": "Configuración",
@@ -116,6 +131,79 @@
       "applyDesign": "2. Aplicar diseño",
       "applyFormulas": "3. Aplicar fórmulas",
       "adjustColumnWidth": "Ajustar ancho de columnas"
+    }
+  },
+  "home": {
+    "brand": "Tu Pastelería",
+    "level": "Nivel {{level}} · Cocina en casa",
+    "popularity": "Popularidad",
+    "goalsBtn": "Metas",
+    "close": "Cerrar",
+    "dock": {
+      "recipes": "Recetas",
+      "pantry": "Despensa",
+      "cook": "Cocinar",
+      "social": "Redes",
+      "orders": "Pedidos"
+    },
+    "goalsTitle": "Metas del nivel",
+    "goalsDone": "¡Completaste todas las metas de esta etapa!",
+    "recipesTitle": "¿Qué preparamos?",
+    "ingredientsCount": "{{n}} ingredientes",
+    "prepare": "Preparar",
+    "noRecipes": "Aún no hay recetas.",
+    "checkTitle": "Para «{{recipe}}»",
+    "colIngredient": "Ingrediente",
+    "colNeed": "Necesito",
+    "colHave": "Tengo",
+    "colStatus": "Estado",
+    "buy": "Comprar",
+    "cook": "Cocinar",
+    "cooked": "¡Cocinaste {{recipe}}!",
+    "publishSocial": "Publicar en redes",
+    "keepGoing": "Seguir",
+    "socialTitle": "Redes sociales",
+    "popularityOf": "de popularidad",
+    "socialHint": "Publica lo que cocinas para ganar visibilidad. Con suficiente popularidad llegan pedidos informales.",
+    "publish": "Publicar «{{recipe}}»",
+    "cookToPublish": "Cocina algo para publicar",
+    "attendInformal": "Atender pedido informal",
+    "ordersTitle": "Clientes y pedidos",
+    "step1": "1 · Cliente",
+    "step2": "2 · Pedido",
+    "step3": "3 · Producción, entrega y cobro",
+    "customerName": "Nombre del cliente",
+    "add": "Agregar",
+    "customerPh": "Cliente…",
+    "productPh": "Producto…",
+    "pricePh": "Precio S/",
+    "createOrder": "Crear pedido",
+    "deliver": "Entregar y cobrar",
+    "charged": "Cobrado ✓",
+    "noOrders": "Aún no hay pedidos.",
+    "pantryTitle": "Despensa",
+    "noIngredients": "Aún no tienes ingredientes.",
+    "levelDoneTitle": "¡Nivel completado!",
+    "levelDoneText": "¡Desbloqueaste la siguiente etapa!",
+    "continue": "Continuar",
+    "storeTitle": "¡Abriste tu pastelería!",
+    "storeText": "Completaste 5 ventas. Sal de casa: tu negocio ahora vive en la ciudad.",
+    "goToStore": "Ir a tu pastelería →",
+    "stock": {
+      "empty": "Agotado",
+      "low": "Poco",
+      "ok": "Suficiente"
+    },
+    "goal": {
+      "PURCHASES_REGISTERED": "Comprar ingredientes",
+      "WAREHOUSES_STOCKED": "Almacenes abastecidos",
+      "PRODUCTIONS_COOKED": "Cocinar recetas",
+      "POSTS_PUBLISHED": "Publicar en redes",
+      "POPULARITY": "Popularidad",
+      "INFORMAL_ORDERS": "Pedidos informales",
+      "CUSTOMERS_REGISTERED": "Registrar clientes",
+      "ORDERS_CREATED": "Crear pedidos",
+      "SALES_COMPLETED": "Completar ventas"
     }
   }
 }

@@ -17,11 +17,26 @@
       "suppliesInRed": "supplies in red"
     },
     "buildings": {
-      "oficina": { "name": "The Office", "tagline": "Set up the business, your customers and packaging rules." },
-      "bodega": { "name": "The Warehouse", "tagline": "Your supplies and stock. Adjust waste and counts." },
-      "tienda": { "name": "The Shop", "tagline": "The heart: build quotes and sell them." },
-      "obrador": { "name": "The Workshop", "tagline": "Produce orders and keep your recipes." },
-      "mercado": { "name": "The Market", "tagline": "Buy materials and manage suppliers." }
+      "oficina": {
+        "name": "The Office",
+        "tagline": "Set up the business, your customers and packaging rules."
+      },
+      "bodega": {
+        "name": "The Warehouse",
+        "tagline": "Your supplies and stock. Adjust waste and counts."
+      },
+      "tienda": {
+        "name": "The Shop",
+        "tagline": "The heart: build quotes and sell them."
+      },
+      "obrador": {
+        "name": "The Workshop",
+        "tagline": "Produce orders and keep your recipes."
+      },
+      "mercado": {
+        "name": "The Market",
+        "tagline": "Buy materials and manage suppliers."
+      }
     },
     "actions": {
       "settings": "Settings",
@@ -116,6 +131,79 @@
       "applyDesign": "2. Apply design",
       "applyFormulas": "3. Apply formulas",
       "adjustColumnWidth": "Adjust column width"
+    }
+  },
+  "home": {
+    "brand": "Your Bakery",
+    "level": "Level {{level}} · Home kitchen",
+    "popularity": "Popularity",
+    "goalsBtn": "Goals",
+    "close": "Close",
+    "dock": {
+      "recipes": "Recipes",
+      "pantry": "Pantry",
+      "cook": "Cook",
+      "social": "Social",
+      "orders": "Orders"
+    },
+    "goalsTitle": "Level goals",
+    "goalsDone": "You completed all the goals of this stage!",
+    "recipesTitle": "What shall we make?",
+    "ingredientsCount": "{{n}} ingredients",
+    "prepare": "Prepare",
+    "noRecipes": "No recipes yet.",
+    "checkTitle": "For “{{recipe}}”",
+    "colIngredient": "Ingredient",
+    "colNeed": "Need",
+    "colHave": "Have",
+    "colStatus": "Status",
+    "buy": "Buy",
+    "cook": "Cook",
+    "cooked": "You cooked {{recipe}}!",
+    "publishSocial": "Post on social",
+    "keepGoing": "Continue",
+    "socialTitle": "Social media",
+    "popularityOf": "popularity",
+    "socialHint": "Post what you cook to gain visibility. With enough popularity, informal orders arrive.",
+    "publish": "Post “{{recipe}}”",
+    "cookToPublish": "Cook something to post",
+    "attendInformal": "Take informal order",
+    "ordersTitle": "Customers and orders",
+    "step1": "1 · Customer",
+    "step2": "2 · Order",
+    "step3": "3 · Production, delivery and payment",
+    "customerName": "Customer name",
+    "add": "Add",
+    "customerPh": "Customer…",
+    "productPh": "Product…",
+    "pricePh": "Price S/",
+    "createOrder": "Create order",
+    "deliver": "Deliver and charge",
+    "charged": "Charged ✓",
+    "noOrders": "No orders yet.",
+    "pantryTitle": "Pantry",
+    "noIngredients": "You have no ingredients yet.",
+    "levelDoneTitle": "Level completed!",
+    "levelDoneText": "You unlocked the next stage!",
+    "continue": "Continue",
+    "storeTitle": "You opened your bakery!",
+    "storeText": "You completed 5 sales. Leave home: your business now lives in the city.",
+    "goToStore": "Go to your bakery →",
+    "stock": {
+      "empty": "Empty",
+      "low": "Low",
+      "ok": "Enough"
+    },
+    "goal": {
+      "PURCHASES_REGISTERED": "Buy ingredients",
+      "WAREHOUSES_STOCKED": "Stocked pantries",
+      "PRODUCTIONS_COOKED": "Cook recipes",
+      "POSTS_PUBLISHED": "Post on social",
+      "POPULARITY": "Popularity",
+      "INFORMAL_ORDERS": "Informal orders",
+      "CUSTOMERS_REGISTERED": "Register customers",
+      "ORDERS_CREATED": "Create orders",
+      "SALES_COMPLETED": "Complete sales"
     }
   }
 }
