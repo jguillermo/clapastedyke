@@ -19,6 +19,9 @@
   @if (social()) {
     <button type="button" class="dock__chip" (click)="openSocial()">Redes</button>
   }
+  @if (ordersUnlocked()) {
+    <button type="button" class="dock__chip" (click)="openOrders()">Pedidos</button>
+  }
 </nav>
 
 @if (overlay() !== 'none') {
@@ -137,6 +140,56 @@
             </button>
           }
         </div>
+      </div>
+    </section>
+  }
+
+  <!-- Pedidos (Fase 3) -->
+  @if (overlay() === 'orders') {
+    <section class="panel" role="dialog" aria-label="Clientes y pedidos">
+      <header class="panel__head">
+        <h2>Clientes y pedidos</h2>
+        <button type="button" class="icon-btn" (click)="close()" aria-label="Cerrar">✕</button>
+      </header>
+      <div class="panel__body">
+        <h3 class="sub">1 · Cliente</h3>
+        <div class="row">
+          <input class="field" type="text" placeholder="Nombre del cliente"
+            [value]="newCustomerName()" (input)="newCustomerName.set($any($event.target).value)" />
+          <button type="button" class="btn btn--mini" [disabled]="busy()" (click)="addCustomer()">Agregar</button>
+        </div>
+
+        <h3 class="sub">2 · Pedido</h3>
+        <div class="form-grid">
+          <select class="field" [value]="orderCustomerId()" (change)="orderCustomerId.set($any($event.target).value)">
+            <option value="">Cliente…</option>
+            @for (c of customers(); track c.id) { <option [value]="c.id">{{ c.name }}</option> }
+          </select>
+          <select class="field" [value]="orderRecipeId()" (change)="orderRecipeId.set($any($event.target).value)">
+            <option value="">Producto…</option>
+            @for (r of recipes(); track r.id) { <option [value]="r.id">{{ r.name }}</option> }
+          </select>
+          <input class="field" type="number" min="1" placeholder="Precio S/"
+            [value]="orderPrice()" (input)="orderPrice.set($any($event.target).valueAsNumber)" />
+          <button type="button" class="btn btn--primary" [disabled]="busy()" (click)="placeOrder()">Crear pedido</button>
+        </div>
+
+        <h3 class="sub">3 · Producción, entrega y cobro</h3>
+        @for (o of basicOrders(); track o.id) {
+          <div class="card">
+            <div>
+              <strong>{{ o.recipeName }}</strong>
+              <span class="muted"> · {{ o.customerName }} · S/ {{ o.priceSoles }}</span>
+            </div>
+            @if (o.status === 'Pending') {
+              <button type="button" class="btn btn--mini" [disabled]="busy()" (click)="deliverOrder(o)">Entregar y cobrar</button>
+            } @else {
+              <span class="muted">Cobrado ✓</span>
+            }
+          </div>
+        } @empty {
+          <p class="muted">Aún no hay pedidos.</p>
+        }
       </div>
     </section>
   }

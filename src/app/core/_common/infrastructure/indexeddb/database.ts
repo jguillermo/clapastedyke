@@ -8,7 +8,7 @@
  */
 
 export const DB_NAME = 'bakery-costing';
-export const DB_VERSION = 3;
+export const DB_VERSION = 4;
 
 const STORES = [
   'customers',
@@ -27,6 +27,7 @@ const STORES = [
   'popularity', // v3: reputation (singleton 'POPULARITY')
   'social_posts', // v3: publicaciones en redes
   'informal_orders', // v3: pedidos informales
+  'basic_orders', // v4: pedidos básicos (Fase 3, sin presupuesto)
 ] as const;
 
 export type StoreName = (typeof STORES)[number] | 'counters';

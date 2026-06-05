@@ -22,6 +22,7 @@ export const ID_PREFIXES = {
   production: 'PRD',
   socialPost: 'PUB',
   informalOrder: 'INF',
+  basicOrder: 'PDB',
 } as const;
 
 export type IdPrefix = (typeof ID_PREFIXES)[keyof typeof ID_PREFIXES];

@@ -15,8 +15,15 @@ import { PublishProduction } from '../../../../core/reputation/application/publi
 import { GetPopularity } from '../../../../core/reputation/application/get-popularity/get-popularity';
 import { AttendInformalOrder } from '../../../../core/reputation/application/attend-informal-order/attend-informal-order';
 import { Feature } from '../../../../core/progression/domain/feature';
+import { ListCustomers } from '../../../../core/catalog/application/list-customers/list-customers';
+import { SaveCustomer } from '../../../../core/catalog/application/save-customer/save-customer';
+import { CustomerPrimitives } from '../../../../core/catalog/domain/customer/customer';
+import { PlaceBasicOrder } from '../../../../core/sales/application/place-basic-order/place-basic-order';
+import { DeliverBasicOrder } from '../../../../core/sales/application/deliver-basic-order/deliver-basic-order';
+import { ListBasicOrders } from '../../../../core/sales/application/list-basic-orders/list-basic-orders';
+import { BasicOrderPrimitives } from '../../../../core/sales/domain/basic-order/basic-order';
 
-type Overlay = 'none' | 'goals' | 'recipes' | 'check' | 'cooked' | 'levelup' | 'social';
+type Overlay = 'none' | 'goals' | 'recipes' | 'check' | 'cooked' | 'levelup' | 'social' | 'orders';
 
 /** Popularidad a partir de la cual llega un pedido informal. */
 const INFORMAL_ORDER_THRESHOLD = 60;
@@ -43,6 +50,11 @@ export class HomeShell {
   private readonly publishProduction = inject(PublishProduction);
   private readonly getPopularity = inject(GetPopularity);
   private readonly attendInformalOrder = inject(AttendInformalOrder);
+  private readonly listCustomers = inject(ListCustomers);
+  private readonly saveCustomer = inject(SaveCustomer);
+  private readonly placeBasicOrder = inject(PlaceBasicOrder);
+  private readonly deliverBasicOrder = inject(DeliverBasicOrder);
+  private readonly listBasicOrders = inject(ListBasicOrders);
 
   protected readonly overlay = signal<Overlay>('none');
   protected readonly recipes = signal<RecipePrimitives[]>([]);
@@ -62,6 +74,15 @@ export class HomeShell {
   protected readonly canPublish = computed(() => this.social() && this.lastCooked() !== null);
   protected readonly lastCookedName = computed(() => this.lastCooked()?.name ?? '');
   protected readonly informalReady = computed(() => this.social() && this.popularity() >= INFORMAL_ORDER_THRESHOLD);
+
+  /** Fase 3: clientes y pedidos desbloqueados. */
+  protected readonly ordersUnlocked = computed(() => this.facade.isFeatureUnlocked(Feature.ORDERS));
+  protected readonly customers = signal<CustomerPrimitives[]>([]);
+  protected readonly basicOrders = signal<BasicOrderPrimitives[]>([]);
+  protected readonly newCustomerName = signal('');
+  protected readonly orderCustomerId = signal('');
+  protected readonly orderRecipeId = signal('');
+  protected readonly orderPrice = signal(20);
 
   constructor() {
     void this.init();
@@ -155,6 +176,56 @@ export class HomeShell {
     this.busy.set(true);
     await this.attendInformalOrder.execute({ recipeName: this.lastCooked()?.name ?? 'pastel' });
     await this.facade.refresh();
+    this.busy.set(false);
+  }
+
+  /* ---------- Fase 3: clientes y pedidos ---------- */
+
+  protected async openOrders(): Promise<void> {
+    await this.refreshOrders();
+    this.overlay.set('orders');
+  }
+
+  private async refreshOrders(): Promise<void> {
+    this.customers.set(await this.listCustomers.execute());
+    this.basicOrders.set(await this.listBasicOrders.execute());
+  }
+
+  protected async addCustomer(): Promise<void> {
+    const name = this.newCustomerName().trim();
+    if (!name) return;
+    this.busy.set(true);
+    const { id } = await this.saveCustomer.execute({ name });
+    this.newCustomerName.set('');
+    this.orderCustomerId.set(id);
+    await this.facade.refresh();
+    this.customers.set(await this.listCustomers.execute());
+    this.busy.set(false);
+  }
+
+  protected async placeOrder(): Promise<void> {
+    const customer = this.customers().find(c => c.id === this.orderCustomerId());
+    const recipe = this.recipes().find(r => r.id === this.orderRecipeId());
+    const price = Number(this.orderPrice());
+    if (!customer || !recipe || !(price > 0)) return;
+    this.busy.set(true);
+    await this.placeBasicOrder.execute({
+      customerId: customer.id,
+      customerName: customer.name,
+      recipeId: recipe.id,
+      recipeName: recipe.name,
+      priceSoles: price,
+    });
+    await this.facade.refresh();
+    this.basicOrders.set(await this.listBasicOrders.execute());
+    this.busy.set(false);
+  }
+
+  protected async deliverOrder(order: BasicOrderPrimitives): Promise<void> {
+    this.busy.set(true);
+    await this.deliverBasicOrder.execute({ orderId: order.id });
+    await this.facade.refresh();
+    this.basicOrders.set(await this.listBasicOrders.execute());
     this.busy.set(false);
   }
 
