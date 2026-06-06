@@ -232,7 +232,8 @@ Escena **`WorldScene.KITCHEN`** (la cocina de casa). El Cap 0 vive entero aquí.
 
 ### 7.1 Motor y assets
 
-- **Three.js** + `GLTFLoader` con `DRACOLoader`, cargando `3dmodel/kitchen/kitchen.glb` (Draco + texturas WebP). Layout y materiales en `3dmodel/kitchen/scene_layout.json` y `scene_objects.json`.
+- **Three.js** + `GLTFLoader` con `DRACOLoader`, cargando el GLB fijo de la cocina + sus movibles según `scene_layout.json` (Draco + texturas WebP).
+- Esos GLB **no existen aún**: se **exportan** desde la `.blend` de cocina elegida en `3dmodel/Isometric Rooms Collection/` (candidatas: `isometric cozy kitchen` / `Isometric Kitchen Nook` / `Isometric Kitchen Scene`) siguiendo el procedimiento canónico de `mundo_3d_assets.md` (y `.claude/3dmodel/export.md`). El Cap 0 los **consume**, no los produce.
 - Rig de cámara que implementa `flyIn()`, `focusStation(station)` y `resetView()` (acercamientos guiados, no saltos bruscos).
 
 ### 7.2 Accesibilidad (obligatoria)
