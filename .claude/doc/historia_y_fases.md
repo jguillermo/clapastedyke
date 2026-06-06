@@ -216,19 +216,26 @@ Tres reglas no negociables:
 
 ### Qué debe contener cada documento de capítulo
 
-Todo documento de capítulo es **autocontenido** y, salvo la narrativa, **todo lo que describe es exclusivo de ese capítulo** (el dominio, el contexto y los casos de uso justos para cumplirlo, ni más ni menos). Debe incluir, como mínimo:
+Todo documento de capítulo es **autocontenido** y, salvo la narrativa, **todo lo que describe es exclusivo de ese capítulo** (el dominio, el contexto y los casos de uso justos para cumplirlo, ni más ni menos). El modelado sigue **siempre Domain-Driven Design** (diseño estratégico + táctico, reglas de agregado de Vernon). Debe incluir, como mínimo:
 
 1. **Narrativa.** El fragmento del relato de Ariana que corresponde a este capítulo —el "porqué" emocional que lo dispara.
 2. **Diálogos de ayuda.** Los textos y diálogos exactos que el jugador verá en las ayudas/tutoriales del capítulo (en español).
 3. **Objetivo del capítulo.** Qué hay que cumplir para darlo por hecho —la señal de avance, detallada y medible.
-4. **Modelo de dominio.** Entidades, value objects e invariantes **exclusivamente los necesarios para cumplir este capítulo**.
-5. **Bounded context.** El o los contextos delimitados que entran, **exclusivamente para cumplir este capítulo**.
-6. **Motor de progresión.** `GoalType`, `target`, `Feature` y persistencia que habilitan y cierran el capítulo.
-7. **Representación en el mundo 3D.** Escenas, edificios y cámara del capítulo.
+4. **Modelo de dominio (DDD táctico).** Exclusivamente lo necesario para este capítulo, y siempre:
+   - **Value objects** (igualdad por valor, inmutables) y **entidades** (identidad propia) bien distinguidos.
+   - **Agregados explícitos**: marcar cada **agregado raíz**, sus **miembros internos** y el **comportamiento** que expone. Aplicar las reglas de Vernon: agregados **pequeños**, **referenciar otros agregados solo por identidad** (id, nunca el objeto), invariantes propias **dentro** del límite, y cambios entre agregados por **consistencia eventual** (Domain Events).
+   - **Anti-anemia**: creación vía **factory** y **métodos de intención de negocio**, no setters públicos.
+   - **Read models / proyecciones** marcados como tales (no son agregados; no se persisten como transacción ni tienen repositorio).
+5. **Bounded context (DDD estratégico).** El o los contextos delimitados que entran, **exclusivamente para este capítulo**, y siempre:
+   - Su **clasificación de subdominio** (Core / Supporting / Generic) y su **lenguaje ubicuo**.
+   - El **Context Mapping**: relación con otros contextos (Customer/Supplier, Published Language, Anticorruption Layer, Shared Kernel…). Lo normal es publicar **Domain Events** y que los demás se suscriban, sin acoplamiento directo.
+   - **Un repositorio por agregado raíz** y los **domain services** (operaciones sin estado que no caben en una entidad).
+6. **Motor de progresión.** `GoalType`, `target`, `Feature`, eventos de dominio que disparan el avance y persistencia que habilitan y cierran el capítulo.
+7. **Representación en el mundo 3D.** Escenas, estaciones/edificios, cámara y fallbacks (sin WebGL, `prefers-reduced-motion`) del capítulo.
 8. **Componentes visuales.** Los componentes de interfaz que se van a usar.
 9. **Flujo de trabajo detallado.** El paso a paso completo del capítulo, de entrada a estado final.
-10. **Casos de uso.** Los casos de uso (use cases) que tendrá el capítulo.
-11. **Validaciones.** Las validaciones de dominio, de entrada y los criterios de aceptación del capítulo.
+10. **Casos de uso (Application Services).** Una intención por caso de uso; delgados, orquestan el dominio y publican eventos. No llevan lógica de negocio.
+11. **Validaciones.** Separadas por dónde viven: **invariantes de agregado** (una sola instancia, impuestas por factory/métodos) frente a **invariantes set-based o referenciales** (cruzan varias instancias u otros agregados → Domain Policy o Application Service vía repositorio), más las **transversales** de formulario y los **criterios de aceptación**.
 
 ## Cómo se avanza entre fases
 
