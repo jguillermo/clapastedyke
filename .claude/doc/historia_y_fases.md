@@ -204,19 +204,20 @@ Cada capítulo es una fase. La ficha es macro: el **dolor que la dispara**, **qu
 
 # Parte 3 — Avance y alcance
 
+## Regla de oro — un capítulo, un archivo, y solo cuando toca (CRÍTICA)
+
+> **La documentación del siguiente capítulo solo se escribe cuando el capítulo actual ya está desarrollado en código fuente y validado.** No se adelanta la documentación de la siguiente etapa mientras el capítulo actual no esté implementado y validado. La documentación avanza al ritmo del desarrollo real, no antes.
+
+Tres reglas no negociables:
+
+- **No adelantar documentación.** Primero se desarrolla y valida el capítulo actual; recién entonces se redacta el documento del siguiente. Nunca en paralelo, nunca adelantándose a lo que aún no se construye.
+- **Un archivo por capítulo.** Cada capítulo nuevo es un **archivo nuevo y propio**, que especifica a detalle ese capítulo completo: todas las características, reglas, datos y flujo de trabajo que necesita para considerarse hecho. Ese archivo es la fuente de verdad de *ese* capítulo.
+- **Aislamiento estricto.** Ese archivo **solo describe lo que hace su capítulo**. No toca, no modifica ni asume otros capítulos. Cada capítulo se especifica como una unidad cerrada.
+
 ## Cómo se avanza entre fases
 
 - **Camino natural (recomendado).** Cada fase se cierra cumpliendo su **señal de avance**. El juego siempre muestra *qué falta* para la siguiente, así el camino nunca es ambiguo.
 - **Atajo (`ForceLevelUp`).** Quien ya conoce el juego puede **saltar** a la fase donde realmente está su negocio, sin repetir la historia desde la cocina vacía. El mundo se reconfigura de inmediato a esa fase. Camino natural y atajo conviven.
 
-## Qué queda fuera de esta guía (y dónde vive)
-
-| Tema | Dónde vive |
-|---|---|
-| Modelo de dominio (entidades, casos de uso, eventos, invariantes) | `plan_de_negocio.md` |
-| Motor de progresión (`GoalType`, `target`, `Feature`, persistencia) | `plan_de_negocio.md` |
-| Representación en el mundo 3D (escenas, edificios, cámara) | `diseno_mundo_juego.md` |
-| Lenguaje visual (colores, tipografía, componentes, iconos) | Suite de diseño visual (por crear) |
-| **Flujo de trabajo detallado de cada fase** | **Archivos de entregable, uno por fase (por crear)** |
 
 Esta guía es el **mapa narrativo** que ordena todo lo anterior: dice **qué etapa es cada cosa** y **por qué aparece cuando aparece**.
