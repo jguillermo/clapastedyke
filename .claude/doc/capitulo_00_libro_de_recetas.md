@@ -77,19 +77,36 @@ Bounded context **`recipe-book`**, autocontenido. Reutiliza value objects compar
 - **`RecipeYield`** — rinde de referencia del queque: `{ weight: Quantity /* en g */, servings?: number }`. Identidad por valor.
 - **`WeightRange`** — banda de peso para empaque: `{ min: Quantity, max: Quantity }`; invariante `max > min`.
 
-### 4.2 Entidades / agregados
+### 4.2 Entidades y agregados
 
-- **`Ingredient`** — `{ id: EntityId, name: string, baseUnit: 'g' | 'u' }`. Materia prima referenciada por las recetas. Identidad por `id`.
-- **`SpongeRecipe`** (queque) — `{ id, name, flavor?: string, referenceYield: RecipeYield, lines: IngredientLine[] }`. **Define el peso de referencia** que gobierna el escalado de toda la torta.
-- **`FillingRecipe`** (relleno) — `{ id, name, referenceWeight: Quantity /* g */, lines: IngredientLine[] }`. Cantidades por ese peso de referencia.
-- **`CoveringRecipe`** (cobertura) — misma forma que `FillingRecipe`.
+El contexto tiene **8 agregados pequeños** (Regla 2 de Vernon). Cada raíz se persiste por separado, referencia a las demás **solo por identidad** (Regla 3) y protege sus propias invariantes dentro de su límite (Regla 1).
+
+| Agregado raíz | Miembros internos | Referencias (solo por id) | Comportamiento clave |
+|---|---|---|---|
+| `Ingredient` | — | — | — |
+| `SpongeRecipe` (queque) | `IngredientLine[]`, `RecipeYield` | `Ingredient` (`ingredientId` en cada línea) | `addLine`, `changeYield` |
+| `FillingRecipe` (relleno) | `IngredientLine[]` | `Ingredient` | `addLine` |
+| `CoveringRecipe` (cobertura) | `IngredientLine[]` | `Ingredient` | `addLine` |
+| `Topper` | — | — | — |
+| `PackagingItem` | — | — | — |
+| `PackagingRule` | `WeightRange` (VO) | `PackagingItem` (`boxId`, `baseId`) | `matches(weight): boolean` |
+| `CakeComposition` (la torta) | — | `Sponge/Filling/CoveringRecipe`, `Topper`, `PackagingItem` (todo por id) | `recompose(targetWeight)` |
+
+Campos por agregado:
+
+- **`Ingredient`** — `{ id: EntityId, name, baseUnit: 'g' | 'u' }`. Materia prima referenciada por las recetas. **Necesita identidad** porque la `ShoppingList` agrega por `ingredientId`.
+- **`SpongeRecipe`** — `{ id, name, flavor?, referenceYield: RecipeYield, lines: IngredientLine[] }`. **Define el peso de referencia** que gobierna el escalado de toda la torta.
+- **`FillingRecipe`** — `{ id, name, referenceWeight: Quantity /* g */, lines: IngredientLine[] }`. Cantidades por ese peso de referencia.
+- **`CoveringRecipe`** — misma forma que `FillingRecipe` (mismo rol: capa escalada por peso).
 - **`Topper`** — `{ id, name }`. Ítem de decoración elegido a mano.
 - **`PackagingItem`** — `{ id, name, type: 'box' | 'base' }`.
-- **`PackagingRule`** — `{ id, range: WeightRange, boxId: EntityId, baseId: EntityId }`. Banda de peso → caja + base. `matches(weight): boolean` → `range.min ≤ weight ≤ range.max`.
-- **`CakeComposition`** (la torta) — agregado raíz:
-  `{ id, name?, targetWeight: Quantity /* g */, spongeRecipeId, fillingRecipeId, coveringRecipeId, topperId?, suggestedBoxId, suggestedBaseId }`.
-- **`ShoppingList`** — proyección de salida: `items: ShoppingListItem[]`.
-  - **`ShoppingListItem`** — `{ name: string, totalQuantity: Quantity, category: 'ingredient' | 'packaging' | 'topper' }`. **Solo cantidades** — sin precios ni stock.
+- **`PackagingRule`** — `{ id, range: WeightRange, boxId, baseId }`. `matches(weight)` → `range.min ≤ weight ≤ range.max`.
+- **`CakeComposition`** — `{ id, name?, targetWeight: Quantity /* g */, spongeRecipeId, fillingRecipeId, coveringRecipeId, topperId?, suggestedBoxId, suggestedBaseId }`.
+
+**Creación y comportamiento (evitar Anemic Domain Model).** Cada raíz se crea con una **factory** que impone sus invariantes (`SpongeRecipe.create(...)`, etc.) y se modifica con **métodos de intención de negocio** (`addLine`, `changeYield`, `recompose`), nunca con setters públicos. Las invariantes de una sola instancia viven en el agregado (§11.1); las que cruzan varias instancias, fuera (§11.2).
+
+- **`ShoppingList`** — **no es agregado**: es una **proyección / read model** (estilo CQRS) derivada de una `CakeComposition` + sus recetas. No se persiste como transacción ni tiene repositorio. `items: ShoppingListItem[]`.
+  - **`ShoppingListItem`** — `{ name, totalQuantity: Quantity, category: 'ingredient' | 'packaging' | 'topper' }`. **Solo cantidades** — sin precios ni stock.
 
 ### 4.3 Escalado (cálculo vivo)
 
@@ -114,7 +131,7 @@ El escalado es **cálculo vivo**: se recalcula al cambiar `targetWeight` o cualq
 
 ## 5. Bounded context
 
-Contexto único **`recipe-book`** con estructura DDD:
+Contexto único **`recipe-book`** (Core Domain del capítulo) con estructura DDD:
 
 ```
 core/recipe-book/
@@ -122,12 +139,25 @@ core/recipe-book/
 │   ├── entities/         ← Ingredient, SpongeRecipe, FillingRecipe, CoveringRecipe,
 │   │                        Topper, PackagingItem, PackagingRule, CakeComposition
 │   ├── value-objects/    ← IngredientLine, RecipeYield, WeightRange
-│   ├── repositories/     ← *Repository (contratos)
-│   └── services/         ← CakeScalingService (escalado), ShoppingListBuilder
+│   ├── repositories/     ← un contrato por agregado raíz (ver abajo)
+│   └── services/         ← CakeScalingService, PackagingRuleOverlapPolicy, ShoppingListBuilder
 ├── application/
 │   └── use-cases/        ← ver §10
 └── infrastructure/       ← repos concretos (almacén local), mappers
 ```
+
+**Un repositorio por agregado raíz** (Vernon). `ShoppingList` **no** tiene repositorio (es proyección):
+
+`IngredientRepository`, `SpongeRecipeRepository`, `FillingRecipeRepository`, `CoveringRecipeRepository`, `TopperRepository`, `PackagingItemRepository`, `PackagingRuleRepository`, `CakeCompositionRepository`.
+
+**Domain services** (operaciones que no pertenecen a un solo agregado, sin estado):
+- `CakeScalingService` — escala las recetas al `targetWeight`. Es servicio (no método de `CakeComposition`) porque necesita queque + relleno + cobertura **cargados**, y un agregado no debe cargar otros agregados.
+- `PackagingRuleOverlapPolicy` — valida la invariante *set-based* de no-solape entre bandas (§11.2).
+- `ShoppingListBuilder` — proyecta la `ShoppingList` (proyector de read model).
+
+**Relaciones estratégicas (Context Mapping):**
+- `recipe-book` → `progression`: **Customer/Supplier con Published Language**. `recipe-book` es *upstream* y publica Domain Events (§6); `progression` es *downstream* y se suscribe solo a `CakeComposed`. Sin acoplamiento directo.
+- `recipe-book` ↔ `_common`: **Shared Kernel** mínimo (`EntityId`, `Quantity`). No debe crecer más allá de VOs transversales.
 
 - Persistencia local, en el mismo almacén del juego que el resto de los datos.
 - **No enciende** otros contextos. Solo publica eventos (ver §6) para que `progression` y el mundo reaccionen.
@@ -310,24 +340,34 @@ Una intención = un caso de uso. Inyectan repositorios con `inject()` y publican
 | `ComposeCake` | `{ name?, targetWeight, spongeId, fillingId, coveringId, topperId? }` → `CakeComposition` (con empaque resuelto y vista escalada) | `CakeComposed` |
 | `GenerateShoppingList` | `{ compositionId }` → `ShoppingList` | `ShoppingListGenerated` |
 
-> Nota de orquestación: `ComposeCake` resuelve el empaque vía `PackagingRule.matches(targetWeight)` y calcula la vista escalada con `CakeScalingService`. `GenerateShoppingList` agrega con `ShoppingListBuilder`.
+> Nota de orquestación: `SavePackagingRule` consulta `PackagingRuleOverlapPolicy` (no-solape, §11.2); los `Save*` validan unicidad de `name` y existencia de referencias vía sus repositorios. `ComposeCake` resuelve el empaque vía `PackagingRule.matches(targetWeight)` y calcula la vista escalada con `CakeScalingService`. `GenerateShoppingList` agrega con `ShoppingListBuilder`.
 
 ---
 
 ## 11. Validaciones
 
-**De dominio / entrada:**
+> Dónde vive cada regla importa (Vernon): si solo mira **una instancia**, es invariante de agregado; si cruza **varias instancias** del mismo tipo u otros agregados, es *Policy* o chequeo de Application Service.
 
-- **`Ingredient`** — `name` requerido y **único** (case-insensitive); `baseUnit` ∈ {`g`, `u`}.
-- **`SpongeRecipe`** — `name` único; `referenceYield.weight` > 0; `servings` (si se da) > 0; **≥1 línea**; cada `quantity` > 0; los `ingredientId` deben existir.
-- **`FillingRecipe` / `CoveringRecipe`** — `name` único; `referenceWeight` > 0; **≥1 línea**; cada `quantity` > 0; ingredientes existentes.
-- **`Topper`** — `name` requerido y único.
+### 11.1 Invariantes de agregado (dentro del límite, impuestas por factory/métodos)
+
+- **`Ingredient`** — `name` requerido; `baseUnit` ∈ {`g`, `u`}.
+- **`SpongeRecipe`** — `referenceYield.weight` > 0; `servings` (si se da) > 0; **≥1 línea**; cada `quantity` > 0.
+- **`FillingRecipe` / `CoveringRecipe`** — `referenceWeight` > 0; **≥1 línea**; cada `quantity` > 0.
+- **`Topper`** — `name` requerido.
 - **`PackagingItem`** — `name` requerido; `type` ∈ {`box`, `base`}.
-- **`PackagingRule`** — `range.min` ≥ 0; `range.max` > `range.min`; **bandas sin solape** entre reglas; `boxId` debe referenciar un `PackagingItem` `box`, `baseId` uno `base`.
+- **`PackagingRule`** — `range.min` ≥ 0; `range.max` > `range.min`.
+
+### 11.2 Invariantes set-based y referenciales (fuera del agregado)
+
+No pueden ser invariantes de una entidad porque abarcan la colección u otros agregados. Se aplican en **Application Service** (chequeo vía repositorio) o **Domain Policy**:
+
+- **Unicidad de `name`** (recetas, topper, ingrediente; case-insensitive) — chequeo en el caso de uso `Save*` vía `*Repository` (patrón `byName`).
+- **No-solape de bandas de empaque** — `PackagingRuleOverlapPolicy` consultada por `SavePackagingRule`.
+- **Existencia de referencias** — los `ingredientId` de una receta deben existir; `boxId`/`baseId` deben referenciar un `PackagingItem` del `type` correcto (`box`/`base`). Se valida en el `Save*` correspondiente.
 - **`ComposeCake`** — `targetWeight` > 0; queque, relleno y cobertura seleccionados; si **ninguna** `PackagingRule` cubre `targetWeight` → avisar: *"No hay caja para este peso. Define una regla de empaque que lo cubra."* (bloquea la composición hasta resolver).
 - **`GenerateShoppingList`** — requiere una `CakeComposition` completa (empaque resuelto).
 
-**Transversales (de `diseno_pantallas_flujos.md` §8.2):**
+### 11.3 Transversales (de `diseno_pantallas_flujos.md` §8.2)
 
 - Validación **on-blur**, no por tecla; el error aparece **bajo el campo** con icono + texto que dice **causa + cómo arreglar**.
 - Tras enviar con error: foco al **primer campo inválido**; resumen arriba si hay varios.
