@@ -18,13 +18,23 @@ El orden es deliberado: **primero la historia, después las fases**. Cada fase n
 - **Parte 2 (las fases)** traduce cada capítulo en una **fase del juego**, con una ficha macro uniforme. No hay detalle de flujo aquí: el flujo de trabajo paso a paso de cada fase irá en **archivos de entregable separados**, uno por fase.
 - **Parte 3** explica cómo se avanza entre fases y qué queda fuera de esta guía.
 
-La historia decidió **17 fases**, agrupadas en **4 actos**. Algunas funciones del plan técnico (empaques, costos indirectos, estados de pedido) no son una fase aparte: se absorben dentro del capítulo donde realmente duelen.
+La historia decidió una **Fase 0 (preludio)** y **17 fases**, agrupadas en **4 actos**. La Fase 0 es el arranque: antes de vender nada, Ariana arma su **recetario modular** y aprende a **componer una torta** (queque + relleno + cobertura + empaque + topper) y a sacar su **lista de compra**. Algunas funciones del plan técnico (costos indirectos, estados de pedido) no son una fase aparte: se absorben dentro del capítulo donde realmente duelen.
 
 ---
 
 # Parte 1 — La historia de Ariana
 
 ## Acto I · La pasión en casa
+
+### Capítulo 0 — El libro de recetas en blanco (preludio)
+
+Antes de hornear nada, Ariana tiene un sueño concreto: hacer una **torta de verdad** —no un bizcocho pelado, sino la de capas, con relleno, cobertura, un topper y su caja bonita—. Abre su libro de recetas y está **en blanco**. Y cae en cuenta de algo: una torta no es *una* receta. Es una **base (el queque)**, un **relleno**, una **cobertura** y los **complementos** (caja, base, topper).
+
+Así que empieza a escribir. Primero su **queque**: los ingredientes y **cuánto rinde** (1 kg, alcanza para X porciones) —esa es su medida de referencia—. Luego un **relleno**, suficiente para ese kilo. Luego una **cobertura**. Su libro deja de estar vacío: tiene un pequeño **recetario modular**.
+
+Ahora **compone su primera torta** sobre el papel: *este* queque + *este* relleno + *esta* cobertura, para 1 kg. El libro hace las cuentas —escala relleno y cobertura al peso del queque—, le **sugiere la caja y la base** del tamaño correcto, y ella **elige un topper** para decorar. Al final sale una **lista**: qué necesita y cuánto. Si mañana quiere la misma torta de 2 kg, todo se **recalcula** solo.
+
+No compra nada todavía, no piensa en plata. Solo sabe, por primera vez, **exactamente qué es su torta y qué lleva**. Con esa lista en la mano, está lista para empezar.
 
 ### Capítulo 1 — La cocina vacía y el libro de recetas
 
@@ -156,6 +166,7 @@ Cada capítulo es una fase. La ficha es macro: el **dolor que la dispara**, **qu
 
 | Fase | Capítulo | El dolor que la dispara | Qué aprende a hacer | Entra al juego | Señal de avance | Mundo |
 |---|---|---|---|---|---|---|
+| **0** | El libro de recetas en blanco | "Quiero hacer una torta de verdad, pero no sé de qué está hecha ni qué comprar" | Crear recetas modulares (queque base con su rinde, relleno, cobertura); componer una torta escalada por el peso del queque; recibir empaque sugerido y elegir topper; sacar su lista de materiales | `catalog` (recetas modulares: queque/relleno/cobertura, topper, regla de empaque), `composition` (compone la torta, escala por peso del queque), `shopping-list` (lista de planificación) · `Feature RECIPE_BOOK` | 1.ª torta compuesta con su lista de compra generada | `KITCHEN` |
 | **1** | La cocina vacía | "Quiero hornear algo" | Elegir receta, ver si tiene ingredientes, cocinar | `kitchen`, `catalog` (mínimo), `inventory` (consumo) · `Feature KITCHEN` | 1.ª producción cocinada | `KITCHEN` |
 | **2** | El primer aplauso | "¿Y si lo muestro?" | Fotografiar y publicar; ganar reputación | `reputation` · `Feature SOCIAL` | Publica y suma popularidad | `KITCHEN` |
 | **3** | El primer encargo | "Me piden una torta y me falta un ingrediente" | Atender un pedido informal, pedir mercadería, recibir stock, **cobrar** | `inventory` (compra simple), pedido informal · primera venta | 1.er pedido cobrado | `KITCHEN` |
