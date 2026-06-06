@@ -214,6 +214,22 @@ Tres reglas no negociables:
 - **Un archivo por capítulo.** Cada capítulo nuevo es un **archivo nuevo y propio**, que especifica a detalle ese capítulo completo: todas las características, reglas, datos y flujo de trabajo que necesita para considerarse hecho. Ese archivo es la fuente de verdad de *ese* capítulo.
 - **Aislamiento estricto.** Ese archivo **solo describe lo que hace su capítulo**. No toca, no modifica ni asume otros capítulos. Cada capítulo se especifica como una unidad cerrada.
 
+### Qué debe contener cada documento de capítulo
+
+Todo documento de capítulo es **autocontenido** y, salvo la narrativa, **todo lo que describe es exclusivo de ese capítulo** (el dominio, el contexto y los casos de uso justos para cumplirlo, ni más ni menos). Debe incluir, como mínimo:
+
+1. **Narrativa.** El fragmento del relato de Ariana que corresponde a este capítulo —el "porqué" emocional que lo dispara.
+2. **Diálogos de ayuda.** Los textos y diálogos exactos que el jugador verá en las ayudas/tutoriales del capítulo (en español).
+3. **Objetivo del capítulo.** Qué hay que cumplir para darlo por hecho —la señal de avance, detallada y medible.
+4. **Modelo de dominio.** Entidades, value objects e invariantes **exclusivamente los necesarios para cumplir este capítulo**.
+5. **Bounded context.** El o los contextos delimitados que entran, **exclusivamente para cumplir este capítulo**.
+6. **Motor de progresión.** `GoalType`, `target`, `Feature` y persistencia que habilitan y cierran el capítulo.
+7. **Representación en el mundo 3D.** Escenas, edificios y cámara del capítulo.
+8. **Componentes visuales.** Los componentes de interfaz que se van a usar.
+9. **Flujo de trabajo detallado.** El paso a paso completo del capítulo, de entrada a estado final.
+10. **Casos de uso.** Los casos de uso (use cases) que tendrá el capítulo.
+11. **Validaciones.** Las validaciones de dominio, de entrada y los criterios de aceptación del capítulo.
+
 ## Cómo se avanza entre fases
 
 - **Camino natural (recomendado).** Cada fase se cierra cumpliendo su **señal de avance**. El juego siempre muestra *qué falta* para la siguiente, así el camino nunca es ambiguo.
