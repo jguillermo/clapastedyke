@@ -79,7 +79,7 @@ Bounded context **`recipe-book`**, autocontenido. Reutiliza value objects compar
 
 ### 4.2 Entidades y agregados
 
-El contexto tiene **8 agregados pequeños** (Regla 2 de Vernon). Cada raíz se persiste por separado, referencia a las demás **solo por identidad** (Regla 3) y protege sus propias invariantes dentro de su límite (Regla 1).
+El contexto tiene **8 agregados pequeños** (Regla 2 de Vernon). Cada raíz se persiste por separado, referencia a las demás **solo por identidad** (Regla 3) y protege sus propias invariantes dentro de su límite (Regla 1). **Regla 4 (consistencia eventual):** cada caso de uso modifica **un solo agregado por transacción**; en el Cap 0 se cumple trivialmente —ningún caso de uso muta dos agregados y `CakeComposition` referencia las recetas en **solo-lectura**—, y la propagación a otros contextos (`progression`, mundo) es por Domain Events, no transaccional.
 
 | Agregado raíz | Miembros internos | Referencias (solo por id) | Comportamiento clave |
 |---|---|---|---|
@@ -131,7 +131,26 @@ El escalado es **cálculo vivo**: se recalcula al cambiar `targetWeight` o cualq
 
 ## 5. Bounded context
 
-Contexto único **`recipe-book`** (Core Domain del capítulo) con estructura DDD:
+Contexto único **`recipe-book`** (Core Domain del capítulo) con estructura DDD.
+
+**Lenguaje ubicuo** (español del negocio ↔ identificador en código):
+
+| Negocio (español) | Código (inglés) |
+|---|---|
+| queque (bizcocho base) | `SpongeRecipe` |
+| relleno | `FillingRecipe` |
+| cobertura | `CoveringRecipe` |
+| ingrediente / insumo | `Ingredient` |
+| rinde (cuánto pesa/alcanza el queque) | `referenceYield` / `referenceWeight` |
+| topper (decoración) | `Topper` |
+| empaque (caja / base) | `PackagingItem` (`box` / `base`) |
+| regla de empaque (peso → caja/base) | `PackagingRule` |
+| torta (lo que se arma) | `CakeComposition` |
+| componer una torta | `ComposeCake` |
+| escalar por peso | `CakeScalingService` |
+| lista de compra | `ShoppingList` |
+
+Estructura del contexto:
 
 ```
 core/recipe-book/
@@ -174,6 +193,8 @@ Usa el contexto `progression` existente (`PlayerProgress`, `Goal`, `Level`, `Goa
 - **`Level 0`** (key `recipe-book`):
   - `goals`: `[{ type: CAKES_COMPOSED, target: 1, mode: INCREMENT }]`
   - `unlocks`: `[Feature.KITCHEN]`
+
+**Persistencia.** El progreso se guarda con el mecanismo existente de `progression`: un `ProgressRecord` (`currentLevel: 0`, `progressByType`, `unlockedFeatures: [RECIPE_BOOK]`) en el almacén local del juego, reescrito en cada `RecordProgress` y avance de nivel. El recetario en sí (recetas, toppers, empaques, composición) persiste en los repositorios del contexto `recipe-book` (§5).
 
 ### 6.1 Qué dispara el progreso
 
@@ -323,9 +344,9 @@ flyIn → Cocina → coach.intro → tap RECIPE_BOARD → "Mi libro de recetas" 
 
 ---
 
-## 10. Casos de uso (`recipe-book/application/use-cases/`)
+## 10. Casos de uso (Application Services) (`recipe-book/application/use-cases/`)
 
-Una intención = un caso de uso. Inyectan repositorios con `inject()` y publican su evento de dominio al terminar.
+Una intención = un caso de uso. Son **Application Services delgados**: orquestan el dominio (cargan agregados por repositorio, invocan factories/métodos y domain services, publican el evento) y **no llevan lógica de negocio** —esa vive en los agregados (§4.2) y en los domain services (§5)—. Inyectan repositorios con `inject()`.
 
 | Caso de uso | Entrada → salida | Evento |
 |---|---|---|
@@ -347,6 +368,8 @@ Una intención = un caso de uso. Inyectan repositorios con `inject()` y publican
 ## 11. Validaciones
 
 > Dónde vive cada regla importa (Vernon): si solo mira **una instancia**, es invariante de agregado; si cruza **varias instancias** del mismo tipo u otros agregados, es *Policy* o chequeo de Application Service.
+
+Los **criterios de aceptación** del capítulo (cuándo se da por "hecho") están en §3 ("Criterios de hecho") y deben cumplirse junto con las validaciones de abajo.
 
 ### 11.1 Invariantes de agregado (dentro del límite, impuestas por factory/métodos)
 
