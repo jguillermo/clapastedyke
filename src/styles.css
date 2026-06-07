@@ -5,6 +5,9 @@
 @import './styles/migo/index.css';
 @import 'tailwindcss';
 
+/* Base de posicionamiento/backdrop del CDK Overlay (lo usa app-dialog). */
+@import '@angular/cdk/overlay-prebuilt.css';
+
 /* Base global — paleta y tipografía Migo (tokens vía skill migo-design) */
 html,
 body {
@@ -30,3 +33,10 @@ h3 {
   color: var(--text-heading);
   letter-spacing: var(--tracking-heading);
 }
+
+/* Backdrop del diálogo (app-dialog). El CDK crea el backdrop en el contenedor del
+   overlay, fuera de cualquier componente, por eso su estilo es necesariamente global. */
+.app-dialog__backdrop {
+  background: rgba(47, 33, 24, 0.44);
+}
+

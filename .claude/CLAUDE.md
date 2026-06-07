@@ -52,3 +52,20 @@ You are an expert in TypeScript, Angular, and scalable web application developme
 - Design services around a single responsibility
 - Use the `providedIn: 'root'` option for singleton services
 - Use the `inject()` function instead of constructor injection
+
+## Project Rules (`.claude/rules/`)
+
+Convenciones específicas por área. Consulta la regla correspondiente antes de tocar esos ficheros:
+
+- [components-conventions.md](rules/components-conventions.md) — **librería de componentes** en `src/app/components/`: UI agnóstica con **Angular CDK**, **cero lógica de negocio**, estilo solo con tokens Migo, `ControlValueAccessor` para form controls, patrón de Overlay.
+- [path-aliases-conventions.md](rules/path-aliases-conventions.md) — alias `@app/@components/@core/@features/@platform`: **cruzar áreas con alias, intra-contexto `core/` relativo**.
+- [core-conventions.md](rules/core-conventions.md) — DDD en `core/`: entities, value objects, aggregates, repositories vs services, use cases.
+- [features-conventions.md](rules/features-conventions.md) — features (páginas de ruta): inyectan use cases, nunca servicios de dominio.
+- [features-common-conventions.md](rules/features-common-conventions.md) — reutilizables cross-feature en `features/_common/` (guards, pipes).
+- [platform-conventions.md](rules/platform-conventions.md) — mecanismos técnicos transversales en `platform/`.
+- [providers-conventions.md](rules/providers-conventions.md) — DI por contexto con `provide*()` y `makeEnvironmentProviders`.
+- [assets-conventions.md](rules/assets-conventions.md) — recursos estáticos en `src/assets/`.
+- [unit-tests-conventions.md](rules/unit-tests-conventions.md) — specs de `core/` bajo `testing/`; specs de componentes co-locados.
+- [e2e-tests-conventions.md](rules/e2e-tests-conventions.md) — tests E2E en `tests/e2e/`: flujos completos, no estados intermedios.
+- [main-process-conventions.md](rules/main-process-conventions.md) — proceso principal de Electron en `app/src/`.
+- [example-conventions.md](rules/example-conventions.md) — ejemplo DDD canónico de punta a punta.

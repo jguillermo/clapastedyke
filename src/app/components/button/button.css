@@ -1,0 +1,128 @@
+/* Botón Migo — estilo 100% desde tokens del design system. Sin colores crudos. */
+
+:host {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s2);
+  min-height: var(--touch-min);
+  padding: 0 var(--s5);
+  border: 1px solid transparent;
+  border-radius: var(--r-pill);
+  font-family: var(--font-body);
+  font-size: var(--fs-body-s);
+  font-weight: var(--fw-semibold);
+  line-height: 1;
+  text-decoration: none;
+  cursor: pointer;
+  user-select: none;
+  transition:
+    background-color var(--dur-base) var(--ease-out),
+    border-color var(--dur-base) var(--ease-out),
+    color var(--dur-base) var(--ease-out),
+    box-shadow var(--dur-base) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out);
+}
+
+:host:active {
+  transform: translateY(1px);
+}
+
+:host:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* ---------- Tamaños ---------- */
+:host(.app-btn--sm) {
+  min-height: 36px;
+  padding: 0 var(--s4);
+  font-size: var(--fs-caption);
+}
+
+:host(.app-btn--lg) {
+  min-height: 52px;
+  padding: 0 var(--s6);
+  font-size: var(--fs-body);
+}
+
+:host(.app-btn--block) {
+  display: flex;
+  width: 100%;
+}
+
+/* ---------- Variantes ---------- */
+:host(.app-btn--primary) {
+  background-color: var(--brand);
+  color: var(--text-on-brand);
+}
+:host(.app-btn--primary:hover) {
+  background-color: var(--brand-hover);
+}
+
+:host(.app-btn--secondary) {
+  background-color: var(--surface-card);
+  border-color: var(--border-strong);
+  color: var(--text-body);
+}
+:host(.app-btn--secondary:hover) {
+  background-color: var(--surface-sunken);
+}
+
+:host(.app-btn--ghost) {
+  background-color: transparent;
+  color: var(--text-body);
+}
+:host(.app-btn--ghost:hover) {
+  background-color: var(--surface-sunken);
+}
+
+:host(.app-btn--danger) {
+  background-color: var(--error);
+  color: var(--text-on-brand);
+}
+:host(.app-btn--danger:hover) {
+  background-color: var(--terra-600);
+}
+
+/* ---------- Estados deshabilitado / cargando ---------- */
+:host([disabled]),
+:host([aria-disabled='true']) {
+  cursor: not-allowed;
+  opacity: 0.55;
+  transform: none;
+}
+
+:host(.app-btn--loading) .app-btn__label {
+  opacity: 0.7;
+}
+
+.app-btn__spinner {
+  width: 1em;
+  height: 1em;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: var(--r-pill);
+  animation: app-btn-spin 0.6s linear infinite;
+}
+
+.app-btn__label {
+  display: inline-flex;
+  align-items: center;
+}
+
+@keyframes app-btn-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :host,
+  :host:active {
+    transition: none;
+  }
+  .app-btn__spinner {
+    animation-duration: 1.5s;
+  }
+}

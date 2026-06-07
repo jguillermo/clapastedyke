@@ -1,0 +1,106 @@
+<main class="showcase">
+  <header class="showcase__head">
+    <h1>Componentes</h1>
+    <p>Librería UI agnóstica — comportamiento por Angular CDK, estilo por el design system Migo.</p>
+  </header>
+
+  <!-- ============================ Button ============================ -->
+  <section class="showcase__section">
+    <h2>Button</h2>
+
+    <h3>Variantes</h3>
+    <div class="showcase__row">
+      <button app-button variant="primary">Primary</button>
+      <button app-button variant="secondary">Secondary</button>
+      <button app-button variant="ghost">Ghost</button>
+      <button app-button variant="danger">Danger</button>
+    </div>
+
+    <h3>Tamaños</h3>
+    <div class="showcase__row showcase__row--baseline">
+      <button app-button size="sm">Small</button>
+      <button app-button size="md">Medium</button>
+      <button app-button size="lg">Large</button>
+    </div>
+
+    <h3>Estados</h3>
+    <div class="showcase__row">
+      <button app-button [disabled]="true">Disabled</button>
+      <button app-button [loading]="loadingDemo()" (click)="simulateLoading()">
+        {{ loadingDemo() ? 'Guardando…' : 'Simular carga' }}
+      </button>
+    </div>
+
+    <h3>Ancho completo</h3>
+    <button app-button block>Block</button>
+  </section>
+
+  <!-- ====================== FormField + Input ====================== -->
+  <section class="showcase__section">
+    <h2>FormField + Input</h2>
+
+    <form [formGroup]="form" class="showcase__form">
+      <app-form-field
+        label="Email"
+        hint="Te enviaremos la confirmación aquí"
+        required
+        [error]="
+          form.controls.email.touched && form.controls.email.invalid
+            ? 'Introduce un email válido'
+            : ''
+        "
+      >
+        <app-input type="email" placeholder="hola@migo.com" formControlName="email" />
+      </app-form-field>
+
+      <app-form-field
+        label="País"
+        required
+        [error]="
+          form.controls.country.touched && form.controls.country.invalid ? 'Elige un país' : ''
+        "
+      >
+        <app-select
+          [options]="countries"
+          placeholder="Selecciona un país"
+          formControlName="country"
+        />
+      </app-form-field>
+
+      <app-form-field
+        [error]="
+          form.controls.terms.touched && form.controls.terms.invalid
+            ? 'Debes aceptar para continuar'
+            : ''
+        "
+      >
+        <app-checkbox formControlName="terms">Acepto los términos y condiciones</app-checkbox>
+      </app-form-field>
+
+      <p class="showcase__value">
+        Valor del formulario: <code>{{ formValue() | json }}</code>
+      </p>
+
+      <button app-button type="button" variant="secondary" (click)="toggleEmailDisabled()">
+        {{ form.controls.email.disabled ? 'Habilitar' : 'Deshabilitar' }} input
+      </button>
+    </form>
+  </section>
+
+  <!-- ============================ Dialog ============================ -->
+  <section class="showcase__section">
+    <h2>Dialog</h2>
+    <button app-button (click)="dialogOpen.set(true)">Abrir diálogo</button>
+
+    <app-dialog [open]="dialogOpen()" title="¿Confirmar acción?" (closed)="dialogOpen.set(false)">
+      <p>
+        Este diálogo se renderiza en un CDK Overlay con focus-trap, bloqueo de scroll y cierre por
+        ESC o backdrop. El foco vuelve al botón al cerrar.
+      </p>
+      <button app-button dialog-footer variant="ghost" (click)="dialogOpen.set(false)">
+        Cancelar
+      </button>
+      <button app-button dialog-footer (click)="dialogOpen.set(false)">Aceptar</button>
+    </app-dialog>
+  </section>
+</main>

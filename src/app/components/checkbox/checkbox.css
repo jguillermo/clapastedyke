@@ -1,0 +1,108 @@
+/* Checkbox Migo — solo tokens del design system. */
+
+:host {
+  display: inline-block;
+}
+
+.app-check {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  min-height: var(--touch-min);
+  cursor: pointer;
+  font-family: var(--font-body);
+  font-size: var(--fs-body);
+  color: var(--text-body);
+}
+
+/* Input nativo accesible pero visualmente oculto: el foco/estado siguen siendo nativos. */
+.app-check__input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.app-check__box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  background-color: var(--surface-card);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-sm);
+  color: var(--text-on-brand);
+  transition:
+    background-color var(--dur-base) var(--ease-out),
+    border-color var(--dur-base) var(--ease-out),
+    box-shadow var(--dur-base) var(--ease-out);
+}
+
+.app-check__tick {
+  width: 14px;
+  height: 14px;
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+
+/* Marcado */
+.app-check__input:checked + .app-check__box,
+.app-check__input:indeterminate + .app-check__box {
+  background-color: var(--brand);
+  border-color: var(--brand);
+}
+
+.app-check__input:checked + .app-check__box .app-check__tick {
+  opacity: 1;
+}
+
+/* Indeterminado: barra horizontal en lugar del check */
+.app-check__input:indeterminate + .app-check__box::after {
+  content: '';
+  position: absolute;
+  width: 10px;
+  height: 2px;
+  border-radius: var(--r-pill);
+  background-color: var(--text-on-brand);
+}
+
+.app-check__box {
+  position: relative;
+}
+
+/* Foco visible (solo teclado) */
+.app-check__input:focus-visible + .app-check__box {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* Inválido */
+:host(.app-checkbox--invalid) .app-check__box {
+  border-color: var(--error);
+}
+
+/* Deshabilitado */
+:host(.app-checkbox--disabled) .app-check {
+  cursor: not-allowed;
+  color: var(--text-muted);
+}
+
+:host(.app-checkbox--disabled) .app-check__box {
+  background-color: var(--surface-sunken);
+  border-color: var(--border-subtle);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-check__box,
+  .app-check__tick {
+    transition: none;
+  }
+}

@@ -1,0 +1,39 @@
+/* Campo de formulario Migo — solo tokens del design system. */
+
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+}
+
+.app-field__label {
+  font-family: var(--font-body);
+  font-size: var(--fs-body-s);
+  font-weight: var(--fw-semibold);
+  color: var(--text-body);
+}
+
+.app-field__req {
+  margin-inline-start: var(--s1);
+  color: var(--accent);
+}
+
+.app-field__control {
+  display: flex;
+  flex-direction: column;
+}
+
+.app-field__msg {
+  margin: 0;
+  font-size: var(--fs-caption);
+  line-height: var(--lh-snug);
+}
+
+.app-field__msg--hint {
+  color: var(--text-muted);
+}
+
+.app-field__msg--error {
+  color: var(--error);
+  font-weight: var(--fw-medium);
+}

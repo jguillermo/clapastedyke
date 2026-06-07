@@ -7,8 +7,8 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
-import { KitchenEngine } from '../../../platform/three/kitchen-engine';
-import { KitchenStation } from '../../../platform/three/kitchen-station';
+import { KitchenEngine } from '@platform/three/kitchen-engine';
+import { KitchenStation } from '@platform/three/kitchen-station';
 
 /** Estación tal como la presenta el dock / la ruta accesible. */
 interface StationItem {
