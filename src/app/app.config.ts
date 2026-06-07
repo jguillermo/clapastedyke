@@ -2,10 +2,14 @@ import { ApplicationConfig, provideBrowserGlobalErrorListeners } from '@angular/
 import { provideRouter } from '@angular/router';
 
 import { routes } from './app.routes';
+import { provideEventBus } from './core/_common/event-bus.providers';
+import { provideRecipeBook } from './core/recipe-book/recipe-book.providers';
 
 export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
-    provideRouter(routes)
+    provideRouter(routes),
+    provideEventBus(),
+    provideRecipeBook()
   ]
 };
