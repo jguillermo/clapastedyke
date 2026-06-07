@@ -1,0 +1,10 @@
+/* ============================================================
+   Migo Design System · punto de entrada de tokens
+   Espejo del skill `migo-design` (única fuente de verdad). Solo imports.
+   ============================================================ */
+
+@import './fonts.css';
+@import './colors.css';
+@import './typography.css';
+@import './spacing.css';
+@import './radii.css';

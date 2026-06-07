@@ -1,0 +1,26 @@
+/* ============================================================
+   Migo · Spacing tokens (copiado del skill migo-design — fuente de verdad)
+   Rhythm of 4 — every gap is a multiple of 4px.
+   ============================================================ */
+
+:root {
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s5: 20px;
+  --s6: 24px;
+  --s8: 32px;
+  --s10: 40px;
+  --s12: 48px;
+  --s16: 64px;
+  --s20: 80px;
+  --s24: 96px;
+
+  /* Layout */
+  --container-max: 1120px; /* desktop content cap */
+  --reading-max: 680px; /* comfortable measure */
+  --touch-min: 44px; /* minimum tap target */
+  --grid-gutter: 24px; /* desktop gutter */
+  --grid-margin: 32px; /* desktop page margin */
+}

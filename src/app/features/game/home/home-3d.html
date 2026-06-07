@@ -1,0 +1,76 @@
+<div class="world">
+  <!-- Lienzo 3D (solo si hay WebGL) -->
+  @if (webglSupported()) {
+    <canvas #canvas class="world__canvas" aria-hidden="true"></canvas>
+
+    <!-- Globo del chef coach tras el flyIn -->
+    @if (coachVisible()) {
+      <p class="coach" role="status">{{ coachText }}</p>
+    }
+  } @else {
+    <!-- Ruta accesible sin WebGL: el flujo se opera desde el dock -->
+    <div class="world__fallback">
+      <h1>Tu cocina</h1>
+      <p>Tu equipo no puede mostrar la cocina en 3D, pero puedes seguir igual desde abajo.</p>
+    </div>
+  }
+
+  <!-- HUD mínimo (Nivel 0) -->
+  <header class="hud">
+    <span class="hud__level">Nivel 0</span>
+    <span class="hud__title">El libro de recetas en blanco</span>
+  </header>
+
+  <!-- Dock: ruta accesible, siempre operable -->
+  <nav class="dock" aria-label="Estaciones de la cocina">
+    @for (item of stations; track item.station) {
+      <button
+        type="button"
+        class="dock__station"
+        [class.dock__station--active]="item.active"
+        [disabled]="!item.active"
+        [attr.aria-disabled]="!item.active"
+        (click)="handleStation(item.station)"
+      >
+        {{ item.label }}
+        @if (!item.active) {
+          <span class="dock__lock" aria-label="se desbloquea más adelante">🔒</span>
+        }
+      </button>
+    }
+  </nav>
+
+  <!-- Overlay del libro de recetas (stub: gancho del siguiente paso) -->
+  @if (overlayOpen()) {
+    <div class="overlay" role="dialog" aria-modal="true" aria-labelledby="recipe-book-title">
+      <button
+        type="button"
+        class="overlay__scrim"
+        aria-label="Cerrar"
+        (click)="closeOverlay()"
+      ></button>
+      <div class="overlay__panel">
+        <header class="overlay__head">
+          <h2 id="recipe-book-title">Mi libro de recetas</h2>
+          <button
+            #closeBtn
+            type="button"
+            class="overlay__close"
+            aria-label="Cerrar"
+            (click)="closeOverlay()"
+          >
+            ✕
+          </button>
+        </header>
+        <div class="overlay__empty">
+          <p class="overlay__empty-title">Tu libro está en blanco</p>
+          <p class="overlay__empty-hint">
+            Empieza por tu queque: anota sus ingredientes y cuánto rinde.
+          </p>
+          <button type="button" class="btn-primary" disabled>Crea tu primer queque</button>
+          <p class="overlay__soon">Los formularios del recetario llegan en el siguiente paso.</p>
+        </div>
+      </div>
+    </div>
+  }
+</div>
