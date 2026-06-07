@@ -506,6 +506,20 @@ HubDiscoveryResponse<T>        ←──   PairingResult
 
 The **mapper** in Angular's `infrastructure/` translates between both worlds.
 
+### The mapper is an Anticorruption Layer
+
+This boundary is a DDD **Anticorruption Layer (ACL)**, and naming it as such clarifies the intent. The main process is an **upstream** system with its own language (the IPC contract: `HubInfo`, `DiscoveryProgressEvent`). The Angular renderer is the **downstream** consumer. Rather than conforming to the upstream shapes (the Conformist pattern), the renderer protects its domain model behind the mapper, which translates upstream IPC types into clean domain types (`Hub`, `DiscoveryState`).
+
+The IPC contract types double as a **Published Language**: a documented, versioned exchange format that both sides agree on. This is why the rule above is non-negotiable — leaking an IPC type (`HubInfo`) into a feature or a use case would erase the ACL and let the upstream model corrupt the domain.
+
+| ACL role | Where it lives |
+|---|---|
+| Upstream model (Published Language) | `app/src/<module>/<module>.types.ts` (main process) |
+| Translation (the ACL itself) | `core/<context>/infrastructure/*.mapper.ts` (renderer) |
+| Protected downstream model | `core/<context>/domain/` entities & value objects |
+
+**Rule:** every IPC type that crosses into the renderer is consumed by a mapper and never reaches `application/` or `features/` directly.
+
 ## Preload aggregator
 
 `preload.ts` is the single entry point for the renderer process. It composes all preload APIs and exposes them via `contextBridge`:

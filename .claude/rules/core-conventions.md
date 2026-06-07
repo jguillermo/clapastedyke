@@ -2,6 +2,16 @@
 
 Applies to files in `src/app/core/*/domain/`, `src/app/core/*/application/`, and `src/app/core/*/infrastructure/`.
 
+## Ubiquitous Language
+
+Names are part of the design, not decoration. Contexts, entities, value objects, use cases and methods must come from the **business language of the domain expert**, not from technical jargon. The code is the model.
+
+- A context is named after a bounded area of the business (`auth`, `license`, `device`), never after a technical mechanism (`http`, `manager`, `data`).
+- A use case is named after the **user's intention**: `RegisterLicense`, not `LicenseHandler` or `LicenseProcessor`.
+- A domain method is named after the **business verb**: `license.activate(...)`, not `license.setStatus('active')`.
+
+A file that satisfies every structural rule below but uses non-domain names (`DeviceManagerService.processData()`) still violates this convention.
+
 ## Folder structure
 
 ```
@@ -32,6 +42,15 @@ Cross-cutting projections that don't belong to a specific context (like the
 `Resource` DTO used by Home, projected from multiple sources) live in
 `core/_common/<topic>/` alongside the existing utilities (`use-case.ts`,
 `jwt.utils.ts`).
+
+> **Note — organize by pattern, deliberately.** `domain/` is split by tactical
+> pattern (`entities/`, `value-objects/`, `repositories/`, `services/`).
+> Classic DDD literature recommends grouping by business concept instead
+> (`domain/model/<aggregate>/` holding the root, its children and its
+> repository together). We keep the by-pattern layout for consistency with the
+> Angular ecosystem; the trade-off is that an aggregate's root, value objects
+> and repository live in separate folders. If a context ever grows an aggregate
+> with several child entities, reconsider grouping that aggregate by concept.
 
 ## Repository vs Service
 
@@ -80,15 +99,22 @@ When `inject()` is not possible (e.g., the class is not in an injection context)
 
 ## Value Object — `domain/value-objects/`
 
-Wraps a single primitive. Identity **is** its value. Immutable.
+Measures, quantifies or describes a concept whose **identity is its value**. Immutable.
+
+A VO is NOT limited to a single primitive. It may either:
+
+-   **Wrap one primitive** as a strong type — `OrganizationId`, `DeviceId`.
+-   **Group several related attributes as a conceptual whole** — `Money { amount, currency }`, `DateRange { from, to }`. The attributes only make sense together.
 
 Rules:
 
--   Always `readonly value: T`
--   Always implement `equals()` (compares by value) and `toString()`
--   No additional logic — it is a strong type over a primitive
+-   Immutable — never mutated; replaced as a whole.
+-   Implement `equals()` (compares by value, attribute by attribute) and `toString()`.
+-   Single-primitive VOs expose `readonly value: T`.
+-   **Behavior is allowed** when it belongs to the value itself, as long as it has **no side effects** and **returns a new instance** — `money.add(other): Money`, `range.overlaps(other): boolean`. What is forbidden is application/orchestration logic (loading from repositories, calling services), not value semantics.
 
 ```typescript
+// Single primitive — strong type over a string
 export class OrganizationId {
     constructor(readonly value: string) {}
     equals(other: OrganizationId): boolean {
@@ -96,6 +122,26 @@ export class OrganizationId {
     }
     toString(): string {
         return this.value;
+    }
+}
+
+// Conceptual whole — several attributes + side-effect-free behavior
+export class Money {
+    constructor(
+        readonly amount: number,
+        readonly currency: string,
+    ) {}
+    add(other: Money): Money {
+        if (other.currency !== this.currency) {
+            throw new Error('Currency mismatch');
+        }
+        return new Money(this.amount + other.amount, this.currency);
+    }
+    equals(other: Money): boolean {
+        return this.amount === other.amount && this.currency === other.currency;
+    }
+    toString(): string {
+        return `${this.amount} ${this.currency}`;
     }
 }
 ```
@@ -129,6 +175,65 @@ export class AuthUser {
         return this.id === other.id;
     }
 }
+```
+
+### The domain decides, the use case orchestrates
+
+`readonly` fields make entities immutable — but immutable is NOT the same as anemic. An entity that only carries data and `equals()` while all business rules live in use cases is an **Anemic Domain Model**, the anti-pattern this convention exists to prevent.
+
+Business behavior and invariants belong **on the entity or value object**, expressed as intention-revealing methods that return a **new instance** (the immutable equivalent of state change):
+
+```typescript
+export class License {
+    // ...readonly fields, constructor, equals()...
+
+    // Business verb, validates its own invariant, returns a new instance
+    activate(on: DeviceId): License {
+        if (this.isExpired) {
+            throw new LicenseExpiredError(this.id);
+        }
+        return new License({ ...this.toData(), activatedOn: on.value });
+    }
+}
+```
+
+The use case **orchestrates** — it loads the aggregate from the repository, calls the domain method, and persists the result. It must not contain business rules:
+
+```typescript
+// Correct — use case orchestrates, the entity decides
+execute({ licenseId, deviceId }: ActivateLicenseInput): Promise<void> {
+    const license = await this._licenses.byId(new LicenseId(licenseId));
+    const activated = license.activate(new DeviceId(deviceId)); // ← rule lives here
+    return this._licenses.save(activated);
+}
+
+// Wrong — anemic: the rule leaked into the use case
+execute({ license, deviceId }: ActivateLicenseInput): Promise<void> {
+    if (license.expiresAt < Date.now()) { // ← belongs on License.activate()
+        throw new LicenseExpiredError(license.id);
+    }
+    // ...
+}
+```
+
+**Rule of thumb:** if a rule can be expressed with the data the entity/VO already holds, it lives there — not in the use case.
+
+## Aggregates
+
+A cluster of entities and value objects that change together has an **Aggregate Root** — the single entity through which the cluster is accessed. Even though there are no transactions in the renderer, the aggregate is still the **consistency boundary** of the model.
+
+-   **Child entities are created and modified only through the root.** Never instantiate a child entity on its own and attach it from outside — expose a method on the root (`order.addLine(...)`), not `new OrderLine(...)` followed by `order.setLine(...)`.
+-   **One repository per Aggregate Root**, never per child entity. The repository loads and saves the whole aggregate.
+-   **Reference other aggregates by identity, not by direct object reference.** Hold the other aggregate's id, not its instance. Across bounded contexts this id is a `string` (see [Cross-context type consistency](#cross-context-type-consistency)); within the same context it is the other root's value object id.
+-   **Keep aggregates small.** Most are a single entity plus value objects. Pull an entity into the aggregate only when it must stay consistent with the root; otherwise model it as a separate aggregate referenced by id.
+
+```typescript
+// Correct — mutate through the root, which enforces the invariant
+const updated = order.addLine(productId, new Money(2999, 'USD'));
+
+// Wrong — building a child outside the root bypasses its invariants
+const line = new OrderLine(productId, new Money(2999, 'USD'));
+order.setLine(line); // ← do not do this
 ```
 
 ## Service Contract Types — `domain/services/*.service.types.ts`
