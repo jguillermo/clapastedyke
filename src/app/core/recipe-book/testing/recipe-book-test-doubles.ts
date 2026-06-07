@@ -132,6 +132,18 @@ export class RecordingEventBus extends EventBus {
     }
 }
 
+/** The 8 aggregate repository bindings to in-memory doubles (no EventBus). */
+export const recipeBookRepositoryProviders: Provider[] = [
+    { provide: IngredientRepository, useClass: InMemoryIngredientRepository },
+    { provide: SpongeRecipeRepository, useClass: InMemorySpongeRecipeRepository },
+    { provide: FillingRecipeRepository, useClass: InMemoryFillingRecipeRepository },
+    { provide: CoveringRecipeRepository, useClass: InMemoryCoveringRecipeRepository },
+    { provide: TopperRepository, useClass: InMemoryTopperRepository },
+    { provide: PackagingItemRepository, useClass: InMemoryPackagingItemRepository },
+    { provide: PackagingRuleRepository, useClass: InMemoryPackagingRuleRepository },
+    { provide: CakeCompositionRepository, useClass: InMemoryCakeCompositionRepository },
+];
+
 export interface RecipeBookFakes {
     bus: RecordingEventBus;
     providers: Provider[];
@@ -140,16 +152,6 @@ export interface RecipeBookFakes {
 /** Builds fresh in-memory fakes and the matching Angular providers. */
 export function makeRecipeBookFakes(): RecipeBookFakes {
     const bus = new RecordingEventBus();
-    const providers: Provider[] = [
-        { provide: IngredientRepository, useClass: InMemoryIngredientRepository },
-        { provide: SpongeRecipeRepository, useClass: InMemorySpongeRecipeRepository },
-        { provide: FillingRecipeRepository, useClass: InMemoryFillingRecipeRepository },
-        { provide: CoveringRecipeRepository, useClass: InMemoryCoveringRecipeRepository },
-        { provide: TopperRepository, useClass: InMemoryTopperRepository },
-        { provide: PackagingItemRepository, useClass: InMemoryPackagingItemRepository },
-        { provide: PackagingRuleRepository, useClass: InMemoryPackagingRuleRepository },
-        { provide: CakeCompositionRepository, useClass: InMemoryCakeCompositionRepository },
-        { provide: EventBus, useValue: bus },
-    ];
+    const providers: Provider[] = [...recipeBookRepositoryProviders, { provide: EventBus, useValue: bus }];
     return { bus, providers };
 }

@@ -16,6 +16,7 @@ const STORES = [
     'packaging_items',
     'packaging_rules',
     'cake_compositions',
+    'progress',
 ] as const;
 
 export type StoreName = (typeof STORES)[number];
