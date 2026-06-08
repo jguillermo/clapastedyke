@@ -5,7 +5,7 @@ import { Checkbox } from './checkbox';
 
 @Component({
   imports: [ReactiveFormsModule, Checkbox],
-  template: `<app-checkbox [formControl]="control">Acepto los términos</app-checkbox>`,
+  template: `<migo-checkbox [formControl]="control">Acepto los términos</migo-checkbox>`,
 })
 class Host {
   readonly control = new FormControl(false);

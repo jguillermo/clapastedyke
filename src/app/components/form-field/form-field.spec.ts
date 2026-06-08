@@ -15,7 +15,7 @@ describe('FormField', () => {
     const fixture = TestBed.createComponent(FormField);
     fixture.componentRef.setInput('error', 'Requerido');
     fixture.detectChanges();
-    const error = fixture.nativeElement.querySelector('.app-field__msg--error') as HTMLElement;
+    const error = fixture.nativeElement.querySelector('.migo-field__msg--error') as HTMLElement;
     expect(error.getAttribute('role')).toBe('alert');
     expect(fixture.componentInstance.invalid()).toBe(true);
     expect(fixture.componentInstance.describedBy()).toBe(fixture.componentInstance.errorId);
@@ -25,7 +25,7 @@ describe('FormField', () => {
     const fixture = TestBed.createComponent(FormField);
     fixture.componentRef.setInput('hint', 'Pista');
     fixture.detectChanges();
-    expect(fixture.nativeElement.querySelector('.app-field__msg--hint')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('.migo-field__msg--hint')).toBeTruthy();
     expect(fixture.componentInstance.describedBy()).toBe(fixture.componentInstance.hintId);
   });
 });

@@ -4,7 +4,12 @@ import { Button, ButtonVariant } from './button';
 
 @Component({
   imports: [Button],
-  template: `<button app-button [variant]="variant()" [loading]="loading()" [disabled]="disabled()">
+  template: `<button
+    migo-button
+    [variant]="variant()"
+    [loading]="loading()"
+    [disabled]="disabled()"
+  >
     Go
   </button>`,
 })
@@ -26,9 +31,9 @@ describe('Button', () => {
     const { fixture, button } = setup();
     fixture.componentInstance.variant.set('danger');
     fixture.detectChanges();
-    expect(button.classList).toContain('app-btn');
-    expect(button.classList).toContain('app-btn--danger');
-    expect(button.classList).toContain('app-btn--md');
+    expect(button.classList).toContain('migo-btn');
+    expect(button.classList).toContain('migo-btn--danger');
+    expect(button.classList).toContain('migo-btn--md');
   });
 
   it('disables the native button and marks it busy while loading', () => {
@@ -37,7 +42,7 @@ describe('Button', () => {
     fixture.detectChanges();
     expect(button.disabled).toBe(true);
     expect(button.getAttribute('aria-busy')).toBe('true');
-    expect(button.classList).toContain('app-btn--loading');
+    expect(button.classList).toContain('migo-btn--loading');
   });
 
   it('disables via the disabled input', () => {

@@ -16,16 +16,16 @@ let nextCheckboxId = 0;
 /**
  * Checkbox presentacional. Implementa `ControlValueAccessor` (valor booleano), así que
  * enchufa con Reactive Forms / `ngModel`. La etiqueta es el contenido proyectado.
- * Si está dentro de `<app-form-field>`, toma de él el `aria-describedby` / estado inválido.
+ * Si está dentro de `<migo-form-field>`, toma de él el `aria-describedby` / estado inválido.
  * Sin lógica de negocio.
  */
 @Component({
-  selector: 'app-checkbox',
+  selector: 'migo-checkbox',
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <label class="app-check">
+    <label class="migo-check">
       <input
-        class="app-check__input"
+        class="migo-check__input"
         type="checkbox"
         [id]="controlId()"
         [checked]="checked()"
@@ -36,8 +36,8 @@ let nextCheckboxId = 0;
         (change)="onToggle($event)"
         (blur)="onBlur()"
       />
-      <span class="app-check__box" aria-hidden="true">
-        <svg class="app-check__tick" viewBox="0 0 16 16" fill="none">
+      <span class="migo-check__box" aria-hidden="true">
+        <svg class="migo-check__tick" viewBox="0 0 16 16" fill="none">
           <path
             d="M3.5 8.5l3 3 6-7"
             stroke="currentColor"
@@ -47,14 +47,14 @@ let nextCheckboxId = 0;
           />
         </svg>
       </span>
-      <span class="app-check__label"><ng-content /></span>
+      <span class="migo-check__label"><ng-content /></span>
     </label>
   `,
   styleUrl: './checkbox.css',
   host: {
-    class: 'app-checkbox',
-    '[class.app-checkbox--invalid]': 'isInvalid()',
-    '[class.app-checkbox--disabled]': 'isDisabled()',
+    class: 'migo-checkbox',
+    '[class.migo-checkbox--invalid]': 'isInvalid()',
+    '[class.migo-checkbox--disabled]': 'isDisabled()',
   },
   providers: [{ provide: NG_VALUE_ACCESSOR, useExisting: forwardRef(() => Checkbox), multi: true }],
 })
@@ -66,7 +66,7 @@ export class Checkbox implements ControlValueAccessor {
   readonly invalid = input(false, { transform: booleanAttribute });
   readonly disabled = input(false, { transform: booleanAttribute });
 
-  private readonly fallbackId = `app-checkbox-${nextCheckboxId++}`;
+  private readonly fallbackId = `migo-checkbox-${nextCheckboxId++}`;
   protected readonly checked = signal(false);
   private readonly disabledByForm = signal(false);
 

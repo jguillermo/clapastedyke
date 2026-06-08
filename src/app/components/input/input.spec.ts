@@ -5,7 +5,7 @@ import { InputField } from './input';
 
 @Component({
   imports: [ReactiveFormsModule, InputField],
-  template: `<app-input [formControl]="control" />`,
+  template: `<migo-input [formControl]="control" />`,
 })
 class Host {
   readonly control = new FormControl('');

@@ -15,38 +15,38 @@ let nextFieldId = 0;
  *
  * Uso:
  * ```html
- * <app-form-field label="Email" [error]="emailError()">
- *   <app-input type="email" formControlName="email" />
- * </app-form-field>
+ * <migo-form-field label="Email" [error]="emailError()">
+ *   <migo-input type="email" formControlName="email" />
+ * </migo-form-field>
  * ```
  */
 @Component({
-  selector: 'app-form-field',
+  selector: 'migo-form-field',
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (label()) {
-      <label class="app-field__label" [attr.for]="controlId">
+      <label class="migo-field__label" [attr.for]="controlId">
         {{ label() }}
         @if (required()) {
-          <span class="app-field__req" aria-hidden="true">*</span>
+          <span class="migo-field__req" aria-hidden="true">*</span>
         }
       </label>
     }
 
-    <div class="app-field__control">
+    <div class="migo-field__control">
       <ng-content />
     </div>
 
     @if (error()) {
-      <p class="app-field__msg app-field__msg--error" [id]="errorId" role="alert">
+      <p class="migo-field__msg migo-field__msg--error" [id]="errorId" role="alert">
         {{ error() }}
       </p>
     } @else if (hint()) {
-      <p class="app-field__msg app-field__msg--hint" [id]="hintId">{{ hint() }}</p>
+      <p class="migo-field__msg migo-field__msg--hint" [id]="hintId">{{ hint() }}</p>
     }
   `,
   styleUrl: './form-field.css',
-  host: { class: 'app-field' },
+  host: { class: 'migo-field' },
 })
 export class FormField {
   readonly label = input('');
@@ -55,7 +55,7 @@ export class FormField {
   readonly required = input(false, { transform: booleanAttribute });
 
   /** Id único compartido por el `<label>` y el control hijo. */
-  readonly controlId = `app-field-${nextFieldId++}`;
+  readonly controlId = `migo-field-${nextFieldId++}`;
   readonly hintId = `${this.controlId}-hint`;
   readonly errorId = `${this.controlId}-error`;
 

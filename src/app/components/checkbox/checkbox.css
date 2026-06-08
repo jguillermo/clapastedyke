@@ -4,7 +4,7 @@
   display: inline-block;
 }
 
-.app-check {
+.migo-check {
   display: inline-flex;
   align-items: center;
   gap: var(--s2);
@@ -16,7 +16,7 @@
 }
 
 /* Input nativo accesible pero visualmente oculto: el foco/estado siguen siendo nativos. */
-.app-check__input {
+.migo-check__input {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -29,7 +29,7 @@
   white-space: nowrap;
 }
 
-.app-check__box {
+.migo-check__box {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -46,7 +46,7 @@
     box-shadow var(--dur-base) var(--ease-out);
 }
 
-.app-check__tick {
+.migo-check__tick {
   width: 14px;
   height: 14px;
   opacity: 0;
@@ -54,18 +54,18 @@
 }
 
 /* Marcado */
-.app-check__input:checked + .app-check__box,
-.app-check__input:indeterminate + .app-check__box {
+.migo-check__input:checked + .migo-check__box,
+.migo-check__input:indeterminate + .migo-check__box {
   background-color: var(--brand);
   border-color: var(--brand);
 }
 
-.app-check__input:checked + .app-check__box .app-check__tick {
+.migo-check__input:checked + .migo-check__box .migo-check__tick {
   opacity: 1;
 }
 
 /* Indeterminado: barra horizontal en lugar del check */
-.app-check__input:indeterminate + .app-check__box::after {
+.migo-check__input:indeterminate + .migo-check__box::after {
   content: '';
   position: absolute;
   width: 10px;
@@ -74,35 +74,35 @@
   background-color: var(--text-on-brand);
 }
 
-.app-check__box {
+.migo-check__box {
   position: relative;
 }
 
 /* Foco visible (solo teclado) */
-.app-check__input:focus-visible + .app-check__box {
+.migo-check__input:focus-visible + .migo-check__box {
   outline: none;
   box-shadow: var(--focus-ring);
 }
 
 /* Inválido */
-:host(.app-checkbox--invalid) .app-check__box {
+:host(.migo-checkbox--invalid) .migo-check__box {
   border-color: var(--error);
 }
 
 /* Deshabilitado */
-:host(.app-checkbox--disabled) .app-check {
+:host(.migo-checkbox--disabled) .migo-check {
   cursor: not-allowed;
   color: var(--text-muted);
 }
 
-:host(.app-checkbox--disabled) .app-check__box {
+:host(.migo-checkbox--disabled) .migo-check__box {
   background-color: var(--surface-sunken);
   border-color: var(--border-subtle);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .app-check__box,
-  .app-check__tick {
+  .migo-check__box,
+  .migo-check__tick {
     transition: none;
   }
 }

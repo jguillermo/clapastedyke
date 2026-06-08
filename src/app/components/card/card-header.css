@@ -1,0 +1,27 @@
+:host {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  padding: var(--s5) var(--s6) var(--s3);
+}
+
+/* Icono leading (svg/img proyectado). */
+:host ::ng-deep [card-icon] {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  color: var(--brand);
+}
+
+.migo-card__heading {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s1);
+  min-width: 0;
+}
+
+/* Acciones trailing (p. ej. botón cerrar). */
+:host ::ng-deep [card-actions] {
+  margin-inline-start: auto;
+  flex: 0 0 auto;
+}

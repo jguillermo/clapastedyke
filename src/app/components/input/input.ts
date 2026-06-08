@@ -19,15 +19,15 @@ let nextInputId = 0;
  * Control de texto presentacional. Implementa `ControlValueAccessor`, así que enchufa
  * directamente con Reactive Forms (`formControlName`, `[formControl]`) o `ngModel`.
  *
- * Si está dentro de `<app-form-field>`, toma de él el `id` / `aria-describedby` / estado
+ * Si está dentro de `<migo-form-field>`, toma de él el `id` / `aria-describedby` / estado
  * inválido. Standalone, usar `ariaLabel` para accesibilidad. Sin lógica de negocio.
  */
 @Component({
-  selector: 'app-input',
+  selector: 'migo-input',
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <input
-      class="app-input__control"
+      class="migo-input__control"
       [id]="controlId()"
       [type]="type()"
       [value]="value()"
@@ -42,9 +42,9 @@ let nextInputId = 0;
   `,
   styleUrl: './input.css',
   host: {
-    class: 'app-input',
-    '[class.app-input--invalid]': 'isInvalid()',
-    '[class.app-input--disabled]': 'isDisabled()',
+    class: 'migo-input',
+    '[class.migo-input--invalid]': 'isInvalid()',
+    '[class.migo-input--disabled]': 'isDisabled()',
   },
   providers: [
     { provide: NG_VALUE_ACCESSOR, useExisting: forwardRef(() => InputField), multi: true },
@@ -56,14 +56,14 @@ export class InputField implements ControlValueAccessor {
 
   readonly type = input<InputType>('text');
   readonly placeholder = input('');
-  /** Etiqueta accesible cuando se usa sin `app-form-field`. */
+  /** Etiqueta accesible cuando se usa sin `migo-form-field`. */
   readonly ariaLabel = input('');
-  /** Fuerza el estado inválido sin un `app-form-field` que lo provea. */
+  /** Fuerza el estado inválido sin un `migo-form-field` que lo provea. */
   readonly invalid = input(false, { transform: booleanAttribute });
   /** Deshabilita el control en uso standalone (con forms, lo gestiona el FormControl). */
   readonly disabled = input(false, { transform: booleanAttribute });
 
-  private readonly fallbackId = `app-input-${nextInputId++}`;
+  private readonly fallbackId = `migo-input-${nextInputId++}`;
   protected readonly value = signal('');
   private readonly disabledByForm = signal(false);
 

@@ -5,7 +5,7 @@
 @import './styles/migo/index.css';
 @import 'tailwindcss';
 
-/* Base de posicionamiento/backdrop del CDK Overlay (lo usa app-dialog). */
+/* Base de posicionamiento/backdrop del CDK Overlay (lo usa MigoDialog vía CDK Dialog). */
 @import '@angular/cdk/overlay-prebuilt.css';
 
 /* Base global — paleta y tipografía Migo (tokens vía skill migo-design) */
@@ -34,9 +34,37 @@ h3 {
   letter-spacing: var(--tracking-heading);
 }
 
-/* Backdrop del diálogo (app-dialog). El CDK crea el backdrop en el contenedor del
-   overlay, fuera de cualquier componente, por eso su estilo es necesariamente global. */
-.app-dialog__backdrop {
+/* Diálogo (MigoDialog). El Dialog es un shell agnóstico: solo overlay + backdrop + foco.
+   El contenedor del overlay es TRANSPARENTE — la superficie (fondo/radio/sombra/padding) la
+   aporta el componente que se envía, típicamente con un <migo-card>. El backdrop y la animación
+   se estilan aquí (global) porque el CDK los crea fuera de cualquier componente.
+   El ancho lo decide quien abre vía MigoDialogConfig.width. */
+.migo-dialog__backdrop {
   background: rgba(47, 33, 24, 0.44);
 }
 
+.migo-dialog__panel .cdk-dialog-container {
+  display: block;
+  max-width: 92vw;
+  background: transparent;
+  padding: 0;
+  outline: none;
+  animation: migo-dialog-in var(--dur-slow) var(--ease-out);
+}
+
+@keyframes migo-dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .migo-dialog__panel .cdk-dialog-container {
+    animation: none;
+  }
+}

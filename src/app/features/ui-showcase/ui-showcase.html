@@ -10,29 +10,29 @@
 
     <h3>Variantes</h3>
     <div class="showcase__row">
-      <button app-button variant="primary">Primary</button>
-      <button app-button variant="secondary">Secondary</button>
-      <button app-button variant="ghost">Ghost</button>
-      <button app-button variant="danger">Danger</button>
+      <button migo-button variant="primary">Primary</button>
+      <button migo-button variant="secondary">Secondary</button>
+      <button migo-button variant="ghost">Ghost</button>
+      <button migo-button variant="danger">Danger</button>
     </div>
 
     <h3>Tamaños</h3>
     <div class="showcase__row showcase__row--baseline">
-      <button app-button size="sm">Small</button>
-      <button app-button size="md">Medium</button>
-      <button app-button size="lg">Large</button>
+      <button migo-button size="sm">Small</button>
+      <button migo-button size="md">Medium</button>
+      <button migo-button size="lg">Large</button>
     </div>
 
     <h3>Estados</h3>
     <div class="showcase__row">
-      <button app-button [disabled]="true">Disabled</button>
-      <button app-button [loading]="loadingDemo()" (click)="simulateLoading()">
+      <button migo-button [disabled]="true">Disabled</button>
+      <button migo-button [loading]="loadingDemo()" (click)="simulateLoading()">
         {{ loadingDemo() ? 'Guardando…' : 'Simular carga' }}
       </button>
     </div>
 
     <h3>Ancho completo</h3>
-    <button app-button block>Block</button>
+    <button migo-button block>Block</button>
   </section>
 
   <!-- ====================== FormField + Input ====================== -->
@@ -40,7 +40,7 @@
     <h2>FormField + Input</h2>
 
     <form [formGroup]="form" class="showcase__form">
-      <app-form-field
+      <migo-form-field
         label="Email"
         hint="Te enviaremos la confirmación aquí"
         required
@@ -50,57 +50,112 @@
             : ''
         "
       >
-        <app-input type="email" placeholder="hola@migo.com" formControlName="email" />
-      </app-form-field>
+        <migo-input type="email" placeholder="hola@migo.com" formControlName="email" />
+      </migo-form-field>
 
-      <app-form-field
+      <migo-form-field
         label="País"
         required
         [error]="
           form.controls.country.touched && form.controls.country.invalid ? 'Elige un país' : ''
         "
       >
-        <app-select
+        <migo-select
           [options]="countries"
           placeholder="Selecciona un país"
           formControlName="country"
         />
-      </app-form-field>
+      </migo-form-field>
 
-      <app-form-field
+      <migo-form-field
         [error]="
           form.controls.terms.touched && form.controls.terms.invalid
             ? 'Debes aceptar para continuar'
             : ''
         "
       >
-        <app-checkbox formControlName="terms">Acepto los términos y condiciones</app-checkbox>
-      </app-form-field>
+        <migo-checkbox formControlName="terms">Acepto los términos y condiciones</migo-checkbox>
+      </migo-form-field>
 
       <p class="showcase__value">
         Valor del formulario: <code>{{ formValue() | json }}</code>
       </p>
 
-      <button app-button type="button" variant="secondary" (click)="toggleEmailDisabled()">
+      <button migo-button type="button" variant="secondary" (click)="toggleEmailDisabled()">
         {{ form.controls.email.disabled ? 'Habilitar' : 'Deshabilitar' }} input
       </button>
     </form>
   </section>
 
+  <!-- ============================ Card ============================ -->
+  <section class="showcase__section">
+    <h2>Card</h2>
+
+    <h3>Variantes</h3>
+    <div class="showcase__cards">
+      <migo-card variant="elevated">
+        <migo-card-header>
+          <svg card-icon viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path
+              d="M12 2 2 7l10 5 10-5-10-5ZM2 17l10 5 10-5M2 12l10 5 10-5"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+          <migo-card-title>Elevated</migo-card-title>
+          <migo-card-subtitle>Con sombra</migo-card-subtitle>
+        </migo-card-header>
+        <migo-card-body
+          >Superficie elevada con sombra. Header con icono, título y subtítulo.</migo-card-body
+        >
+        <migo-card-footer>
+          <button migo-button variant="ghost" size="sm">Cancelar</button>
+          <button migo-button size="sm">Aceptar</button>
+        </migo-card-footer>
+      </migo-card>
+
+      <migo-card variant="outlined">
+        <migo-card-header><migo-card-title>Outlined</migo-card-title></migo-card-header>
+        <migo-card-body>Borde sutil, sin sombra.</migo-card-body>
+      </migo-card>
+
+      <migo-card variant="filled">
+        <migo-card-header><migo-card-title>Filled</migo-card-title></migo-card-header>
+        <migo-card-body>Fondo hundido, sin borde ni sombra.</migo-card-body>
+      </migo-card>
+    </div>
+
+    <h3>Elevaciones</h3>
+    <div class="showcase__cards">
+      <migo-card elevation="sm"><migo-card-body>elevation sm</migo-card-body></migo-card>
+      <migo-card elevation="md"><migo-card-body>elevation md</migo-card-body></migo-card>
+      <migo-card elevation="lg"><migo-card-body>elevation lg</migo-card-body></migo-card>
+    </div>
+
+    <h3>Interactivo</h3>
+    <div class="showcase__cards">
+      <migo-card interactive>
+        <migo-card-body
+          >Pasa el ratón o tabula: sube la sombra y muestra focus-ring.</migo-card-body
+        >
+      </migo-card>
+    </div>
+  </section>
+
   <!-- ============================ Dialog ============================ -->
   <section class="showcase__section">
     <h2>Dialog</h2>
-    <button app-button (click)="dialogOpen.set(true)">Abrir diálogo</button>
+    <p class="showcase__value">
+      <code>MigoDialog.open(ConfirmDialog)</code> — el diálogo es un componente.
+    </p>
+    <button migo-button (click)="openConfirm()">Abrir diálogo</button>
 
-    <app-dialog [open]="dialogOpen()" title="¿Confirmar acción?" (closed)="dialogOpen.set(false)">
-      <p>
-        Este diálogo se renderiza en un CDK Overlay con focus-trap, bloqueo de scroll y cierre por
-        ESC o backdrop. El foco vuelve al botón al cerrar.
+    @if (dialogResult() !== null) {
+      <p class="showcase__value">
+        Último resultado: <code>{{ dialogResult() ? 'Aceptar' : 'Cancelar' }}</code>
       </p>
-      <button app-button dialog-footer variant="ghost" (click)="dialogOpen.set(false)">
-        Cancelar
-      </button>
-      <button app-button dialog-footer (click)="dialogOpen.set(false)">Aceptar</button>
-    </app-dialog>
+    }
   </section>
 </main>

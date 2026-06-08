@@ -9,6 +9,10 @@ reutilizables**. El **comportamiento** lo aporta **Angular CDK** (overlay, focus
 a11y); el **estilo**, exclusivamente los **tokens del design system Migo**
 (`src/styles/migo/*.css`). No son páginas ni conocen rutas; los consume cualquier feature.
 
+> **Catálogo vivo:** [`src/app/components/README.md`](../../src/app/components/README.md) lista los
+> componentes creados, cómo se usan y el roadmap de lo que falta. Al crear un componente, añade su
+> fila y su sección de uso allí.
+
 ## La regla de oro: CERO lógica de negocio
 
 Un componente de `components/` **nunca** contiene ni conoce lógica de negocio. Solo presenta lo
@@ -44,21 +48,27 @@ components/
 │   ├── button.ts
 │   ├── button.css
 │   └── button.spec.ts
+├── card/          # migo-card + partes (-header/-title/-subtitle/-body/-footer)
 ├── form-field/
 ├── input/
 ├── checkbox/
 ├── select/
-└── dialog/
+└── dialog/        # solo el servicio MigoDialog (sin chrome)
 ```
 
 ## Naming
 
 - **Sin sufijo `.component`** en fichero ni clase: `button.ts` / `class Button`.
-- Selectores en kebab-case con prefijo `app-`: `app-select`, `app-checkbox`, `app-dialog`.
+- Selectores en kebab-case con prefijo **`migo-`** (es el design system Migo): `migo-select`,
+  `migo-checkbox`, `migo-card-title`. **No `app-`** — ese prefijo es para las features
+  (`app-home`, `app-ui-showcase`). `angular.json` mantiene `prefix: app`; los componentes del DS
+  usan `migo-` por convención (no hay ESLint que lo imponga).
+- Las **clases CSS internas** también llevan el prefijo `migo-` (`migo-btn`, `migo-field__label`,
+  `migo-dialog__panel`).
 - Para controles montados sobre un elemento nativo, **selector de atributo** sobre el nativo:
-  `selector: 'button[app-button], a[app-button]'` (conserva la semántica accesible).
+  `selector: 'button[migo-button], a[migo-button]'` (conserva la semántica accesible).
 - El nombre de la clase puede divergir del selector si evita colisiones
-  (`app-input` → `class InputField`, para no chocar con el decorador `Input` de Angular).
+  (`migo-input` → `class InputField`, para no chocar con el decorador `Input` de Angular).
 
 ## Reglas de componente (alineadas con CLAUDE.md)
 
@@ -90,7 +100,7 @@ nativo (`input`, `change`). No hay validación de negocio dentro del control.
 
 ## Composición con `FormField`
 
-`FormField` (`app-form-field`) es el contenedor de **label + hint + error**: genera el `id`, la
+`FormField` (`migo-form-field`) es el contenedor de **label + hint + error**: genera el `id`, la
 relación ARIA (`for`, `aria-describedby`) y la región de error. Solo renderiza el `<label>` si
 recibe `label` (así sirve de contenedor de solo-error para controles con etiqueta propia, como
 el checkbox).
@@ -107,23 +117,65 @@ protected readonly isInvalid = computed(() => (this.field?.invalid() ?? false) |
 Standalone (sin `FormField`) el control sigue funcionando y expone `ariaLabel` para la
 accesibilidad.
 
-## Componentes con CDK Overlay (Dialog, Select)
+## Dialog: servicio que abre un componente
 
-Para popups (diálogo, panel de select) usar **CDK Overlay**. Patrón:
+El diálogo **no** es un componente declarativo: es un **servicio `MigoDialog`** (sobre
+**`@angular/cdk/dialog`**) que **abre un componente**. El componente que se abre **es** el
+diálogo.
 
-- El contenido del overlay vive en un **`<ng-template>` dentro del componente**. Al portarlo
-  (`TemplatePortal` / `cdkConnectedOverlay`), la **encapsulación emulada sigue aplicando los
-  estilos scoped** del `.css` del componente (los selectores `[_ngcontent-xxx]` casan por
-  atributo, no por posición en el DOM). **No** hace falta `ViewEncapsulation.None`.
-- Lo que el CDK crea **fuera** del componente (el **backdrop**) no recibe estilos scoped → su
-  estilo es **global** y vive en `src/styles.css` (p.ej. `.app-dialog__backdrop`). Es la única
-  excepción global y debe documentarse en el `.css` del componente.
-- Foco: `cdkTrapFocus cdkTrapFocusAutoCapture` (de `@angular/cdk/a11y`) atrapa el foco y lo
-  devuelve al disparador al cerrar.
-- Para listas seleccionables (select) usar `cdkListbox` + `cdkOption` (`@angular/cdk/listbox`):
-  aportan teclado (flechas, Home/End, type-ahead), roles ARIA y gestión de foco.
-- El estado abierto/cerrado es **declarativo** vía un input (`[open]`) o un signal interno; el
-  componente adjunta/desadjunta el overlay en un `effect()` y emite la salida correspondiente.
+```typescript
+const ref = migoDialog.open<boolean>(ConfirmDialog, { data: { message }, ariaLabel: 'Confirmar' });
+ref.closed.subscribe((result) => { ... });
+```
+
+- `MigoDialog.open(Componente, config?)` envuelve el `Dialog` de CDK y aplica los defaults Migo
+  (`panelClass: migo-dialog__panel`, `backdropClass: migo-dialog__backdrop`). CDK Dialog ya aporta
+  overlay centrado, backdrop, **focus-trap + restauración de foco**, **ESC** y bloqueo de scroll.
+- El componente abierto inyecta **`MigoDialogRef`** para cerrarse (`ref.close(resultado)`) y
+  **`MIGO_DIALOG_DATA`** para recibir datos. Ambos se re-exportan desde `dialog.service.ts`
+  (son el `DialogRef`/`DIALOG_DATA` de CDK con nombre de marca).
+- **Nombre accesible** vía `MigoDialogConfig.ariaLabel` al abrir (el contenedor de CDK Dialog lo
+  lee en init).
+- **El componente de contenido vive en `features/`**, no en `components/` (su texto es contenido
+  de la app). El DS solo aporta el servicio.
+- **El Dialog es un shell agnóstico**: NO aporta chrome (ni título, ni cuerpo, ni acciones). El
+  contenedor del overlay es **transparente** (`.migo-dialog__panel .cdk-dialog-container` en
+  `src/styles.css`: `background: transparent; padding: 0`). Toda la vista (superficie, header,
+  body, footer) la pone el componente enviado, **típicamente con un `migo-card`**.
+- **El ancho** lo decide quien abre vía `MigoDialogConfig.width` (CDK), no el shell.
+- Solo el **backdrop** y la **animación** de entrada son globales (los crea el CDK fuera de
+  cualquier componente).
+
+## Card (superficie / maquetación)
+
+`Card` es la pieza de maquetación del DS y la superficie que normalmente se monta dentro de un
+diálogo. Composición por subcomponentes:
+
+- **`migo-card`** (`class Card`): contenedor. Inputs `variant` (`elevated`|`outlined`|`filled`),
+  `elevation` (`sm`|`md`|`lg`, solo elevated), `interactive` (hover sube sombra + cursor +
+  focus-ring; pone `tabindex=0`). `border-radius: var(--r-xl)`, `overflow: hidden`, **sin padding**
+  (lo ponen las partes). Variantes con `[class.migo-card--*]` (class bindings).
+- **`migo-card-header`**: fila con slot `[card-icon]` (icono leading), bloque de título/subtítulo
+  (contenido por defecto) y slot `[card-actions]` (trailing, `margin-inline-start:auto`).
+- **`migo-card-title`** (`<h3>`), **`migo-card-subtitle`** (`<p>` muted).
+- **`migo-card-body`**: contenido con padding.
+- **`migo-card-footer`**: fila de acciones a la derecha, con `border-top`.
+
+Sombras por nivel: `--shadow-sm/md/lg`. Iconos: se proyectan (`[card-icon]`), no hay sistema de
+iconos propio. Todo el estilo con tokens Migo.
+
+## Select con CDK Overlay + Listbox
+
+El `Select` (panel desplegable) sí usa **CDK Overlay** declarativo:
+
+- El panel vive en un **`<ng-template cdkConnectedOverlay>` dentro del componente**: la
+  **encapsulación emulada sigue aplicando los estilos scoped** del `.css` (los selectores
+  `[_ngcontent-xxx]` casan por atributo, no por posición en el DOM). **No** hace falta
+  `ViewEncapsulation.None`.
+- Lista con `cdkListbox` + `cdkOption` (`@angular/cdk/listbox`): teclado (flechas, Home/End,
+  type-ahead), roles ARIA y gestión de foco. `cdkTrapFocus cdkTrapFocusAutoCapture` para el foco.
+- Estado abierto/cerrado con un signal interno; abre/cierra en respuesta a eventos del overlay
+  (`overlayOutsideClick`, `overlayKeydown`).
 
 ## Accesibilidad (requisito duro)
 

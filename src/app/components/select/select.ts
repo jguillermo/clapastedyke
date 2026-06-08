@@ -28,18 +28,18 @@ let nextSelectId = 0;
  * Select (combobox) presentacional. El disparador abre, vía CDK Overlay, un panel con un
  * `cdkListbox` que aporta teclado (flechas, Home/End, type-ahead), roles ARIA y foco.
  * Implementa `ControlValueAccessor` (valor `string`), así que enchufa con Reactive Forms.
- * Si está dentro de `<app-form-field>`, toma de él id / `aria-describedby` / estado inválido.
+ * Si está dentro de `<migo-form-field>`, toma de él id / `aria-describedby` / estado inválido.
  * Sin lógica de negocio.
  */
 @Component({
-  selector: 'app-select',
+  selector: 'migo-select',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [OverlayModule, CdkListboxModule, A11yModule],
   template: `
     <button
       #trigger
       type="button"
-      class="app-select__trigger"
+      class="migo-select__trigger"
       cdkOverlayOrigin
       #origin="cdkOverlayOrigin"
       [id]="controlId()"
@@ -52,12 +52,12 @@ let nextSelectId = 0;
       (click)="toggle()"
     >
       <span
-        class="app-select__value"
-        [class.app-select__value--placeholder]="selectedLabel() === null"
+        class="migo-select__value"
+        [class.migo-select__value--placeholder]="selectedLabel() === null"
       >
         {{ selectedLabel() ?? placeholder() }}
       </span>
-      <span class="app-select__chevron" aria-hidden="true"></span>
+      <span class="migo-select__chevron" aria-hidden="true"></span>
     </button>
 
     <ng-template
@@ -70,7 +70,7 @@ let nextSelectId = 0;
       (detach)="close()"
     >
       <ul
-        class="app-select__panel"
+        class="migo-select__panel"
         cdkListbox
         cdkTrapFocus
         cdkTrapFocusAutoCapture
@@ -79,12 +79,12 @@ let nextSelectId = 0;
       >
         @for (option of options(); track option.value) {
           <li
-            class="app-select__option"
+            class="migo-select__option"
             [cdkOption]="option.value"
             [cdkOptionDisabled]="option.disabled ?? false"
           >
-            <span class="app-select__option-label">{{ option.label }}</span>
-            <span class="app-select__option-check" aria-hidden="true"></span>
+            <span class="migo-select__option-label">{{ option.label }}</span>
+            <span class="migo-select__option-check" aria-hidden="true"></span>
           </li>
         }
       </ul>
@@ -92,10 +92,10 @@ let nextSelectId = 0;
   `,
   styleUrl: './select.css',
   host: {
-    class: 'app-select',
-    '[class.app-select--invalid]': 'isInvalid()',
-    '[class.app-select--disabled]': 'isDisabled()',
-    '[class.app-select--open]': 'isOpen()',
+    class: 'migo-select',
+    '[class.migo-select--invalid]': 'isInvalid()',
+    '[class.migo-select--disabled]': 'isDisabled()',
+    '[class.migo-select--open]': 'isOpen()',
   },
   providers: [{ provide: NG_VALUE_ACCESSOR, useExisting: forwardRef(() => Select), multi: true }],
 })
@@ -109,7 +109,7 @@ export class Select implements ControlValueAccessor {
   readonly disabled = input(false, { transform: booleanAttribute });
 
   private readonly trigger = viewChild.required<ElementRef<HTMLButtonElement>>('trigger');
-  private readonly fallbackId = `app-select-${nextSelectId++}`;
+  private readonly fallbackId = `migo-select-${nextSelectId++}`;
 
   private readonly selected = signal<string | null>(null);
   private readonly disabledByForm = signal(false);

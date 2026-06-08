@@ -6,34 +6,34 @@
   gap: var(--s2);
 }
 
-.app-field__label {
+.migo-field__label {
   font-family: var(--font-body);
   font-size: var(--fs-body-s);
   font-weight: var(--fw-semibold);
   color: var(--text-body);
 }
 
-.app-field__req {
+.migo-field__req {
   margin-inline-start: var(--s1);
   color: var(--accent);
 }
 
-.app-field__control {
+.migo-field__control {
   display: flex;
   flex-direction: column;
 }
 
-.app-field__msg {
+.migo-field__msg {
   margin: 0;
   font-size: var(--fs-caption);
   line-height: var(--lh-snug);
 }
 
-.app-field__msg--hint {
+.migo-field__msg--hint {
   color: var(--text-muted);
 }
 
-.app-field__msg--error {
+.migo-field__msg--error {
   color: var(--error);
   font-weight: var(--fw-medium);
 }

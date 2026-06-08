@@ -1,0 +1,10 @@
+:host {
+  display: block;
+}
+
+.migo-card__subtitle {
+  margin: 0;
+  font-size: var(--fs-body-s);
+  color: var(--text-muted);
+  line-height: var(--lh-snug);
+}

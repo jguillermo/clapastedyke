@@ -1,0 +1,59 @@
+/* Card Migo — superficie. Solo tokens del design system. */
+
+:host {
+  display: block;
+  border-radius: var(--r-xl);
+  overflow: hidden; /* media/contenido a sangre respeta el radio */
+  background-color: var(--surface-card);
+}
+
+/* ---------- Variantes ---------- */
+:host(.migo-card--elevated) {
+  background-color: var(--surface-card);
+  box-shadow: var(--shadow-md);
+}
+:host(.migo-card--elevated.migo-card--sm) {
+  box-shadow: var(--shadow-sm);
+}
+:host(.migo-card--elevated.migo-card--md) {
+  box-shadow: var(--shadow-md);
+}
+:host(.migo-card--elevated.migo-card--lg) {
+  box-shadow: var(--shadow-lg);
+}
+
+:host(.migo-card--outlined) {
+  background-color: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  box-shadow: none;
+}
+
+:host(.migo-card--filled) {
+  background-color: var(--surface-sunken);
+  box-shadow: none;
+}
+
+/* ---------- Interactivo (clicable) ---------- */
+:host(.migo-card--interactive) {
+  cursor: pointer;
+  transition:
+    box-shadow var(--dur-base) var(--ease-out),
+    transform var(--dur-base) var(--ease-out);
+}
+:host(.migo-card--interactive:hover) {
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-1px);
+}
+:host(.migo-card--interactive:focus-visible) {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :host(.migo-card--interactive) {
+    transition: none;
+  }
+  :host(.migo-card--interactive:hover) {
+    transform: none;
+  }
+}

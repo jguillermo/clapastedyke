@@ -5,7 +5,7 @@ import { Select, SelectOption } from './select';
 
 @Component({
   imports: [ReactiveFormsModule, Select],
-  template: `<app-select [options]="options" [formControl]="control" />`,
+  template: `<migo-select [options]="options" [formControl]="control" />`,
 })
 class Host {
   readonly options: SelectOption[] = [
@@ -20,7 +20,7 @@ describe('Select (ControlValueAccessor)', () => {
   let fixture: ComponentFixture<Host>;
 
   function triggerButton(): HTMLButtonElement {
-    return fixture.nativeElement.querySelector('.app-select__trigger') as HTMLButtonElement;
+    return fixture.nativeElement.querySelector('.migo-select__trigger') as HTMLButtonElement;
   }
 
   async function open(): Promise<void> {
@@ -35,19 +35,19 @@ describe('Select (ControlValueAccessor)', () => {
 
   it('opens a listbox panel with one option per item', async () => {
     await open();
-    const panel = document.querySelector('.app-select__panel');
+    const panel = document.querySelector('.migo-select__panel');
     expect(panel?.getAttribute('role')).toBe('listbox');
-    expect(document.querySelectorAll('.app-select__option').length).toBe(3);
+    expect(document.querySelectorAll('.migo-select__option').length).toBe(3);
   });
 
   it('selecting an option updates the control and closes the panel', async () => {
     await open();
-    const options = document.querySelectorAll<HTMLElement>('.app-select__option');
+    const options = document.querySelectorAll<HTMLElement>('.migo-select__option');
     options[1].click();
     fixture.detectChanges();
     await fixture.whenStable();
     expect(fixture.componentInstance.control.value).toBe('es');
-    expect(document.querySelector('.app-select__panel')).toBeNull();
+    expect(document.querySelector('.migo-select__panel')).toBeNull();
   });
 
   it('shows the selected label in the trigger when the control has a value', async () => {

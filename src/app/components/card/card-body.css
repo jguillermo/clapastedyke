@@ -1,0 +1,11 @@
+:host {
+  display: block;
+  padding: 0 var(--s6) var(--s5);
+  color: var(--text-body);
+  line-height: var(--lh-body);
+}
+
+/* Si el card no tiene header, el body recupera el padding superior. */
+:host:first-child {
+  padding-top: var(--s6);
+}
