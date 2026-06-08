@@ -24,7 +24,7 @@ const ELEVATION_SHADOW: Record<CardElevation, string> = {
  * ```html
  * <migo-card variant="elevated" elevation="md">
  *   <migo-card-header>
- *     <svg card-icon>…</svg>
+ *     <migo-icon card-icon name="mat:layers" size="lg" />
  *     <migo-card-title>Título</migo-card-title>
  *   </migo-card-header>
  *   <migo-card-body>…</migo-card-body>

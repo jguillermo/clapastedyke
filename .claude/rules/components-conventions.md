@@ -194,6 +194,57 @@ iconos propio. Todo el estilo con utilidades del tema.
 > Nota: las variantes arbitrarias estructurales (`[&>*]:`, `[&.cdk-option-active]:`) **sí** se
 > permiten — lo prohibido son los **valores** arbitrarios (`size-[24px]`, `bg-[#fff]`).
 
+## Iconos — SIEMPRE `migo-icon`
+
+**Prohibido incrustar `<svg>` sueltos en plantillas.** Todo icono se pinta con
+**`<migo-icon name="…">`** (`components/icon/`), que lee un **registro tipado**
+(`icon.registry.ts`) y lo pinta como `<svg fill="currentColor">`.
+
+Esta regla es **exclusivamente para iconos** (glifos inline de la UI). Las imágenes SVG
+(logos, ilustraciones, fondos) van en `src/assets/images/` y se cargan con `NgOptimizedImage`
+o `<img>` — nunca con `<migo-icon>`.
+
+### Prefijos de librería
+
+Los nombres de icono llevan un prefijo que identifica su librería de origen:
+
+| Prefijo | Librería | Formato del nombre |
+|---------|----------|--------------------|
+| `mat:` | Material Design Icons (Filled, 24×24) | snake_case original (`mat:expand_more`) |
+| `custom:` | Iconos propios sin librería externa | cualquiera |
+
+Ejemplo: `<migo-icon name="mat:check" size="md" color="brand" />`
+
+El `name` es `input.required<IconName>` → un nombre inexistente es **error de compilación**.
+El nombre después del prefijo es **el nombre original de la librería**, nunca traducido.
+
+### Cómo añadir un icono
+
+1. `npm install -D <paquete>` — **solo dev**; no llega al bundle de producción.
+2. Abrir el SVG del icono en `node_modules/<paquete>/…` y copiar el atributo `d` del `<path>`.
+3. Registrar en `icon.registry.ts`: añadir el nombre al sub-tipo de la librería (`MatIconName`,
+   etc.) y el `d` a `ICON_PATHS`.
+4. Añadir un comentario inline: `// mat · <nombre original>`.
+5. Si es una **librería nueva**: definir un nuevo sub-tipo, ampliar la unión `IconName` y
+   documentar la fuente y la ruta de los SVGs en el bloque de cabecera del registro.
+
+### Iconos propios (`custom:`)
+
+Si no existe un icono adecuado en ninguna librería, añadir el nombre a `CustomIconName` con un
+comentario `// custom · descripción`.
+
+### Resto de reglas de uso
+
+- **`size`** (`xs|sm|md|lg|xl` → `size-3.5/4/5/6/8`) y **`color`** (`current` + semánticos →
+  `text-*`) salen de inputs del DS; viven en el `<svg>` interno. Las clases de **animación**
+  (`opacity-*`, `rotate-*`, `transition-*`) las pone el consumidor en el propio `<migo-icon>`
+  (van al host, afectan al svg) — así no chocan con el tamaño. Ej. checkbox (check con `opacity`),
+  select (chevron con `rotate-180`).
+- Decorativo por defecto (`aria-hidden`); con `ariaLabel` pasa a `role="img"` + `aria-label`.
+- En slots de icono (`[card-icon]`) se proyecta un `<migo-icon card-icon name="mat:…" size="lg">`.
+- Excepción: glifos que **no** son icono (p.ej. la barra de indeterminado del checkbox) siguen
+  siendo un elemento con utilidades de tamaño del tema, no un `migo-icon`.
+
 ## Select con CDK Overlay + Listbox
 
 El `Select` (panel desplegable) sí usa **CDK Overlay** declarativo:
@@ -250,9 +301,9 @@ que **genera** una utilidad por cada token semántico. Todo el estilo de la app 
   `body`→`text-base`, `body-s`→`text-sm`, `overline`→`text-eyebrow` (headings: `text-display`,
   `text-h1`…`text-h4`). Los colores de borde Migo (`--border-subtle/strong`) generan
   `border-border-subtle`/`border-border-strong` (doble `border` esperado).
-- **Glifos**: dimensiones de glifos decorativos (check, chevron, barra de indeterminado) se hacen
-  con **SVG** dimensionado con pasos de escala (`size-3`, `size-3.5`, `w-2.5 h-0.5`), nunca con
-  trucos de borde a px sueltos.
+- **Iconos**: van por `<migo-icon>` (ver sección "Iconos"), nunca `<svg>` sueltos. Glifos que no son
+  icono (p.ej. la barra de indeterminado del checkbox) se dimensionan con pasos de escala
+  (`w-2.5 h-0.5`), nunca con trucos de borde a px sueltos.
 
 Las animaciones globales que apuntan a DOM del CDK (backdrop/panel del diálogo) **sí** viven como
 CSS global en `src/styles.css` — no pueden ser utilidades porque el CDK genera ese DOM.

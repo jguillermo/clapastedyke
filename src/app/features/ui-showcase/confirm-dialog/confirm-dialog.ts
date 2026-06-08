@@ -6,6 +6,7 @@ import { CardFooter } from '@components/card/card-footer';
 import { CardHeader } from '@components/card/card-header';
 import { CardTitle } from '@components/card/card-title';
 import { MIGO_DIALOG_DATA, MigoDialogRef } from '@components/dialog/dialog.service';
+import { Icon } from '@components/icon/icon';
 
 export interface ConfirmDialogData {
   title: string;
@@ -20,19 +21,11 @@ export interface ConfirmDialogData {
 @Component({
   selector: 'app-confirm-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Button, Card, CardHeader, CardTitle, CardBody, CardFooter],
+  imports: [Button, Card, CardHeader, CardTitle, CardBody, CardFooter, Icon],
   template: `
     <migo-card>
       <migo-card-header>
-        <svg card-icon viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path
-            d="M12 8v5m0 3h.01M10.3 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.7 3.86a2 2 0 0 0-3.4 0Z"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          />
-        </svg>
+        <migo-icon card-icon name="mat:warning" size="lg" color="brand" />
         <migo-card-title>{{ data.title }}</migo-card-title>
       </migo-card-header>
 

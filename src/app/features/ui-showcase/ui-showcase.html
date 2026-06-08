@@ -113,15 +113,7 @@
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
       <migo-card variant="elevated">
         <migo-card-header>
-          <svg card-icon viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path
-              d="M12 2 2 7l10 5 10-5-10-5ZM2 17l10 5 10-5M2 12l10 5 10-5"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-          </svg>
+          <migo-icon card-icon name="mat:layers" size="lg" color="brand" />
           <migo-card-title>Elevated</migo-card-title>
           <migo-card-subtitle>Con sombra</migo-card-subtitle>
         </migo-card-header>
@@ -163,6 +155,48 @@
           >Pasa el ratón o tabula: sube la sombra y muestra focus-ring.</migo-card-body
         >
       </migo-card>
+    </div>
+  </section>
+
+  <!-- ============================ Icon ============================ -->
+  <section
+    class="flex flex-col gap-4 p-6 bg-surface-card border border-border-subtle rounded-xl shadow-sm"
+  >
+    <h2 class="m-0 text-h2">Icon</h2>
+
+    <h3 class="mt-2 mb-0 font-body text-eyebrow font-semibold tracking-overline uppercase text-muted">
+      Galería (iconos del registro)
+    </h3>
+    <div class="flex flex-wrap gap-4 text-body">
+      @for (icon of iconNames; track icon) {
+        <div class="flex flex-col items-center gap-1 w-20">
+          <migo-icon [name]="icon" size="lg" />
+          <span class="text-eyebrow text-muted">{{ icon }}</span>
+        </div>
+      }
+    </div>
+
+    <h3 class="mt-2 mb-0 font-body text-eyebrow font-semibold tracking-overline uppercase text-muted">
+      Tamaños
+    </h3>
+    <div class="flex flex-wrap gap-4 items-end text-brand">
+      <migo-icon name="mat:home" size="xs" />
+      <migo-icon name="mat:home" size="sm" />
+      <migo-icon name="mat:home" size="md" />
+      <migo-icon name="mat:home" size="lg" />
+      <migo-icon name="mat:home" size="xl" />
+    </div>
+
+    <h3 class="mt-2 mb-0 font-body text-eyebrow font-semibold tracking-overline uppercase text-muted">
+      Colores
+    </h3>
+    <div class="flex flex-wrap gap-4 items-center">
+      <migo-icon name="mat:info" size="lg" color="brand" />
+      <migo-icon name="mat:info" size="lg" color="accent" />
+      <migo-icon name="mat:info" size="lg" color="success" />
+      <migo-icon name="mat:info" size="lg" color="warning" />
+      <migo-icon name="mat:info" size="lg" color="error" />
+      <migo-icon name="mat:info" size="lg" color="muted" />
     </div>
   </section>
 

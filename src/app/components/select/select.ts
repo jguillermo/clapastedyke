@@ -15,6 +15,7 @@ import {
 } from '@angular/core';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
 import { FormField } from '@components/form-field/form-field';
+import { Icon } from '@components/icon/icon';
 
 export interface SelectOption {
   value: string;
@@ -40,7 +41,7 @@ const TRIGGER_BASE =
 @Component({
   selector: 'migo-select',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [OverlayModule, CdkListboxModule, A11yModule],
+  imports: [OverlayModule, CdkListboxModule, A11yModule, Icon],
   template: `
     <button
       #trigger
@@ -63,21 +64,13 @@ const TRIGGER_BASE =
       >
         {{ selectedLabel() ?? placeholder() }}
       </span>
-      <svg
-        class="shrink-0 size-3 text-muted transition-transform duration-base ease-out motion-reduce:transition-none"
+      <migo-icon
+        name="mat:expand_more"
+        size="xs"
+        color="muted"
+        class="transition-transform duration-base ease-out motion-reduce:transition-none"
         [class.rotate-180]="isOpen()"
-        viewBox="0 0 16 16"
-        fill="none"
-        aria-hidden="true"
-      >
-        <path
-          d="M4 6l4 4 4-4"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        />
-      </svg>
+      />
     </button>
 
     <ng-template
@@ -104,20 +97,12 @@ const TRIGGER_BASE =
             [cdkOptionDisabled]="option.disabled ?? false"
           >
             <span class="flex-1">{{ option.label }}</span>
-            <svg
-              class="shrink-0 size-3.5 text-brand opacity-0 group-aria-selected:opacity-100"
-              viewBox="0 0 16 16"
-              fill="none"
-              aria-hidden="true"
-            >
-              <path
-                d="M3.5 8.5l3 3 6-7"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-            </svg>
+            <migo-icon
+              name="mat:check"
+              size="xs"
+              color="brand"
+              class="opacity-0 group-aria-selected:opacity-100"
+            />
           </li>
         }
       </ul>

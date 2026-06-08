@@ -12,6 +12,8 @@ import { CardTitle } from '@components/card/card-title';
 import { Checkbox } from '@components/checkbox/checkbox';
 import { MigoDialog } from '@components/dialog/dialog.service';
 import { FormField } from '@components/form-field/form-field';
+import { Icon } from '@components/icon/icon';
+import { IconName } from '@components/icon/icon.registry';
 import { InputField } from '@components/input/input';
 import { Select, SelectOption } from '@components/select/select';
 import { ConfirmDialog } from './confirm-dialog/confirm-dialog';
@@ -35,6 +37,7 @@ import { ConfirmDialog } from './confirm-dialog/confirm-dialog';
     CardFooter,
     Checkbox,
     FormField,
+    Icon,
     InputField,
     Select,
   ],
@@ -45,6 +48,22 @@ export class UiShowcase {
 
   protected readonly loadingDemo = signal(false);
   protected readonly dialogResult = signal<boolean | null>(null);
+
+  protected readonly iconNames: IconName[] = [
+    'mat:home',
+    'mat:search',
+    'mat:settings',
+    'mat:add',
+    'mat:check',
+    'mat:close',
+    'mat:expand_more',
+    'mat:chevron_right',
+    'mat:arrow_back',
+    'mat:info',
+    'mat:warning',
+    'mat:error',
+    'mat:layers',
+  ];
 
   protected readonly countries: SelectOption[] = [
     { value: 'pe', label: 'Perú' },

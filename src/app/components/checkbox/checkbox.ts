@@ -10,6 +10,7 @@ import {
 } from '@angular/core';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
 import { FormField } from '@components/form-field/form-field';
+import { Icon } from '@components/icon/icon';
 
 let nextCheckboxId = 0;
 
@@ -29,6 +30,7 @@ const BOX_BASE =
 @Component({
   selector: 'migo-checkbox',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [Icon],
   template: `
     <label [class]="labelClasses()">
       <input
@@ -47,20 +49,12 @@ const BOX_BASE =
         @if (indeterminate()) {
           <span class="w-2.5 h-0.5 rounded-full bg-on-brand"></span>
         } @else {
-          <svg
-            class="size-3.5 opacity-0 transition-opacity duration-fast ease-out motion-reduce:transition-none"
+          <migo-icon
+            name="mat:check"
+            size="xs"
+            class="opacity-0 transition-opacity duration-fast ease-out motion-reduce:transition-none"
             [class.opacity-100]="checked()"
-            viewBox="0 0 16 16"
-            fill="none"
-          >
-            <path
-              d="M3.5 8.5l3 3 6-7"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-          </svg>
+          />
         }
       </span>
       <span><ng-content /></span>
