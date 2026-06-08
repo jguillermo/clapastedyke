@@ -27,6 +27,7 @@ no HTML/CSS ad-hoc.
 
 | Componente | Selector | Tipo | Reactive Forms (CVA) | Estado |
 |---|---|---|:---:|:---:|
+| [Icon](#icon) | `migo-icon` | Presentacional | — | ✅ |
 | [Button](#button) | `button[migo-button]`, `a[migo-button]` | Presentacional | — | ✅ |
 | [Card](#card) (+ partes) | `migo-card` (+ `-header/-title/-subtitle/-body/-footer`) | Presentacional | — | ✅ |
 | [FormField](#formfield) | `migo-form-field` | Layout de campo | — | ✅ |
@@ -36,6 +37,28 @@ no HTML/CSS ad-hoc.
 | [Dialog](#dialog) | `MigoDialog` (servicio) | Servicio (CDK Dialog) | — | ✅ |
 
 ---
+
+## Icon
+
+`migo-icon` — pinta un icono de **Material Design** desde un registro SVG tipado
+(`icon/icon.registry.ts`). `name` (requerido, `IconName`) · `size`: `xs` (14) \| `sm` (16) \|
+`md` (20, default) \| `lg` (24) \| `xl` (32) · `color`: `current` (default, hereda) \| `brand` \|
+`body` \| `heading` \| `muted` \| `accent` \| `fresh` \| `celebrate` \| `success` \| `warning` \|
+`error` \| `info` \| `on-brand` · `ariaLabel` (si se da, pasa a `role="img"`; por defecto es
+decorativo `aria-hidden`).
+
+Para **añadir un icono**: copia su `path` oficial de Material (filled, `viewBox 0 0 24 24`,
+single-path) a `IconName` + `ICON_PATHS` en `icon/icon.registry.ts`. **No se usan `<svg>` sueltos**
+en plantillas — todo icono va por `migo-icon`. Las clases de animación (`opacity-*`, `rotate-*`,
+`transition-*`) se ponen en el propio `<migo-icon>`.
+
+```html
+<migo-icon name="check" />
+<migo-icon name="settings" size="lg" color="brand" />
+<migo-icon name="close" ariaLabel="Cerrar" />
+<!-- animado por el consumidor (chevron del select) -->
+<migo-icon name="expand_more" size="xs" color="muted" [class.rotate-180]="open()" />
+```
 
 ## Button
 
@@ -56,7 +79,7 @@ no HTML/CSS ad-hoc.
 ```html
 <migo-card variant="elevated" elevation="md">
   <migo-card-header>
-    <svg card-icon>…</svg>
+    <migo-icon card-icon name="layers" size="lg" />
     <migo-card-title>Título</migo-card-title>
     <migo-card-subtitle>Subtítulo</migo-card-subtitle>
     <button migo-button card-actions variant="ghost" aria-label="Cerrar">✕</button>
@@ -160,8 +183,8 @@ Pendiente (ningún componente de abajo existe todavía). Orden sugerido por uso 
 - [ ] **Tag input / Autocomplete** (CDK Overlay + Listbox).
 - [ ] **Date picker** (CDK Overlay + calendario).
 - [ ] **Slider** (`migo-slider`).
-- [ ] **Icon** — decidir estrategia (sprite SVG vs componente `migo-icon`); hoy los iconos se
-      proyectan como `<svg>` sueltos.
+- [x] **Icon** (`migo-icon`) — ✅ hecho: registro SVG tipado de Material (`icon/icon.registry.ts`),
+      inputs `name`/`size`/`color`/`ariaLabel`. Todo icono va por `migo-icon` (no `<svg>` sueltos).
 
 > Mantener este README al día: al crear un componente, añadir su fila a **Estado**, su sección de
 > uso y marcar/quitar su entrada del **Roadmap**.
