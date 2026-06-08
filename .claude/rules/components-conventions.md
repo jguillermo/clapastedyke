@@ -13,6 +13,21 @@ a11y); el **estilo**, exclusivamente los **tokens del design system Migo**
 > componentes creados, cómo se usan y el roadmap de lo que falta. Al crear un componente, añade su
 > fila y su sección de uso allí.
 
+## Uso obligatorio: toda la UI se arma con estos componentes
+
+**Cualquier plantilla HTML de la app (features, vistas, diálogos, texto, formularios, tarjetas…)
+se construye con los componentes de esta librería**, no con HTML/CSS ad-hoc.
+
+- Si el componente necesario **existe** → úsalo (`@components/...`).
+- Si **no existe** → **créalo primero aquí** (con estas convenciones) y luego úsalo. **La tarea
+  incluye crear el componente que falte**: la biblioteca crece conforme se necesita. Así se evita
+  retrabajo y estilo duplicado.
+- No se maquetan a mano botones, inputs, selects, diálogos, tarjetas, etc. en una feature cuando
+  hay —o debería haber— un componente para ello.
+
+**Única excepción — el mundo 3D** (`platform/three/*` + `features/game/*`): se renderiza con
+**three.js**, no con DOM; **no** aplica esta regla.
+
 ## La regla de oro: CERO lógica de negocio
 
 Un componente de `components/` **nunca** contiene ni conoce lógica de negocio. Solo presenta lo
@@ -198,8 +213,11 @@ px sueltos ni colores crudos en el `.css` del componente, salvo casos inevitable
 - Spec **co-locado** junto al componente (`button.spec.ts`), vitest + `TestBed` con globals.
 - Para form controls, probar el CVA con un host que use `[formControl]` (escribe valor → input;
   teclea → control; `control.disable()` → deshabilitado).
-- Para overlays, abrir y aserir contra el panel en `document` (`.app-dialog__panel`,
-  `.app-select__panel`); `afterEach(() => fixture?.destroy())` para limpiar el overlay.
+- Para el `Select` (overlay), abrir y aserir contra el panel en `document` (`.migo-select__panel`);
+  `afterEach(() => fixture?.destroy())` para limpiar el overlay.
+- Para `MigoDialog`, abrir un componente de prueba y aserir su contenido en `document` (+ la clase
+  `.migo-dialog__backdrop`); `ref.close(x)` resuelve `ref.closed`. Cerrar con `Dialog.closeAll()`
+  en `afterEach`.
 - Los specs de `components/` van junto al componente (idiomático Angular); la regla de
   `testing/` de [unit-tests-conventions.md](unit-tests-conventions.md) aplica solo a `core/`.
 

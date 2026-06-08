@@ -8,6 +8,16 @@ A feature is a **route-level page component** — one per route. Features orches
 
 There is NO 1-to-1 correspondence between features and core contexts. A feature can use multiple contexts; a context can serve multiple features.
 
+## Construir la UI con los componentes del design system
+
+La plantilla HTML de una feature **se arma con los componentes de `@components/`** (`migo-button`,
+`migo-card`, `migo-input`, `MigoDialog`, etc.), no con HTML/CSS ad-hoc. Si falta un componente, **se
+crea primero en la librería** y luego se usa (la biblioteca crece conforme se necesita). Regla
+completa en [`components-conventions.md`](components-conventions.md) → "Uso obligatorio".
+
+**Excepción:** el mundo 3D (`features/game/*` + `platform/three/*`) se renderiza con three.js y no
+aplica esta regla.
+
 ## Import rules
 
 Features may import from:

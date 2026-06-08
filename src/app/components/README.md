@@ -6,6 +6,22 @@ estilo por los **tokens Migo** (`src/styles/migo/*.css`). Reglas completas en
 
 Se importan con el alias `@components/...` y se usan como standalone (`imports: [...]`).
 
+## Política de uso (OBLIGATORIA)
+
+**Toda la UI se construye con los componentes de esta librería.** Al escribir cualquier plantilla
+HTML (features, vistas, diálogos, texto, formularios, tarjetas…) **se usan los componentes del DS**,
+no HTML/CSS ad-hoc.
+
+- Si el componente que necesitas **ya existe** → úsalo.
+- Si **no existe** → **créalo aquí primero** (añádelo a la librería con sus convenciones) y luego
+  úsalo. La tarea incluye crear el componente que falte; la biblioteca **crece conforme se
+  necesita**. Así no se hace retrabajo ni se duplica estilo.
+- No se maquetan botones, inputs, selects, diálogos, tarjetas, etc. "a mano" en una feature cuando
+  hay (o debe haber) un componente para ello.
+
+**Única excepción: el mundo 3D** (`platform/three/*` + `features/game/*`). Se renderiza con
+**three.js**, no con DOM, así que **no** aplica esta regla.
+
 ## Estado
 
 | Componente | Selector | Tipo | Reactive Forms (CVA) | Estado |
