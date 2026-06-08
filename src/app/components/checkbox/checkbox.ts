@@ -13,6 +13,13 @@ import { FormField } from '@components/form-field/form-field';
 
 let nextCheckboxId = 0;
 
+/** Caja visual. El input nativo es `peer sr-only`: el foco/checked llegan vía variantes peer-*. */
+const BOX_BASE =
+  'relative inline-flex items-center justify-center shrink-0 size-5 rounded-sm text-on-brand ' +
+  'border transition duration-base ease-out motion-reduce:transition-none ' +
+  'peer-checked:bg-brand peer-checked:border-brand peer-indeterminate:bg-brand ' +
+  'peer-indeterminate:border-brand peer-focus-visible:outline-none peer-focus-visible:shadow-focus';
+
 /**
  * Checkbox presentacional. Implementa `ControlValueAccessor` (valor booleano), así que
  * enchufa con Reactive Forms / `ngModel`. La etiqueta es el contenido proyectado.
@@ -23,9 +30,9 @@ let nextCheckboxId = 0;
   selector: 'migo-checkbox',
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <label class="migo-check">
+    <label [class]="labelClasses()">
       <input
-        class="migo-check__input"
+        class="peer sr-only"
         type="checkbox"
         [id]="controlId()"
         [checked]="checked()"
@@ -36,26 +43,30 @@ let nextCheckboxId = 0;
         (change)="onToggle($event)"
         (blur)="onBlur()"
       />
-      <span class="migo-check__box" aria-hidden="true">
-        <svg class="migo-check__tick" viewBox="0 0 16 16" fill="none">
-          <path
-            d="M3.5 8.5l3 3 6-7"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          />
-        </svg>
+      <span [class]="boxClasses()" aria-hidden="true">
+        @if (indeterminate()) {
+          <span class="w-2.5 h-0.5 rounded-full bg-on-brand"></span>
+        } @else {
+          <svg
+            class="size-3.5 opacity-0 transition-opacity duration-fast ease-out motion-reduce:transition-none"
+            [class.opacity-100]="checked()"
+            viewBox="0 0 16 16"
+            fill="none"
+          >
+            <path
+              d="M3.5 8.5l3 3 6-7"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+        }
       </span>
-      <span class="migo-check__label"><ng-content /></span>
+      <span><ng-content /></span>
     </label>
   `,
-  styleUrl: './checkbox.css',
-  host: {
-    class: 'migo-checkbox',
-    '[class.migo-checkbox--invalid]': 'isInvalid()',
-    '[class.migo-checkbox--disabled]': 'isDisabled()',
-  },
+  host: { class: 'inline-block' },
   providers: [{ provide: NG_VALUE_ACCESSOR, useExisting: forwardRef(() => Checkbox), multi: true }],
 })
 export class Checkbox implements ControlValueAccessor {
@@ -74,6 +85,23 @@ export class Checkbox implements ControlValueAccessor {
   protected readonly describedBy = computed(() => this.field?.describedBy() ?? null);
   protected readonly isInvalid = computed(() => (this.field?.invalid() ?? false) || this.invalid());
   protected readonly isDisabled = computed(() => this.disabledByForm() || this.disabled());
+
+  protected readonly labelClasses = computed(() => {
+    const base = 'inline-flex items-center gap-2 min-h-11 font-body text-base';
+    return this.isDisabled()
+      ? `${base} cursor-not-allowed text-muted`
+      : `${base} cursor-pointer text-body`;
+  });
+
+  protected readonly boxClasses = computed(() => {
+    if (this.isDisabled()) {
+      return `${BOX_BASE} bg-surface-sunken border-border-subtle`;
+    }
+    if (this.isInvalid()) {
+      return `${BOX_BASE} bg-surface-card border-error`;
+    }
+    return `${BOX_BASE} bg-surface-card border-border-strong`;
+  });
 
   private onChange: (value: boolean) => void = () => {};
   private onTouched: () => void = () => {};

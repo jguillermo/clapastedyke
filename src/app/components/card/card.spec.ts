@@ -32,12 +32,16 @@ describe('Card', () => {
 
   it('applies variant and elevation classes', () => {
     const { fixture, card } = setup();
-    fixture.componentInstance.variant.set('outlined');
+    // Elevated + lg → sombra lg.
     fixture.componentInstance.elevation.set('lg');
     fixture.detectChanges();
-    expect(card.classList).toContain('migo-card');
-    expect(card.classList).toContain('migo-card--outlined');
-    expect(card.classList).toContain('migo-card--lg');
+    expect(card.classList).toContain('rounded-xl');
+    expect(card.classList).toContain('shadow-lg');
+    // Outlined → borde, sin sombra.
+    fixture.componentInstance.variant.set('outlined');
+    fixture.detectChanges();
+    expect(card.classList).toContain('border-border-subtle');
+    expect(card.classList).not.toContain('shadow-lg');
   });
 
   it('renders the projected header, body and footer parts', () => {
@@ -53,6 +57,6 @@ describe('Card', () => {
     fixture.componentInstance.interactive.set(true);
     fixture.detectChanges();
     expect(card.getAttribute('tabindex')).toBe('0');
-    expect(card.classList).toContain('migo-card--interactive');
+    expect(card.classList).toContain('cursor-pointer');
   });
 });

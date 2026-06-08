@@ -4,7 +4,7 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
 @Component({
   selector: 'migo-card-title',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `<h3 class="migo-card__title"><ng-content /></h3>`,
-  styleUrl: './card-title.css',
+  template: `<h3 class="m-0 font-display text-h4 text-heading leading-snug"><ng-content /></h3>`,
+  host: { class: 'block' },
 })
 export class CardTitle {}

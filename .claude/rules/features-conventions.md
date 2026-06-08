@@ -15,8 +15,14 @@ La plantilla HTML de una feature **se arma con los componentes de `@components/`
 crea primero en la librería** y luego se usa (la biblioteca crece conforme se necesita). Regla
 completa en [`components-conventions.md`](components-conventions.md) → "Uso obligatorio".
 
+Cuando una feature maqueta layout propio alrededor de esos componentes (rejillas, secciones,
+HUD…), lo hace con **utilidades Tailwind del tema Migo** (sin `.css`/`styleUrl`, sin valores
+arbitrarios), igual que la librería — ver [`components-conventions.md`](components-conventions.md)
+→ "Estilo: solo utilidades Tailwind del tema Migo".
+
 **Excepción:** el mundo 3D (`features/game/*` + `platform/three/*`) se renderiza con three.js y no
-aplica esta regla.
+aplica esta regla. (El **HUD DOM** superpuesto al canvas sí usa utilidades Tailwind; solo el render
+3D queda fuera.)
 
 ## Import rules
 

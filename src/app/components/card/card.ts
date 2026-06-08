@@ -1,7 +1,19 @@
-import { booleanAttribute, ChangeDetectionStrategy, Component, input } from '@angular/core';
+import {
+  booleanAttribute,
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  input,
+} from '@angular/core';
 
 export type CardVariant = 'elevated' | 'outlined' | 'filled';
 export type CardElevation = 'sm' | 'md' | 'lg';
+
+const ELEVATION_SHADOW: Record<CardElevation, string> = {
+  sm: 'shadow-sm',
+  md: 'shadow-md',
+  lg: 'shadow-lg',
+};
 
 /**
  * Superficie/tarjeta presentacional. Es la pieza de maquetación del design system: se compone
@@ -24,16 +36,8 @@ export type CardElevation = 'sm' | 'md' | 'lg';
   selector: 'migo-card',
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `<ng-content />`,
-  styleUrl: './card.css',
   host: {
-    class: 'migo-card',
-    '[class.migo-card--elevated]': "variant() === 'elevated'",
-    '[class.migo-card--outlined]': "variant() === 'outlined'",
-    '[class.migo-card--filled]': "variant() === 'filled'",
-    '[class.migo-card--sm]': "elevation() === 'sm'",
-    '[class.migo-card--md]': "elevation() === 'md'",
-    '[class.migo-card--lg]': "elevation() === 'lg'",
-    '[class.migo-card--interactive]': 'interactive()',
+    '[class]': 'hostClasses()',
     '[attr.tabindex]': 'interactive() ? 0 : null',
   },
 })
@@ -41,4 +45,26 @@ export class Card {
   readonly variant = input<CardVariant>('elevated');
   readonly elevation = input<CardElevation>('md');
   readonly interactive = input(false, { transform: booleanAttribute });
+
+  protected readonly hostClasses = computed(() => {
+    const parts = ['block rounded-xl overflow-hidden'];
+    switch (this.variant()) {
+      case 'outlined':
+        parts.push('bg-surface-card border border-border-subtle');
+        break;
+      case 'filled':
+        parts.push('bg-surface-sunken');
+        break;
+      default:
+        parts.push('bg-surface-card', ELEVATION_SHADOW[this.elevation()]);
+    }
+    if (this.interactive()) {
+      parts.push(
+        'cursor-pointer transition duration-base ease-out hover:shadow-lg hover:-translate-y-px',
+        'focus-visible:outline-none focus-visible:shadow-focus',
+        'motion-reduce:transition-none motion-reduce:hover:translate-y-0',
+      );
+    }
+    return parts.join(' ');
+  });
 }

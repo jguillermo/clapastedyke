@@ -1,8 +1,11 @@
 /* ============================================================
-   Migo · Color tokens (copiado del skill migo-design — fuente de verdad)
+   Migo · Paleta primitiva (copiada del skill migo-design — fuente de verdad)
    Repostería palette — warm honey/terracotta over dough neutrals.
-   Pistachio = fresh accent. Strawberry = celebration only (scarce).
-   No cool grays, no purple, no corporate gradients.
+
+   IMPORTANTE: estos primitivos son SOLO referencia interna. NO viven en `@theme`,
+   así que NO generan utilidades de Tailwind. Las utilidades del design system se
+   generan desde los tokens SEMÁNTICOS de `theme.css` (bg-brand, text-body, …),
+   que apuntan aquí. No usar `bg-miel-600` ni `var(--miel-600)` en componentes.
    ============================================================ */
 
 :root {
@@ -53,7 +56,7 @@
   --fresa-400: #db5e7e;
   --fresa-500: #c2495f;
 
-  /* ---------- Semánticos ---------- */
+  /* ---------- Estado (crudos) ---------- */
   --exito: #3f9d5c;
   --exito-soft: #e3f2e6;
   --alerta: #e8941f;
@@ -63,40 +66,11 @@
   --info: #3e8fa0;
   --info-soft: #e0f0f2;
 
-  /* ============================================================
-     Semantic aliases — prefer these in product code
-     ============================================================ */
+  /* ---------- Familias tipográficas ---------- */
+  --titular: 'Fraunces', Georgia, 'Times New Roman', serif;
+  --cuerpo: 'Hanken Grotesk', system-ui, -apple-system, sans-serif;
 
-  /* Surfaces */
-  --surface-page: var(--crema);
-  --surface-card: var(--nata);
-  --surface-warm: var(--nata-tibia);
-  --surface-sunken: var(--masa-100);
-
-  /* Text */
-  --text-heading: var(--cacao-900);
-  --text-body: var(--cacao-800);
-  --text-muted: var(--cacao-600);
-  --text-placeholder: var(--cacao-400);
-  --text-on-brand: #ffffff;
-  --text-overline: var(--terra-400);
-
-  /* Borders */
-  --border-subtle: var(--masa-200);
-  --border-strong: var(--masa-300);
-
-  /* Brand actions */
-  --brand: var(--miel-600);
-  --brand-hover: var(--miel-700);
-  --brand-soft: var(--miel-100);
-  --accent: var(--terra-500);
-  --accent-soft: var(--terra-50);
-  --fresh: var(--pist-500);
-  --fresh-soft: var(--pist-100);
-  --celebrate: var(--fresa-400);
-  --celebrate-soft: var(--fresa-100);
-
-  /* Page background wash — warm window light in the corners */
+  /* ---------- Wash de fondo de página (luz cálida en las esquinas) ---------- */
   --bg-wash:
     radial-gradient(1100px 520px at 88% -8%, rgba(232, 163, 61, 0.16), transparent 60%),
     radial-gradient(900px 480px at -6% 12%, rgba(159, 190, 111, 0.14), transparent 58%),

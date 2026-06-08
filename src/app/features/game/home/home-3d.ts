@@ -7,8 +7,15 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
+import { Button } from '@components/button/button';
 import { KitchenEngine } from '@platform/three/kitchen-engine';
 import { KitchenStation } from '@platform/three/kitchen-station';
+
+/** Estilo del botón de estación del dock (ruta accesible). Solo utilidades del tema Migo. */
+const STATION_BASE =
+  'inline-flex items-center gap-2 min-h-11 px-5 rounded-full border font-body text-sm ' +
+  'font-semibold cursor-pointer transition duration-base ease-out focus-visible:outline-none ' +
+  'focus-visible:shadow-focus disabled:cursor-not-allowed disabled:opacity-70';
 
 /** Estación tal como la presenta el dock / la ruta accesible. */
 interface StationItem {
@@ -28,9 +35,10 @@ interface StationItem {
  */
 @Component({
   selector: 'app-home',
+  imports: [Button],
   templateUrl: './home-3d.html',
-  styleUrl: './home-3d.css',
   host: {
+    class: 'block fixed inset-0 overflow-hidden',
     '(window:resize)': 'onResize()',
     '(document:keydown.escape)': 'onEscape()',
   },
@@ -126,6 +134,13 @@ export class Home3d implements AfterViewInit, OnDestroy {
     if (canvas) {
       this.engine?.resize(canvas.clientWidth, canvas.clientHeight);
     }
+  }
+
+  /** Clases del botón de estación según esté activa (desbloqueada) o no. */
+  protected stationClasses(active: boolean): string {
+    return active
+      ? `${STATION_BASE} bg-brand border-brand text-on-brand hover:bg-brand-hover`
+      : `${STATION_BASE} bg-surface-warm border-border-strong text-body`;
   }
 }
 

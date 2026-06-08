@@ -1,45 +1,59 @@
-<main class="showcase">
-  <header class="showcase__head">
-    <h1>Componentes</h1>
-    <p>Librería UI agnóstica — comportamiento por Angular CDK, estilo por el design system Migo.</p>
+<main class="max-w-reading mx-auto px-5 py-10 flex flex-col gap-10">
+  <header>
+    <h1 class="mt-0 mb-2 text-h1">Componentes</h1>
+    <p class="m-0 text-muted">
+      Librería UI agnóstica — comportamiento por Angular CDK, estilo por el design system Migo.
+    </p>
   </header>
 
   <!-- ============================ Button ============================ -->
-  <section class="showcase__section">
-    <h2>Button</h2>
+  <section
+    class="flex flex-col gap-4 p-6 bg-surface-card border border-border-subtle rounded-xl shadow-sm"
+  >
+    <h2 class="m-0 text-h2">Button</h2>
 
-    <h3>Variantes</h3>
-    <div class="showcase__row">
+    <h3 class="mt-2 mb-0 font-body text-eyebrow font-semibold tracking-overline uppercase text-muted">
+      Variantes
+    </h3>
+    <div class="flex flex-wrap gap-3 items-center">
       <button migo-button variant="primary">Primary</button>
       <button migo-button variant="secondary">Secondary</button>
       <button migo-button variant="ghost">Ghost</button>
       <button migo-button variant="danger">Danger</button>
     </div>
 
-    <h3>Tamaños</h3>
-    <div class="showcase__row showcase__row--baseline">
+    <h3 class="mt-2 mb-0 font-body text-eyebrow font-semibold tracking-overline uppercase text-muted">
+      Tamaños
+    </h3>
+    <div class="flex flex-wrap gap-3 items-baseline">
       <button migo-button size="sm">Small</button>
       <button migo-button size="md">Medium</button>
       <button migo-button size="lg">Large</button>
     </div>
 
-    <h3>Estados</h3>
-    <div class="showcase__row">
+    <h3 class="mt-2 mb-0 font-body text-eyebrow font-semibold tracking-overline uppercase text-muted">
+      Estados
+    </h3>
+    <div class="flex flex-wrap gap-3 items-center">
       <button migo-button [disabled]="true">Disabled</button>
       <button migo-button [loading]="loadingDemo()" (click)="simulateLoading()">
         {{ loadingDemo() ? 'Guardando…' : 'Simular carga' }}
       </button>
     </div>
 
-    <h3>Ancho completo</h3>
+    <h3 class="mt-2 mb-0 font-body text-eyebrow font-semibold tracking-overline uppercase text-muted">
+      Ancho completo
+    </h3>
     <button migo-button block>Block</button>
   </section>
 
   <!-- ====================== FormField + Input ====================== -->
-  <section class="showcase__section">
-    <h2>FormField + Input</h2>
+  <section
+    class="flex flex-col gap-4 p-6 bg-surface-card border border-border-subtle rounded-xl shadow-sm"
+  >
+    <h2 class="m-0 text-h2">FormField + Input</h2>
 
-    <form [formGroup]="form" class="showcase__form">
+    <form [formGroup]="form" class="flex flex-col gap-4 max-w-90">
       <migo-form-field
         label="Email"
         hint="Te enviaremos la confirmación aquí"
@@ -77,8 +91,8 @@
         <migo-checkbox formControlName="terms">Acepto los términos y condiciones</migo-checkbox>
       </migo-form-field>
 
-      <p class="showcase__value">
-        Valor del formulario: <code>{{ formValue() | json }}</code>
+      <p class="m-0 text-sm text-muted">
+        Valor del formulario: <code class="font-body text-body">{{ formValue() | json }}</code>
       </p>
 
       <button migo-button type="button" variant="secondary" (click)="toggleEmailDisabled()">
@@ -88,11 +102,15 @@
   </section>
 
   <!-- ============================ Card ============================ -->
-  <section class="showcase__section">
-    <h2>Card</h2>
+  <section
+    class="flex flex-col gap-4 p-6 bg-surface-card border border-border-subtle rounded-xl shadow-sm"
+  >
+    <h2 class="m-0 text-h2">Card</h2>
 
-    <h3>Variantes</h3>
-    <div class="showcase__cards">
+    <h3 class="mt-2 mb-0 font-body text-eyebrow font-semibold tracking-overline uppercase text-muted">
+      Variantes
+    </h3>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
       <migo-card variant="elevated">
         <migo-card-header>
           <svg card-icon viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -127,15 +145,19 @@
       </migo-card>
     </div>
 
-    <h3>Elevaciones</h3>
-    <div class="showcase__cards">
+    <h3 class="mt-2 mb-0 font-body text-eyebrow font-semibold tracking-overline uppercase text-muted">
+      Elevaciones
+    </h3>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
       <migo-card elevation="sm"><migo-card-body>elevation sm</migo-card-body></migo-card>
       <migo-card elevation="md"><migo-card-body>elevation md</migo-card-body></migo-card>
       <migo-card elevation="lg"><migo-card-body>elevation lg</migo-card-body></migo-card>
     </div>
 
-    <h3>Interactivo</h3>
-    <div class="showcase__cards">
+    <h3 class="mt-2 mb-0 font-body text-eyebrow font-semibold tracking-overline uppercase text-muted">
+      Interactivo
+    </h3>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
       <migo-card interactive>
         <migo-card-body
           >Pasa el ratón o tabula: sube la sombra y muestra focus-ring.</migo-card-body
@@ -145,16 +167,20 @@
   </section>
 
   <!-- ============================ Dialog ============================ -->
-  <section class="showcase__section">
-    <h2>Dialog</h2>
-    <p class="showcase__value">
-      <code>MigoDialog.open(ConfirmDialog)</code> — el diálogo es un componente.
+  <section
+    class="flex flex-col gap-4 p-6 bg-surface-card border border-border-subtle rounded-xl shadow-sm"
+  >
+    <h2 class="m-0 text-h2">Dialog</h2>
+    <p class="m-0 text-sm text-muted">
+      <code class="font-body text-body">MigoDialog.open(ConfirmDialog)</code> — el diálogo es un
+      componente.
     </p>
     <button migo-button (click)="openConfirm()">Abrir diálogo</button>
 
     @if (dialogResult() !== null) {
-      <p class="showcase__value">
-        Último resultado: <code>{{ dialogResult() ? 'Aceptar' : 'Cancelar' }}</code>
+      <p class="m-0 text-sm text-muted">
+        Último resultado:
+        <code class="font-body text-body">{{ dialogResult() ? 'Aceptar' : 'Cancelar' }}</code>
       </p>
     }
   </section>

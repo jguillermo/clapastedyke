@@ -47,6 +47,28 @@ You are an expert in TypeScript, Angular, and scalable web application developme
 - Use the async pipe to handle observables
 - Do not assume globals like (`new Date()`) are available.
 
+## Styling — SOLO Tailwind, nada de CSS puro
+
+**Todo el estilado de la app (componentes, features, layout, diálogos, HUD) se hace con utilidades
+de Tailwind v4 generadas del tema Migo. NO se escribe CSS puro.** Aplica a todo el desarrollo salvo
+el render **three.js** (`platform/three/*` + el render 3D de `features/game/*`), que no es DOM.
+
+- **Sin `.css`/`styleUrl` por componente ni feature.** El estilo son utilidades Tailwind en la
+  plantilla y en el objeto `host` (base estática en `host: { class }`; variantes por signal en un
+  `computed()` enlazado a `host: { '[class]' }`).
+- **El tema es la única fuente** (`src/styles/migo/theme.css`, directiva `@theme`): genera una
+  utilidad por token **semántico** del design system (`bg-brand`, `text-body`, `rounded-xl`,
+  `shadow-focus`, `min-h-11`…) sobre la paleta primitiva de `palette.css`.
+- **PROHIBIDO valores arbitrarios** de Tailwind (`p-[40px]`, `bg-[#fff]`, `text-[13px]`),
+  `var(--token)` y CSS crudo. Si falta un valor, se añade como token al tema; no se inventa en la
+  plantilla. (Variantes estructurales como `[&>*]:`, `peer-*`, `group-*`, `aria-*`,
+  `motion-reduce:` **sí** se permiten: condicionan, no introducen medidas/colores mágicos.)
+- **Único CSS global permitido**: `src/styles.css` (tema + base del documento + chrome del overlay
+  de CDK Dialog, que apunta a DOM generado por el CDK y no puede llevar utilidades).
+- Detalle completo y mapeo de tokens en
+  [components-conventions.md](rules/components-conventions.md) → "Estilo: solo utilidades Tailwind
+  del tema Migo".
+
 ## Services
 
 - Design services around a single responsibility
@@ -57,7 +79,7 @@ You are an expert in TypeScript, Angular, and scalable web application developme
 
 Convenciones específicas por área. Consulta la regla correspondiente antes de tocar esos ficheros:
 
-- [components-conventions.md](rules/components-conventions.md) — **librería de componentes** en `src/app/components/`: UI agnóstica con **Angular CDK**, **cero lógica de negocio**, estilo solo con tokens Migo, `ControlValueAccessor` para form controls, patrón de Overlay.
+- [components-conventions.md](rules/components-conventions.md) — **librería de componentes** en `src/app/components/`: UI agnóstica con **Angular CDK**, **cero lógica de negocio**, estilo con **utilidades Tailwind del tema Migo** (sin CSS por componente; sin valores arbitrarios), `ControlValueAccessor` para form controls, patrón de Overlay.
 - [path-aliases-conventions.md](rules/path-aliases-conventions.md) — alias `@app/@components/@core/@features/@platform`: **cruzar áreas con alias, intra-contexto `core/` relativo**.
 - [core-conventions.md](rules/core-conventions.md) — DDD en `core/`: entities, value objects, aggregates, repositories vs services, use cases.
 - [features-conventions.md](rules/features-conventions.md) — features (páginas de ruta): inyectan use cases, nunca servicios de dominio.

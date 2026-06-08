@@ -20,7 +20,7 @@ describe('Select (ControlValueAccessor)', () => {
   let fixture: ComponentFixture<Host>;
 
   function triggerButton(): HTMLButtonElement {
-    return fixture.nativeElement.querySelector('.migo-select__trigger') as HTMLButtonElement;
+    return fixture.nativeElement.querySelector('button') as HTMLButtonElement;
   }
 
   async function open(): Promise<void> {
@@ -35,19 +35,19 @@ describe('Select (ControlValueAccessor)', () => {
 
   it('opens a listbox panel with one option per item', async () => {
     await open();
-    const panel = document.querySelector('.migo-select__panel');
-    expect(panel?.getAttribute('role')).toBe('listbox');
-    expect(document.querySelectorAll('.migo-select__option').length).toBe(3);
+    const panel = document.querySelector('[role="listbox"]');
+    expect(panel).toBeTruthy();
+    expect(document.querySelectorAll('[role="option"]').length).toBe(3);
   });
 
   it('selecting an option updates the control and closes the panel', async () => {
     await open();
-    const options = document.querySelectorAll<HTMLElement>('.migo-select__option');
+    const options = document.querySelectorAll<HTMLElement>('[role="option"]');
     options[1].click();
     fixture.detectChanges();
     await fixture.whenStable();
     expect(fixture.componentInstance.control.value).toBe('es');
-    expect(document.querySelector('.migo-select__panel')).toBeNull();
+    expect(document.querySelector('[role="listbox"]')).toBeNull();
   });
 
   it('shows the selected label in the trigger when the control has a value', async () => {

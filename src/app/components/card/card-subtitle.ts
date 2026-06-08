@@ -4,7 +4,7 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
 @Component({
   selector: 'migo-card-subtitle',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `<p class="migo-card__subtitle"><ng-content /></p>`,
-  styleUrl: './card-subtitle.css',
+  template: `<p class="m-0 text-sm text-muted leading-snug"><ng-content /></p>`,
+  host: { class: 'block' },
 })
 export class CardSubtitle {}

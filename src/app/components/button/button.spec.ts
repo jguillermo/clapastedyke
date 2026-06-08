@@ -31,9 +31,10 @@ describe('Button', () => {
     const { fixture, button } = setup();
     fixture.componentInstance.variant.set('danger');
     fixture.detectChanges();
-    expect(button.classList).toContain('migo-btn');
-    expect(button.classList).toContain('migo-btn--danger');
-    expect(button.classList).toContain('migo-btn--md');
+    // El estilo es Tailwind del tema Migo: base (rounded-full), variante (bg-error) y tamaño md (min-h-11).
+    expect(button.classList).toContain('rounded-full');
+    expect(button.classList).toContain('bg-error');
+    expect(button.classList).toContain('min-h-11');
   });
 
   it('disables the native button and marks it busy while loading', () => {
@@ -42,7 +43,8 @@ describe('Button', () => {
     fixture.detectChanges();
     expect(button.disabled).toBe(true);
     expect(button.getAttribute('aria-busy')).toBe('true');
-    expect(button.classList).toContain('migo-btn--loading');
+    // El estado de carga muestra el spinner animado.
+    expect(button.querySelector('.animate-spin')).toBeTruthy();
   });
 
   it('disables via the disabled input', () => {

@@ -1,37 +1,45 @@
-/* You can add global styles to this file, and also import other style files */
+/* Estilos globales. El estilizado de componentes/features se hace con utilidades
+   de Tailwind generadas desde el tema Migo (src/styles/migo/theme.css). Aquí solo
+   vive la capa global: base del documento y el chrome del overlay de CDK Dialog,
+   que apunta a DOM generado por CDK y por tanto no puede llevar utilidades. */
 
-/* Tokens Migo primero: traen el @import remoto de Google Fonts, que debe
-   preceder a cualquier otra regla (incluida la expansión de Tailwind). */
+/* 1) Capa PRE-Tailwind: fuentes (@import remoto, debe ir primero) + paleta primitiva. */
 @import './styles/migo/index.css';
+
+/* 2) Tailwind. */
 @import 'tailwindcss';
 
-/* Base de posicionamiento/backdrop del CDK Overlay (lo usa MigoDialog vía CDK Dialog). */
+/* 3) Tema Migo (@theme): genera las utilidades del design system. */
+@import './styles/migo/theme.css';
+
+/* 4) Base de posicionamiento/backdrop del CDK Overlay (lo usa MigoDialog vía CDK Dialog). */
 @import '@angular/cdk/overlay-prebuilt.css';
 
-/* Base global — paleta y tipografía Migo (tokens vía skill migo-design) */
-html,
-body {
-  height: 100%;
-}
+@layer base {
+  html,
+  body {
+    height: 100%;
+  }
 
-body {
-  margin: 0;
-  background-color: var(--surface-page);
-  background-image: var(--bg-wash);
-  color: var(--text-body);
-  font-family: var(--font-body);
-  font-size: var(--fs-body);
-  line-height: var(--lh-body);
-  -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
-}
+  body {
+    margin: 0;
+    background-color: var(--color-surface-page);
+    background-image: var(--bg-wash);
+    color: var(--color-body);
+    font-family: var(--font-body);
+    font-size: var(--text-base);
+    line-height: var(--leading-body);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
 
-h1,
-h2,
-h3 {
-  font-family: var(--font-display);
-  color: var(--text-heading);
-  letter-spacing: var(--tracking-heading);
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    color: var(--color-heading);
+    letter-spacing: var(--tracking-heading);
+  }
 }
 
 /* Diálogo (MigoDialog). El Dialog es un shell agnóstico: solo overlay + backdrop + foco.
@@ -49,7 +57,7 @@ h3 {
   background: transparent;
   padding: 0;
   outline: none;
-  animation: migo-dialog-in var(--dur-slow) var(--ease-out);
+  animation: migo-dialog-in var(--duration-slow) var(--ease-out);
 }
 
 @keyframes migo-dialog-in {

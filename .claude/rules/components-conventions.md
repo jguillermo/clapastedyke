@@ -6,8 +6,10 @@ Applies to files in `src/app/components/`.
 
 `components/` es la **librería de componentes de diseño**: piezas de UI **agnósticas y
 reutilizables**. El **comportamiento** lo aporta **Angular CDK** (overlay, focus-trap, listbox,
-a11y); el **estilo**, exclusivamente los **tokens del design system Migo**
-(`src/styles/migo/*.css`). No son páginas ni conocen rutas; los consume cualquier feature.
+a11y); el **estilo**, exclusivamente **utilidades de Tailwind v4 generadas del tema Migo**
+(`src/styles/migo/theme.css`). **No hay CSS por componente** (`styleUrl`/`.css`): todo el estilo
+son utilidades Tailwind en la plantilla y en el objeto `host`. No son páginas ni conocen rutas;
+los consume cualquier feature.
 
 > **Catálogo vivo:** [`src/app/components/README.md`](../../src/app/components/README.md) lista los
 > componentes creados, cómo se usan y el roadmap de lo que falta. Al crear un componente, añade su
@@ -40,7 +42,7 @@ va aquí.
 | Componer con otros componentes de la librería (`@components/...`) | Inyectar servicios de dominio, use cases o repositorios |
 | Estado de **UI** con signals (`open`, `focused`, `checked`) | Estado o reglas de **negocio** |
 | Recibir datos por `input()`, emitir por `output()` | HTTP, IPC, `window.*`, `Router`, navegación |
-| Estilar con tokens Migo (`var(--brand)`, `var(--r-md)`…) | Hardcodear colores/medidas fuera de tokens |
+| Estilar con utilidades del tema (`bg-brand`, `rounded-xl`, `gap-2`…) | Valores arbitrarios (`p-[40px]`, `bg-[#fff]`), `var(--token)` o CSS crudo |
 
 > Esto es más estricto que las reglas de capas habituales: `components/` no importa de **ninguna**
 > capa de la app, solo de Angular, CDK y de sí misma.
@@ -55,13 +57,13 @@ va aquí.
 
 ## Estructura
 
-Un componente por carpeta; plantilla inline (componentes pequeños), CSS externo, spec co-locado.
+Un componente por carpeta; plantilla inline (componentes pequeños), spec co-locado. **Sin `.css`
+por componente** — el estilo son utilidades Tailwind.
 
 ```
 components/
 ├── button/
-│   ├── button.ts
-│   ├── button.css
+│   ├── button.ts        # plantilla + estilo (utilidades Tailwind) — sin .css
 │   └── button.spec.ts
 ├── card/          # migo-card + partes (-header/-title/-subtitle/-body/-footer)
 ├── form-field/
@@ -78,8 +80,11 @@ components/
   `migo-checkbox`, `migo-card-title`. **No `app-`** — ese prefijo es para las features
   (`app-home`, `app-ui-showcase`). `angular.json` mantiene `prefix: app`; los componentes del DS
   usan `migo-` por convención (no hay ESLint que lo imponga).
-- Las **clases CSS internas** también llevan el prefijo `migo-` (`migo-btn`, `migo-field__label`,
-  `migo-dialog__panel`).
+- **No hay clases CSS internas propias** (`migo-btn`, `migo-field__label`…): el estilo son
+  utilidades Tailwind. Las únicas clases con prefijo `migo-` que quedan son las que el CDK necesita
+  como hook global del diálogo (`migo-dialog__panel`/`migo-dialog__backdrop`, definidas en
+  `src/styles.css`). Para tests/hooks estables, apóyate en selectores semánticos (rol, elemento
+  nativo, atributo ARIA), no en clases de utilidad.
 - Para controles montados sobre un elemento nativo, **selector de atributo** sobre el nativo:
   `selector: 'button[migo-button], a[migo-button]'` (conserva la semántica accesible).
 - El nombre de la clase puede divergir del selector si evita colisiones
@@ -91,9 +96,12 @@ components/
 - `ChangeDetectionStrategy.OnPush` siempre.
 - `input()` / `output()` / `computed()` / `signal()`. Nada de `@Input`/`@Output`.
 - **Host bindings dentro del objeto `host`** del decorador, nunca `@HostBinding`/`@HostListener`.
-- Bindings de `class` y `style` (nunca `ngClass`/`ngStyle`).
+- Bindings de `class` (nunca `ngClass`/`ngStyle`).
 - Control flow nativo (`@if`, `@for`, `@switch`).
-- Plantilla **inline** para piezas pequeñas; estilos en `.css` externo vía `styleUrl`.
+- Plantilla **inline**; **sin `.css`/`styleUrl`** — el estilo son utilidades Tailwind del tema.
+- **Estilo del host**: estilos base estáticos en `host: { class: '…' }`. Cuando las clases dependen
+  de signals (variantes/tamaños/estado), un **único** binding `host: { '[class]': 'hostClasses()' }`
+  con un `computed()` que devuelve la cadena completa (no mezclar `class:` estático con `[class]`).
 - `inject()` en vez de constructor injection.
 - Booleanos por input con `transform: booleanAttribute`.
 
@@ -168,53 +176,98 @@ diálogo. Composición por subcomponentes:
 
 - **`migo-card`** (`class Card`): contenedor. Inputs `variant` (`elevated`|`outlined`|`filled`),
   `elevation` (`sm`|`md`|`lg`, solo elevated), `interactive` (hover sube sombra + cursor +
-  focus-ring; pone `tabindex=0`). `border-radius: var(--r-xl)`, `overflow: hidden`, **sin padding**
-  (lo ponen las partes). Variantes con `[class.migo-card--*]` (class bindings).
+  focus-ring; pone `tabindex=0`). `rounded-xl overflow-hidden`, **sin padding** (lo ponen las
+  partes). Las variantes se resuelven en un `computed()` enlazado a `host: { '[class]': … }`.
 - **`migo-card-header`**: fila con slot `[card-icon]` (icono leading), bloque de título/subtítulo
-  (contenido por defecto) y slot `[card-actions]` (trailing, `margin-inline-start:auto`).
+  (contenido por defecto) y slot `[card-actions]` (trailing, `ms-auto`).
 - **`migo-card-title`** (`<h3>`), **`migo-card-subtitle`** (`<p>` muted).
 - **`migo-card-body`**: contenido con padding.
-- **`migo-card-footer`**: fila de acciones a la derecha, con `border-top`.
+- **`migo-card-footer`**: fila de acciones a la derecha, con `border-t`.
 
-Sombras por nivel: `--shadow-sm/md/lg`. Iconos: se proyectan (`[card-icon]`), no hay sistema de
-iconos propio. Todo el estilo con tokens Migo.
+Sombras por nivel: `shadow-sm/md/lg`. Iconos: se proyectan (`[card-icon]`), no hay sistema de
+iconos propio. Todo el estilo con utilidades del tema.
+
+> **Contenido proyectado sin `::ng-deep`.** Para estilar lo que llega por `ng-content` (icono y
+> acciones del header), se envuelve el slot en un `<span class="contents [&>*]:size-6 …">`:
+> `contents` evita una caja vacía cuando no se proyecta nada, y la **variante de hijo** `[&>*]:`
+> aplica utilidades del tema al contenido proyectado. **Prohibido `::ng-deep`** (no hay CSS).
+> Nota: las variantes arbitrarias estructurales (`[&>*]:`, `[&.cdk-option-active]:`) **sí** se
+> permiten — lo prohibido son los **valores** arbitrarios (`size-[24px]`, `bg-[#fff]`).
 
 ## Select con CDK Overlay + Listbox
 
 El `Select` (panel desplegable) sí usa **CDK Overlay** declarativo:
 
-- El panel vive en un **`<ng-template cdkConnectedOverlay>` dentro del componente**: la
-  **encapsulación emulada sigue aplicando los estilos scoped** del `.css` (los selectores
-  `[_ngcontent-xxx]` casan por atributo, no por posición en el DOM). **No** hace falta
-  `ViewEncapsulation.None`.
+- El panel vive en un **`<ng-template cdkConnectedOverlay>` dentro del componente**. Como las
+  utilidades de Tailwind son **globales** (no scoped), el estilo del panel funciona aunque el DOM
+  se proyecte fuera del componente — **desaparece** cualquier dependencia de la encapsulación.
 - Lista con `cdkListbox` + `cdkOption` (`@angular/cdk/listbox`): teclado (flechas, Home/End,
   type-ahead), roles ARIA y gestión de foco. `cdkTrapFocus cdkTrapFocusAutoCapture` para el foco.
 - Estado abierto/cerrado con un signal interno; abre/cierra en respuesta a eventos del overlay
   (`overlayOutsideClick`, `overlayKeydown`).
+- **Estado de opción con variantes nativas de Tailwind**: la selección se estila con
+  `aria-selected:` (+ `group`/`group-aria-selected:` para el check interior) y `aria-disabled:`,
+  no con clases propias; el resaltado de teclado del CDK con `[&.cdk-option-active]:bg-surface-sunken`.
 
 ## Accesibilidad (requisito duro)
 
 - Debe pasar **todos los checks de AXE** y cumplir **WCAG AA** (contraste, foco, ARIA).
-- Foco visible siempre con `box-shadow: var(--focus-ring)` y `outline: none` (solo
-  `:focus-visible`).
+- Foco visible siempre con `focus-visible:shadow-focus focus-visible:outline-none` (utilidad del
+  tema; el token es `--shadow-focus`).
 - Preferir elementos nativos (`<button>`, `<input>`) y `<label for>` reales.
-- Respetar `@media (prefers-reduced-motion: reduce)` en transiciones/animaciones.
+- Respetar `prefers-reduced-motion` con la variante `motion-reduce:` (p.ej. `motion-reduce:transition-none`).
 
-## Estilo: solo tokens Migo
+## Estilo: solo utilidades Tailwind del tema Migo
 
-Todo valor de color, espaciado, radio, sombra, tipografía y motion sale de un token CSS de
-`src/styles/migo/` (`--brand`, `--surface-card`, `--text-body`, `--border-subtle`, `--r-md`,
-`--r-pill`, `--s4`, `--shadow-lg`, `--focus-ring`, `--ease-out`, `--dur-base`…). **Nunca** hex,
-px sueltos ni colores crudos en el `.css` del componente, salvo casos inevitables
-(p.ej. dimensiones de un glifo).
+> **OBLIGATORIO: en `components/` se estiliza EXCLUSIVAMENTE con Tailwind.** No es opcional ni una
+> preferencia: ningún componente de la librería puede llevar `.css`/`styleUrl`, CSS puro,
+> `var(--token)`, `[style]` con medidas/colores, ni valores arbitrarios (`p-[40px]`, `bg-[#fff]`).
+> Si una pieza no se puede expresar con utilidades del tema, **se añade el token al tema**; nunca se
+> escapa a CSS. (La única excepción de toda la app es el render three.js, que no es DOM.)
+
+El design system se expresa como **tema de Tailwind v4** (`@theme` en `src/styles/migo/theme.css`),
+que **genera** una utilidad por cada token semántico. Todo el estilo de la app son esas utilidades.
+
+- **El tema es la única fuente.** `theme.css` define los tokens semánticos (limpiando los defaults
+  de Tailwind con `--<namespace>-*: initial`) sobre la paleta primitiva de `palette.css`
+  (`:root`, **sin** utilidades). Solo se exponen utilidades **semánticas**: `bg-brand`,
+  `text-body`, `bg-surface-card`, `border-border-subtle`, `rounded-xl`, `shadow-lg`,
+  `shadow-focus`, `text-h1`, `font-display`, `ease-out`, `duration-base`… La paleta cruda
+  (`miel-600`, `terra-500`, `cacao-900`) **no** genera utilidades y **no** se usa.
+- **PROHIBIDO valores arbitrarios** de Tailwind (`p-[40px]`, `bg-[#fff]`, `text-[13px]`,
+  `min-h-[44px]`), `var(--token)` y CSS crudo. Si falta un valor, se **añade como token al tema**
+  (lo decide el design system), no se inventa en la plantilla. *(Sin ESLint que lo imponga: es
+  convención + code review.)*
+- **Spacing**: la escala 4px nativa de Tailwind **coincide 1:1** con la escala Migo
+  (`p-4` = 16px = `--s4` … `p-24` = 96px; `--touch-min` 44px = `min-h-11`). Usa esos pasos; no
+  redefine spacing.
+- **Variantes arbitrarias estructurales sí, valores no.** `[&>*]:`, `[&.cdk-option-active]:`,
+  `peer-*`, `group-*`, `aria-*`, `motion-reduce:` están permitidas (seleccionan/condicionan; no
+  introducen medidas/colores mágicos).
+- **Renombres por colisión de namespace** (color de texto vs tamaño de fuente, ambos `text-*`):
+  los **colores** de texto conservan el nombre Migo (`text-body`, `text-heading`, `text-muted`,
+  `text-overline`); la **escala de tamaños** renombra los que chocan — `body-l`→`text-lead`,
+  `body`→`text-base`, `body-s`→`text-sm`, `overline`→`text-eyebrow` (headings: `text-display`,
+  `text-h1`…`text-h4`). Los colores de borde Migo (`--border-subtle/strong`) generan
+  `border-border-subtle`/`border-border-strong` (doble `border` esperado).
+- **Glifos**: dimensiones de glifos decorativos (check, chevron, barra de indeterminado) se hacen
+  con **SVG** dimensionado con pasos de escala (`size-3`, `size-3.5`, `w-2.5 h-0.5`), nunca con
+  trucos de borde a px sueltos.
+
+Las animaciones globales que apuntan a DOM del CDK (backdrop/panel del diálogo) **sí** viven como
+CSS global en `src/styles.css` — no pueden ser utilidades porque el CDK genera ese DOM.
 
 ## Testing
 
 - Spec **co-locado** junto al componente (`button.spec.ts`), vitest + `TestBed` con globals.
 - Para form controls, probar el CVA con un host que use `[formControl]` (escribe valor → input;
   teclea → control; `control.disable()` → deshabilitado).
-- Para el `Select` (overlay), abrir y aserir contra el panel en `document` (`.migo-select__panel`);
+- Para el `Select` (overlay), abrir y aserir contra el panel en `document` por **rol**
+  (`[role="listbox"]`, `[role="option"]`), no por clases de utilidad;
   `afterEach(() => fixture?.destroy())` para limpiar el overlay.
+- En general, los specs consultan el DOM por **selector semántico** (elemento nativo, rol, atributo
+  ARIA) o por la utilidad que codifica la variante (`bg-error`, `min-h-11`), nunca por clases BEM
+  (`migo-*`), que ya no existen.
 - Para `MigoDialog`, abrir un componente de prueba y aserir su contenido en `document` (+ la clase
   `.migo-dialog__backdrop`); `ref.close(x)` resuelve `ref.closed`. Cerrar con `Dialog.closeAll()`
   en `afterEach`.

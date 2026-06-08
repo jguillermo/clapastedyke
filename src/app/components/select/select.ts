@@ -24,6 +24,12 @@ export interface SelectOption {
 
 let nextSelectId = 0;
 
+/** Disparador del select. El borde/anillo de foco varía según validez. */
+const TRIGGER_BASE =
+  'flex items-center gap-2 w-full min-h-11 box-border px-4 rounded-md bg-surface-card border ' +
+  'font-body text-base text-body text-start cursor-pointer transition duration-base ease-out ' +
+  'hover:border-border-strong focus-visible:outline-none motion-reduce:transition-none';
+
 /**
  * Select (combobox) presentacional. El disparador abre, vía CDK Overlay, un panel con un
  * `cdkListbox` que aporta teclado (flechas, Home/End, type-ahead), roles ARIA y foco.
@@ -39,7 +45,7 @@ let nextSelectId = 0;
     <button
       #trigger
       type="button"
-      class="migo-select__trigger"
+      [class]="triggerClasses()"
       cdkOverlayOrigin
       #origin="cdkOverlayOrigin"
       [id]="controlId()"
@@ -52,12 +58,26 @@ let nextSelectId = 0;
       (click)="toggle()"
     >
       <span
-        class="migo-select__value"
-        [class.migo-select__value--placeholder]="selectedLabel() === null"
+        class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
+        [class.text-placeholder]="selectedLabel() === null"
       >
         {{ selectedLabel() ?? placeholder() }}
       </span>
-      <span class="migo-select__chevron" aria-hidden="true"></span>
+      <svg
+        class="shrink-0 size-3 text-muted transition-transform duration-base ease-out motion-reduce:transition-none"
+        [class.rotate-180]="isOpen()"
+        viewBox="0 0 16 16"
+        fill="none"
+        aria-hidden="true"
+      >
+        <path
+          d="M4 6l4 4 4-4"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </svg>
     </button>
 
     <ng-template
@@ -70,7 +90,7 @@ let nextSelectId = 0;
       (detach)="close()"
     >
       <ul
-        class="migo-select__panel"
+        class="mt-1 p-1 list-none max-h-70 overflow-y-auto bg-surface-card border border-border-subtle rounded-md shadow-lg focus:outline-none"
         cdkListbox
         cdkTrapFocus
         cdkTrapFocusAutoCapture
@@ -79,24 +99,31 @@ let nextSelectId = 0;
       >
         @for (option of options(); track option.value) {
           <li
-            class="migo-select__option"
+            class="group flex items-center gap-2 px-3 py-2 rounded-sm text-sm text-body cursor-pointer hover:bg-surface-sunken focus:bg-surface-sunken focus:outline-none aria-selected:text-brand aria-selected:font-semibold aria-disabled:text-placeholder aria-disabled:cursor-not-allowed aria-disabled:hover:bg-transparent [&.cdk-option-active]:bg-surface-sunken"
             [cdkOption]="option.value"
             [cdkOptionDisabled]="option.disabled ?? false"
           >
-            <span class="migo-select__option-label">{{ option.label }}</span>
-            <span class="migo-select__option-check" aria-hidden="true"></span>
+            <span class="flex-1">{{ option.label }}</span>
+            <svg
+              class="shrink-0 size-3.5 text-brand opacity-0 group-aria-selected:opacity-100"
+              viewBox="0 0 16 16"
+              fill="none"
+              aria-hidden="true"
+            >
+              <path
+                d="M3.5 8.5l3 3 6-7"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
           </li>
         }
       </ul>
     </ng-template>
   `,
-  styleUrl: './select.css',
-  host: {
-    class: 'migo-select',
-    '[class.migo-select--invalid]': 'isInvalid()',
-    '[class.migo-select--disabled]': 'isDisabled()',
-    '[class.migo-select--open]': 'isOpen()',
-  },
+  host: { class: 'block' },
   providers: [{ provide: NG_VALUE_ACCESSOR, useExisting: forwardRef(() => Select), multi: true }],
 })
 export class Select implements ControlValueAccessor {
@@ -120,6 +147,16 @@ export class Select implements ControlValueAccessor {
   protected readonly describedBy = computed(() => this.field?.describedBy() ?? null);
   protected readonly isInvalid = computed(() => (this.field?.invalid() ?? false) || this.invalid());
   protected readonly isDisabled = computed(() => this.disabledByForm() || this.disabled());
+
+  protected readonly triggerClasses = computed(() => {
+    if (this.isDisabled()) {
+      return `${TRIGGER_BASE} bg-surface-sunken text-muted cursor-not-allowed border-border-subtle`;
+    }
+    if (this.isInvalid()) {
+      return `${TRIGGER_BASE} border-error focus-visible:shadow-focus-error`;
+    }
+    return `${TRIGGER_BASE} border-border-subtle focus-visible:border-brand focus-visible:shadow-focus`;
+  });
 
   /** `cdkListboxValue` espera un array; el valor seleccionado es de un solo elemento. */
   protected readonly valueArray = computed(() => {

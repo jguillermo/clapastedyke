@@ -7,13 +7,19 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
 @Component({
   selector: 'migo-card-header',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  // `contents` evita una caja vacía cuando el slot no recibe nada; el `[&>*]:` estiliza
+  // el contenido proyectado (icono / acciones) sin perforar la encapsulación con ::ng-deep.
   template: `
-    <ng-content select="[card-icon]" />
-    <div class="migo-card__heading">
+    <span class="contents [&>*]:size-6 [&>*]:shrink-0 [&>*]:text-brand">
+      <ng-content select="[card-icon]" />
+    </span>
+    <div class="flex flex-col gap-1 min-w-0">
       <ng-content />
     </div>
-    <ng-content select="[card-actions]" />
+    <span class="contents [&>*]:ms-auto [&>*]:shrink-0">
+      <ng-content select="[card-actions]" />
+    </span>
   `,
-  styleUrl: './card-header.css',
+  host: { class: 'flex items-center gap-3 px-6 pt-5 pb-3' },
 })
 export class CardHeader {}

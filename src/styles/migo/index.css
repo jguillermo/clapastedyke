@@ -1,10 +1,10 @@
 /* ============================================================
-   Migo Design System · punto de entrada de tokens
-   Espejo del skill `migo-design` (única fuente de verdad). Solo imports.
+   Migo Design System · capa PRE-Tailwind (sin utilidades)
+   Solo lo que debe cargarse antes de `@import 'tailwindcss'`:
+   las fuentes (@import remoto, ha de ir primero) y la paleta primitiva.
+   El tema (@theme) que genera las utilidades vive en `theme.css` y se importa
+   DESPUÉS de Tailwind desde `src/styles.css`.
    ============================================================ */
 
 @import './fonts.css';
-@import './colors.css';
-@import './typography.css';
-@import './spacing.css';
-@import './radii.css';
+@import './palette.css';

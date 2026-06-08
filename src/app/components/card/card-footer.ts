@@ -5,6 +5,8 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
   selector: 'migo-card-footer',
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `<ng-content />`,
-  styleUrl: './card-footer.css',
+  host: {
+    class: 'flex flex-wrap items-center justify-end gap-3 px-6 pt-3 pb-5 border-t border-border-subtle',
+  },
 })
 export class CardFooter {}

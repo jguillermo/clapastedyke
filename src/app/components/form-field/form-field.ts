@@ -25,28 +25,31 @@ let nextFieldId = 0;
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (label()) {
-      <label class="migo-field__label" [attr.for]="controlId">
+      <label class="font-body text-sm font-semibold text-body" [attr.for]="controlId">
         {{ label() }}
         @if (required()) {
-          <span class="migo-field__req" aria-hidden="true">*</span>
+          <span class="ms-1 text-accent" aria-hidden="true">*</span>
         }
       </label>
     }
 
-    <div class="migo-field__control">
+    <div class="flex flex-col">
       <ng-content />
     </div>
 
     @if (error()) {
-      <p class="migo-field__msg migo-field__msg--error" [id]="errorId" role="alert">
+      <p
+        class="m-0 text-caption leading-snug text-error font-medium"
+        [id]="errorId"
+        role="alert"
+      >
         {{ error() }}
       </p>
     } @else if (hint()) {
-      <p class="migo-field__msg migo-field__msg--hint" [id]="hintId">{{ hint() }}</p>
+      <p class="m-0 text-caption leading-snug text-muted" [id]="hintId">{{ hint() }}</p>
     }
   `,
-  styleUrl: './form-field.css',
-  host: { class: 'migo-field' },
+  host: { class: 'flex flex-col gap-2' },
 })
 export class FormField {
   readonly label = input('');

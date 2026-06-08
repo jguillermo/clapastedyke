@@ -15,6 +15,13 @@ export type InputType = 'text' | 'email' | 'password' | 'number' | 'search' | 't
 
 let nextInputId = 0;
 
+/** Estilo del control nativo. El borde/anillo de foco varía según validez. */
+const CONTROL_BASE =
+  'w-full min-h-11 box-border px-4 rounded-md bg-surface-card border font-body text-base ' +
+  'text-body transition duration-base ease-out placeholder:text-placeholder ' +
+  'hover:border-border-strong focus:outline-none disabled:bg-surface-sunken ' +
+  'disabled:text-muted disabled:cursor-not-allowed motion-reduce:transition-none';
+
 /**
  * Control de texto presentacional. Implementa `ControlValueAccessor`, así que enchufa
  * directamente con Reactive Forms (`formControlName`, `[formControl]`) o `ngModel`.
@@ -27,7 +34,7 @@ let nextInputId = 0;
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <input
-      class="migo-input__control"
+      [class]="controlClasses()"
       [id]="controlId()"
       [type]="type()"
       [value]="value()"
@@ -40,12 +47,7 @@ let nextInputId = 0;
       (blur)="onBlur()"
     />
   `,
-  styleUrl: './input.css',
-  host: {
-    class: 'migo-input',
-    '[class.migo-input--invalid]': 'isInvalid()',
-    '[class.migo-input--disabled]': 'isDisabled()',
-  },
+  host: { class: 'block' },
   providers: [
     { provide: NG_VALUE_ACCESSOR, useExisting: forwardRef(() => InputField), multi: true },
   ],
@@ -71,6 +73,12 @@ export class InputField implements ControlValueAccessor {
   protected readonly describedBy = computed(() => this.field?.describedBy() ?? null);
   protected readonly isInvalid = computed(() => (this.field?.invalid() ?? false) || this.invalid());
   protected readonly isDisabled = computed(() => this.disabledByForm() || this.disabled());
+
+  protected readonly controlClasses = computed(() =>
+    this.isInvalid()
+      ? `${CONTROL_BASE} border-error focus:border-error focus:shadow-focus-error`
+      : `${CONTROL_BASE} border-border-subtle focus:border-brand focus:shadow-focus`,
+  );
 
   private onChange: (value: string) => void = () => {};
   private onTouched: () => void = () => {};

@@ -1,7 +1,8 @@
 # Librería de componentes Migo (`@components`)
 
 Componentes de UI **agnósticos** (cero lógica de negocio): comportamiento por **Angular CDK**,
-estilo por los **tokens Migo** (`src/styles/migo/*.css`). Reglas completas en
+estilo por **utilidades de Tailwind generadas del tema Migo** (`src/styles/migo/theme.css`) — sin
+CSS por componente ni valores arbitrarios. Reglas completas en
 [`.claude/rules/components-conventions.md`](../../../.claude/rules/components-conventions.md).
 
 Se importan con el alias `@components/...` y se usan como standalone (`imports: [...]`).

@@ -39,7 +39,6 @@ import { ConfirmDialog } from './confirm-dialog/confirm-dialog';
     Select,
   ],
   templateUrl: './ui-showcase.html',
-  styleUrl: './ui-showcase.css',
 })
 export class UiShowcase {
   private readonly dialog = inject(MigoDialog);
