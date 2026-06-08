@@ -1,13 +1,6 @@
-import {
-  AfterViewInit,
-  Component,
-  ElementRef,
-  OnDestroy,
-  effect,
-  signal,
-  viewChild,
-} from '@angular/core';
-import { Button } from '@components/button/button';
+import { AfterViewInit, Component, ElementRef, OnDestroy, inject, signal, viewChild } from '@angular/core';
+import { MigoDialog, MigoDialogRef } from '@components/dialog/dialog.service';
+import { RecipeBook } from '@features/recipe-book/recipe-book';
 import { KitchenEngine } from '@platform/three/kitchen-engine';
 import { KitchenStation } from '@platform/three/kitchen-station';
 
@@ -28,27 +21,25 @@ interface StationItem {
 /**
  * Página del mundo 3D — escena `KITCHEN` de la Fase 0.
  *
- * Posee el canvas, instancia el {@link KitchenEngine}, reproduce el `flyIn`,
- * y al hacer clic en la estación del libro de recetas abre su overlay (stub,
- * gancho del siguiente paso). Incluye la **ruta accesible**: el dock opera el
- * flujo sin 3D, y si no hay WebGL se muestra solo el dock.
+ * Posee el canvas, instancia el {@link KitchenEngine}, reproduce el `flyIn`, y al
+ * hacer clic en la estación del libro de recetas enfoca la cámara y abre el hub
+ * {@link RecipeBook} como diálogo (CDK aporta foco/ESC/scroll-lock). Incluye la
+ * **ruta accesible**: el dock opera el flujo sin 3D, y si no hay WebGL se muestra
+ * solo el dock.
  */
 @Component({
   selector: 'app-home',
-  imports: [Button],
   templateUrl: './home-3d.html',
   host: {
     class: 'block fixed inset-0 overflow-hidden',
     '(window:resize)': 'onResize()',
-    '(document:keydown.escape)': 'onEscape()',
   },
 })
 export class Home3d implements AfterViewInit, OnDestroy {
   private readonly canvasRef = viewChild<ElementRef<HTMLCanvasElement>>('canvas');
-  private readonly closeButton = viewChild<ElementRef<HTMLButtonElement>>('closeBtn');
+  private readonly dialog = inject(MigoDialog);
 
   protected readonly webglSupported = signal(true);
-  protected readonly overlayOpen = signal(false);
   protected readonly coachVisible = signal(false);
 
   protected readonly coachText =
@@ -61,19 +52,12 @@ export class Home3d implements AfterViewInit, OnDestroy {
   ];
 
   private engine: KitchenEngine | null = null;
-  private triggerEl: HTMLElement | null = null;
+  private recipeBookRef: MigoDialogRef<unknown, RecipeBook> | null = null;
   private readonly reducedMotion =
     window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 
   constructor() {
     this.webglSupported.set(detectWebgl());
-    // Al abrir el overlay, lleva el foco al botón de cerrar (gestión de foco WCAG).
-    effect(() => {
-      const btn = this.closeButton();
-      if (this.overlayOpen() && btn) {
-        btn.nativeElement.focus();
-      }
-    });
   }
 
   ngAfterViewInit(): void {
@@ -108,25 +92,23 @@ export class Home3d implements AfterViewInit, OnDestroy {
   }
 
   protected openRecipeBook(): void {
-    this.coachVisible.set(false);
-    this.triggerEl = (document.activeElement as HTMLElement) ?? null;
-    this.overlayOpen.set(true);
-    void this.engine?.focusStation(KitchenStation.RECIPE_BOARD);
-  }
-
-  protected closeOverlay(): void {
-    if (!this.overlayOpen()) {
+    if (this.recipeBookRef) {
       return;
     }
-    this.overlayOpen.set(false);
-    void this.engine?.resetView();
-    // Restaura el foco al control que abrió el overlay.
-    this.triggerEl?.focus();
-    this.triggerEl = null;
-  }
+    this.coachVisible.set(false);
+    void this.engine?.focusStation(KitchenStation.RECIPE_BOARD);
 
-  protected onEscape(): void {
-    this.closeOverlay();
+    this.recipeBookRef = this.dialog.open<unknown, undefined, RecipeBook>(RecipeBook, {
+      ariaLabel: 'Mi libro de recetas',
+      width: '560px',
+    });
+    this.recipeBookRef.closed.subscribe(() => {
+      this.recipeBookRef = null;
+      void this.engine?.resetView();
+      if (this.webglSupported()) {
+        this.coachVisible.set(true);
+      }
+    });
   }
 
   protected onResize(): void {

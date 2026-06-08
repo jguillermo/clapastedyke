@@ -12,6 +12,12 @@ describe('RecipeYield', () => {
         expect(RecipeYield.of(Quantity.of(1000, 'g')).servings).toBeUndefined();
     });
 
+    it('carries an optional size label (tamaño) and trims it', () => {
+        expect(RecipeYield.of(Quantity.of(1000, 'g'), 8, 'Mediano').size).toBe('Mediano');
+        expect(RecipeYield.of(Quantity.of(1000, 'g'), 8, '  ').size).toBeUndefined();
+        expect(RecipeYield.of(Quantity.of(1000, 'g')).size).toBeUndefined();
+    });
+
     it('rejects non-positive servings', () => {
         expect(() => RecipeYield.of(Quantity.of(1000, 'g'), 0)).toThrow();
         expect(() => RecipeYield.of(Quantity.of(1000, 'g'), -2)).toThrow();

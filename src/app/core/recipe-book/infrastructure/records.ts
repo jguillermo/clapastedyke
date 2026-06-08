@@ -27,7 +27,7 @@ export interface SpongeRecipeRecord {
     id: string;
     name: string;
     flavor?: string;
-    referenceYield: { weight: QuantityRecord; servings?: number };
+    referenceYield: { weight: QuantityRecord; servings?: number; size?: string };
     lines: IngredientLineRecord[];
 }
 

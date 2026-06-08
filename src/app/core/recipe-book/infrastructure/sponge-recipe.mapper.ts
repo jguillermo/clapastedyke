@@ -13,13 +13,18 @@ export const SpongeRecipeMapper = {
             referenceYield: {
                 weight: quantityToRecord(recipe.referenceYield.weight),
                 servings: recipe.referenceYield.servings,
+                size: recipe.referenceYield.size,
             },
             lines: recipe.lines.map(lineToRecord),
         };
     },
 
     toDomain(record: SpongeRecipeRecord): SpongeRecipe {
-        const recipeYield = RecipeYield.of(quantityToDomain(record.referenceYield.weight), record.referenceYield.servings);
+        const recipeYield = RecipeYield.of(
+            quantityToDomain(record.referenceYield.weight),
+            record.referenceYield.servings,
+            record.referenceYield.size,
+        );
         return SpongeRecipe.create(
             new EntityId(record.id),
             record.name,

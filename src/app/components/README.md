@@ -32,8 +32,12 @@ no HTML/CSS ad-hoc.
 | [Card](#card) (+ partes) | `migo-card` (+ `-header/-title/-subtitle/-body/-footer`) | Presentacional | — | ✅ |
 | [FormField](#formfield) | `migo-form-field` | Layout de campo | — | ✅ |
 | [Input](#input) | `migo-input` | Control de texto | ✅ | ✅ |
+| [UnitInput](#unitinput) | `migo-unit-input` | Control numérico con unidad dentro | ✅ | ✅ |
+| [Autocomplete](#autocomplete) | `migo-autocomplete` | Texto con completado fantasma | ✅ | ✅ |
 | [Checkbox](#checkbox) | `migo-checkbox` | Control booleano | ✅ | ✅ |
 | [Select](#select) | `migo-select` | Control (CDK Overlay+Listbox) | ✅ | ✅ |
+| [Grid](#grid) | `migo-grid` | Hoja de cálculo (celdas + teclado) | — | ✅ |
+| [SelectTag](#selecttag) | `migo-select-tag` | Etiquetas tipo Select2 (chips + autocompletar) | — | ✅ |
 | [Dialog](#dialog) | `MigoDialog` (servicio) | Servicio (CDK Dialog) | — | ✅ |
 
 ---
@@ -112,6 +116,33 @@ Solo pinta el `<label>` si hay `label` (sirve de contenedor solo-error para el c
 <migo-input type="email" placeholder="hola@migo.com" formControlName="email" />
 ```
 
+## UnitInput
+
+`migo-unit-input` — control numérico que muestra la **unidad dentro del input, junto al número**
+que se escribe (el número crece con el contenido). `ControlValueAccessor` (valor `string`, admite
+tokens como `1 kg`). Presentacional: la **unidad la calcula el consumidor** y se pasa por `unit`;
+el componente no interpreta ni convierte. Inputs: `unit` · `placeholder` · `ariaLabel` · `invalid`
+· `disabled`.
+
+```html
+<!-- `weightUnit()` lo resuelve el feature desde el dominio (p.ej. un value object) -->
+<migo-unit-input formControlName="weight" [unit]="weightUnit()" (unitToken)="setUnit($event)" placeholder="1" />
+```
+
+El valor es **solo el número**; teclear `k`/`g`/`u` no escribe la letra, emite `unitToken` para que
+el consumidor fije la unidad. Variante `seamless` (sin borde) para celdas de grilla.
+
+## Autocomplete
+
+`migo-autocomplete` — texto con **completado fantasma en línea**: al escribir, el resto de la primera
+sugerencia que coincide aparece tenue dentro del campo; se acepta con Tab / → / Enter. Sin overlay.
+`ControlValueAccessor`. Inputs: `suggestions` (string[]) · `placeholder` · `ariaLabel` · `invalid` ·
+`disabled` · `seamless`.
+
+```html
+<migo-autocomplete formControlName="name" [suggestions]="ingredientNames()" placeholder="Harina" />
+```
+
 ## Checkbox
 
 `migo-checkbox` — control booleano, `ControlValueAccessor`. `indeterminate` · `invalid` ·
@@ -154,6 +185,41 @@ protected readonly data = inject<ConfirmDialogData>(MIGO_DIALOG_DATA);
 ```
 
 Ejemplo vivo de todos los componentes: ruta **`/ui`** (`features/ui-showcase/`).
+
+## Grid
+
+`migo-grid` — shell de **hoja de cálculo**: cabecera por columna, celdas pegadas, navegación por
+teclado (↑/↓/Enter cambian de fila; ←/→ saltan de celda en el borde del cursor) y botón de eliminar
+fila. Presentacional y agnóstico del editor: el consumidor proyecta una `<ng-template>` que pinta el
+control de cada celda (típicamente `migo-autocomplete`/`migo-unit-input` `seamless`). Datos y lógica
+(fila vacía, validación) los aporta el feature. Inputs: `columns` (`{label, width?}[]`) · `rows` ·
+`protectLastRow` · `ariaLabel`. Output: `removeRow` (índice).
+
+```html
+<migo-grid [columns]="columns" [rows]="lineControls()" (removeRow)="removeLine($event)">
+  <ng-template let-line let-r="rowIndex" let-c="colIndex">
+    <div [formGroup]="line">
+      @switch (c) {
+        @case (0) { <migo-autocomplete seamless formControlName="name" [suggestions]="names()" /> }
+        @case (1) { <migo-unit-input seamless formControlName="quantity" [unit]="unit(r)" /> }
+      }
+    </div>
+  </ng-template>
+</migo-grid>
+```
+
+## SelectTag
+
+`migo-select-tag` — campo único estilo **Select2**: una caja con **chips** de lo elegido + un input;
+al escribir abre un **panel** (CDK Overlay) con sugerencias **agrupadas por tipo** y permite **crear**
+valores; **una por tipo** (elegir reemplaza). Toda la lógica vive en el componente; el consumidor solo
+configura `types` e interpreta la salida. Inputs: `types` (`{key,label,values,allowCreate?}[]`),
+`value?` (`Record<tipo,valor>`), `placeholder?`, `ariaLabel?`. Output: `valueChange`
+(`Record<tipo,valor>`).
+
+```html
+<migo-select-tag [types]="charTypes()" (valueChange)="onChars($event)" placeholder="Añade…" />
+```
 
 ---
 

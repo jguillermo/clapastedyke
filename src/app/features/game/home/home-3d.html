@@ -50,49 +50,4 @@
       </button>
     }
   </nav>
-
-  <!-- Overlay del libro de recetas (stub: gancho del siguiente paso) -->
-  @if (overlayOpen()) {
-    <div
-      class="absolute inset-0 grid place-items-center p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="recipe-book-title"
-    >
-      <button
-        type="button"
-        class="absolute inset-0 border-0 p-0 bg-scrim cursor-pointer focus-visible:outline-none focus-visible:shadow-focus"
-        aria-label="Cerrar"
-        (click)="closeOverlay()"
-      ></button>
-      <div
-        class="relative w-full max-w-lg bg-surface-card border border-border-subtle rounded-2xl shadow-lg overflow-hidden"
-      >
-        <header
-          class="flex items-center justify-between px-6 py-5 border-b border-border-subtle"
-        >
-          <h2 id="recipe-book-title" class="m-0 text-h3">Mi libro de recetas</h2>
-          <button
-            #closeBtn
-            type="button"
-            class="min-w-11 min-h-11 border-0 rounded-full bg-surface-sunken text-body text-lead cursor-pointer focus-visible:outline-none focus-visible:shadow-focus"
-            aria-label="Cerrar"
-            (click)="closeOverlay()"
-          >
-            ✕
-          </button>
-        </header>
-        <div class="flex flex-col items-center gap-3 px-6 py-10 text-center">
-          <p class="m-0 font-display text-h3 text-heading">Tu libro está en blanco</p>
-          <p class="m-0 max-w-reading text-muted">
-            Empieza por tu queque: anota sus ingredientes y cuánto rinde.
-          </p>
-          <button migo-button [disabled]="true">Crea tu primer queque</button>
-          <p class="m-0 text-caption text-placeholder">
-            Los formularios del recetario llegan en el siguiente paso.
-          </p>
-        </div>
-      </div>
-    </div>
-  }
 </div>

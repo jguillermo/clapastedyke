@@ -47,6 +47,9 @@ let nextFieldId = 0;
       </p>
     } @else if (hint()) {
       <p class="m-0 text-caption leading-snug text-muted" [id]="hintId">{{ hint() }}</p>
+    } @else if (reserveMessage()) {
+      <!-- Reserva una línea para que mostrar el error no descuadre la fila. -->
+      <p class="m-0 min-h-5" aria-hidden="true"></p>
     }
   `,
   host: { class: 'flex flex-col gap-2' },
@@ -56,6 +59,8 @@ export class FormField {
   readonly hint = input('');
   readonly error = input('');
   readonly required = input(false, { transform: booleanAttribute });
+  /** Reserva el alto del mensaje aunque no haya error/hint, para filas estables. */
+  readonly reserveMessage = input(false, { transform: booleanAttribute });
 
   /** Id único compartido por el `<label>` y el control hijo. */
   readonly controlId = `migo-field-${nextFieldId++}`;

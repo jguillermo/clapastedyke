@@ -18,7 +18,7 @@ interface RecipeLineInput {
 export interface SaveSpongeRecipeRequest {
     name: string;
     flavor?: string;
-    referenceYield: { weightGrams: number; servings?: number };
+    referenceYield: { weightGrams: number; servings?: number; size?: string };
     lines: RecipeLineInput[];
 }
 
@@ -36,7 +36,11 @@ export class SaveSpongeRecipe extends UseCase<SaveSpongeRecipeRequest, { id: str
     async execute({ name, flavor, referenceYield, lines }: SaveSpongeRecipeRequest): Promise<{ id: string }> {
         const existing = await this.recipes.byName(name);
         const id = existing?.id ?? this.recipes.nextIdentity();
-        const recipeYield = RecipeYield.of(Quantity.of(referenceYield.weightGrams, 'g'), referenceYield.servings);
+        const recipeYield = RecipeYield.of(
+            Quantity.of(referenceYield.weightGrams, 'g'),
+            referenceYield.servings,
+            referenceYield.size,
+        );
         const ingredientLines = await this.buildLines(lines);
 
         const recipe = SpongeRecipe.create(id, name, recipeYield, ingredientLines, flavor);

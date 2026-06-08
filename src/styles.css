@@ -60,14 +60,14 @@
   animation: migo-dialog-in var(--duration-slow) var(--ease-out);
 }
 
+/* Solo opacity: un `transform` aquí crea un contenedor de bloque que descoloca
+   los overlays de CDK (paneles de select/combobox) abiertos dentro del diálogo. */
 @keyframes migo-dialog-in {
   from {
     opacity: 0;
-    transform: translateY(8px) scale(0.98);
   }
   to {
     opacity: 1;
-    transform: none;
   }
 }
 
