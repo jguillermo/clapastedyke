@@ -1,0 +1,78 @@
+/* ============================================================
+   Migo · Paleta primitiva (copiada del skill migo-design — fuente de verdad)
+   Repostería palette — warm honey/terracotta over dough neutrals.
+
+   IMPORTANTE: estos primitivos son SOLO referencia interna. NO viven en `@theme`,
+   así que NO generan utilidades de Tailwind. Las utilidades del design system se
+   generan desde los tokens SEMÁNTICOS de `theme.css` (bg-brand, text-body, …),
+   que apuntan aquí. No usar `bg-miel-600` ni `var(--miel-600)` en componentes.
+   ============================================================ */
+
+:root {
+  /* ---------- Neutros tibios (warm neutrals) ---------- */
+  --crema: #fbf4e9; /* page background */
+  --nata: #ffffff; /* surface / card */
+  --nata-tibia: #fffbf4; /* warm surface */
+  --masa-100: #f4eada; /* soft fill */
+  --masa-200: #e8d9c4; /* borders */
+  --masa-300: #d6c2a6; /* strong border / disabled */
+  --cacao-400: #a8937c; /* placeholder / muted */
+  --cacao-600: #7a6450; /* secondary text */
+  --cacao-800: #4a392c; /* body text */
+  --cacao-900: #2f2118; /* headings */
+
+  /* ---------- Primario · Miel (honey) ---------- */
+  --miel-50: #fdf4e1;
+  --miel-100: #fae6bd;
+  --miel-200: #f5d28c;
+  --miel-300: #efbb5a;
+  --miel-400: #e8a33d;
+  --miel-500: #d6892a;
+  --miel-600: #bc7019;
+  --miel-700: #9a5611;
+  --miel-800: #784009;
+
+  /* ---------- Secundario · Terracota ---------- */
+  --terra-50: #fae9e2;
+  --terra-100: #f2cdbf;
+  --terra-200: #e6a48e;
+  --terra-300: #d87e63;
+  --terra-400: #c75d43;
+  --terra-500: #ae4a33;
+  --terra-600: #8f3a27;
+
+  /* ---------- Acento fresco · Pistacho (pistachio) ---------- */
+  --pist-50: #eef4e4;
+  --pist-100: #d9e7c1;
+  --pist-200: #bcd498;
+  --pist-300: #9fbe6f;
+  --pist-400: #82a84f;
+  --pist-500: #6a8e3c;
+  --pist-600: #527030;
+
+  /* ---------- Acento celebración · Fresa (strawberry) ---------- */
+  --fresa-100: #f8d6df;
+  --fresa-300: #e8819b;
+  --fresa-400: #db5e7e;
+  --fresa-500: #c2495f;
+
+  /* ---------- Estado (crudos) ---------- */
+  --exito: #3f9d5c;
+  --exito-soft: #e3f2e6;
+  --alerta: #e8941f;
+  --alerta-soft: #fcebd2;
+  --error: #ce4040;
+  --error-soft: #fbe3e1;
+  --info: #3e8fa0;
+  --info-soft: #e0f0f2;
+
+  /* ---------- Familias tipográficas ---------- */
+  --titular: 'Fraunces', Georgia, 'Times New Roman', serif;
+  --cuerpo: 'Hanken Grotesk', system-ui, -apple-system, sans-serif;
+
+  /* ---------- Wash de fondo de página (luz cálida en las esquinas) ---------- */
+  --bg-wash:
+    radial-gradient(1100px 520px at 88% -8%, rgba(232, 163, 61, 0.16), transparent 60%),
+    radial-gradient(900px 480px at -6% 12%, rgba(159, 190, 111, 0.14), transparent 58%),
+    radial-gradient(700px 420px at 50% 108%, rgba(219, 94, 126, 0.08), transparent 60%);
+}

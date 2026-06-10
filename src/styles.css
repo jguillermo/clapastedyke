@@ -1,0 +1,78 @@
+/* Estilos globales. El estilizado de componentes/features se hace con utilidades
+   de Tailwind generadas desde el tema Migo (src/styles/migo/theme.css). Aquí solo
+   vive la capa global: base del documento y el chrome del overlay de CDK Dialog,
+   que apunta a DOM generado por CDK y por tanto no puede llevar utilidades. */
+
+/* 1) Capa PRE-Tailwind: fuentes (@import remoto, debe ir primero) + paleta primitiva. */
+@import './styles/migo/index.css';
+
+/* 2) Tailwind. */
+@import 'tailwindcss';
+
+/* 3) Tema Migo (@theme): genera las utilidades del design system. */
+@import './styles/migo/theme.css';
+
+/* 4) Base de posicionamiento/backdrop del CDK Overlay (lo usa MigoDialog vía CDK Dialog). */
+@import '@angular/cdk/overlay-prebuilt.css';
+
+@layer base {
+  html,
+  body {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--color-surface-page);
+    background-image: var(--bg-wash);
+    color: var(--color-body);
+    font-family: var(--font-body);
+    font-size: var(--text-base);
+    line-height: var(--leading-body);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    color: var(--color-heading);
+    letter-spacing: var(--tracking-heading);
+  }
+}
+
+/* Diálogo (MigoDialog). El Dialog es un shell agnóstico: solo overlay + backdrop + foco.
+   El contenedor del overlay es TRANSPARENTE — la superficie (fondo/radio/sombra/padding) la
+   aporta el componente que se envía, típicamente con un <migo-card>. El backdrop y la animación
+   se estilan aquí (global) porque el CDK los crea fuera de cualquier componente.
+   El ancho lo decide quien abre vía MigoDialogConfig.width. */
+.migo-dialog__backdrop {
+  background: rgba(47, 33, 24, 0.44);
+}
+
+.migo-dialog__panel .cdk-dialog-container {
+  display: block;
+  max-width: 92vw;
+  background: transparent;
+  padding: 0;
+  outline: none;
+  animation: migo-dialog-in var(--duration-slow) var(--ease-out);
+}
+
+/* Solo opacity: un `transform` aquí crea un contenedor de bloque que descoloca
+   los overlays de CDK (paneles de select/combobox) abiertos dentro del diálogo. */
+@keyframes migo-dialog-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .migo-dialog__panel .cdk-dialog-container {
+    animation: none;
+  }
+}

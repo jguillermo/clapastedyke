@@ -1,0 +1,8 @@
+/* ============================================================
+   Migo · Fonts (copiado del skill migo-design — fuente de verdad)
+   Fraunces (titulares / display serif) + Hanken Grotesk (cuerpo / UI).
+   Both are genuine Google Fonts — loaded from the Google Fonts CDN.
+   For production, self-host the woff2 files and replace the @import.
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400;1,9..144,500&family=Hanken+Grotesk:wght@400;500;600;700;800&display=swap');

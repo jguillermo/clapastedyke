@@ -1,0 +1,72 @@
+<migo-card>
+  <migo-card-header>
+    <migo-icon card-icon name="mat:layers" size="lg" color="brand" />
+    <migo-card-title>Nuevo queque</migo-card-title>
+  </migo-card-header>
+
+  <migo-card-body>
+    <form class="flex flex-col gap-5" [formGroup]="form" (ngSubmit)="save()">
+      <migo-form-field label="Nombre" required reserveMessage [error]="nameError()">
+        <migo-input formControlName="name" placeholder="Queque de vainilla" />
+      </migo-form-field>
+
+      <div class="flex flex-col gap-2">
+        <span class="font-body text-sm font-semibold text-body">Ingredientes</span>
+
+        <migo-grid
+          [columns]="columns"
+          [rows]="lineControls()"
+          ariaLabel="Ingredientes del queque"
+          (removeRow)="removeLine($event)"
+        >
+          <ng-template let-line let-r="rowIndex" let-c="colIndex">
+            <div [formGroup]="line">
+              @switch (c) {
+                @case (0) {
+                  <migo-autocomplete
+                    seamless
+                    formControlName="name"
+                    [suggestions]="ingredientNames()"
+                    [invalid]="lineInvalids()[r]?.name ?? false"
+                    ariaLabel="Ingrediente"
+                  />
+                }
+                @case (1) {
+                  <migo-unit-input
+                    seamless
+                    formControlName="quantity"
+                    [unit]="lineUnits()[r]"
+                    [invalid]="lineInvalids()[r]?.quantity ?? false"
+                    (unitToken)="setLineUnit(r, $event)"
+                    ariaLabel="Cantidad"
+                  />
+                }
+              }
+            </div>
+          </ng-template>
+        </migo-grid>
+
+        @if (errorMessage()) {
+          <p class="m-0 text-caption font-medium text-error" role="alert">{{ errorMessage() }}</p>
+        }
+      </div>
+
+      <div class="flex flex-col gap-2">
+        <span class="font-body text-sm font-semibold text-body">Características</span>
+        <migo-select-tag
+          [types]="charTypes()"
+          (valueChange)="onChars($event)"
+          ariaLabel="Características del queque"
+        />
+        @if (charsError()) {
+          <p class="m-0 text-caption font-medium text-error" role="alert">{{ charsError() }}</p>
+        }
+      </div>
+    </form>
+  </migo-card-body>
+
+  <migo-card-footer>
+    <button migo-button variant="ghost" type="button" (click)="cancel()">Cancelar</button>
+    <button migo-button type="button" [loading]="saving()" (click)="save()">Guardar queque</button>
+  </migo-card-footer>
+</migo-card>

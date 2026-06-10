@@ -1,0 +1,53 @@
+<div class="absolute inset-0">
+  <!-- Lienzo 3D (solo si hay WebGL) -->
+  @if (webglSupported()) {
+    <canvas #canvas class="block w-full h-full" aria-hidden="true"></canvas>
+
+    <!-- Globo del chef coach tras el flyIn -->
+    @if (coachVisible()) {
+      <p
+        class="absolute top-12 left-4 right-4 mx-auto my-0 max-w-md px-5 py-4 bg-surface-card border border-border-subtle rounded-xl shadow-lg text-body text-base text-center"
+        role="status"
+      >
+        {{ coachText }}
+      </p>
+    }
+  } @else {
+    <!-- Ruta accesible sin WebGL: el flujo se opera desde el dock -->
+    <div class="flex flex-col gap-3 items-center justify-center h-full p-8 text-center text-body">
+      <h1 class="text-h1">Tu cocina</h1>
+      <p>Tu equipo no puede mostrar la cocina en 3D, pero puedes seguir igual desde abajo.</p>
+    </div>
+  }
+
+  <!-- HUD mínimo (Nivel 0) -->
+  <header
+    class="absolute top-4 left-4 flex items-center gap-3 px-4 py-2 bg-surface-card border border-border-subtle rounded-full shadow-md"
+  >
+    <span class="px-3 py-0.5 rounded-full bg-brand text-on-brand font-bold text-caption">
+      Nivel 0
+    </span>
+    <span class="font-display text-heading text-sm">El libro de recetas en blanco</span>
+  </header>
+
+  <!-- Dock: ruta accesible, siempre operable -->
+  <nav
+    class="absolute bottom-5 left-1/2 -translate-x-1/2 flex gap-3 p-3 bg-surface-card border border-border-subtle rounded-2xl shadow-lg"
+    aria-label="Estaciones de la cocina"
+  >
+    @for (item of stations; track item.station) {
+      <button
+        type="button"
+        [class]="stationClasses(item.active)"
+        [disabled]="!item.active"
+        [attr.aria-disabled]="!item.active"
+        (click)="handleStation(item.station)"
+      >
+        {{ item.label }}
+        @if (!item.active) {
+          <span class="text-caption" aria-label="se desbloquea más adelante">🔒</span>
+        }
+      </button>
+    }
+  </nav>
+</div>
