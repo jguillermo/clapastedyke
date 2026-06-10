@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+
+
 ## Detailed conventions live in `.claude/`
 
 The authoritative coding rules are in **`.claude/CLAUDE.md`** (always loaded) and **`.claude/rules/*.md`** (one per area). Read the relevant rule before touching files in that area:
