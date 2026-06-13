@@ -35,8 +35,8 @@ Coaching mínimo: 1–2 frases del **Chef Coach** (globo + `GuideCursor`) por pa
 | `coach.ingredient_cost` | Primera vez que agrega un insumo nuevo | "Cuando agregues un insumo, dime cómo lo compras: cuánto y a qué precio (ej. 1 kg a S/ 5). Yo calculo lo que cuesta la cantidad de tu receta." |
 | `coach.create_filling` | Tras guardar el queque | "Ahora un **relleno**. Dime para cuánto rinde y lo escalo solo con el queque." |
 | `coach.create_covering` | Tras guardar el relleno | "Una **cobertura** para terminar la torta." |
-| `coach.create_topper` | Tras guardar la cobertura | "Un **topper** para decorar — es como un ingrediente más." |
-| `coach.create_packaging_rule` | Tras guardar el topper | "¿Qué **caja y base** usas según el peso? Anótalo una vez y yo lo sugiero solo." |
+| `coach.create_topper` | Tras guardar la cobertura | "Un **topper** para decorar — es un insumo más: dime cómo lo compras y su precio." |
+| `coach.create_packaging_rule` | Tras guardar el topper | "Anota tu **caja y base** como cualquier insumo (con su precio) y dime para qué peso van. Yo los sugiero solos." |
 | `coach.compose` | Catálogo con lo mínimo listo | "Arma tu torta: elige queque, relleno y cobertura, y dime el peso. Yo hago las cuentas." |
 | `coach.shopping_list` | Tras componer | "Lista lista. Esto es lo que necesitas comprar. ¡Ya puedes empezar!" |
 
@@ -60,13 +60,13 @@ Coaching mínimo: 1–2 frases del **Chef Coach** (globo + `GuideCursor`) por pa
 
 **Señal de avance (medible):** `CAKES_COMPOSED ≥ 1` — componer **una** torta completa y generar su lista de compra.
 
-Como el catálogo arranca **vacío**, componer una torta exige haber creado antes **todos** los tipos (queque, relleno, cobertura, topper y al menos una regla de empaque que cubra el peso). Por eso una sola meta cubre toda la construcción del recetario.
+Como el catálogo arranca **vacío**, componer una torta exige haber creado antes **todo** lo que la compone: queque, relleno, cobertura, un ingrediente de uso `topper` y al menos una regla de empaque que cubra el peso (con sus ingredientes de uso `box`/`base`). Por eso una sola meta cubre toda la construcción del recetario.
 
 **Al cumplirse:** se cierra el **Nivel 0** y se desbloquea `Feature.KITCHEN` (el flujo de cocinar del Capítulo 1).
 
 Criterios de "hecho":
-- Existe ≥1 `SpongeRecipe`, ≥1 `FillingRecipe`, ≥1 `CoveringRecipe`, ≥1 `Topper` y ≥1 `PackagingRule`.
-- Cada `Ingredient` usado tiene su **precio de compra** (`PurchasePrice`).
+- Existe ≥1 `SpongeRecipe`, ≥1 `FillingRecipe`, ≥1 `CoveringRecipe`, ≥1 `Ingredient` con `usage = topper` y ≥1 `PackagingRule` (con sus ingredientes `box`/`base`).
+- **Todo `Ingredient`** (de receta, topper, caja o base) tiene su **precio de compra** (`PurchasePrice`).
 - Existe ≥1 `CakeComposition` completa con su empaque sugerido resuelto.
 - Se generó su `ShoppingList`, que muestra **costo proporcional por ítem + total de materiales**.
 
@@ -89,7 +89,9 @@ Bounded context **`recipe-book`**, autocontenido. Reutiliza value objects compar
 
 ### 4.2 Entidades y agregados
 
-El contexto tiene **8 agregados pequeños** (Regla 2 de Vernon). Cada raíz se persiste por separado, referencia a las demás **solo por identidad** (Regla 3) y protege sus propias invariantes dentro de su límite (Regla 1). **Regla 4 (consistencia eventual):** cada caso de uso modifica **un solo agregado por transacción**; en el Cap 0 se cumple trivialmente —ningún caso de uso muta dos agregados y `CakeComposition` referencia las recetas en **solo-lectura**—, y la propagación a otros contextos (`progression`, mundo) es por Domain Events, no transaccional.
+El contexto tiene **6 agregados pequeños** (Regla 2 de Vernon). Cada raíz se persiste por separado, referencia a las demás **solo por identidad** (Regla 3) y protege sus propias invariantes dentro de su límite (Regla 1). **Regla 4 (consistencia eventual):** cada caso de uso modifica **un solo agregado por transacción**; en el Cap 0 se cumple trivialmente —ningún caso de uso muta dos agregados y `CakeComposition` referencia las recetas en **solo-lectura**—, y la propagación a otros contextos (`progression`, mundo) es por Domain Events, no transaccional.
+
+> **Todo lo que se compra para preparar la torta es un `Ingredient`** — no hay distinción: la harina, los huevos, el manjar, el topper, la caja y la base son todos `Ingredient`. Lo que cambia es **para qué se usa** (`usage`), no qué son ni cómo se compran. Por eso no existen agregados `Topper` ni `PackagingItem` separados: serían el mismo concepto con otro nombre.
 
 | Agregado raíz | Miembros internos | Referencias (solo por id) | Comportamiento clave |
 |---|---|---|---|
@@ -97,26 +99,22 @@ El contexto tiene **8 agregados pequeños** (Regla 2 de Vernon). Cada raíz se p
 | `SpongeRecipe` (queque) | `IngredientLine[]`, `RecipeYield` | `Ingredient` (`ingredientId` en cada línea) | `addLine`, `changeYield` |
 | `FillingRecipe` (relleno) | `IngredientLine[]` | `Ingredient` | `addLine` |
 | `CoveringRecipe` (cobertura) | `IngredientLine[]` | `Ingredient` | `addLine` |
-| `Topper` | — | — | — |
-| `PackagingItem` | — | — | — |
-| `PackagingRule` | `WeightRange` (VO) | `PackagingItem` (`boxId`, `baseId`) | `matches(weight): boolean` |
-| `CakeComposition` (la torta) | — | `Sponge/Filling/CoveringRecipe`, `Topper`, `PackagingItem` (todo por id) | `recompose(targetWeight)` |
+| `PackagingRule` | `WeightRange` (VO) | `Ingredient` (`boxIngredientId`, `baseIngredientId`) | `matches(weight): boolean` |
+| `CakeComposition` (la torta) | — | `Sponge/Filling/CoveringRecipe`, `Ingredient` (topper/caja/base, todo por id) | `recompose(targetWeight)` |
 
 Campos por agregado:
 
-- **`Ingredient`** — `{ id: EntityId, name, baseUnit: 'g' | 'u', purchasePrice: PurchasePrice }`. Materia prima referenciada por las recetas. **Necesita identidad** porque la `ShoppingList` agrega por `ingredientId`. El **precio de compra vive aquí** (no en la línea): por eso, al elegir un insumo existente, "se jala su información" (precio incluido). Método de intención `repricedTo(newPrice): Ingredient` → devuelve una **nueva instancia** con el precio cambiado (inmutable) y **registra** el evento `IngredientRepriced` (§6.2) para que el histórico lo audite.
-- **`SpongeRecipe`** — `{ id, name, flavor?, referenceYield: RecipeYield, lines: IngredientLine[] }`. **Define el peso de referencia** que gobierna el escalado de toda la torta.
+- **`Ingredient`** — `{ id: EntityId, name, baseUnit: 'g' | 'u', purchasePrice: PurchasePrice, usage: 'recipe' | 'topper' | 'box' | 'base' }`. **Cualquier insumo que se compra para preparar la torta** (de receta, topper, caja o base). **Necesita identidad** porque la `ShoppingList` agrega por `ingredientId`. El **precio de compra vive aquí** (no en la línea): por eso, al elegir un insumo existente, "se jala su información" (precio incluido). `usage` es **solo una etiqueta de uso** (en qué slot entra al componer y cómo se agrupa en la lista), **no** afecta cómo se compra ni se valora — todos llevan `PurchasePrice` y se llenan igual. La **factory `create(...)`** registra `IngredientRepriced { previousPrice: null }` (precio inicial) y el método de intención `repricedTo(newPrice): Ingredient` —que devuelve una **nueva instancia** con el precio cambiado (inmutable)— registra `IngredientRepriced { previousPrice, newPrice }` (cambio). Ambos eventos (§6.2) alimentan el histórico.
+- **`SpongeRecipe`** — `{ id, name, flavor?, referenceYield: RecipeYield, lines: IngredientLine[] }`. **Define el peso de referencia** que gobierna el escalado de toda la torta. Sus líneas referencian ingredientes con `usage = recipe`.
 - **`FillingRecipe`** — `{ id, name, referenceWeight: Quantity /* g */, lines: IngredientLine[] }`. Cantidades por ese peso de referencia.
 - **`CoveringRecipe`** — misma forma que `FillingRecipe` (mismo rol: capa escalada por peso).
-- **`Topper`** — `{ id, name }`. Ítem de decoración elegido a mano.
-- **`PackagingItem`** — `{ id, name, type: 'box' | 'base' }`.
-- **`PackagingRule`** — `{ id, range: WeightRange, boxId, baseId }`. `matches(weight)` → `range.min ≤ weight ≤ range.max`.
-- **`CakeComposition`** — `{ id, name?, targetWeight: Quantity /* g */, spongeRecipeId, fillingRecipeId, coveringRecipeId, topperId?, suggestedBoxId, suggestedBaseId }`.
+- **`PackagingRule`** — `{ id, range: WeightRange, boxIngredientId, baseIngredientId }`. `matches(weight)` → `range.min ≤ weight ≤ range.max`. Los ids apuntan a `Ingredient` con `usage` `box`/`base`.
+- **`CakeComposition`** — `{ id, name?, targetWeight: Quantity /* g */, spongeRecipeId, fillingRecipeId, coveringRecipeId, topperIngredientId?, suggestedBoxIngredientId, suggestedBaseIngredientId }`. El topper, la caja y la base son ingredientes referenciados por id.
 
 **Creación y comportamiento (evitar Anemic Domain Model).** Cada raíz se crea con una **factory** que impone sus invariantes (`SpongeRecipe.create(...)`, etc.) y se modifica con **métodos de intención de negocio** (`addLine`, `changeYield`, `recompose`), nunca con setters públicos. Las invariantes de una sola instancia viven en el agregado (§11.1); las que cruzan varias instancias, fuera (§11.2).
 
-- **`ShoppingList`** — **no es agregado**: es una **proyección / read model** (estilo CQRS) derivada de una `CakeComposition` + sus recetas. No se persiste como transacción ni tiene repositorio. `items: ShoppingListItem[]`, `totalCost: string /* 'S/ 8.50', ya formateado */`. El total es la suma de los costos de los ítems — **cálculo vivo de referencia**, no un total congelado, y se proyecta **listo para pintar**.
-  - **`ShoppingListItem`** — `{ name, totalQuantity: Quantity, cost: string /* 'S/ 1.50' */, purchaseReference?: string, category: 'ingredient' | 'packaging' | 'topper' }`. `cost` es el **costo proporcional** de la cantidad de la lista (regla de tres, ya formateado para la vista); `purchaseReference` es la referencia "ghost" (`"1 kg · S/ 5"`). Sigue **sin stock**. Empaque y topper pueden no tener `PurchasePrice` aún → `cost` vacío ("—") y sin `purchaseReference`. El cálculo crudo en soles vive en el dominio (`PurchasePrice.costFor`); la **proyección** lo formatea (la vista no calcula ni formatea).
+- **`ShoppingList`** — **no es agregado**: es una **proyección / read model** (estilo CQRS) derivada de una `CakeComposition` + sus recetas. No se persiste como transacción ni tiene repositorio. `items: ShoppingListItem[]`, `totalCost: string /* 'S/ 14.50', ya formateado */`. El total es la suma de los costos de los ítems — **cálculo vivo de referencia**, no un total congelado, y se proyecta **listo para pintar**.
+  - **`ShoppingListItem`** — `{ name, totalQuantity: Quantity, cost: string /* 'S/ 1.50' */, purchaseReference: string, category: 'ingredient' | 'packaging' | 'topper' }`. `cost` es el **costo proporcional** de la cantidad de la lista (regla de tres, ya formateado para la vista); `purchaseReference` es la referencia "ghost" (`"1 kg · S/ 5"`). Sigue **sin stock**. **Todos** los ítems llevan precio (receta, topper, caja y base son `Ingredient` con `PurchasePrice`), así que todos muestran su `cost`. `category` se **deriva del `usage`** del ingrediente (`recipe`→ingrediente, `box`/`base`→empaque, `topper`→topper). El cálculo crudo en soles vive en el dominio (`PurchasePrice.costFor`); la **proyección** lo formatea (la vista no calcula ni formatea).
 
 - **`PriceHistoryEntry`** — `{ ingredientId, price: PurchasePrice, recordedAt }`. **Log de auditoría append-only, invisible al usuario** — **no** es parte de la composición de la torta ni del flujo visible. Lo escribe **solo** el suscriptor `IngredientPriceRecorder` (§5) al reaccionar a `IngredientRepriced` (§6.2); jamás se lee desde la UI del Cap 0. Existe para tener trazabilidad del historial de precios "por debajo".
 
@@ -132,9 +130,9 @@ factorCovering = targetWeight / covering.referenceWeight
 
 - Cada `IngredientLine` se multiplica por el factor de su receta (`quantity.scaleBy(factor)`).
 - Los ingredientes se **agregan por `ingredientId`** sumando cantidades (mismo insumo en queque + relleno + cobertura suma en una sola línea).
-- **Costo (cálculo vivo):** por cada línea, `cost = ingredient.purchasePrice.costFor(scaledQuantity)` (= `scaledQuantity.amount × purchasePrice.perBaseUnit()`, regla de tres). El **costo total de materiales** = suma de los costos de todas las líneas + empaque (si tiene precio). Es **derivado**, nunca almacenado: vive en `PurchasePrice.costFor()` y lo proyecta el `ShoppingListBuilder`.
-- **Empaque:** `PackagingRule.matches(targetWeight)` → caja + base (1 c/u).
-- **Topper:** 1 por torta (ítem de conteo, no escala por peso).
+- **Costo (cálculo vivo):** por cada ítem, `cost = ingredient.purchasePrice.costFor(quantity)` (= `quantity.amount × purchasePrice.perBaseUnit()`, regla de tres). Aplica **igual a todo**: a las líneas de receta (con la cantidad escalada) y al topper / caja / base (con su cantidad de 1 u). El **costo total de materiales** = suma de **todos** los costos. Es **derivado**, nunca almacenado: vive en `PurchasePrice.costFor()` y lo proyecta el `ShoppingListBuilder`.
+- **Empaque:** `PackagingRule.matches(targetWeight)` → caja + base (1 c/u); cada una es un `Ingredient` con su precio.
+- **Topper:** 1 por torta (ítem de conteo, no escala por peso); es un `Ingredient` con su precio.
 
 > **A confirmar en revisión:** el topper se modela como ítem `count = 1` (no escala por peso). Si debe escalar con el tamaño, se ajusta a un modelo por banda como el empaque.
 
@@ -153,10 +151,11 @@ Contexto único **`recipe-book`** (Core Domain del capítulo) con estructura DDD
 | queque (bizcocho base) | `SpongeRecipe` |
 | relleno | `FillingRecipe` |
 | cobertura | `CoveringRecipe` |
-| ingrediente / insumo | `Ingredient` |
+| ingrediente / insumo (todo lo que se compra para preparar) | `Ingredient` |
+| para qué se usa el insumo | `usage` (`recipe` / `topper` / `box` / `base`) |
 | rinde (cuánto pesa/alcanza el queque) | `referenceYield` / `referenceWeight` |
-| topper (decoración) | `Topper` |
-| empaque (caja / base) | `PackagingItem` (`box` / `base`) |
+| topper (decoración) | `Ingredient` con `usage = topper` |
+| empaque (caja / base) | `Ingredient` con `usage = box` / `base` |
 | regla de empaque (peso → caja/base) | `PackagingRule` |
 | torta (lo que se arma) | `CakeComposition` |
 | componer una torta | `ComposeCake` |
@@ -174,7 +173,7 @@ Estructura del contexto:
 core/recipe-book/
 ├── domain/
 │   ├── entities/         ← Ingredient, SpongeRecipe, FillingRecipe, CoveringRecipe,
-│   │                        Topper, PackagingItem, PackagingRule, CakeComposition
+│   │                        PackagingRule, CakeComposition
 │   ├── value-objects/    ← IngredientLine, RecipeYield, WeightRange, PurchasePrice
 │   ├── repositories/     ← un contrato por agregado raíz + IngredientPriceHistoryRepository
 │   └── services/         ← CakeScalingService, PackagingRuleOverlapPolicy, ShoppingListBuilder
@@ -186,7 +185,7 @@ core/recipe-book/
 
 **Un repositorio por agregado raíz** (Vernon). `ShoppingList` **no** tiene repositorio (es proyección):
 
-`IngredientRepository`, `SpongeRecipeRepository`, `FillingRecipeRepository`, `CoveringRecipeRepository`, `TopperRepository`, `PackagingItemRepository`, `PackagingRuleRepository`, `CakeCompositionRepository`.
+`IngredientRepository` (cubre receta, topper, caja y base — todos son `Ingredient`), `SpongeRecipeRepository`, `FillingRecipeRepository`, `CoveringRecipeRepository`, `PackagingRuleRepository`, `CakeCompositionRepository`.
 
 Más un **store de auditoría append-only** (no es un agregado de negocio): `IngredientPriceHistoryRepository` (`append(entry: PriceHistoryEntry)`). Lo escribe **solo** el suscriptor `IngredientPriceRecorder`; ningún caso de uso del flujo lo toca ni lo lee.
 
@@ -238,8 +237,6 @@ Convención: nombre en pasado, inglés, payload mínimo.
 - `SpongeRecipeSaved { recipeId, isNew }`
 - `FillingRecipeSaved { recipeId, isNew }`
 - `CoveringRecipeSaved { recipeId, isNew }`
-- `TopperSaved { topperId, isNew }`
-- `PackagingItemSaved { itemId, isNew }`
 - `PackagingRuleSaved { ruleId }`
 - `CakeComposed { compositionId }` ← **único que mueve la meta**
 - `ShoppingListGenerated { compositionId, itemCount }`
@@ -277,7 +274,7 @@ De la suite de diseño (`.claude/design/diseno_componentes.md`, tokens en `disen
 | Componente | Uso en el Cap 0 |
 |---|---|
 | **Overlay** (panel de vidrio) | Contenedor de "Mi libro de recetas" y de cada formulario/flujo. Cierra con `x`/`Esc`/scrim → `resetView`. |
-| **Form Field** | Formularios de queque, relleno, cobertura, topper, regla de empaque y composición. Label visible, input ≥44px, validación on-blur. |
+| **Form Field** | Formularios de queque, relleno, cobertura, topper, regla de empaque y composición. Label visible, input ≥44px, validación on-blur. En las líneas de ingrediente, muestra a la derecha el **costo proporcional** y, en gris pequeño, el **ghost** con la referencia de compra (texto, no componente nuevo). |
 | **Card** + **List/Table** | Listado del catálogo por tipo y la tabla de la lista de compra (móvil: cards; desktop: tabla). |
 | **Button** | Acciones primarias/secundarias ("Guardar", "+ Nuevo", "Componer torta", "Generar lista"). |
 | **Chef Coach / Speech Bubble** + **GuideCursor** | Coaching mínimo (§2). Respeta `prefers-reduced-motion`. |
@@ -292,7 +289,7 @@ De la suite de diseño (`.claude/design/diseno_componentes.md`, tokens en `disen
 
 ```
 flyIn → Cocina → coach.intro → tap RECIPE_BOARD → "Mi libro de recetas" (EmptyState)
-  → SaveSpongeRecipe → SaveFillingRecipe → SaveCoveringRecipe → SaveTopper → SavePackagingRule
+  → SaveSpongeRecipe → SaveFillingRecipe → SaveCoveringRecipe → SaveIngredient(topper) → SaveIngredient(caja/base) + SavePackagingRule
   → ComposeCake (elige queque+relleno+cobertura, peso kg, topper; sugiere caja/base)
   → GenerateShoppingList → CakeComposed → ✔ Nivel 0 → LevelUp → desbloquea KITCHEN
 ```
@@ -340,8 +337,8 @@ flyIn → Cocina → coach.intro → tap RECIPE_BOARD → "Mi libro de recetas" 
 
 4. **Crear relleno (`SaveFillingRecipe`).** Nombre, **peso de referencia** (para cuánto queque rinde) y líneas de ingrediente — **mismo patrón de línea** que el queque (nombre → cantidad → precio, con costo proporcional + ghost). Guardar.
 5. **Crear cobertura (`SaveCoveringRecipe`).** Igual que el relleno.
-6. **Crear topper (`SaveTopper`).** Nombre. Guardar.
-7. **Crear regla de empaque (`SavePackagingItem` + `SavePackagingRule`).** Define caja y base (ítems) y la regla: rango de peso → caja + base.
+6. **Crear topper (`SaveIngredient`, `usage = topper`).** Es **un ingrediente más**: nombre + **cómo lo compra** (presentación + precio), con el **mismo sub-flujo** del paso 3 (ej. topper `1 u · S/ 3`). Guardar.
+7. **Crear caja y base + regla de empaque.** La caja y la base son **ingredientes** (`SaveIngredient`, `usage = box` / `base`), creados con el mismo sub-flujo de precio (ej. caja `pack 10 · S/ 20`, base `pack 10 · S/ 10`). Luego la regla (`SavePackagingRule`) solo **mapea** rango de peso → qué caja y qué base usar (elige ingredientes ya creados; no define precio).
 
    ```
    ┌──────────────────────────────────────────┐
@@ -383,11 +380,11 @@ flyIn → Cocina → coach.intro → tap RECIPE_BOARD → "Mi libro de recetas" 
    │ 🥚 Huevos              4 u     S/ 1.60  ingrediente   │
    │ 🍫 Manjar blanco      300 g    S/ 3.00  ingrediente   │
    │ 🍦 Chantilly          200 g    S/ 2.40  ingrediente   │
-   │ 📦 Caja Nº 20           1 u       —      empaque       │
-   │ 🟫 Base 22 cm           1 u       —      empaque       │
-   │ 🎀 Feliz cumpleaños     1 u       —      topper        │
+   │ 📦 Caja Nº 20           1 u     S/ 2.00  empaque       │
+   │ 🟫 Base 22 cm           1 u     S/ 1.00  empaque       │
+   │ 🎀 Feliz cumpleaños     1 u     S/ 3.00  topper        │
    ├──────────────────────────────────────────────────────┤
-   │ Total de materiales                      S/ 8.50      │
+   │ Total de materiales                      S/ 14.50     │
    └──────────────────────────────────────────────────────┘
    ```
 
@@ -401,19 +398,17 @@ Una intención = un caso de uso. Son **Application Services delgados**: orquesta
 
 | Caso de uso | Entrada → salida | Evento |
 |---|---|---|
-| `SaveIngredient` | `{ name, baseUnit, purchasePrice: { amount, per } }` → `{ id }` | `IngredientSaved` (+ `IngredientRepriced` si fija/cambia precio) |
+| `SaveIngredient` | `{ name, baseUnit, usage, purchasePrice: { amount, per } }` → `{ id }` — **da de alta cualquier insumo** (receta, topper, caja o base, según `usage`) | `IngredientSaved` (+ `IngredientRepriced` si fija/cambia precio) |
 | `PreviewIngredientCost` | `{ ingredientId, quantity }` → `{ cost: 'S/ 1.50', purchaseReference: '1 kg · S/ 5' }` | — |
 | `SaveSpongeRecipe` | `{ name, flavor?, referenceYield, lines }` → `{ id }` | `SpongeRecipeSaved` |
 | `SaveFillingRecipe` | `{ name, referenceWeight, lines }` → `{ id }` | `FillingRecipeSaved` |
 | `SaveCoveringRecipe` | `{ name, referenceWeight, lines }` → `{ id }` | `CoveringRecipeSaved` |
-| `SaveTopper` | `{ name }` → `{ id }` | `TopperSaved` |
-| `SavePackagingItem` | `{ name, type }` → `{ id }` | `PackagingItemSaved` |
-| `SavePackagingRule` | `{ range, boxId, baseId }` → `{ id }` | `PackagingRuleSaved` |
+| `SavePackagingRule` | `{ range, boxIngredientId, baseIngredientId }` → `{ id }` | `PackagingRuleSaved` |
 | `ListRecipeBook` | `{ }` → catálogo agrupado por tipo | — |
-| `ComposeCake` | `{ name?, targetWeight, spongeId, fillingId, coveringId, topperId? }` → `CakeComposition` (con empaque resuelto y vista escalada) | `CakeComposed` |
+| `ComposeCake` | `{ name?, targetWeight, spongeId, fillingId, coveringId, topperIngredientId? }` → `CakeComposition` (con empaque resuelto y vista escalada) | `CakeComposed` |
 | `GenerateShoppingList` | `{ compositionId }` → `ShoppingList` (cantidades + costo por ítem + `totalCost`) | `ShoppingListGenerated` |
 
-> Nota de orquestación: `SaveIngredient` es **upsert por nombre** —si el insumo existe, actualiza su precio con `Ingredient.repricedTo()`, que registra `IngredientRepriced`—; el caso de uso solo persiste y publica el evento, **no** escribe el histórico (eso lo hace el suscriptor `IngredientPriceRecorder`, §5). `PreviewIngredientCost` es **cálculo vivo**: devuelve el costo y el ghost ya formateados para que la vista los pinte sin replicar la fórmula (memoria `calculos-solo-en-negocio`). `SavePackagingRule` consulta `PackagingRuleOverlapPolicy` (no-solape, §11.2); los `Save*` validan unicidad de `name` y existencia de referencias vía sus repositorios. `ComposeCake` resuelve el empaque vía `PackagingRule.matches(targetWeight)` y calcula la vista escalada con `CakeScalingService`. `GenerateShoppingList` agrega con `ShoppingListBuilder` (cantidades + costo proporcional + total).
+> Nota de orquestación: `SaveIngredient` es **upsert por nombre** —si el insumo existe, actualiza su precio con `Ingredient.repricedTo()`, que registra `IngredientRepriced`—; el caso de uso solo persiste y publica el evento, **no** escribe el histórico (eso lo hace el suscriptor `IngredientPriceRecorder`, §5). `PreviewIngredientCost` es **cálculo vivo**: devuelve el costo y el ghost ya formateados para que la vista los pinte sin replicar la fórmula (memoria `calculos-solo-en-negocio`). `SavePackagingRule` consulta `PackagingRuleOverlapPolicy` (no-solape, §11.2) y valida que `boxIngredientId`/`baseIngredientId` referencien `Ingredient` con `usage` `box`/`base`; los `Save*` validan unicidad de `name` y existencia de referencias vía sus repositorios. `ComposeCake` resuelve el empaque vía `PackagingRule.matches(targetWeight)` y calcula la vista escalada con `CakeScalingService`. `GenerateShoppingList` agrega con `ShoppingListBuilder` (cantidades + costo proporcional + total).
 
 ---
 
@@ -425,20 +420,18 @@ Los **criterios de aceptación** del capítulo (cuándo se da por "hecho") está
 
 ### 11.1 Invariantes de agregado (dentro del límite, impuestas por factory/métodos)
 
-- **`Ingredient`** — `name` requerido; `baseUnit` ∈ {`g`, `u`}; `purchasePrice.amount` > 0; `purchasePrice.per.amount` > 0 (impuesto por el VO `PurchasePrice`).
+- **`Ingredient`** (cubre receta, topper, caja y base) — `name` requerido; `baseUnit` ∈ {`g`, `u`}; `usage` ∈ {`recipe`, `topper`, `box`, `base`}; `purchasePrice.amount` > 0; `purchasePrice.per.amount` > 0 (impuesto por el VO `PurchasePrice`).
 - **`SpongeRecipe`** — `referenceYield.weight` > 0; `servings` (si se da) > 0; **≥1 línea**; cada `quantity` > 0.
 - **`FillingRecipe` / `CoveringRecipe`** — `referenceWeight` > 0; **≥1 línea**; cada `quantity` > 0.
-- **`Topper`** — `name` requerido.
-- **`PackagingItem`** — `name` requerido; `type` ∈ {`box`, `base`}.
 - **`PackagingRule`** — `range.min` ≥ 0; `range.max` > `range.min`.
 
 ### 11.2 Invariantes set-based y referenciales (fuera del agregado)
 
 No pueden ser invariantes de una entidad porque abarcan la colección u otros agregados. Se aplican en **Application Service** (chequeo vía repositorio) o **Domain Policy**:
 
-- **Unicidad de `name`** (recetas, topper, ingrediente; case-insensitive) — chequeo en el caso de uso `Save*` vía `*Repository` (patrón `byName`).
+- **Unicidad de `name`** (recetas e ingredientes —incluidos topper, caja y base—; case-insensitive) — chequeo en el caso de uso `Save*` vía `*Repository` (patrón `byName`).
 - **No-solape de bandas de empaque** — `PackagingRuleOverlapPolicy` consultada por `SavePackagingRule`.
-- **Existencia de referencias** — los `ingredientId` de una receta deben existir; `boxId`/`baseId` deben referenciar un `PackagingItem` del `type` correcto (`box`/`base`). Se valida en el `Save*` correspondiente.
+- **Existencia de referencias** — los `ingredientId` de una receta deben existir; `boxIngredientId`/`baseIngredientId` deben referenciar un `Ingredient` con el `usage` correcto (`box`/`base`); el topper de una composición debe ser un `Ingredient` con `usage = topper`. Se valida en el `Save*`/`ComposeCake` correspondiente.
 - **`ComposeCake`** — `targetWeight` > 0; queque, relleno y cobertura seleccionados; si **ninguna** `PackagingRule` cubre `targetWeight` → avisar: *"No hay caja para este peso. Define una regla de empaque que lo cubra."* (bloquea la composición hasta resolver).
 - **`GenerateShoppingList`** — requiere una `CakeComposition` completa (empaque resuelto).
 
