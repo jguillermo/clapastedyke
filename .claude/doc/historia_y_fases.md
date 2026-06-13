@@ -32,9 +32,9 @@ Antes de hornear nada, Ariana tiene un sueño concreto: hacer una **torta de ver
 
 Así que empieza a escribir. Primero su **queque**: los ingredientes y **cuánto rinde** (1 kg, alcanza para X porciones) —esa es su medida de referencia—. Luego un **relleno**, suficiente para ese kilo. Luego una **cobertura**. Su libro deja de estar vacío: tiene un pequeño **recetario modular**.
 
-Ahora **compone su primera torta** sobre el papel: *este* queque + *este* relleno + *esta* cobertura, para 1 kg. El libro hace las cuentas —escala relleno y cobertura al peso del queque—, le **sugiere la caja y la base** del tamaño correcto, y ella **elige un topper** para decorar. Al final sale una **lista**: qué necesita y cuánto. Si mañana quiere la misma torta de 2 kg, todo se **recalcula** solo.
+Ahora **compone su primera torta** sobre el papel: *este* queque + *este* relleno + *esta* cobertura, para 1 kg. El libro hace las cuentas —escala relleno y cobertura al peso del queque—, le **sugiere la caja y la base** del tamaño correcto, y ella **elige un topper** para decorar. Al final sale una **lista**: qué necesita, cuánto, y **cuánto le cuesta comprarlo**. Si mañana quiere la misma torta de 2 kg, todo se **recalcula** solo.
 
-No compra nada todavía, no piensa en plata. Solo sabe, por primera vez, **exactamente qué es su torta y qué lleva**. Con esa lista en la mano, está lista para empezar.
+Por cada insumo apunta **cómo lo compra** (1 kg a S/ 5) y el libro le dice el **costo de la cantidad exacta** que usa la receta y el **costo de materiales** de la torta. Todavía **no fija precio de venta ni piensa en margen** —eso llega más adelante—. Lo que sí sabe, por primera vez, es **exactamente qué es su torta, qué lleva y cuánto le cuesta**. Con esa lista en la mano, está lista para empezar.
 
 ### Capítulo 1 — La cocina vacía y el libro de recetas
 
@@ -84,9 +84,9 @@ Le duele perder ese pedido. Y aprende la lección a la mala: **tiene que mirar s
 
 ### Capítulo 7 — "¿A cuánto lo vendo?"
 
-Una clienta le encarga una torta enorme para **30 personas** y le pregunta el precio. Ariana abre la boca para improvisar un número… y se da cuenta de que **nunca supo cuánto cobrar**. Venía poniendo precios "a ojo", y haciendo cuentas honestas descubre algo feo: **en varios pedidos casi no ganó nada, o perdió**.
+Una clienta le encarga una torta enorme para **30 personas** y le pregunta el precio. Ariana abre la boca para improvisar un número… y se da cuenta de que **nunca supo a cuánto venderla**. Sabía bien lo que le costaban los **ingredientes** —eso lo anota desde su libro de recetas—, pero venía poniendo el **precio de venta "a ojo"**, sin sumar su trabajo ni un margen. Haciendo cuentas honestas descubre algo feo: **en varios pedidos casi no ganó nada, o perdió**.
 
-Se sienta con papel y lápiz. Suma cuánto cuestan los ingredientes de esa torta, cuántas **horas de su trabajo** le toma, el empaque, y cuánto quiere **ganar de verdad**. Por primera vez arma un **presupuesto**: precio = costo + margen. Deja de regalar su talento. Ahora, cuando alguien pregunta "¿cuánto?", Ariana **lo sabe**.
+Se sienta con papel y lápiz. Parte del **costo de ingredientes que ya tiene**, le suma cuántas **horas de su trabajo** le toma, el empaque, y cuánto quiere **ganar de verdad**. Por primera vez arma un **presupuesto**: precio de venta = costo + mano de obra + margen. Deja de regalar su talento. Ahora, cuando alguien pregunta "¿cuánto?", Ariana **lo sabe**.
 
 ---
 
@@ -166,7 +166,7 @@ Cada capítulo es una fase. La ficha es macro: el **dolor que la dispara**, **qu
 
 | Fase | Capítulo | El dolor que la dispara | Qué aprende a hacer | Entra al juego | Señal de avance | Mundo |
 |---|---|---|---|---|---|---|
-| **0** | El libro de recetas en blanco | "Quiero hacer una torta de verdad, pero no sé de qué está hecha ni qué comprar" | Crear recetas modulares (queque base con su rinde, relleno, cobertura); componer una torta escalada por el peso del queque; recibir empaque sugerido y elegir topper; sacar su lista de materiales | `catalog` (recetas modulares: queque/relleno/cobertura, topper, regla de empaque), `composition` (compone la torta, escala por peso del queque), `shopping-list` (lista de planificación) · `Feature RECIPE_BOOK` | 1.ª torta compuesta con su lista de compra generada | `KITCHEN` |
+| **0** | El libro de recetas en blanco | "Quiero hacer una torta de verdad, pero no sé de qué está hecha ni qué comprar" | Crear recetas modulares (queque base con su rinde, relleno, cobertura); anotar el **costo de compra** de cada insumo y ver el **costo de materiales** de la torta (sin precio de venta aún); componer una torta escalada por el peso del queque; recibir empaque sugerido y elegir topper; sacar su lista de materiales con costo | `catalog` (recetas modulares: queque/relleno/cobertura, topper, regla de empaque, **costo de compra de insumos**), `composition` (compone la torta, escala por peso del queque), `shopping-list` (lista de planificación con costo de materiales) · `Feature RECIPE_BOOK` | 1.ª torta compuesta con su lista de compra generada | `KITCHEN` |
 | **1** | La cocina vacía | "Quiero hornear algo" | Elegir receta, ver si tiene ingredientes, cocinar | `kitchen`, `catalog` (mínimo), `inventory` (consumo) · `Feature KITCHEN` | 1.ª producción cocinada | `KITCHEN` |
 | **2** | El primer aplauso | "¿Y si lo muestro?" | Fotografiar y publicar; ganar reputación | `reputation` · `Feature SOCIAL` | Publica y suma popularidad | `KITCHEN` |
 | **3** | El primer encargo | "Me piden una torta y me falta un ingrediente" | Atender un pedido informal, pedir mercadería, recibir stock, **cobrar** | `inventory` (compra simple), pedido informal · primera venta | 1.er pedido cobrado | `KITCHEN` |
@@ -178,7 +178,7 @@ Cada capítulo es una fase. La ficha es macro: el **dolor que la dispara**, **qu
 | **4** | El recetario crece | "Con una sola receta no llego" | Ampliar su catálogo de productos | `catalog` (crece) | Varias recetas activas | `KITCHEN` |
 | **5** | "¿Quién me pidió qué?" | El caos de no recordar a quién le debe qué | Registrar clientes (nombre, contacto, pedido) | `sales` (`Customer`) · `Feature CUSTOMERS` | 1.er cliente registrado | `KITCHEN` |
 | **6** | "Se me acabó la harina" | Quedarse sin stock a mitad de un pedido; uno cancela | Controlar inventario (semáforo), comprar a tiempo; estados de pedido (pendiente/confirmado/cancelado) | `inventory` (control real), `sales` (`Order` con estados) · `Feature ORDERS` | Gestiona varios pedidos sin quedarse sin stock | `KITCHEN` |
-| **7** | "¿A cuánto lo vendo?" | Descubrir que cobraba mal y casi no ganaba | Costear y presupuestar: ingredientes + mano de obra + empaque + margen | `quoting` (`Quote`), incluye empaque y costos · `Feature QUOTING` | Presupuestos con precio calculado | `KITCHEN` |
+| **7** | "¿A cuánto lo vendo?" | Descubrir que vendía mal y casi no ganaba | Presupuestar el **precio de venta**: parte del **costo de ingredientes que ya trae del Cap 0** y le suma mano de obra + empaque + margen | `quoting` (`Quote`), reúsa el costo de insumos y añade mano de obra y margen · `Feature QUOTING` | Presupuestos con precio de venta calculado | `KITCHEN` |
 
 ## Acto III · La pastelería de verdad
 
