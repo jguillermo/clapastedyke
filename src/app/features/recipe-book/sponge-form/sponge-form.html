@@ -46,11 +46,11 @@
                     <button
                       #costCell
                       type="button"
-                      class="flex w-full flex-col items-start px-3 py-1 text-left rounded-sm focus-visible:shadow-focus focus-visible:outline-none"
+                      class="px-3 py-1 text-base text-body rounded-sm hover:underline focus-visible:shadow-focus focus-visible:outline-none"
+                      title="Toca para ver o cambiar cómo compras el insumo"
                       (click)="openPrice(r, costCell)"
                     >
-                      <span class="text-base text-body">{{ costViews()[r].cost || '—' }}</span>
-                      <span class="text-caption text-muted">⁁ {{ costViews()[r].reference }}</span>
+                      {{ costViews()[r].cost || '—' }}
                     </button>
                   } @else if (line.controls.name.value.trim()) {
                     <button
@@ -67,6 +67,15 @@
             </div>
           </ng-template>
         </migo-grid>
+
+        @if (materialTotal()) {
+          <div class="flex items-center justify-between border-t border-border-subtle pt-2">
+            <span class="font-body text-sm font-semibold text-body">Costo de materiales</span>
+            <span class="font-body text-base font-semibold text-heading">{{ materialTotal() }}</span>
+          </div>
+        }
+
+        <p class="m-0 text-caption text-muted">Toca un costo para ver o cambiar cómo compras el insumo.</p>
 
         @if (errorMessage()) {
           <p class="m-0 text-caption font-medium text-error" role="alert">{{ errorMessage() }}</p>

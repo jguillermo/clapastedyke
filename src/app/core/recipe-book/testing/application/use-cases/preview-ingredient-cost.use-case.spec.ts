@@ -16,7 +16,7 @@ describe('PreviewIngredientCost', () => {
         });
 
         expect(result.cost).toBe('S/ 1.50');
-        expect(result.perBaseUnitLabel).toBe('S/ 0.0050 / g');
+        expect(result.perBaseUnitLabel).toBe('S/ 0.0050 por g');
         expect(result.reference).toBe('1 kg · S/ 5');
     });
 

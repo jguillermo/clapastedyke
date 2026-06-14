@@ -22,9 +22,9 @@ export function formatReference(price: PurchasePrice): string {
     return `${formatMeasure(price.per)} · S/ ${trim(price.amount)}`;
 }
 
-/** Cost per base unit, ready to paint: `'S/ 0.0050 / g'`. */
+/** Cost per base unit, ready to paint: `'S/ 0.0050 por g'`. */
 export function formatPerBaseUnit(price: PurchasePrice): string {
-    return `S/ ${price.perBaseUnit().toFixed(4)} / ${price.per.unit}`;
+    return `S/ ${price.perBaseUnit().toFixed(4)} por ${price.per.unit}`;
 }
 
 /** Drops trailing zeros from a number for display (5.00 → "5", 1.50 → "1.5"). */

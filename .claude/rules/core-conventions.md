@@ -308,6 +308,30 @@ DeviceHttpService         // mixes updates + system info
 
 API response interfaces (`*Response`, `*Payload`) are infrastructure contracts, never domain models. They live in `infrastructure/` of their context.
 
+## Backward-compatible persistence — tolerate old data (CRITICAL)
+
+Persisted data **outlives the code that wrote it**. The IndexedDB store accumulates documents written by **older versions of the app**, and versioning only ever **ADDS** stores — it never rewrites or deletes the documents already there. Therefore **every read must tolerate records written by a previous version**: a record may be missing fields that the current code expects.
+
+**Rules:**
+
+- **Reads never crash on legacy records.** A mapper or repository that does `record.newField.x` will throw the day it meets a document saved before `newField` existed. Guard every field added after the first release.
+- **Schema changes are additive.** Add new optional fields to `*Record` interfaces; do not rename or repurpose existing ones (a rename orphans every old document). If a concept must change shape, write a migration, don't assume.
+- **Decide a per-field legacy policy and apply it in the mapper/repository, not the domain:**
+  - **Default** — when a sensible default exists, fill it on read (`record.flag ?? false`).
+  - **Skip** — when no honest default exists (e.g. a price that was never captured), the repository **ignores** the legacy record (`all()` filters it out, `byId`/`byName` return `null`) so it is simply re-created with the new data when next used. Never invent business values to satisfy a non-null field.
+  - **Migrate** — when the old data must be preserved in the new shape, transform it explicitly on read (or in a one-off upgrade).
+- **The domain stays clean.** Entities/VOs keep their required fields and invariants; the tolerance lives in the **infrastructure** layer (mapper/repository) — the Anticorruption Layer toward storage absorbs old shapes so the domain only ever sees valid, current aggregates.
+
+```typescript
+// infrastructure — skip legacy documents written before `purchasePrice` existed
+function isPriced(record: IngredientRecord): boolean {
+    return !!record.purchasePrice && typeof record.purchasePrice.amount === 'number';
+}
+async all(): Promise<Ingredient[]> {
+    return (await this.store.all()).filter(isPriced).map(IngredientMapper.toDomain);
+}
+```
+
 ## When to create a Value Object
 
 | Condition                                                  | Recommended type                |

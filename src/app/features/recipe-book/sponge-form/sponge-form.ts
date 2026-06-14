@@ -28,7 +28,7 @@ import { BaseUnit } from '@core/_common/quantity';
 import { MeasureInput } from '@core/recipe-book/domain/value-objects/measure-input';
 import { SaveSpongeRecipe } from '@core/recipe-book/application/use-cases/save-sponge-recipe.use-case';
 import { SaveIngredient } from '@core/recipe-book/application/use-cases/save-ingredient.use-case';
-import { PreviewIngredientCost } from '@core/recipe-book/application/use-cases/preview-ingredient-cost.use-case';
+import { PreviewRecipeCost } from '@core/recipe-book/application/use-cases/preview-recipe-cost.use-case';
 import { PriceCapture, type PurchaseValue } from '../price-capture/price-capture';
 
 /** Un insumo del catálogo con su precio, para autocompletar y jalar el precio. */
@@ -54,7 +54,6 @@ type LineGroup = FormGroup<{
 interface CostView {
   hasPrice: boolean;
   cost: string;
-  reference: string;
 }
 
 /** Valores por defecto de cada tipo (sugerencias; los añadidos se reutilizan vía `valuesByType`). */
@@ -99,7 +98,7 @@ export class SpongeForm {
   private readonly fb = inject(FormBuilder);
   private readonly saveSponge = inject(SaveSpongeRecipe);
   private readonly saveIngredient = inject(SaveIngredient);
-  private readonly preview = inject(PreviewIngredientCost);
+  private readonly previewCost = inject(PreviewRecipeCost);
   protected readonly ref = inject<MigoDialogRef<{ id: string }>>(MigoDialogRef);
   private readonly data = inject<SpongeFormData | null>(MIGO_DIALOG_DATA, { optional: true });
 
@@ -119,6 +118,7 @@ export class SpongeForm {
   protected readonly submitted = signal(false);
   protected readonly errorMessage = signal('');
   protected readonly costViews = signal<CostView[]>([]);
+  protected readonly materialTotal = signal('');
 
   // Popover de precio anclado a la fila activa.
   protected readonly activeRow = signal<number | null>(null);
@@ -342,20 +342,18 @@ export class SpongeForm {
   }
 
   private async recomputeCosts(): Promise<void> {
-    const views = await Promise.all(
-      this.lines.controls.map(async (line): Promise<CostView> => {
-        const name = line.controls.name.value.trim();
-        const purchase = name ? this.purchaseFor(line) : null;
-        if (!purchase) {
-          return { hasPrice: false, cost: '', reference: '' };
-        }
+    const purchases = this.lines.controls.map((line) => (line.controls.name.value.trim() ? this.purchaseFor(line) : null));
+    const result = await this.previewCost.execute({
+      lines: this.lines.controls.map((line, i) => {
         const measure = MeasureInput.parse(rawLine(line), 'any');
-        const quantity = measure.quantity ? { value: measure.quantity.value, unit: measure.baseUnit } : undefined;
-        const res = await this.preview.execute({ purchasePrice: purchase, quantity });
-        return { hasPrice: true, cost: res.cost, reference: res.reference };
+        return {
+          purchasePrice: purchases[i],
+          quantity: measure.quantity ? { value: measure.quantity.value, unit: measure.baseUnit } : undefined,
+        };
       }),
-    );
-    this.costViews.set(views);
+    });
+    this.costViews.set(result.items.map((item, i) => ({ hasPrice: purchases[i] !== null, cost: item.cost })));
+    this.materialTotal.set(purchases.some((p) => p !== null) ? result.total : '');
   }
 
   private servingsFromChars(): number | undefined {

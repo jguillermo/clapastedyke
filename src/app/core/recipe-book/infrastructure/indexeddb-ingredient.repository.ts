@@ -16,12 +16,12 @@ export class IndexedDbIngredientRepository extends IngredientRepository {
 
     async byId(id: EntityId): Promise<Ingredient | null> {
         const record = await this.store.get(id.value);
-        return record ? IngredientMapper.toDomain(record) : null;
+        return record && isPriced(record) ? IngredientMapper.toDomain(record) : null;
     }
 
     async byName(name: string): Promise<Ingredient | null> {
         const target = name.trim().toLowerCase();
-        const record = (await this.store.all()).find((r) => r.name.toLowerCase() === target);
+        const record = (await this.store.all()).find((r) => isPriced(r) && r.name.toLowerCase() === target);
         return record ? IngredientMapper.toDomain(record) : null;
     }
 
@@ -30,6 +30,15 @@ export class IndexedDbIngredientRepository extends IngredientRepository {
     }
 
     async all(): Promise<Ingredient[]> {
-        return (await this.store.all()).map(IngredientMapper.toDomain);
+        return (await this.store.all()).filter(isPriced).map(IngredientMapper.toDomain);
     }
+}
+
+/**
+ * Skips legacy ingredient documents saved before prices existed (no
+ * `purchasePrice`). They are ignored — never mapped — so the app does not crash
+ * on stale data; re-using such an ingredient simply re-creates it with a price.
+ */
+function isPriced(record: IngredientRecord): boolean {
+    return !!record.purchasePrice && typeof record.purchasePrice.amount === 'number';
 }

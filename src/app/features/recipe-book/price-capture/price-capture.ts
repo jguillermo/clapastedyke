@@ -62,7 +62,7 @@ export interface PurchaseValue {
 
           <p class="m-0 min-h-5 text-caption text-muted" aria-live="polite">
             @if (perBaseUnitLabel()) {
-              ⁁ {{ perBaseUnitLabel() }}
+              Te cuesta {{ perBaseUnitLabel() }}
             }
           </p>
         </form>
