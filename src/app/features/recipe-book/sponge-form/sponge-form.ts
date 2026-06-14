@@ -25,7 +25,7 @@ import { Grid, type GridColumn } from '@components/grid/grid';
 import { SelectTag, type SelectTagType } from '@components/select-tag/select-tag';
 import { MIGO_DIALOG_DATA, MigoDialogRef } from '@components/dialog/dialog.service';
 import { BaseUnit } from '@core/_common/quantity';
-import { MeasureInput } from '@core/recipe-book/domain/value-objects/measure-input';
+import { MeasureInput, type MeasureKind } from '@core/recipe-book/domain/value-objects/measure-input';
 import { SaveSpongeRecipe } from '@core/recipe-book/application/use-cases/save-sponge-recipe.use-case';
 import { SaveIngredient } from '@core/recipe-book/application/use-cases/save-ingredient.use-case';
 import { PreviewRecipeCost } from '@core/recipe-book/application/use-cases/preview-recipe-cost.use-case';
@@ -174,7 +174,7 @@ export class SpongeForm {
 
   protected readonly lineUnits = computed(() => {
     this.valueTick();
-    return this.lines.controls.map((line) => MeasureInput.parse(rawLine(line), 'any').unit);
+    return this.lines.controls.map((line) => this.measureOf(line).unit);
   });
 
   protected readonly lineInvalids = computed(() => {
@@ -189,7 +189,7 @@ export class SpongeForm {
       if (!filled || !show) {
         return { name: false, quantity: false };
       }
-      return { name: !name, quantity: !MeasureInput.parse(rawLine(line), 'any').isValid };
+      return { name: !name, quantity: !this.measureOf(line).isValid };
     });
   });
 
@@ -271,7 +271,7 @@ export class SpongeForm {
     const parsed: { name: string; baseUnit: BaseUnit; quantity: number; purchase: PurchaseValue }[] = [];
     for (const line of filled) {
       const name = line.controls.name.value.trim();
-      const measure = MeasureInput.parse(rawLine(line), 'any');
+      const measure = this.measureOf(line);
       const purchase = this.purchaseFor(line);
       if (!name || !measure.quantity) {
         this.errorMessage.set('Revisa los ingredientes marcados.');
@@ -341,11 +341,31 @@ export class SpongeForm {
     return option ? option.purchase : null;
   }
 
+  /**
+   * Cómo interpretar la cantidad de la fila: la **unidad la dicta el precio** del
+   * insumo (compras en `u` → conteo; en `g` → masa). Sin precio aún, se infiere
+   * por lo que el usuario teclee (`any`).
+   */
+  private kindFor(line: LineGroup): MeasureKind {
+    const purchase = this.purchaseFor(line);
+    if (!purchase) return 'any';
+    return purchase.per.unit === 'u' ? 'count' : 'mass';
+  }
+
+  /** Parsea la cantidad de la fila con la unidad correcta (regida por el precio). */
+  private measureOf(line: LineGroup): MeasureInput {
+    const kind = this.kindFor(line);
+    const quantity = line.controls.quantity.value;
+    // En conteo no hay sub-unidad; en masa el token k/g distingue kg de g.
+    const raw = kind === 'count' ? quantity : quantity + line.controls.unit.value;
+    return MeasureInput.parse(raw, kind);
+  }
+
   private async recomputeCosts(): Promise<void> {
     const purchases = this.lines.controls.map((line) => (line.controls.name.value.trim() ? this.purchaseFor(line) : null));
     const result = await this.previewCost.execute({
       lines: this.lines.controls.map((line, i) => {
-        const measure = MeasureInput.parse(rawLine(line), 'any');
+        const measure = this.measureOf(line);
         return {
           purchasePrice: purchases[i],
           quantity: measure.quantity ? { value: measure.quantity.value, unit: measure.baseUnit } : undefined,
@@ -388,10 +408,6 @@ export class SpongeForm {
   private errorFor(control: AbstractControl, message: string): string {
     return this.shows(control) ? message : '';
   }
-}
-
-function rawLine(line: LineGroup): string {
-  return line.controls.quantity.value + line.controls.unit.value;
 }
 
 /** Une defaults + usados, deduplicando sin distinguir mayúsculas (gana el primero). */
