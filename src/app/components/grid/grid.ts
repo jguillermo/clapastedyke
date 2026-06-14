@@ -123,6 +123,7 @@ export class Grid {
     let target: { r: number; c: number } | null = null;
     switch (event.key) {
       case 'Enter':
+        if (active?.tagName === 'BUTTON') return; // botones resuelven con comportamiento nativo
         target = { r: r + 1, c: 0 }; // al inicio de la fila siguiente
         break;
       case 'ArrowDown':
@@ -145,7 +146,7 @@ export class Grid {
     }
   }
 
-  private focusCell(r: number, c: number): boolean {
+  focusCell(r: number, c: number): boolean {
     if (r < 0 || c < 0) {
       return false;
     }

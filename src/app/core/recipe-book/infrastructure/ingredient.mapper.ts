@@ -14,6 +14,7 @@ export const IngredientMapper = {
             purchasePrice: {
                 amount: ingredient.purchasePrice.amount,
                 per: quantityToRecord(ingredient.purchasePrice.per),
+                currency: ingredient.purchasePrice.currency,
             },
         };
     },
@@ -24,7 +25,11 @@ export const IngredientMapper = {
             name: record.name,
             baseUnit: record.baseUnit,
             usage: record.usage,
-            purchasePrice: PurchasePrice.of(record.purchasePrice.amount, quantityToDomain(record.purchasePrice.per)),
+            purchasePrice: PurchasePrice.of(
+                record.purchasePrice.amount,
+                quantityToDomain(record.purchasePrice.per),
+                record.purchasePrice.currency ?? 'PEN',
+            ),
         });
     },
 };

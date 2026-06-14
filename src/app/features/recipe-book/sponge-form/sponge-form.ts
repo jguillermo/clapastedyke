@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject, signal, viewChild } from '@angular/core';
 import {
   AbstractControl,
   FormArray,
@@ -120,6 +120,8 @@ export class SpongeForm {
   protected readonly costViews = signal<CostView[]>([]);
   protected readonly materialTotal = signal('');
 
+  private readonly grid = viewChild(Grid);
+
   // Popover de precio anclado a la fila activa.
   protected readonly activeRow = signal<number | null>(null);
   protected readonly activeOrigin = signal<HTMLElement | null>(null);
@@ -238,16 +240,20 @@ export class SpongeForm {
   }
 
   protected closePrice(): void {
+    const origin = this.activeOrigin();
     this.activeRow.set(null);
     this.activeOrigin.set(null);
+    setTimeout(() => origin?.focus());
   }
 
   protected onPriceConfirmed(purchase: PurchaseValue): void {
     const r = this.activeRow();
     if (r !== null) {
       this.lines.at(r)?.controls.purchase.setValue(purchase);
+      this.activeRow.set(null);
+      this.activeOrigin.set(null);
+      setTimeout(() => this.grid()?.focusCell(r + 1, 0));
     }
-    this.closePrice();
   }
 
   protected async save(): Promise<void> {

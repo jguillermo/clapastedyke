@@ -3,8 +3,9 @@ import { Quantity } from '../../../_common/quantity';
 /**
  * Purchase price of an ingredient — a *conceptual whole* value object (identity
  * by value, immutable). Models **how Ariana buys it**: the presentation she
- * buys (`per`, e.g. 1000 g or 30 u) and what that purchase costs (`amount`, in
- * soles). It is a buying cost, never a selling price.
+ * buys (`per`, e.g. 1000 g or 30 u), what that purchase costs (`amount`), and
+ * in which **currency** (`currency`, ISO 4217). It is a buying cost, never a
+ * selling price.
  *
  * Behaviour is side-effect-free and returns values:
  * - {@link perBaseUnit} — cost per base unit (the "price per gram/unit"), a
@@ -14,17 +15,19 @@ import { Quantity } from '../../../_common/quantity';
  */
 export class PurchasePrice {
     private constructor(
-        /** Soles paid for the whole purchase presentation. */
-        readonly amount: number,
+        /** Amount paid for the whole purchase presentation (in `currency`). */
+        readonly amount: number,   // Nivel 1: costo pagado por la presentación completa
         /** The presentation bought, in the ingredient's base unit (g | u). */
-        readonly per: Quantity,
+        readonly per: Quantity,    // Nivel 1: presentación comprada normalizada a la unidad base
+        /** ISO 4217 currency code (e.g. 'PEN' for Peruvian sol). */
+        readonly currency: string, // Nivel 1: moneda del monto (identifica la unidad monetaria)
     ) {}
 
-    static of(amount: number, per: Quantity): PurchasePrice {
+    static of(amount: number, per: Quantity, currency = 'PEN'): PurchasePrice {
         if (!Number.isFinite(amount) || amount <= 0) {
             throw new Error(`Purchase price must be a finite positive number, got ${amount}`);
         }
-        return new PurchasePrice(amount, per);
+        return new PurchasePrice(amount, per, currency);
     }
 
     /** Cost of one base unit (e.g. soles per gram). Live reference calc. */
@@ -43,10 +46,15 @@ export class PurchasePrice {
     }
 
     equals(other: PurchasePrice): boolean {
-        return this.amount === other.amount && this.per.equals(other.per);
+        return this.amount === other.amount && this.per.equals(other.per) && this.currency === other.currency;
     }
 
     toString(): string {
-        return `${this.per.toString()} · S/ ${this.amount}`;
+        return `${this.per.toString()} · ${symbolFor(this.currency)} ${this.amount}`;
     }
+}
+
+/** Maps ISO 4217 code to display symbol; falls back to the code itself. */
+export function symbolFor(currency: string): string {
+    return currency === 'PEN' ? 'S/' : currency;
 }

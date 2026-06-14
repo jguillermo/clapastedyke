@@ -12,8 +12,8 @@ export interface SaveIngredientRequest {
     name: string;
     baseUnit: BaseUnit;
     usage: IngredientUsage;
-    /** How it is bought: presentation (in base unit) + price. */
-    purchasePrice: { amount: number; per: { value: number; unit: BaseUnit } };
+    /** How it is bought: presentation (in base unit) + price + currency. */
+    purchasePrice: { amount: number; per: { value: number; unit: BaseUnit }; currency?: string };
 }
 
 /**
@@ -32,6 +32,7 @@ export class SaveIngredient extends UseCase<SaveIngredientRequest, { id: string 
         const price = PurchasePrice.of(
             purchasePrice.amount,
             Quantity.of(purchasePrice.per.value, purchasePrice.per.unit),
+            purchasePrice.currency ?? 'PEN',
         );
         const existing = await this.ingredients.byName(name);
 

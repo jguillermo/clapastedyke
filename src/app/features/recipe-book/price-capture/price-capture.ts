@@ -11,13 +11,14 @@ import {
 } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
+import { CdkTrapFocus } from '@angular/cdk/a11y';
 import { BaseUnit } from '@core/_common/quantity';
 import { Card } from '@components/card/card';
 import { CardBody } from '@components/card/card-body';
 import { CardFooter } from '@components/card/card-footer';
 import { Button } from '@components/button/button';
 import { FormField } from '@components/form-field/form-field';
-import { InputField } from '@components/input/input';
+import { CurrencyInput } from '@components/currency-input/currency-input';
 import { UnitInput, type UnitToken } from '@components/unit-input/unit-input';
 import { MeasureInput } from '@core/recipe-book/domain/value-objects/measure-input';
 import { PreviewIngredientCost } from '@core/recipe-book/application/use-cases/preview-ingredient-cost.use-case';
@@ -26,6 +27,7 @@ import { PreviewIngredientCost } from '@core/recipe-book/application/use-cases/p
 export interface PurchaseValue {
   amount: number;
   per: { value: number; unit: BaseUnit };
+  currency: string;
 }
 
 /**
@@ -38,11 +40,12 @@ export interface PurchaseValue {
 @Component({
   selector: 'app-price-capture',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, Card, CardBody, CardFooter, Button, FormField, InputField, UnitInput],
+  imports: [ReactiveFormsModule, CdkTrapFocus, Card, CardBody, CardFooter, Button, FormField, CurrencyInput, UnitInput],
+  host: { '(keydown.escape)': 'onEscape()' },
   template: `
     <migo-card variant="elevated" elevation="lg" class="w-80">
       <migo-card-body>
-        <form class="flex flex-col gap-3" [formGroup]="form" (ngSubmit)="confirmPrice()">
+        <form cdkTrapFocus cdkTrapFocusAutoCapture class="flex flex-col gap-3" [formGroup]="form" (ngSubmit)="confirmPrice()">
           <p class="m-0 text-sm font-semibold text-heading">¿Cómo compras "{{ name() }}"?</p>
 
           <div class="flex items-end gap-3">
@@ -56,7 +59,7 @@ export interface PurchaseValue {
               />
             </migo-form-field>
             <migo-form-field label="Precio" class="flex-1">
-              <migo-input formControlName="price" type="number" placeholder="0.00" ariaLabel="Precio de la compra" />
+              <migo-currency-input formControlName="price" ariaLabel="Precio de la compra" (keydown.enter)="onEnterPrice($event)" />
             </migo-form-field>
           </div>
 
@@ -115,6 +118,15 @@ export class PriceCapture implements OnInit {
     this.form.setValue({ presentation: String(display), price: String(initial.amount) });
   }
 
+  protected onEscape(): void {
+    this.cancelled.emit();
+  }
+
+  protected onEnterPrice(e: Event): void {
+    e.preventDefault();
+    this.confirmPrice();
+  }
+
   protected setUnit(token: UnitToken): void {
     this.unitToken.set(token);
   }
@@ -137,7 +149,7 @@ export class PriceCapture implements OnInit {
     if (!measure.quantity || !Number.isFinite(amount) || amount <= 0) {
       return null;
     }
-    return { amount, per: { value: measure.quantity.value, unit: measure.baseUnit } };
+    return { amount, per: { value: measure.quantity.value, unit: measure.baseUnit }, currency: 'PEN' };
   }
 
   private async recompute(): Promise<void> {

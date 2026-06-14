@@ -15,6 +15,7 @@ export interface QuantityRecord {
 export interface PurchasePriceRecord {
     amount: number;
     per: QuantityRecord;
+    currency?: string; // optional for backward-compat with records written before currency was added
 }
 
 export interface IngredientLineRecord {

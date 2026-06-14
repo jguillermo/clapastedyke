@@ -85,6 +85,7 @@ function toIngredientOption(ingredient: Ingredient): IngredientOption {
     purchase: {
       amount: ingredient.purchasePrice.amount,
       per: { value: ingredient.purchasePrice.per.value, unit: ingredient.purchasePrice.per.unit },
+      currency: ingredient.purchasePrice.currency,
     },
   };
 }
