@@ -1,12 +1,10 @@
 import { TestBed } from '@angular/core/testing';
-import { makeRecipeBookFakes, RecordingEventBus } from '../../recipe-book-test-doubles';
+import { aPurchase, makeRecipeBookFakes, RecordingEventBus } from '../../recipe-book-test-doubles';
 import { EventBus } from '../../../../_common/event-bus';
 import { SaveIngredient } from '../../../application/use-cases/save-ingredient.use-case';
 import { SaveSpongeRecipe } from '../../../application/use-cases/save-sponge-recipe.use-case';
 import { SaveFillingRecipe } from '../../../application/use-cases/save-filling-recipe.use-case';
 import { SaveCoveringRecipe } from '../../../application/use-cases/save-covering-recipe.use-case';
-import { SaveTopper } from '../../../application/use-cases/save-topper.use-case';
-import { SavePackagingItem } from '../../../application/use-cases/save-packaging-item.use-case';
 import { SavePackagingRule } from '../../../application/use-cases/save-packaging-rule.use-case';
 import { ComposeCake } from '../../../application/use-cases/compose-cake.use-case';
 import { GenerateShoppingList } from '../../../application/use-cases/generate-shopping-list.use-case';
@@ -14,10 +12,10 @@ import { GenerateShoppingList } from '../../../application/use-cases/generate-sh
 /** Drives the whole Cap 0 flow and returns the list for a 1 kg cake (§9). */
 async function runCap0Flow(): Promise<{ compositionId: string }> {
     const ing = TestBed.inject(SaveIngredient);
-    const flour = (await ing.execute({ name: 'Harina', baseUnit: 'g' })).id;
-    const eggs = (await ing.execute({ name: 'Huevos', baseUnit: 'u' })).id;
-    const manjar = (await ing.execute({ name: 'Manjar blanco', baseUnit: 'g' })).id;
-    const cream = (await ing.execute({ name: 'Chantilly', baseUnit: 'g' })).id;
+    const flour = (await ing.execute({ name: 'Harina', baseUnit: 'g', usage: 'recipe', purchasePrice: aPurchase('g') })).id;
+    const eggs = (await ing.execute({ name: 'Huevos', baseUnit: 'u', usage: 'recipe', purchasePrice: aPurchase('u') })).id;
+    const manjar = (await ing.execute({ name: 'Manjar blanco', baseUnit: 'g', usage: 'recipe', purchasePrice: aPurchase('g') })).id;
+    const cream = (await ing.execute({ name: 'Chantilly', baseUnit: 'g', usage: 'recipe', purchasePrice: aPurchase('g') })).id;
 
     const spongeId = (
         await TestBed.inject(SaveSpongeRecipe).execute({
@@ -43,10 +41,10 @@ async function runCap0Flow(): Promise<{ compositionId: string }> {
             lines: [{ ingredientId: cream, quantity: 200 }],
         })
     ).id;
-    const topperId = (await TestBed.inject(SaveTopper).execute({ name: 'Feliz cumpleaños' })).id;
+    const topperId = (await ing.execute({ name: 'Feliz cumpleaños', baseUnit: 'u', usage: 'topper', purchasePrice: aPurchase('u') })).id;
 
-    const box = (await TestBed.inject(SavePackagingItem).execute({ name: 'Caja Nº 20', type: 'box' })).id;
-    const base = (await TestBed.inject(SavePackagingItem).execute({ name: 'Base 22 cm', type: 'base' })).id;
+    const box = (await ing.execute({ name: 'Caja Nº 20', baseUnit: 'u', usage: 'box', purchasePrice: aPurchase('u') })).id;
+    const base = (await ing.execute({ name: 'Base 22 cm', baseUnit: 'u', usage: 'base', purchasePrice: aPurchase('u') })).id;
     await TestBed.inject(SavePackagingRule).execute({ range: { minGrams: 500, maxGrams: 1500 }, boxId: box, baseId: base });
 
     const { composition } = await TestBed.inject(ComposeCake).execute({
@@ -68,21 +66,23 @@ describe('GenerateShoppingList', () => {
         bus = TestBed.inject(EventBus) as RecordingEventBus;
     });
 
-    it('projects the §9 list (quantities only) and emits ShoppingListGenerated', async () => {
+    it('projects the §9 list (quantities + cost per item + total) and emits ShoppingListGenerated', async () => {
         const { compositionId } = await runCap0Flow();
 
         const list = await TestBed.inject(GenerateShoppingList).execute({ compositionId });
 
         const byName = new Map(list.items.map((i) => [i.name, i]));
-        expect(byName.get('Harina')?.totalQuantity.value).toBe(250);
-        expect(byName.get('Huevos')?.totalQuantity.value).toBe(4);
-        expect(byName.get('Huevos')?.totalQuantity.unit).toBe('u');
-        expect(byName.get('Manjar blanco')?.totalQuantity.value).toBe(300);
-        expect(byName.get('Chantilly')?.totalQuantity.value).toBe(200);
+        // factor 1 (target 1 kg = reference 1 kg), so quantities equal the recipe lines.
+        expect(byName.get('Harina')?.quantity).toBe('250 g');
+        expect(byName.get('Harina')?.cost).toBe('S/ 1.25'); // 0.005/g · 250 g
+        expect(byName.get('Huevos')?.quantity).toBe('4 u');
+        expect(byName.get('Manjar blanco')?.quantity).toBe('300 g');
+        expect(byName.get('Chantilly')?.quantity).toBe('200 g');
         expect(byName.get('Caja Nº 20')?.category).toBe('packaging');
         expect(byName.get('Base 22 cm')?.category).toBe('packaging');
         expect(byName.get('Feliz cumpleaños')?.category).toBe('topper');
         expect(list.items).toHaveLength(7);
+        expect(list.totalCost).toMatch(/^S\/ \d/);
 
         const event = bus.published.find((e) => e.name === 'ShoppingListGenerated');
         expect(event?.data['itemCount']).toBe(7);

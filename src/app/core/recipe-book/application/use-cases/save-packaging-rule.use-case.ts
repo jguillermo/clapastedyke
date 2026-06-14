@@ -5,7 +5,7 @@ import { Quantity } from '../../../_common/quantity';
 import { EventBus } from '../../../_common/event-bus';
 import { PackagingRule } from '../../domain/entities/packaging-rule';
 import { WeightRange } from '../../domain/value-objects/weight-range';
-import { PackagingItemRepository } from '../../domain/repositories/packaging-item.repository';
+import { IngredientRepository } from '../../domain/repositories/ingredient.repository';
 import { PackagingRuleRepository } from '../../domain/repositories/packaging-rule.repository';
 import { PackagingRuleOverlapPolicy } from '../../domain/services/packaging-rule-overlap.policy';
 import { RecipeBookEvents } from '../../domain/events/recipe-book-events';
@@ -24,18 +24,18 @@ export interface SavePackagingRuleRequest {
 @Injectable({ providedIn: 'root' })
 export class SavePackagingRule extends UseCase<SavePackagingRuleRequest, { id: string }> {
     private readonly rules = inject(PackagingRuleRepository);
-    private readonly items = inject(PackagingItemRepository);
+    private readonly ingredients = inject(IngredientRepository);
     private readonly overlapPolicy = inject(PackagingRuleOverlapPolicy);
     private readonly bus = inject(EventBus);
 
     async execute({ range, boxId, baseId }: SavePackagingRuleRequest): Promise<{ id: string }> {
-        const box = await this.items.byId(new EntityId(boxId));
-        if (!box || box.type !== 'box') {
-            throw new Error(`Packaging item ${boxId} must exist and be a box`);
+        const box = await this.ingredients.byId(new EntityId(boxId));
+        if (!box || box.usage !== 'box') {
+            throw new Error(`Ingredient ${boxId} must exist and have usage 'box'`);
         }
-        const base = await this.items.byId(new EntityId(baseId));
-        if (!base || base.type !== 'base') {
-            throw new Error(`Packaging item ${baseId} must exist and be a base`);
+        const base = await this.ingredients.byId(new EntityId(baseId));
+        if (!base || base.usage !== 'base') {
+            throw new Error(`Ingredient ${baseId} must exist and have usage 'base'`);
         }
 
         const weightRange = WeightRange.of(Quantity.of(range.minGrams, 'g'), Quantity.of(range.maxGrams, 'g'));

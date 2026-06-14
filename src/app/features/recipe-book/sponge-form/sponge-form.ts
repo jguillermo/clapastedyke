@@ -9,6 +9,7 @@ import {
   type FormControl,
 } from '@angular/forms';
 import { toSignal, takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { OverlayModule } from '@angular/cdk/overlay';
 import { Button } from '@components/button/button';
 import { Card } from '@components/card/card';
 import { CardBody } from '@components/card/card-body';
@@ -23,13 +24,23 @@ import { Autocomplete } from '@components/autocomplete/autocomplete';
 import { Grid, type GridColumn } from '@components/grid/grid';
 import { SelectTag, type SelectTagType } from '@components/select-tag/select-tag';
 import { MIGO_DIALOG_DATA, MigoDialogRef } from '@components/dialog/dialog.service';
+import { BaseUnit } from '@core/_common/quantity';
 import { MeasureInput } from '@core/recipe-book/domain/value-objects/measure-input';
 import { SaveSpongeRecipe } from '@core/recipe-book/application/use-cases/save-sponge-recipe.use-case';
 import { SaveIngredient } from '@core/recipe-book/application/use-cases/save-ingredient.use-case';
+import { PreviewIngredientCost } from '@core/recipe-book/application/use-cases/preview-ingredient-cost.use-case';
+import { PriceCapture, type PurchaseValue } from '../price-capture/price-capture';
 
-/** Datos del diálogo: ingredientes existentes + valores ya usados por tipo de característica. */
+/** Un insumo del catálogo con su precio, para autocompletar y jalar el precio. */
+export interface IngredientOption {
+  name: string;
+  baseUnit: BaseUnit;
+  purchase: PurchaseValue;
+}
+
+/** Datos del diálogo: insumos existentes (con precio) + valores por característica. */
 export interface SpongeFormData {
-  ingredients: string[];
+  ingredients: IngredientOption[];
   valuesByType: Record<string, string[]>;
 }
 
@@ -37,7 +48,14 @@ type LineGroup = FormGroup<{
   name: FormControl<string>;
   quantity: FormControl<string>;
   unit: FormControl<string>;
+  purchase: FormControl<PurchaseValue | null>;
 }>;
+
+interface CostView {
+  hasPrice: boolean;
+  cost: string;
+  reference: string;
+}
 
 /** Valores por defecto de cada tipo (sugerencias; los añadidos se reutilizan vía `valuesByType`). */
 const DEFAULT_VALUES: Record<string, readonly string[]> = {
@@ -48,16 +66,17 @@ const DEFAULT_VALUES: Record<string, readonly string[]> = {
 };
 
 /**
- * Formulario "Nuevo queque". Ingredientes en grilla y un **único campo** ({@link
- * SelectTag}) que recoge sabor + peso + porciones + tamaño como chips. Al guardar,
- * la vista reparte: `sabor → flavor` (propiedad) y `peso/porciones/tamaño →
- * referenceYield` (peso normalizado con {@link MeasureInput}, manda el escalado).
+ * Formulario "Nuevo queque". Ingredientes en grilla con **nombre → cantidad →
+ * costo**: el costo de la cantidad de la receta (regla de tres) y el ghost de la
+ * compra se muestran en la 3ª columna. Si el insumo ya existe se jala su precio;
+ * si es nuevo, un popover en línea ({@link PriceCapture}) pide cómo se compra.
  */
 @Component({
   selector: 'app-sponge-form',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     ReactiveFormsModule,
+    OverlayModule,
     Button,
     Card,
     CardHeader,
@@ -71,6 +90,7 @@ const DEFAULT_VALUES: Record<string, readonly string[]> = {
     Autocomplete,
     Grid,
     SelectTag,
+    PriceCapture,
   ],
   host: { '(focusout)': 'bumpInteraction()' },
   templateUrl: './sponge-form.html',
@@ -79,12 +99,14 @@ export class SpongeForm {
   private readonly fb = inject(FormBuilder);
   private readonly saveSponge = inject(SaveSpongeRecipe);
   private readonly saveIngredient = inject(SaveIngredient);
+  private readonly preview = inject(PreviewIngredientCost);
   protected readonly ref = inject<MigoDialogRef<{ id: string }>>(MigoDialogRef);
   private readonly data = inject<SpongeFormData | null>(MIGO_DIALOG_DATA, { optional: true });
 
   protected readonly columns: readonly GridColumn[] = [
     { label: 'Ingrediente' },
-    { label: 'Cantidad', width: 'w-40' },
+    { label: 'Cantidad', width: 'w-32' },
+    { label: 'Costo', width: 'w-44' },
   ];
 
   protected readonly form = this.fb.nonNullable.group({
@@ -96,14 +118,26 @@ export class SpongeForm {
   protected readonly saving = signal(false);
   protected readonly submitted = signal(false);
   protected readonly errorMessage = signal('');
+  protected readonly costViews = signal<CostView[]>([]);
+
+  // Popover de precio anclado a la fila activa.
+  protected readonly activeRow = signal<number | null>(null);
+  protected readonly activeOrigin = signal<HTMLElement | null>(null);
 
   private readonly valueTick = toSignal(this.form.valueChanges, { initialValue: null });
   private readonly interaction = signal(0);
 
+  /** Opciones del catálogo indexadas por nombre (para jalar el precio). */
+  private readonly optionsByName = new Map<string, IngredientOption>(
+    (this.data?.ingredients ?? []).map((opt) => [opt.name.trim().toLowerCase(), opt]),
+  );
+
   constructor() {
-    this.form.controls.lines.valueChanges
-      .pipe(takeUntilDestroyed(inject(DestroyRef)))
-      .subscribe(() => this.ensureTrailingRow());
+    this.form.controls.lines.valueChanges.pipe(takeUntilDestroyed(inject(DestroyRef))).subscribe(() => {
+      this.ensureTrailingRow();
+      void this.recomputeCosts();
+    });
+    void this.recomputeCosts();
   }
 
   protected get lines(): FormArray<LineGroup> {
@@ -115,7 +149,6 @@ export class SpongeForm {
     return [...this.lines.controls];
   });
 
-  /** Tipos del campo único: defaults ∪ valores ya usados, con validación de dominio por tipo. */
   protected readonly charTypes = computed<SelectTagType[]>(() => {
     const used = this.data?.valuesByType ?? {};
     return [
@@ -129,9 +162,8 @@ export class SpongeForm {
   protected readonly ingredientNames = computed(() => {
     this.valueTick();
     const names = new Map<string, string>();
-    for (const raw of this.data?.ingredients ?? []) {
-      const name = raw.trim();
-      if (name) names.set(name.toLowerCase(), name);
+    for (const opt of this.data?.ingredients ?? []) {
+      names.set(opt.name.toLowerCase(), opt.name);
     }
     for (const line of this.lines.controls) {
       const name = line.controls.name.value.trim();
@@ -163,10 +195,24 @@ export class SpongeForm {
 
   protected readonly nameError = computed(() => this.errorFor(this.form.controls.name, 'El nombre es obligatorio.'));
 
-  /** Error del campo único: hace falta un peso válido. */
   protected readonly charsError = computed(() => {
     if (!this.submitted()) return '';
     return MeasureInput.parse(this.chars()['peso'] ?? '', 'mass').isValid ? '' : 'Elige el peso del queque.';
+  });
+
+  /** Nombre / compra de la fila activa (para el popover). */
+  protected readonly activeName = computed(() => {
+    this.valueTick();
+    const r = this.activeRow();
+    return r === null ? '' : (this.lines.at(r)?.controls.name.value.trim() ?? '');
+  });
+
+  protected readonly activePurchase = computed(() => {
+    this.valueTick();
+    const r = this.activeRow();
+    if (r === null) return null;
+    const line = this.lines.at(r);
+    return line ? this.purchaseFor(line) : null;
   });
 
   // --- Acciones ---
@@ -184,6 +230,24 @@ export class SpongeForm {
       this.lines.removeAt(index);
     }
     this.ensureTrailingRow();
+  }
+
+  protected openPrice(index: number, origin: HTMLElement): void {
+    this.activeOrigin.set(origin);
+    this.activeRow.set(index);
+  }
+
+  protected closePrice(): void {
+    this.activeRow.set(null);
+    this.activeOrigin.set(null);
+  }
+
+  protected onPriceConfirmed(purchase: PurchaseValue): void {
+    const r = this.activeRow();
+    if (r !== null) {
+      this.lines.at(r)?.controls.purchase.setValue(purchase);
+    }
+    this.closePrice();
   }
 
   protected async save(): Promise<void> {
@@ -204,15 +268,24 @@ export class SpongeForm {
       return;
     }
 
-    const parsed: { name: string; baseUnit: 'g' | 'u'; quantity: number }[] = [];
+    const parsed: { name: string; baseUnit: BaseUnit; quantity: number; purchase: PurchaseValue }[] = [];
     for (const line of filled) {
       const name = line.controls.name.value.trim();
       const measure = MeasureInput.parse(rawLine(line), 'any');
+      const purchase = this.purchaseFor(line);
       if (!name || !measure.quantity) {
         this.errorMessage.set('Revisa los ingredientes marcados.');
         return;
       }
-      parsed.push({ name, baseUnit: measure.baseUnit, quantity: measure.quantity.value });
+      if (!purchase) {
+        this.errorMessage.set(`Falta el precio de "${name}". Tócalo en la columna Costo.`);
+        return;
+      }
+      if (measure.baseUnit !== purchase.per.unit) {
+        this.errorMessage.set(`La unidad de "${name}" no coincide con cómo lo compras.`);
+        return;
+      }
+      parsed.push({ name, baseUnit: purchase.per.unit, quantity: measure.quantity.value, purchase });
     }
 
     const weight = MeasureInput.parse(this.chars()['peso'] ?? '', 'mass');
@@ -224,7 +297,12 @@ export class SpongeForm {
     try {
       const lines: { ingredientId: string; quantity: number }[] = [];
       for (const item of parsed) {
-        const { id } = await this.saveIngredient.execute({ name: item.name, baseUnit: item.baseUnit });
+        const { id } = await this.saveIngredient.execute({
+          name: item.name,
+          baseUnit: item.baseUnit,
+          usage: 'recipe',
+          purchasePrice: item.purchase,
+        });
         lines.push({ ingredientId: id, quantity: item.quantity });
       }
       const result = await this.saveSponge.execute({
@@ -255,6 +333,31 @@ export class SpongeForm {
 
   // --- Helpers ---
 
+  /** Precio de la fila: el fijado en el popover o el jalado del catálogo por nombre. */
+  private purchaseFor(line: LineGroup): PurchaseValue | null {
+    const explicit = line.controls.purchase.value;
+    if (explicit) return explicit;
+    const option = this.optionsByName.get(line.controls.name.value.trim().toLowerCase());
+    return option ? option.purchase : null;
+  }
+
+  private async recomputeCosts(): Promise<void> {
+    const views = await Promise.all(
+      this.lines.controls.map(async (line): Promise<CostView> => {
+        const name = line.controls.name.value.trim();
+        const purchase = name ? this.purchaseFor(line) : null;
+        if (!purchase) {
+          return { hasPrice: false, cost: '', reference: '' };
+        }
+        const measure = MeasureInput.parse(rawLine(line), 'any');
+        const quantity = measure.quantity ? { value: measure.quantity.value, unit: measure.baseUnit } : undefined;
+        const res = await this.preview.execute({ purchasePrice: purchase, quantity });
+        return { hasPrice: true, cost: res.cost, reference: res.reference };
+      }),
+    );
+    this.costViews.set(views);
+  }
+
   private servingsFromChars(): number | undefined {
     const raw = this.chars()['porciones'];
     const n = raw ? Number(raw) : NaN;
@@ -273,6 +376,7 @@ export class SpongeForm {
       name: [''],
       quantity: [''],
       unit: [''],
+      purchase: this.fb.nonNullable.control<PurchaseValue | null>(null),
     });
   }
 
@@ -303,7 +407,6 @@ function union(defaults: readonly string[], used?: readonly string[]): string[] 
   }
   return [...seen.values()];
 }
-
 
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : 'No se pudo guardar. Inténtalo de nuevo.';

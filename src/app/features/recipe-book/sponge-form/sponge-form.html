@@ -41,6 +41,28 @@
                     ariaLabel="Cantidad"
                   />
                 }
+                @case (2) {
+                  @if (costViews()[r]?.hasPrice) {
+                    <button
+                      #costCell
+                      type="button"
+                      class="flex w-full flex-col items-start px-3 py-1 text-left rounded-sm focus-visible:shadow-focus focus-visible:outline-none"
+                      (click)="openPrice(r, costCell)"
+                    >
+                      <span class="text-base text-body">{{ costViews()[r].cost || '—' }}</span>
+                      <span class="text-caption text-muted">⁁ {{ costViews()[r].reference }}</span>
+                    </button>
+                  } @else if (line.controls.name.value.trim()) {
+                    <button
+                      #costCell
+                      type="button"
+                      class="px-3 py-1 text-caption font-medium text-brand rounded-sm focus-visible:shadow-focus focus-visible:outline-none"
+                      (click)="openPrice(r, costCell)"
+                    >
+                      ＋ precio
+                    </button>
+                  }
+                }
               }
             </div>
           </ng-template>
@@ -70,3 +92,22 @@
     <button migo-button type="button" [loading]="saving()" (click)="save()">Guardar queque</button>
   </migo-card-footer>
 </migo-card>
+
+@if (activeRow() !== null && activeOrigin(); as origin) {
+  <ng-template
+    cdkConnectedOverlay
+    [cdkConnectedOverlayOrigin]="origin"
+    [cdkConnectedOverlayOpen]="true"
+    [cdkConnectedOverlayHasBackdrop]="true"
+    cdkConnectedOverlayBackdropClass="cdk-overlay-transparent-backdrop"
+    (backdropClick)="closePrice()"
+    (detach)="closePrice()"
+  >
+    <app-price-capture
+      [name]="activeName()"
+      [initial]="activePurchase()"
+      (confirmed)="onPriceConfirmed($event)"
+      (cancelled)="closePrice()"
+    />
+  </ng-template>
+}

@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
-import { makeRecipeBookFakes } from '../../recipe-book-test-doubles';
-import { SavePackagingItem } from '../../../application/use-cases/save-packaging-item.use-case';
+import { aPurchase, makeRecipeBookFakes } from '../../recipe-book-test-doubles';
+import { SaveIngredient } from '../../../application/use-cases/save-ingredient.use-case';
 import { SavePackagingRule } from '../../../application/use-cases/save-packaging-rule.use-case';
 
 describe('SavePackagingRule', () => {
@@ -9,9 +9,9 @@ describe('SavePackagingRule', () => {
 
     beforeEach(async () => {
         TestBed.configureTestingModule({ providers: makeRecipeBookFakes().providers });
-        const saveItem = TestBed.inject(SavePackagingItem);
-        box = (await saveItem.execute({ name: 'Caja Nº 20', type: 'box' })).id;
-        base = (await saveItem.execute({ name: 'Base 22 cm', type: 'base' })).id;
+        const saveIngredient = TestBed.inject(SaveIngredient);
+        box = (await saveIngredient.execute({ name: 'Caja Nº 20', baseUnit: 'u', usage: 'box', purchasePrice: aPurchase('u') })).id;
+        base = (await saveIngredient.execute({ name: 'Base 22 cm', baseUnit: 'u', usage: 'base', purchasePrice: aPurchase('u') })).id;
     });
 
     it('saves a rule when box and base exist with the right type', async () => {

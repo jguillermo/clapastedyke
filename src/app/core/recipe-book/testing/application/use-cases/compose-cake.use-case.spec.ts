@@ -1,11 +1,10 @@
 import { TestBed } from '@angular/core/testing';
-import { makeRecipeBookFakes, RecordingEventBus } from '../../recipe-book-test-doubles';
+import { aPurchase, makeRecipeBookFakes, RecordingEventBus } from '../../recipe-book-test-doubles';
 import { EventBus } from '../../../../_common/event-bus';
 import { SaveIngredient } from '../../../application/use-cases/save-ingredient.use-case';
 import { SaveSpongeRecipe } from '../../../application/use-cases/save-sponge-recipe.use-case';
 import { SaveFillingRecipe } from '../../../application/use-cases/save-filling-recipe.use-case';
 import { SaveCoveringRecipe } from '../../../application/use-cases/save-covering-recipe.use-case';
-import { SavePackagingItem } from '../../../application/use-cases/save-packaging-item.use-case';
 import { SavePackagingRule } from '../../../application/use-cases/save-packaging-rule.use-case';
 import { ComposeCake } from '../../../application/use-cases/compose-cake.use-case';
 
@@ -17,9 +16,9 @@ interface Seeded {
 
 async function seedRecipes(): Promise<Seeded> {
     const ing = TestBed.inject(SaveIngredient);
-    const flour = (await ing.execute({ name: 'Harina', baseUnit: 'g' })).id;
-    const manjar = (await ing.execute({ name: 'Manjar', baseUnit: 'g' })).id;
-    const cream = (await ing.execute({ name: 'Chantilly', baseUnit: 'g' })).id;
+    const flour = (await ing.execute({ name: 'Harina', baseUnit: 'g', usage: 'recipe', purchasePrice: aPurchase('g') })).id;
+    const manjar = (await ing.execute({ name: 'Manjar', baseUnit: 'g', usage: 'recipe', purchasePrice: aPurchase('g') })).id;
+    const cream = (await ing.execute({ name: 'Chantilly', baseUnit: 'g', usage: 'recipe', purchasePrice: aPurchase('g') })).id;
 
     const spongeId = (
         await TestBed.inject(SaveSpongeRecipe).execute({
@@ -62,8 +61,9 @@ describe('ComposeCake', () => {
 
     it('resolves the suggested packaging, returns the scaled view and emits CakeComposed', async () => {
         const { spongeId, fillingId, coveringId } = await seedRecipes();
-        const box = (await TestBed.inject(SavePackagingItem).execute({ name: 'Caja', type: 'box' })).id;
-        const base = (await TestBed.inject(SavePackagingItem).execute({ name: 'Base', type: 'base' })).id;
+        const ing = TestBed.inject(SaveIngredient);
+        const box = (await ing.execute({ name: 'Caja', baseUnit: 'u', usage: 'box', purchasePrice: aPurchase('u') })).id;
+        const base = (await ing.execute({ name: 'Base', baseUnit: 'u', usage: 'base', purchasePrice: aPurchase('u') })).id;
         await TestBed.inject(SavePackagingRule).execute({
             range: { minGrams: 500, maxGrams: 1500 },
             boxId: box,

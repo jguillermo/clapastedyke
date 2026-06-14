@@ -1,5 +1,5 @@
 import { BaseUnit } from '../../_common/quantity';
-import { PackagingType } from '../domain/entities/packaging-item';
+import { IngredientUsage } from '../domain/value-objects/ingredient-usage';
 
 /**
  * Flat storage documents (primitives only) persisted in IndexedDB. They are
@@ -12,6 +12,11 @@ export interface QuantityRecord {
     unit: BaseUnit;
 }
 
+export interface PurchasePriceRecord {
+    amount: number;
+    per: QuantityRecord;
+}
+
 export interface IngredientLineRecord {
     ingredientId: string;
     quantity: QuantityRecord;
@@ -21,6 +26,8 @@ export interface IngredientRecord {
     id: string;
     name: string;
     baseUnit: BaseUnit;
+    usage: IngredientUsage;
+    purchasePrice: PurchasePriceRecord;
 }
 
 export interface SpongeRecipeRecord {
@@ -40,17 +47,6 @@ export interface FillingRecipeRecord {
 
 export type CoveringRecipeRecord = FillingRecipeRecord;
 
-export interface TopperRecord {
-    id: string;
-    name: string;
-}
-
-export interface PackagingItemRecord {
-    id: string;
-    name: string;
-    type: PackagingType;
-}
-
 export interface PackagingRuleRecord {
     id: string;
     range: { min: QuantityRecord; max: QuantityRecord };
@@ -68,4 +64,11 @@ export interface CakeCompositionRecord {
     topperId?: string;
     suggestedBoxId: string;
     suggestedBaseId: string;
+}
+
+export interface PriceHistoryEntryRecord {
+    id: string;
+    ingredientId: string;
+    price: PurchasePriceRecord;
+    recordedAt: string;
 }

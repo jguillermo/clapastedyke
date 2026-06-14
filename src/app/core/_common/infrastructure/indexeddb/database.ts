@@ -5,17 +5,20 @@
  */
 
 export const DB_NAME = 'clapastedyke';
-export const DB_VERSION = 1;
+export const DB_VERSION = 2;
 
 const STORES = [
     'ingredients',
     'sponge_recipes',
     'filling_recipes',
     'covering_recipes',
+    // 'toppers' and 'packaging_items' are legacy: topper/box/base are now
+    // Ingredients (told apart by usage). Kept here so existing DBs are untouched.
     'toppers',
     'packaging_items',
     'packaging_rules',
     'cake_compositions',
+    'ingredient_price_history',
     'progress',
 ] as const;
 

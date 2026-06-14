@@ -8,7 +8,7 @@ import { CakeCompositionRepository } from '../../domain/repositories/cake-compos
 import { SpongeRecipeRepository } from '../../domain/repositories/sponge-recipe.repository';
 import { FillingRecipeRepository } from '../../domain/repositories/filling-recipe.repository';
 import { CoveringRecipeRepository } from '../../domain/repositories/covering-recipe.repository';
-import { TopperRepository } from '../../domain/repositories/topper.repository';
+import { IngredientRepository } from '../../domain/repositories/ingredient.repository';
 import { PackagingRuleRepository } from '../../domain/repositories/packaging-rule.repository';
 import { CakeScalingService, ScaledIngredient } from '../../domain/services/cake-scaling.service';
 import { RecipeBookEvents } from '../../domain/events/recipe-book-events';
@@ -40,7 +40,7 @@ export class ComposeCake extends UseCase<ComposeCakeRequest, ComposeCakeResult> 
     private readonly sponges = inject(SpongeRecipeRepository);
     private readonly fillings = inject(FillingRecipeRepository);
     private readonly coverings = inject(CoveringRecipeRepository);
-    private readonly toppers = inject(TopperRepository);
+    private readonly ingredients = inject(IngredientRepository);
     private readonly rules = inject(PackagingRuleRepository);
     private readonly scaling = inject(CakeScalingService);
     private readonly bus = inject(EventBus);
@@ -54,8 +54,11 @@ export class ComposeCake extends UseCase<ComposeCakeRequest, ComposeCakeResult> 
         if (!sponge || !filling || !covering) {
             throw new Error('Sponge, filling and covering must all be selected and exist');
         }
-        if (request.topperId && !(await this.toppers.byId(new EntityId(request.topperId)))) {
-            throw new Error(`Topper ${request.topperId} does not exist`);
+        if (request.topperId) {
+            const topper = await this.ingredients.byId(new EntityId(request.topperId));
+            if (!topper || topper.usage !== 'topper') {
+                throw new Error(`Ingredient ${request.topperId} must exist and have usage 'topper'`);
+            }
         }
 
         const rule = (await this.rules.all()).find((r) => r.matches(targetWeight));

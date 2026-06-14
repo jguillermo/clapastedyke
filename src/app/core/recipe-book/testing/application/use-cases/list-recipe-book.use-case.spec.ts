@@ -1,7 +1,6 @@
 import { TestBed } from '@angular/core/testing';
-import { makeRecipeBookFakes } from '../../recipe-book-test-doubles';
+import { aPurchase, makeRecipeBookFakes } from '../../recipe-book-test-doubles';
 import { SaveIngredient } from '../../../application/use-cases/save-ingredient.use-case';
-import { SaveTopper } from '../../../application/use-cases/save-topper.use-case';
 import { ListRecipeBook } from '../../../application/use-cases/list-recipe-book.use-case';
 
 describe('ListRecipeBook', () => {
@@ -12,18 +11,18 @@ describe('ListRecipeBook', () => {
     it('returns an empty catalog when nothing has been saved', async () => {
         const catalog = await TestBed.inject(ListRecipeBook).execute();
         expect(catalog.ingredients).toHaveLength(0);
-        expect(catalog.toppers).toHaveLength(0);
         expect(catalog.sponges).toHaveLength(0);
     });
 
-    it('groups saved aggregates by type', async () => {
-        await TestBed.inject(SaveIngredient).execute({ name: 'Harina', baseUnit: 'g' });
-        await TestBed.inject(SaveIngredient).execute({ name: 'Huevos', baseUnit: 'u' });
-        await TestBed.inject(SaveTopper).execute({ name: 'Feliz cumpleaños' });
+    it('returns every saved ingredient, including topper/box/base (told apart by usage)', async () => {
+        const ing = TestBed.inject(SaveIngredient);
+        await ing.execute({ name: 'Harina', baseUnit: 'g', usage: 'recipe', purchasePrice: aPurchase('g') });
+        await ing.execute({ name: 'Huevos', baseUnit: 'u', usage: 'recipe', purchasePrice: aPurchase('u') });
+        await ing.execute({ name: 'Feliz cumpleaños', baseUnit: 'u', usage: 'topper', purchasePrice: aPurchase('u') });
 
         const catalog = await TestBed.inject(ListRecipeBook).execute();
-        expect(catalog.ingredients).toHaveLength(2);
-        expect(catalog.toppers).toHaveLength(1);
-        expect(catalog.toppers[0].name).toBe('Feliz cumpleaños');
+        expect(catalog.ingredients).toHaveLength(3);
+        expect(catalog.ingredients.filter((i) => i.usage === 'topper')).toHaveLength(1);
+        expect(catalog.ingredients.find((i) => i.usage === 'topper')?.name).toBe('Feliz cumpleaños');
     });
 });

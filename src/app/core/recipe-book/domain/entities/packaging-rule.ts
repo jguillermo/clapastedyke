@@ -16,8 +16,8 @@ interface PackagingRuleData {
 export class PackagingRule {
     readonly id: EntityId; // Nivel 1: identidad única de la regla
     readonly range: WeightRange; // Nivel 1: banda de peso que cubre la regla
-    readonly boxId: EntityId; // Nivel 2: caja sugerida (id de un PackagingItem 'box')
-    readonly baseId: EntityId; // Nivel 2: base sugerida (id de un PackagingItem 'base')
+    readonly boxId: EntityId; // Nivel 2: caja sugerida (id de un Ingredient con usage 'box')
+    readonly baseId: EntityId; // Nivel 2: base sugerida (id de un Ingredient con usage 'base')
 
     private constructor(data: PackagingRuleData) {
         this.id = data.id;

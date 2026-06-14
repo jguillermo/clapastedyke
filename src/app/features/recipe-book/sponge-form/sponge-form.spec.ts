@@ -21,13 +21,22 @@ class SaveSpongeRecipeStub {
   }
 }
 
+interface SaveIngredientCall {
+  name: string;
+  baseUnit: string;
+  usage: string;
+  purchasePrice: { amount: number; per: { value: number; unit: string } };
+}
+
 class SaveIngredientStub {
-  readonly calls: { name: string; baseUnit: string }[] = [];
-  async execute(request: { name: string; baseUnit: string }): Promise<{ id: string }> {
+  readonly calls: SaveIngredientCall[] = [];
+  async execute(request: SaveIngredientCall): Promise<{ id: string }> {
     this.calls.push(request);
     return { id: `ing-${request.name}` };
   }
 }
+
+type PurchaseLite = { amount: number; per: { value: number; unit: 'g' | 'u' } };
 
 interface SpongeFormInternals {
   form: FormGroup;
@@ -59,9 +68,16 @@ describe('SpongeForm', () => {
     return { fixture, internals };
   }
 
-  function fillLine(internals: SpongeFormInternals, i: number, name: string, quantity: string) {
+  function fillLine(
+    internals: SpongeFormInternals,
+    i: number,
+    name: string,
+    quantity: string,
+    purchase: PurchaseLite = { amount: 5, per: { value: 1000, unit: 'g' } },
+  ) {
     internals.lines.at(i).get('name')!.setValue(name);
     internals.lines.at(i).get('quantity')!.setValue(quantity);
+    internals.lines.at(i).get('purchase')!.setValue(purchase);
   }
 
   it('keeps an empty trailing row available as the user fills lines', () => {
@@ -79,7 +95,9 @@ describe('SpongeForm', () => {
 
     await internals.save();
 
-    expect(ingredient.calls).toEqual([{ name: 'Harina', baseUnit: 'g' }]);
+    expect(ingredient.calls).toHaveLength(1);
+    expect(ingredient.calls[0]).toMatchObject({ name: 'Harina', baseUnit: 'g', usage: 'recipe' });
+    expect(ingredient.calls[0].purchasePrice).toEqual({ amount: 5, per: { value: 1000, unit: 'g' } });
     expect(sponge.calls).toHaveLength(1);
     expect(sponge.calls[0].referenceYield).toEqual({ weightGrams: 1000, servings: 8, size: 'Mediano' });
     expect(sponge.calls[0].lines).toEqual([{ ingredientId: 'ing-Harina', quantity: 250 }]);
@@ -88,13 +106,14 @@ describe('SpongeForm', () => {
   it('infers a count ingredient when the unit token is "u" (quantity 6, baseUnit u)', async () => {
     const { internals } = setup();
     internals.form.get('name')!.setValue('Queque');
-    fillLine(internals, 0, 'Huevos', '6');
+    fillLine(internals, 0, 'Huevos', '6', { amount: 12, per: { value: 30, unit: 'u' } });
     internals.setLineUnit(0, 'u');
     internals.onChars({ peso: '1 kg' });
 
     await internals.save();
 
-    expect(ingredient.calls).toEqual([{ name: 'Huevos', baseUnit: 'u' }]);
+    expect(ingredient.calls).toHaveLength(1);
+    expect(ingredient.calls[0]).toMatchObject({ name: 'Huevos', baseUnit: 'u', usage: 'recipe' });
     expect(sponge.calls[0].lines).toEqual([{ ingredientId: 'ing-Huevos', quantity: 6 }]);
   });
 

@@ -1,23 +1,26 @@
 import { Provider } from '@angular/core';
 import { EntityId } from '../../_common/entity-id';
+import { BaseUnit, Quantity } from '../../_common/quantity';
 import { DomainEvent } from '../../_common/domain-event';
 import { EventBus, EventHandler } from '../../_common/event-bus';
 import { Ingredient } from '../domain/entities/ingredient';
 import { SpongeRecipe } from '../domain/entities/sponge-recipe';
 import { FillingRecipe } from '../domain/entities/filling-recipe';
 import { CoveringRecipe } from '../domain/entities/covering-recipe';
-import { Topper } from '../domain/entities/topper';
-import { PackagingItem } from '../domain/entities/packaging-item';
 import { PackagingRule } from '../domain/entities/packaging-rule';
 import { CakeComposition } from '../domain/entities/cake-composition';
+import { PurchasePrice } from '../domain/value-objects/purchase-price';
+import { IngredientUsage } from '../domain/value-objects/ingredient-usage';
 import { IngredientRepository } from '../domain/repositories/ingredient.repository';
 import { SpongeRecipeRepository } from '../domain/repositories/sponge-recipe.repository';
 import { FillingRecipeRepository } from '../domain/repositories/filling-recipe.repository';
 import { CoveringRecipeRepository } from '../domain/repositories/covering-recipe.repository';
-import { TopperRepository } from '../domain/repositories/topper.repository';
-import { PackagingItemRepository } from '../domain/repositories/packaging-item.repository';
 import { PackagingRuleRepository } from '../domain/repositories/packaging-rule.repository';
 import { CakeCompositionRepository } from '../domain/repositories/cake-composition.repository';
+import {
+    IngredientPriceHistoryRepository,
+    PriceHistoryEntry,
+} from '../domain/repositories/ingredient-price-history.repository';
 
 /** Shared in-memory store backing the repository fakes. */
 class Store<T extends { id: EntityId }> {
@@ -84,24 +87,6 @@ class InMemoryCoveringRecipeRepository extends CoveringRecipeRepository {
     all = async () => this.store.all();
 }
 
-class InMemoryTopperRepository extends TopperRepository {
-    private readonly store = new Store<Topper>('TP');
-    nextIdentity = () => this.store.next();
-    byId = async (id: EntityId) => this.store.byId(id);
-    byName = async (name: string) => this.store.byName(name, (t) => t.name);
-    save = async (t: Topper) => this.store.save(t);
-    all = async () => this.store.all();
-}
-
-class InMemoryPackagingItemRepository extends PackagingItemRepository {
-    private readonly store = new Store<PackagingItem>('PK');
-    nextIdentity = () => this.store.next();
-    byId = async (id: EntityId) => this.store.byId(id);
-    byName = async (name: string) => this.store.byName(name, (i) => i.name);
-    save = async (i: PackagingItem) => this.store.save(i);
-    all = async () => this.store.all();
-}
-
 class InMemoryPackagingRuleRepository extends PackagingRuleRepository {
     private readonly store = new Store<PackagingRule>('RL');
     nextIdentity = () => this.store.next();
@@ -118,6 +103,16 @@ class InMemoryCakeCompositionRepository extends CakeCompositionRepository {
     all = async () => this.store.all();
 }
 
+/** In-memory append-only price history. */
+export class InMemoryIngredientPriceHistoryRepository extends IngredientPriceHistoryRepository {
+    readonly entries: PriceHistoryEntry[] = [];
+    append = async (entry: PriceHistoryEntry) => {
+        this.entries.push(entry);
+    };
+    byIngredient = async (ingredientId: EntityId) =>
+        this.entries.filter((e) => e.ingredientId.equals(ingredientId));
+}
+
 /** EventBus double that records everything published for assertions. */
 export class RecordingEventBus extends EventBus {
     readonly published: DomainEvent[] = [];
@@ -132,16 +127,15 @@ export class RecordingEventBus extends EventBus {
     }
 }
 
-/** The 8 aggregate repository bindings to in-memory doubles (no EventBus). */
+/** The aggregate repository bindings to in-memory doubles (no EventBus). */
 export const recipeBookRepositoryProviders: Provider[] = [
     { provide: IngredientRepository, useClass: InMemoryIngredientRepository },
     { provide: SpongeRecipeRepository, useClass: InMemorySpongeRecipeRepository },
     { provide: FillingRecipeRepository, useClass: InMemoryFillingRecipeRepository },
     { provide: CoveringRecipeRepository, useClass: InMemoryCoveringRecipeRepository },
-    { provide: TopperRepository, useClass: InMemoryTopperRepository },
-    { provide: PackagingItemRepository, useClass: InMemoryPackagingItemRepository },
     { provide: PackagingRuleRepository, useClass: InMemoryPackagingRuleRepository },
     { provide: CakeCompositionRepository, useClass: InMemoryCakeCompositionRepository },
+    { provide: IngredientPriceHistoryRepository, useClass: InMemoryIngredientPriceHistoryRepository },
 ];
 
 export interface RecipeBookFakes {
@@ -154,4 +148,26 @@ export function makeRecipeBookFakes(): RecipeBookFakes {
     const bus = new RecordingEventBus();
     const providers: Provider[] = [...recipeBookRepositoryProviders, { provide: EventBus, useValue: bus }];
     return { bus, providers };
+}
+
+/** Test helper: a purchase-price request literal for SaveIngredient. */
+export function aPurchase(unit: BaseUnit = 'g', amount = 5): { amount: number; per: { value: number; unit: BaseUnit } } {
+    return { amount, per: { value: unit === 'u' ? 10 : 1000, unit } };
+}
+
+/** Test helper: a priced ingredient (uses `restore` to avoid recording events). */
+export function makeIngredient(
+    id: string,
+    name: string,
+    options: { usage?: IngredientUsage; baseUnit?: BaseUnit; amount?: number; per?: Quantity } = {},
+): Ingredient {
+    const baseUnit = options.baseUnit ?? 'g';
+    const per = options.per ?? Quantity.of(1000, baseUnit);
+    return Ingredient.restore({
+        id: new EntityId(id),
+        name,
+        baseUnit,
+        usage: options.usage ?? 'recipe',
+        purchasePrice: PurchasePrice.of(options.amount ?? 5, per),
+    });
 }

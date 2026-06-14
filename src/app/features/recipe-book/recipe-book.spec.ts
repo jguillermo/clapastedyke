@@ -9,8 +9,6 @@ const emptyCatalog: RecipeBookCatalog = {
   sponges: [],
   fillings: [],
   coverings: [],
-  toppers: [],
-  packagingItems: [],
   packagingRules: [],
 };
 

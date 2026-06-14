@@ -8,7 +8,8 @@ import { Icon } from '@components/icon/icon';
 import { MigoDialog, MigoDialogRef } from '@components/dialog/dialog.service';
 import { ListRecipeBook, type RecipeBookCatalog } from '@core/recipe-book/application/use-cases/list-recipe-book.use-case';
 import type { SpongeRecipe } from '@core/recipe-book/domain/entities/sponge-recipe';
-import { SpongeForm, type SpongeFormData } from './sponge-form/sponge-form';
+import type { Ingredient } from '@core/recipe-book/domain/entities/ingredient';
+import { SpongeForm, type SpongeFormData, type IngredientOption } from './sponge-form/sponge-form';
 
 interface SpongeView {
   id: string;
@@ -52,7 +53,9 @@ export class RecipeBook {
 
   protected createSponge(): void {
     const sponges = this.catalog()?.sponges ?? [];
-    const ingredients = (this.catalog()?.ingredients ?? []).map((i) => i.name);
+    const ingredients = (this.catalog()?.ingredients ?? [])
+      .filter((i) => i.usage === 'recipe')
+      .map(toIngredientOption);
     const dialogRef = this.dialog.open<{ id: string }, SpongeFormData, SpongeForm>(SpongeForm, {
       data: { ingredients, valuesByType: valuesByType(sponges) },
       ariaLabel: 'Nuevo queque',
@@ -72,6 +75,18 @@ export class RecipeBook {
   private async reload(): Promise<void> {
     this.catalog.set(await this.listRecipeBook.execute());
   }
+}
+
+/** Proyecta un Ingredient del catálogo a una opción con precio para el formulario. */
+function toIngredientOption(ingredient: Ingredient): IngredientOption {
+  return {
+    name: ingredient.name,
+    baseUnit: ingredient.baseUnit,
+    purchase: {
+      amount: ingredient.purchasePrice.amount,
+      per: { value: ingredient.purchasePrice.per.value, unit: ingredient.purchasePrice.per.unit },
+    },
+  };
 }
 
 /** Formatea gramos a una etiqueta legible (kg/g) — solo presentación. */

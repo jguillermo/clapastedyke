@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { makeRecipeBookFakes, RecordingEventBus } from '../../recipe-book-test-doubles';
+import { aPurchase, makeRecipeBookFakes, RecordingEventBus } from '../../recipe-book-test-doubles';
 import { SpongeRecipeRepository } from '../../../domain/repositories/sponge-recipe.repository';
 import { EventBus } from '../../../../_common/event-bus';
 import { EntityId } from '../../../../_common/entity-id';
@@ -15,7 +15,12 @@ describe('SaveSpongeRecipe', () => {
     });
 
     it('builds lines from existing ingredients and emits SpongeRecipeSaved', async () => {
-        const flour = await TestBed.inject(SaveIngredient).execute({ name: 'Harina', baseUnit: 'g' });
+        const flour = await TestBed.inject(SaveIngredient).execute({
+            name: 'Harina',
+            baseUnit: 'g',
+            usage: 'recipe',
+            purchasePrice: aPurchase('g'),
+        });
 
         const result = await TestBed.inject(SaveSpongeRecipe).execute({
             name: 'Queque de vainilla',
