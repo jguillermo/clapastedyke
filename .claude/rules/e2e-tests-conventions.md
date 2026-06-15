@@ -2,6 +2,35 @@
 
 Applies to files in `tests/e2e/`.
 
+## Dos modos de testing E2E
+
+Los tests E2E se dividen en **dos modos con reglas distintas**. Todo flujo o componente nuevo
+debe tener cobertura E2E — **no es opcional**.
+
+### Modo 1 — Flujos de negocio (features que tocan `core/`)
+
+Todo flujo de negocio **debe** tener un test de flujo completo. No existe la opción de "lo
+testeo después":
+
+- El test empieza en el punto de entrada del usuario y termina en el **estado terminal observable**
+  (dato guardado, ruta cambiada, elemento ocultado de forma permanente).
+- Ningún test puede terminar en un estado intermedio (modal abierto, spinner visible, botón apareció).
+- Naming con `→`: `"crear receta → guardar → aparece en listado"`.
+- Aplica a todo lo que toque `core/` (recipe-book, progression, y cualquier contexto futuro).
+
+### Modo 2 — Componentes UI (showcase `/ui`)
+
+Los componentes del design system se testean **exhaustivamente** por estado y variante:
+
+- Un `describe` por componente, un test por estado/variante/interacción.
+- Validar DOM semántico: roles ARIA, `aria-label`, `aria-describedby`, `aria-disabled`.
+- Validar interacción de teclado: Tab, Enter, Escape, flechas donde aplique.
+- **No aplica la regla de "terminal state"**: el objetivo es cobertura de estados, no de flujos.
+- Ejemplo: `Button → variant primary → click → dispara acción`, `Button → disabled → click → no dispara`.
+- Usar `data-test-id` estables en el showcase; se añaden conforme se escribe cada test.
+
+---
+
 ## CRITICAL: complete flows always win over intermediate state tests
 
 **A complete flow test is always more valuable than an intermediate state test.**

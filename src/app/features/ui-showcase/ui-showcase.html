@@ -16,7 +16,7 @@
       Variantes
     </h3>
     <div class="flex flex-wrap gap-3 items-center">
-      <button migo-button variant="primary">Primary</button>
+      <button migo-button variant="primary" data-test-id="button-primary">Primary</button>
       <button migo-button variant="secondary">Secondary</button>
       <button migo-button variant="ghost">Ghost</button>
       <button migo-button variant="danger">Danger</button>
@@ -35,8 +35,8 @@
       Estados
     </h3>
     <div class="flex flex-wrap gap-3 items-center">
-      <button migo-button [disabled]="true">Disabled</button>
-      <button migo-button [loading]="loadingDemo()" (click)="simulateLoading()">
+      <button migo-button [disabled]="true" data-test-id="button-disabled">Disabled</button>
+      <button migo-button [loading]="loadingDemo()" (click)="simulateLoading()" data-test-id="button-loading-trigger">
         {{ loadingDemo() ? 'Guardando…' : 'Simular carga' }}
       </button>
     </div>
