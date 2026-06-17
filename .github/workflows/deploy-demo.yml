@@ -1,8 +1,9 @@
-name: Desplegar demo en GitHub Pages
+name: Desplegar en GitHub Pages
 
+# Cada push a `main` (merge de un pull request o push directo) dispara el deploy.
 on:
   push:
-    branches: [alpha-01]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
