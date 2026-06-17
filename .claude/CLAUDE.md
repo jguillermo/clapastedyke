@@ -22,6 +22,14 @@ You are an expert in TypeScript, Angular, and scalable web application developme
 - It MUST pass all AXE checks.
 - It MUST follow all WCAG AA minimums, including focus management, color contrast, and ARIA attributes.
 
+> **Excepción ÚNICA y aceptada — zoom del usuario.** El viewport desactiva el zoom
+> (`maximum-scale=1, user-scalable=no`, `src/index.html`) a propósito, para que la app se sienta
+> nativa y "sólida" en móvil (decisión de producto). Esto incumple WCAG 1.4.4 y dispara la regla
+> **`meta-viewport` de AXE**: es la **única** excepción a "MUST pass all AXE checks" y **NO se
+> arregla** — si hay una corrida de AXE en `/ui`/e2e, se deshabilita esa regla puntual. El resto de
+> WCAG AA (contraste, foco, ARIA, teclado) sigue siendo obligatorio. Ver
+> [mobile-first-conventions.md](rules/mobile-first-conventions.md).
+
 ### Components
 
 - Keep components small and focused on a single responsibility
@@ -80,6 +88,7 @@ el render **three.js** (`platform/three/*` + el render 3D de `features/game/*`),
 Convenciones específicas por área. Consulta la regla correspondiente antes de tocar esos ficheros:
 
 - [components-conventions.md](rules/components-conventions.md) — **librería de componentes** en `src/app/components/`: UI agnóstica con **Angular CDK**, **cero lógica de negocio**, estilo con **utilidades Tailwind del tema Migo** (sin CSS por componente; sin valores arbitrarios), `ControlValueAccessor` para form controls, patrón de Overlay.
+- [mobile-first-conventions.md](rules/mobile-first-conventions.md) — **regla dura**: toda la UI DOM es **mobile-first** (base = móvil, se mejora con `sm:`/`md:`/`lg:`); diálogos/formularios **full-bleed** en móvil (`migo-card` con `fill`), grillas que no se aplastan, targets ≥44px, **viewport sin zoom** (excepción aceptada a AXE). Verificar a 375px.
 - [path-aliases-conventions.md](rules/path-aliases-conventions.md) — alias `@app/@components/@core/@features/@platform`: **cruzar áreas con alias, intra-contexto `core/` relativo**.
 - [core-conventions.md](rules/core-conventions.md) — DDD en `core/`: entities, value objects, aggregates, repositories vs services, use cases.
 - [features-conventions.md](rules/features-conventions.md) — features (páginas de ruta): inyectan use cases, nunca servicios de dominio.

@@ -14,6 +14,7 @@ The authoritative coding rules are in **`.claude/CLAUDE.md`** (always loaded) an
 - `platform-conventions.md` — cross-cutting technical mechanisms
 - `providers-conventions.md` — per-context DI via `provide*()` functions
 - `path-aliases-conventions.md` — `@app/@components/@core/@features/@platform`
+- `mobile-first-conventions.md` — **hard rule**: toda la UI DOM es mobile-first (diálogos/formularios full-bleed en móvil, grillas que no se aplastan, targets ≥44px, viewport sin zoom). Cada componente y feature debe cumplirla y verificarse a 375px.
 - `unit-tests-conventions.md`, `e2e-tests-conventions.md`, `assets-conventions.md`
 
 > Note: `main-process-conventions.md` and `asset-protocol-conventions.md` describe an Electron main process (`app/src/`) that does **not** exist in this repo. This is a **browser** Angular app — persistence is **IndexedDB**, not Electron IPC. Treat those two rules as inapplicable here unless an `app/` directory is added.
@@ -86,6 +87,15 @@ All DOM styling uses **Tailwind v4 utilities generated from the Migo theme** —
 - **No per-component `.css`/`styleUrl`.** Component style = utilities in the template and the decorator `host` object (static base in `host: { class }`; signal-driven variants via a `computed()` bound to `host: { '[class]' }`).
 - The **only** global CSS (`src/styles.css`) is the theme import chain + document base + the CDK Dialog overlay chrome (which targets CDK-generated DOM that can't carry utilities).
 - **Exception — the 3D world** (`platform/three/*` + the 3D render in `features/game/*`): rendered with three.js, not DOM, so this rule does not apply. A DOM HUD overlaid on the canvas still uses Tailwind.
+
+## Mobile-first (hard rule) — see `mobile-first-conventions.md`
+
+La app se usa **principalmente en móvil**; el uso en móvil debe ser fluido y sólido. Reglas que muerden:
+
+- **Base = móvil.** Utilidades sin prefijo describen el móvil; se *mejora* con `sm:`/`md:`/`lg:`. Nunca desktop-first (`grid-cols-3` base que se aplasta). Breakpoints = defaults de Tailwind.
+- **Diálogos/formularios full-bleed en móvil.** `MigoDialog` ocupa toda la pantalla en `<640px` (fijo, sin radio); el `migo-card` enviado usa el input **`fill`** para que solo el body scrollee y header/footer queden fijos. En `sm+` vuelve a tarjeta centrada (`max-h: 90dvh`).
+- **Grillas/tablas no se aplastan**: apilan (`grid-cols-1 sm:…`) o scrollean en horizontal (`migo-grid`).
+- **Targets táctiles ≥ 44px** (`min-h-11`). **Viewport sin zoom** (`src/index.html`) — excepción aceptada a la regla AXE `meta-viewport` (ver la regla y la sección de a11y de `.claude/CLAUDE.md`).
 
 ## Conventions that bite if missed
 

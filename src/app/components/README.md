@@ -23,6 +23,11 @@ no HTML/CSS ad-hoc.
 **Única excepción: el mundo 3D** (`platform/three/*` + `features/game/*`). Se renderiza con
 **three.js**, no con DOM, así que **no** aplica esta regla.
 
+**Mobile-first (regla dura).** Todo componente es mobile-first y debe verse y operarse bien a
+**375px** en `/ui`: base = móvil, se mejora con `sm:`/`md:`/`lg:`; sin anchos fijos que desborden;
+targets táctiles ≥ 44px (`min-h-11`). Detalle en
+[`.claude/rules/mobile-first-conventions.md`](../../../.claude/rules/mobile-first-conventions.md).
+
 ## Estado
 
 | Componente | Selector | Tipo | Reactive Forms (CVA) | Estado |
@@ -77,8 +82,14 @@ en plantillas — todo icono va por `migo-icon`. Las clases de animación (`opac
 ## Card
 
 `migo-card` — `variant`: `elevated` \| `outlined` \| `filled` · `elevation`: `sm` \| `md` \| `lg`
-(solo elevated) · `interactive`. Partes: `migo-card-header` (slots `[card-icon]`, `[card-actions]`),
-`migo-card-title`, `migo-card-subtitle`, `migo-card-body`, `migo-card-footer`.
+(solo elevated) · `interactive` · `fill`. Partes: `migo-card-header` (slots `[card-icon]`,
+`[card-actions]`), `migo-card-title`, `migo-card-subtitle`, `migo-card-body`, `migo-card-footer`.
+
+**`fill`** (mobile-first): el card **llena** su contenedor (columna a toda altura) y el
+`migo-card-body` pasa a ser la **única zona scrollable**; header/footer quedan fijos. Pierde el radio
+en móvil (`rounded-none sm:rounded-xl`). Es el patrón para un componente abierto como **diálogo**:
+en móvil el `MigoDialog` es full-bleed y el card con `fill` ocupa toda la pantalla. Ver
+[`mobile-first-conventions.md`](../../../.claude/rules/mobile-first-conventions.md).
 
 ```html
 <migo-card variant="elevated" elevation="md">
@@ -194,6 +205,9 @@ fila. Presentacional y agnóstico del editor: el consumidor proyecta una `<ng-te
 control de cada celda (típicamente `migo-autocomplete`/`migo-unit-input` `seamless`). Datos y lógica
 (fila vacía, validación) los aporta el feature. Inputs: `columns` (`{label, width?}[]`) · `rows` ·
 `protectLastRow` · `ariaLabel`. Output: `removeRow` (índice).
+
+**Mobile-first**: en pantallas estrechas la grilla **scrollea en horizontal** (no se aplasta) — las
+columnas conservan ancho (`min-w-32` las flexibles, `shrink-0` las de ancho fijo).
 
 ```html
 <migo-grid [columns]="columns" [rows]="lineControls()" (removeRow)="removeLine($event)">

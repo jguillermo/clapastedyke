@@ -45,9 +45,21 @@ export class Card {
   readonly variant = input<CardVariant>('elevated');
   readonly elevation = input<CardElevation>('md');
   readonly interactive = input(false, { transform: booleanAttribute });
+  /**
+   * Mobile-first: hace que el card **llene** su contenedor (típicamente un diálogo) —
+   * columna a toda altura con el `migo-card-body` como única zona scrollable y
+   * header/footer fijos. Full-bleed sin radio en móvil, con radio en `sm+`.
+   * Ver mobile-first-conventions.md.
+   */
+  readonly fill = input(false, { transform: booleanAttribute });
 
   protected readonly hostClasses = computed(() => {
-    const parts = ['block rounded-xl overflow-hidden'];
+    const parts = [
+      'overflow-hidden',
+      this.fill()
+        ? 'flex flex-1 flex-col min-h-0 rounded-none sm:rounded-xl'
+        : 'block rounded-xl',
+    ];
     switch (this.variant()) {
       case 'outlined':
         parts.push('bg-surface-card border border-border-subtle');

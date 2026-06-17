@@ -20,6 +20,7 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
       <ng-content select="[card-actions]" />
     </span>
   `,
-  host: { class: 'flex items-center gap-3 px-6 pt-5 pb-3' },
+  // `shrink-0` mantiene la cabecera fija cuando el card está en `fill` (columna flex).
+  host: { class: 'flex shrink-0 items-center gap-3 px-4 sm:px-6 pt-5 pb-3' },
 })
 export class CardHeader {}
