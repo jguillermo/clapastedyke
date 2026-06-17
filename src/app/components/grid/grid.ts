@@ -46,7 +46,7 @@ export interface GridCellContext {
       @for (col of columns(); track col.label) {
         <div
           role="columnheader"
-          class="{{ col.width ?? 'flex-1' }} min-w-0 px-3 py-2 border-b border-r border-border-subtle font-body text-caption font-semibold text-muted"
+          class="{{ col.width ? col.width + ' shrink-0' : 'flex-1 min-w-32' }} px-3 py-2 border-b border-r border-border-subtle font-body text-caption font-semibold text-muted"
         >
           {{ col.label }}
         </div>
@@ -64,7 +64,7 @@ export interface GridCellContext {
               role="gridcell"
               [attr.data-row]="r"
               [attr.data-col]="c"
-              class="{{ col.width ?? 'flex-1' }} min-w-0 border-b border-r border-border-subtle"
+              class="{{ col.width ? col.width + ' shrink-0' : 'flex-1 min-w-32' }} border-b border-r border-border-subtle"
             >
               <ng-container
                 [ngTemplateOutlet]="cellTemplate"
@@ -92,7 +92,10 @@ export interface GridCellContext {
   `,
   host: {
     role: 'grid',
-    class: 'block rounded-md border-t border-l border-border-subtle overflow-hidden',
+    // Mobile-first: scroll horizontal en pantallas estrechas (las columnas conservan ancho con
+    // `shrink-0` / `min-w-32` y no se aplastan). El contenedor clipa con su radio.
+    // Ver mobile-first-conventions.md.
+    class: 'block overflow-x-auto rounded-md border-t border-l border-border-subtle',
     '[attr.aria-label]': 'ariaLabel() || null',
     '(keydown)': 'onKeydown($event)',
   },

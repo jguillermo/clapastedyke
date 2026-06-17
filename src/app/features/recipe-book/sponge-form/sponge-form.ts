@@ -217,6 +217,23 @@ export class SpongeForm {
     return line ? this.purchaseFor(line) : null;
   });
 
+  /**
+   * Familia de unidad que el popover de precio debe fijar: la dicta la cantidad de
+   * la fila activa (`count` si se tecleó en `u`, `mass` si en g/kg). Sin una
+   * cantidad válida aún → `any` (el popover queda libre y la cantidad se
+   * reinterpretará luego según el precio fijado).
+   */
+  protected readonly activeKind = computed<MeasureKind>(() => {
+    this.valueTick();
+    const r = this.activeRow();
+    if (r === null) return 'any';
+    const line = this.lines.at(r);
+    if (!line) return 'any';
+    const measure = this.measureOf(line);
+    if (!measure.isValid) return 'any';
+    return measure.baseUnit === 'u' ? 'count' : 'mass';
+  });
+
   // --- Acciones ---
 
   protected onChars(selection: Record<string, string>): void {

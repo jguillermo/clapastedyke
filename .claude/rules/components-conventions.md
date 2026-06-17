@@ -104,6 +104,9 @@ components/
   con un `computed()` que devuelve la cadena completa (no mezclar `class:` estático con `[class]`).
 - `inject()` en vez de constructor injection.
 - Booleanos por input con `transform: booleanAttribute`.
+- **Mobile-first (regla dura)**: base = móvil, se mejora con `sm:`/`md:`/`lg:`; sin anchos fijos que
+  desborden; targets táctiles ≥ 44px (`min-h-11`). Verifica el componente a 375px en `/ui`. Detalle
+  en [mobile-first-conventions.md](mobile-first-conventions.md).
 
 ## Form controls → `ControlValueAccessor`
 
@@ -262,7 +265,10 @@ El `Select` (panel desplegable) sí usa **CDK Overlay** declarativo:
 
 ## Accesibilidad (requisito duro)
 
-- Debe pasar **todos los checks de AXE** y cumplir **WCAG AA** (contraste, foco, ARIA).
+- Debe pasar **todos los checks de AXE** y cumplir **WCAG AA** (contraste, foco, ARIA). **Única
+  excepción aceptada**: la regla AXE `meta-viewport` (el viewport bloquea el zoom a propósito) — no
+  se arregla, se deshabilita esa regla puntual. Ver
+  [mobile-first-conventions.md](mobile-first-conventions.md).
 - Foco visible siempre con `focus-visible:shadow-focus focus-visible:outline-none` (utilidad del
   tema; el token es `--shadow-focus`).
 - Preferir elementos nativos (`<button>`, `<input>`) y `<label for>` reales.

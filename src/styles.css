@@ -31,6 +31,11 @@
     line-height: var(--leading-body);
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
+    /* Mobile-first "sólido": sin doble-tap-zoom y sin reescalado de texto al rotar. El viewport
+       (index.html) ya bloquea el pinch-zoom. Ver mobile-first-conventions.md. */
+    touch-action: manipulation;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
   }
 
   h1,
@@ -52,12 +57,43 @@
 }
 
 .migo-dialog__panel .cdk-dialog-container {
-  display: block;
-  max-width: 92vw;
+  display: flex; /* columna que acota el card: header/footer fijos, body scrollable */
+  flex-direction: column;
   background: transparent;
   padding: 0;
   outline: none;
   animation: migo-dialog-in var(--duration-slow) var(--ease-out);
+}
+
+/* Mobile-first: en <640px el formulario/diálogo es FULL-BLEED, fijo y sólido —
+   ocupa toda la pantalla, sin margen ni radio, sin flotar. El card enviado debe usar
+   `fill` para llenar el alto y que solo su body scrollee. Ver mobile-first-conventions.md. */
+@media (max-width: 639px) {
+  /* El panel abraza el VISUAL viewport (--vvh/--vvt los sincroniza platform/viewport): así se
+     ajusta al espacio sobre el teclado en lugar de quedar más alto que la pantalla y desplazarse.
+     Fallback a 100dvh antes de que el JS escriba las vars o si no hay visualViewport. */
+  .migo-dialog__panel.cdk-overlay-pane {
+    position: fixed;
+    top: var(--vvt, 0px);
+    left: 0;
+    max-width: 100%;
+    width: 100vw !important; /* anula el width inline del config (p.ej. 640px) en móvil */
+    height: var(--vvh, 100dvh);
+  }
+
+  .migo-dialog__panel .cdk-dialog-container {
+    width: 100%;
+    height: 100%; /* llena el panel (= alto visible) */
+    animation: none; /* sin animación de salto al ocupar toda la pantalla */
+  }
+}
+
+/* sm+: tarjeta centrada. Respeta el width del config y acota la altura para scroll interno. */
+@media (min-width: 640px) {
+  .migo-dialog__panel .cdk-dialog-container {
+    max-width: 92vw;
+    max-height: 90dvh;
+  }
 }
 
 /* Solo opacity: un `transform` aquí crea un contenedor de bloque que descoloca

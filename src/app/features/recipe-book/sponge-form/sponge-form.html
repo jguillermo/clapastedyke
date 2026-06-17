@@ -1,4 +1,4 @@
-<migo-card>
+<migo-card fill>
   <migo-card-header>
     <migo-icon card-icon name="mat:layers" size="lg" color="brand" />
     <migo-card-title>Nuevo queque</migo-card-title>
@@ -115,6 +115,7 @@
     <app-price-capture
       [name]="activeName()"
       [initial]="activePurchase()"
+      [kind]="activeKind()"
       (confirmed)="onPriceConfirmed($event)"
       (cancelled)="closePrice()"
     />

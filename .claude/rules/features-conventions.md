@@ -20,6 +20,11 @@ HUD…), lo hace con **utilidades Tailwind del tema Migo** (sin `.css`/`styleUrl
 arbitrarios), igual que la librería — ver [`components-conventions.md`](components-conventions.md)
 → "Estilo: solo utilidades Tailwind del tema Migo".
 
+Ese layout es **mobile-first** (regla dura): base = móvil, se mejora con `sm:`/`md:`/`lg:`; las
+rejillas apilan o scrollean (no se aplastan) y los formularios abiertos como diálogo usan un
+`migo-card` con `fill` para ocupar toda la pantalla en móvil. Ver
+[`mobile-first-conventions.md`](mobile-first-conventions.md).
+
 **Excepción:** el mundo 3D (`features/game/*` + `platform/three/*`) se renderiza con three.js y no
 aplica esta regla. (El **HUD DOM** superpuesto al canvas sí usa utilidades Tailwind; solo el render
 3D queda fuera.)

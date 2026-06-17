@@ -43,6 +43,8 @@ interface SpongeFormInternals {
   lines: FormArray;
   setLineUnit(index: number, token: UnitToken): void;
   onChars(selection: Record<string, string>): void;
+  openPrice(index: number, origin: HTMLElement): void;
+  activeKind(): 'mass' | 'count' | 'any';
   save(): Promise<void>;
 }
 
@@ -115,6 +117,30 @@ describe('SpongeForm', () => {
     expect(ingredient.calls).toHaveLength(1);
     expect(ingredient.calls[0]).toMatchObject({ name: 'Huevos', baseUnit: 'u', usage: 'recipe' });
     expect(sponge.calls[0].lines).toEqual([{ ingredientId: 'ing-Huevos', quantity: 6 }]);
+  });
+
+  it('fija la familia del precio en "count" cuando la cantidad está en unidades', () => {
+    const { internals } = setup();
+    internals.lines.at(0).get('name')!.setValue('Huevos');
+    internals.lines.at(0).get('quantity')!.setValue('12');
+    internals.setLineUnit(0, 'u');
+    internals.openPrice(0, document.createElement('button'));
+    expect(internals.activeKind()).toBe('count');
+  });
+
+  it('fija la familia del precio en "mass" cuando la cantidad es un peso', () => {
+    const { internals } = setup();
+    internals.lines.at(0).get('name')!.setValue('Harina');
+    internals.lines.at(0).get('quantity')!.setValue('250');
+    internals.openPrice(0, document.createElement('button'));
+    expect(internals.activeKind()).toBe('mass');
+  });
+
+  it('deja la familia en "any" mientras no haya una cantidad válida', () => {
+    const { internals } = setup();
+    internals.lines.at(0).get('name')!.setValue('Harina');
+    internals.openPrice(0, document.createElement('button'));
+    expect(internals.activeKind()).toBe('any');
   });
 
   it('does not save without a weight tag', async () => {
