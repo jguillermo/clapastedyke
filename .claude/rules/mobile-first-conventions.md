@@ -82,6 +82,11 @@ no tiene margen, no tiene radio, no se desplaza al tocar.
   (`h-full flex flex-col`), pierde el radio en móvil (`rounded-none sm:rounded-xl`) y **solo el
   `migo-card-body` scrollea** (`flex-1 overflow-y-auto`); header y footer quedan **fijos** arriba y
   abajo.
+- **Se ajusta al teclado**: en móvil el diálogo abraza el **visual viewport** (no el alto total del
+  dispositivo), así que al aparecer el teclado **se encoge** al espacio visible sobre él —
+  header/footer siguen a la vista y el body scrollea hasta el campo enfocado, sin desplazarse hacia
+  arriba ni parecer un error. Lo sincroniza `platform/viewport/` (variables `--vvh`/`--vvt` en
+  `:root`), que consume `.migo-dialog__panel` en `src/styles.css`.
 
 ```html
 <!-- Componente abierto como diálogo -->

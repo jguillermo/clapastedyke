@@ -5,6 +5,7 @@ import { routes } from './app.routes';
 import { provideEventBus } from '@core/_common/event-bus.providers';
 import { provideRecipeBook } from '@core/recipe-book/recipe-book.providers';
 import { provideProgression } from '@core/progression/progression.providers';
+import { providePlatform } from '@platform/platform.providers';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -12,6 +13,7 @@ export const appConfig: ApplicationConfig = {
     provideRouter(routes),
     provideEventBus(),
     provideRecipeBook(),
-    provideProgression()
+    provideProgression(),
+    providePlatform()
   ]
 };

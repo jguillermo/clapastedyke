@@ -47,6 +47,11 @@ export class Ingredient extends AggregateRoot {
         if (!name.trim()) {
             throw new Error('Ingredient name is required');
         }
+        if (baseUnit !== purchasePrice.per.unit) {
+            throw new Error(
+                `Ingredient base unit (${baseUnit}) must match its purchase presentation unit (${purchasePrice.per.unit})`,
+            );
+        }
         const ingredient = new Ingredient({ id, name: name.trim(), baseUnit, usage, purchasePrice });
         ingredient.recordEvent(
             RecipeBookEvents.ingredientRepriced(id.value, {
@@ -64,6 +69,11 @@ export class Ingredient extends AggregateRoot {
 
     /** Changes the purchase price; returns a new instance and records the change. */
     repricedTo(newPrice: PurchasePrice): Ingredient {
+        if (newPrice.per.unit !== this.baseUnit) {
+            throw new Error(
+                `Cannot reprice a ${this.baseUnit} ingredient with a ${newPrice.per.unit} purchase presentation`,
+            );
+        }
         const next = new Ingredient({ ...this.data(), purchasePrice: newPrice });
         next.recordEvent(
             RecipeBookEvents.ingredientRepriced(this.id.value, {

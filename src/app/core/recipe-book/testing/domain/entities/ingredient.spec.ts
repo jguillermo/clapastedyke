@@ -4,6 +4,7 @@ import { Ingredient } from '../../../domain/entities/ingredient';
 import { PurchasePrice } from '../../../domain/value-objects/purchase-price';
 
 const price = (amount: number) => PurchasePrice.of(amount, Quantity.of(1000, 'g'));
+const countPrice = (amount: number, per = 30) => PurchasePrice.of(amount, Quantity.of(per, 'u'));
 
 describe('Ingredient', () => {
     it('create records the initial price as IngredientRepriced { previousPrice: null }', () => {
@@ -47,7 +48,22 @@ describe('Ingredient', () => {
 
     it('equals by id', () => {
         const a = Ingredient.create(new EntityId('IN-1'), 'Harina', 'g', 'recipe', price(5));
-        const b = Ingredient.create(new EntityId('IN-1'), 'Otra', 'u', 'topper', price(9));
+        const b = Ingredient.create(new EntityId('IN-1'), 'Otra', 'g', 'topper', price(9));
         expect(a.equals(b)).toBe(true);
+    });
+
+    it('create rejects a base unit that does not match the purchase presentation unit', () => {
+        // count ingredient priced in grams → inconsistente
+        expect(() => Ingredient.create(new EntityId('IN-1'), 'Huevos', 'u', 'recipe', price(5))).toThrow();
+        // la combinación consistente (conteo con presentación en `u`) sí funciona
+        expect(() =>
+            Ingredient.create(new EntityId('IN-2'), 'Huevos', 'u', 'recipe', countPrice(12)),
+        ).not.toThrow();
+    });
+
+    it('repricedTo rejects a price in a different unit family', () => {
+        const eggs = Ingredient.create(new EntityId('IN-1'), 'Huevos', 'u', 'recipe', countPrice(12));
+        expect(() => eggs.repricedTo(price(5))).toThrow(); // precio en `g` sobre un insumo `u`
+        expect(() => eggs.repricedTo(countPrice(15, 30))).not.toThrow();
     });
 });

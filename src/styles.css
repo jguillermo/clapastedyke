@@ -69,17 +69,21 @@
    ocupa toda la pantalla, sin margen ni radio, sin flotar. El card enviado debe usar
    `fill` para llenar el alto y que solo su body scrollee. Ver mobile-first-conventions.md. */
 @media (max-width: 639px) {
+  /* El panel abraza el VISUAL viewport (--vvh/--vvt los sincroniza platform/viewport): así se
+     ajusta al espacio sobre el teclado en lugar de quedar más alto que la pantalla y desplazarse.
+     Fallback a 100dvh antes de que el JS escriba las vars o si no hay visualViewport. */
   .migo-dialog__panel.cdk-overlay-pane {
     position: fixed;
-    inset: 0;
+    top: var(--vvt, 0px);
+    left: 0;
     max-width: 100%;
     width: 100vw !important; /* anula el width inline del config (p.ej. 640px) en móvil */
-    height: 100dvh;
+    height: var(--vvh, 100dvh);
   }
 
   .migo-dialog__panel .cdk-dialog-container {
     width: 100%;
-    height: 100dvh;
+    height: 100%; /* llena el panel (= alto visible) */
     animation: none; /* sin animación de salto al ocupar toda la pantalla */
   }
 }

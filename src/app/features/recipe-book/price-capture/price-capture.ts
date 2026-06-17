@@ -20,7 +20,7 @@ import { Button } from '@components/button/button';
 import { FormField } from '@components/form-field/form-field';
 import { CurrencyInput } from '@components/currency-input/currency-input';
 import { UnitInput, type UnitToken } from '@components/unit-input/unit-input';
-import { MeasureInput } from '@core/recipe-book/domain/value-objects/measure-input';
+import { MeasureInput, type MeasureKind } from '@core/recipe-book/domain/value-objects/measure-input';
 import { PreviewIngredientCost } from '@core/recipe-book/application/use-cases/preview-ingredient-cost.use-case';
 
 /** How an ingredient is bought, normalised to its base unit. */
@@ -36,6 +36,11 @@ export interface PurchaseValue {
  * calcula el negocio, {@link PreviewIngredientCost}; la vista no calcula). Emite
  * `confirm` con el precio normalizado a la unidad base. Se reutiliza para
  * cualquier insumo (receta, topper, caja, base).
+ *
+ * La **familia de unidad queda fijada** por `kind` (la dicta la cantidad de la
+ * fila): en `count` la presentación está bloqueada en `u` (no se puede pasar a
+ * gramos); en `mass` se puede alternar **kg↔g** (mismo factor 1000, misma unidad
+ * base `g`) pero no a `u`; en `any` (sin cantidad aún) el usuario elige libre.
  */
 @Component({
   selector: 'app-price-capture',
@@ -83,6 +88,8 @@ export class PriceCapture implements OnInit {
 
   readonly name = input('');
   readonly initial = input<PurchaseValue | null>(null);
+  /** Familia de unidad fijada por la cantidad de la fila (`count`/`mass`); `any` = libre. */
+  readonly kind = input<MeasureKind>('any');
 
   readonly confirmed = output<PurchaseValue>();
   readonly cancelled = output<void>();
@@ -93,10 +100,10 @@ export class PriceCapture implements OnInit {
 
   private readonly tick = toSignal(this.form.valueChanges, { initialValue: null });
 
-  /** Unidad resuelta para el chip del input de presentación. */
+  /** Unidad resuelta para el chip del input de presentación (en la familia fijada por `kind`). */
   protected readonly presentationUnit = computed(() => {
     this.tick();
-    return MeasureInput.parse(this.rawPresentation(), 'any').unit;
+    return MeasureInput.parse(this.rawPresentation(), this.kind()).unit;
   });
 
   protected readonly canConfirm = computed(() => {
@@ -128,6 +135,10 @@ export class PriceCapture implements OnInit {
   }
 
   protected setUnit(token: UnitToken): void {
+    const kind = this.kind();
+    // En conteo la unidad está fija en `u`; en masa solo se alterna kg↔g (nunca a `u`).
+    if (kind === 'count') return;
+    if (kind === 'mass' && token === 'u') return;
     this.unitToken.set(token);
   }
 
@@ -139,12 +150,14 @@ export class PriceCapture implements OnInit {
   }
 
   private rawPresentation(): string {
-    return this.form.controls.presentation.value + this.unitToken();
+    const value = this.form.controls.presentation.value;
+    // En conteo `MeasureInput.parse(_, 'count')` no admite letras → solo el número.
+    return this.kind() === 'count' ? value : value + this.unitToken();
   }
 
   /** Builds the normalised purchase, or null when incomplete/invalid. */
   private purchase(): PurchaseValue | null {
-    const measure = MeasureInput.parse(this.rawPresentation(), 'any');
+    const measure = MeasureInput.parse(this.rawPresentation(), this.kind());
     const amount = Number(this.form.controls.price.value.replace(',', '.'));
     if (!measure.quantity || !Number.isFinite(amount) || amount <= 0) {
       return null;

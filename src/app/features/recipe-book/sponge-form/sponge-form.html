@@ -115,6 +115,7 @@
     <app-price-capture
       [name]="activeName()"
       [initial]="activePurchase()"
+      [kind]="activeKind()"
       (confirmed)="onPriceConfirmed($event)"
       (cancelled)="closePrice()"
     />
