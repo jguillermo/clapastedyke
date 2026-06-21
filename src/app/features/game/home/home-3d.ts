@@ -1,6 +1,5 @@
-import { AfterViewInit, Component, ElementRef, OnDestroy, inject, signal, viewChild } from '@angular/core';
-import { MigoDialog, MigoDialogRef } from '@components/dialog/dialog.service';
-import { RecipeBook } from '@features/recipe-book/recipe-book';
+import { AfterViewInit, Component, ElementRef, OnDestroy, signal, viewChild } from '@angular/core';
+import { RecipeBook3d } from '@features/recipe-book/book-3d/recipe-book-3d';
 import { KitchenEngine } from '@platform/three/kitchen-engine';
 import { KitchenStation } from '@platform/three/kitchen-station';
 
@@ -30,6 +29,7 @@ interface StationItem {
 @Component({
   selector: 'app-home',
   templateUrl: './home-3d.html',
+  imports: [RecipeBook3d],
   host: {
     class: 'block fixed inset-0 overflow-hidden',
     '(window:resize)': 'onResize()',
@@ -37,10 +37,10 @@ interface StationItem {
 })
 export class Home3d implements AfterViewInit, OnDestroy {
   private readonly canvasRef = viewChild<ElementRef<HTMLCanvasElement>>('canvas');
-  private readonly dialog = inject(MigoDialog);
 
   protected readonly webglSupported = signal(true);
   protected readonly coachVisible = signal(false);
+  protected readonly bookOpen = signal(false);
 
   protected readonly coachText =
     'Bienvenida a tu cocina. Antes de hornear, armemos tu libro de recetas.';
@@ -52,7 +52,6 @@ export class Home3d implements AfterViewInit, OnDestroy {
   ];
 
   private engine: KitchenEngine | null = null;
-  private recipeBookRef: MigoDialogRef<unknown, RecipeBook> | null = null;
   private readonly reducedMotion =
     window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 
@@ -71,7 +70,11 @@ export class Home3d implements AfterViewInit, OnDestroy {
     try {
       this.engine = new KitchenEngine(canvas, this.reducedMotion);
       this.engine.onStationClick((station) => this.handleStation(station));
-      void this.engine.flyIn().then(() => this.coachVisible.set(true));
+      void this.engine.flyIn().then(() => {
+        if (!this.bookOpen()) {
+          this.coachVisible.set(true);
+        }
+      });
     } catch {
       // El contexto WebGL pudo fallar al crearse: caemos a la ruta accesible.
       this.engine = null;
@@ -92,23 +95,23 @@ export class Home3d implements AfterViewInit, OnDestroy {
   }
 
   protected openRecipeBook(): void {
-    if (this.recipeBookRef) {
+    if (this.bookOpen()) {
       return;
     }
     this.coachVisible.set(false);
     void this.engine?.focusStation(KitchenStation.RECIPE_BOARD);
+    this.engine?.pause(); // libera GPU mientras el libro está a pantalla completa
+    this.bookOpen.set(true);
+  }
 
-    this.recipeBookRef = this.dialog.open<unknown, undefined, RecipeBook>(RecipeBook, {
-      ariaLabel: 'Mi libro de recetas',
-      width: '560px',
-    });
-    this.recipeBookRef.closed.subscribe(() => {
-      this.recipeBookRef = null;
-      void this.engine?.resetView();
-      if (this.webglSupported()) {
-        this.coachVisible.set(true);
-      }
-    });
+  /** El libro se cerró: reanuda la cocina y vuelve a la vista general. */
+  protected onRecipeBookClosed(): void {
+    this.bookOpen.set(false);
+    this.engine?.resume();
+    void this.engine?.resetView();
+    if (this.webglSupported()) {
+      this.coachVisible.set(true);
+    }
   }
 
   protected onResize(): void {

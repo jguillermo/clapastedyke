@@ -1,5 +1,4 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { BaseUnit } from '@core/_common/quantity';
 import { Button } from '@components/button/button';
 import { Card } from '@components/card/card';
 import { CardBody } from '@components/card/card-body';
@@ -28,6 +27,7 @@ import { IngredientDetail, type IngredientDetailData, type IngredientDetailResul
 import { IngredientForm, type IngredientFormData } from './ingredient-form/ingredient-form';
 import type { IngredientOption, InitialLine } from './_shared/ingredient-grid/ingredient-grid';
 import { USAGE_LABELS } from './_shared/ingredient-usage.labels';
+import { formatQuantity, formatWeight, layerChips, spongeChips } from './_shared/recipe-format';
 
 interface RecipeView {
   id: string;
@@ -329,22 +329,6 @@ function toIngredientOption(ingredient: Ingredient): IngredientOption {
   };
 }
 
-/** Formatea una cantidad a una etiqueta legible (g/kg/u) — solo presentación. */
-function formatQuantity(value: number, unit: BaseUnit): string {
-  if (unit === 'u') return `${value} u`;
-  return formatWeight(value);
-}
-
-/** Formatea gramos a una etiqueta legible (kg/g) — solo presentación. */
-function formatWeight(grams: number): string {
-  return grams >= 1000 ? `${+(grams / 1000).toFixed(2)} kg` : `${grams} g`;
-}
-
-/** Chips de una capa (relleno/cobertura): su peso de referencia. */
-function layerChips(layer: FillingRecipe | CoveringRecipe): string[] {
-  return [`Rinde ${formatWeight(layer.referenceWeight.value)}`];
-}
-
 /** Vista de listado de una capa (relleno/cobertura). */
 function layerView(layer: FillingRecipe | CoveringRecipe): RecipeView {
   return {
@@ -353,16 +337,6 @@ function layerView(layer: FillingRecipe | CoveringRecipe): RecipeView {
     lineCount: layer.lines.length,
     chips: layerChips(layer),
   };
-}
-
-/** Chips de características de un queque para el listado. */
-function spongeChips(s: SpongeRecipe): string[] {
-  const chips: string[] = [];
-  if (s.flavor) chips.push(s.flavor);
-  chips.push(formatWeight(s.referenceYield.weight.value));
-  if (s.referenceYield.size) chips.push(s.referenceYield.size);
-  if (s.referenceYield.servings) chips.push(`${s.referenceYield.servings} porciones`);
-  return chips;
 }
 
 /** Pesos de referencia ya usados por las capas, para sugerirlos en el SelectTag. */

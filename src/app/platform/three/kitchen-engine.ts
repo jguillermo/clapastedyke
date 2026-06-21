@@ -44,6 +44,7 @@ export class KitchenEngine {
   private clickHandler: StationClickHandler | null = null;
   private frameId = 0;
   private disposed = false;
+  private paused = false;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -126,6 +127,25 @@ export class KitchenEngine {
     this.chef.celebrate();
   }
 
+  /** Detiene el loop de render (p. ej. mientras se abre el libro a pantalla completa). */
+  pause(): void {
+    if (this.paused || this.disposed) {
+      return;
+    }
+    this.paused = true;
+    cancelAnimationFrame(this.frameId);
+  }
+
+  /** Reanuda el loop de render tras un {@link pause}. */
+  resume(): void {
+    if (!this.paused || this.disposed) {
+      return;
+    }
+    this.paused = false;
+    this.clock.getDelta(); // descarta el dt acumulado durante la pausa
+    this.loop();
+  }
+
   /** Ajusta el render al nuevo tamaño del canvas. */
   resize(width: number, height: number): void {
     if (this.disposed || width === 0 || height === 0) {
@@ -155,7 +175,7 @@ export class KitchenEngine {
   }
 
   private readonly loop = (): void => {
-    if (this.disposed) {
+    if (this.disposed || this.paused) {
       return;
     }
     const dt = this.clock.getDelta();
