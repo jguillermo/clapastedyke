@@ -5,12 +5,14 @@ import {
   DestroyRef,
   inject,
   input,
+  type OnInit,
   signal,
   viewChild,
 } from '@angular/core';
 import { FormArray, FormBuilder, FormGroup, ReactiveFormsModule, type FormControl } from '@angular/forms';
 import { toSignal, takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { OverlayModule } from '@angular/cdk/overlay';
+import { BaseUnit } from '@core/_common/quantity';
 import { UnitInput, type UnitToken } from '@components/unit-input/unit-input';
 import { Autocomplete } from '@components/autocomplete/autocomplete';
 import { Grid, type GridColumn } from '@components/grid/grid';
@@ -20,6 +22,13 @@ import { PriceCapture, type PurchaseValue } from '../price-capture/price-capture
 import type { IngredientOption, ParsedLine } from './types';
 
 export type { IngredientOption, ParsedLine, PurchaseValue };
+
+/** Línea inicial para precargar la grilla al editar una receta (cantidad en unidad base). */
+export interface InitialLine {
+  name: string;
+  quantity: number;
+  baseUnit: BaseUnit;
+}
 
 type LineGroup = FormGroup<{
   name: FormControl<string>;
@@ -48,12 +57,15 @@ interface CostView {
   host: { '(focusout)': 'bumpInteraction()' },
   templateUrl: './ingredient-grid.html',
 })
-export class IngredientGrid {
+export class IngredientGrid implements OnInit {
   private readonly fb = inject(FormBuilder);
   private readonly previewCost = inject(PreviewRecipeCost);
 
   /** Catálogo de insumos existentes (con precio) para autocompletar y jalar el precio. */
   readonly ingredients = input<IngredientOption[]>([]);
+
+  /** Líneas para precargar al editar una receta (vacío = grilla nueva en blanco). */
+  readonly initialLines = input<InitialLine[]>([]);
 
   protected readonly columns: readonly GridColumn[] = [
     { label: 'Ingrediente' },
@@ -88,6 +100,21 @@ export class IngredientGrid {
       void this.recomputeCosts();
     });
     void this.recomputeCosts();
+  }
+
+  ngOnInit(): void {
+    // Precarga al editar: los inputs ya están disponibles aquí (no en el constructor),
+    // igual que en PriceCapture. El precio se autorrellena solo (purchaseFor lo jala del
+    // catálogo por nombre), así que solo se siembra nombre + cantidad + unidad.
+    const seeds = this.initialLines();
+    if (seeds.length === 0) {
+      return;
+    }
+    this.lines.clear();
+    for (const seed of seeds) {
+      this.lines.push(this.seededLine(seed));
+    }
+    this.lines.push(this.newLine());
   }
 
   protected readonly lineControls = computed(() => {
@@ -310,4 +337,26 @@ export class IngredientGrid {
       purchase: this.fb.nonNullable.control<PurchaseValue | null>(null),
     });
   }
+
+  /** Construye una línea precargada: cantidad base → texto visible + token de unidad. */
+  private seededLine(seed: InitialLine): LineGroup {
+    const display = displayQuantity(seed.quantity, seed.baseUnit);
+    return this.fb.nonNullable.group({
+      name: [seed.name],
+      quantity: [display.value],
+      unit: [display.unit],
+      purchase: this.fb.nonNullable.control<PurchaseValue | null>(null),
+    });
+  }
+}
+
+/**
+ * Cantidad en unidad base → texto + token para los controles de la fila. En `u` el
+ * token es `u` (conteo); en masa se muestra kg (token `k`) si ≥1000 g, si no g.
+ */
+function displayQuantity(quantity: number, baseUnit: BaseUnit): { value: string; unit: string } {
+  if (baseUnit === 'u') {
+    return { value: String(quantity), unit: 'u' };
+  }
+  return quantity >= 1000 ? { value: String(quantity / 1000), unit: 'k' } : { value: String(quantity), unit: 'g' };
 }

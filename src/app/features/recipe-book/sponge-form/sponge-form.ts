@@ -18,12 +18,26 @@ import { SaveIngredient } from '@core/recipe-book/application/use-cases/save-ing
 import { IngredientGrid, type IngredientOption } from '../_shared/ingredient-grid/ingredient-grid';
 import { messageOf, union, validateLabel, validateMass, validateServings } from '../_shared/recipe-form.utils';
 
+import type { InitialLine } from '../_shared/ingredient-grid/ingredient-grid';
+
 export type { IngredientOption };
+
+/** Receta existente proyectada para precargar el formulario al editar. */
+export interface SpongeRecipePrefill {
+  name: string;
+  flavor?: string;
+  weightLabel: string;
+  servings?: string;
+  size?: string;
+  lines: InitialLine[];
+}
 
 /** Datos del diálogo: insumos existentes (con precio) + valores por característica. */
 export interface SpongeFormData {
   ingredients: IngredientOption[];
   valuesByType: Record<string, string[]>;
+  /** Si viene, el formulario abre en modo edición precargado (nombre bloqueado). */
+  recipe?: SpongeRecipePrefill;
 }
 
 /** Valores por defecto de cada tipo (sugerencias; los añadidos se reutilizan vía `valuesByType`). */
@@ -67,12 +81,18 @@ export class SpongeForm {
   private readonly data = inject<SpongeFormData | null>(MIGO_DIALOG_DATA, { optional: true });
 
   protected readonly ingredientOptions = this.data?.ingredients ?? [];
+  private readonly prefill = this.data?.recipe ?? null;
+  protected readonly editing = this.prefill !== null;
+  protected readonly title = this.editing ? 'Editar queque' : 'Nuevo queque';
+  protected readonly saveLabel = this.editing ? 'Guardar cambios' : 'Guardar queque';
+  protected readonly initialLines = this.prefill?.lines ?? [];
+  protected readonly initialChars: Record<string, string> = this.prefill ? spongeCharsOf(this.prefill) : {};
 
   protected readonly form = this.fb.nonNullable.group({
-    name: ['', Validators.required],
+    name: [{ value: this.prefill?.name ?? '', disabled: this.editing }, Validators.required],
   });
 
-  protected readonly chars = signal<Record<string, string>>({});
+  protected readonly chars = signal<Record<string, string>>(this.prefill ? spongeCharsOf(this.prefill) : {});
   protected readonly saving = signal(false);
   protected readonly submitted = signal(false);
   protected readonly errorMessage = signal('');
@@ -140,7 +160,7 @@ export class SpongeForm {
         lines.push({ ingredientId: id, quantity: item.quantity });
       }
       const result = await this.saveSponge.execute({
-        name: this.form.controls.name.value,
+        name: this.form.getRawValue().name,
         flavor: this.chars()['sabor'] || undefined,
         referenceYield: {
           weightGrams: weight.quantity.value,
@@ -183,4 +203,13 @@ export class SpongeForm {
   private errorFor(control: AbstractControl, message: string): string {
     return this.shows(control) ? message : '';
   }
+}
+
+/** Características de un queque existente en el formato del `migo-select-tag`. */
+function spongeCharsOf(prefill: SpongeRecipePrefill): Record<string, string> {
+  const chars: Record<string, string> = { peso: prefill.weightLabel };
+  if (prefill.flavor) chars['sabor'] = prefill.flavor;
+  if (prefill.servings) chars['porciones'] = prefill.servings;
+  if (prefill.size) chars['tamaño'] = prefill.size;
+  return chars;
 }

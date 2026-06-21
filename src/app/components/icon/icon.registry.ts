@@ -46,7 +46,8 @@ export type MatIconName =
   | 'mat:search'
   | 'mat:settings'
   | 'mat:arrow_back'
-  | 'mat:layers';
+  | 'mat:layers'
+  | 'mat:edit';
 
 // Iconos propios sin librería externa
 export type CustomIconName = never; // añadir: | 'custom:nombre'
@@ -74,4 +75,6 @@ export const ICON_PATHS: Record<IconName, string> = {
   'mat:arrow_back': 'M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20z', // mat · arrow_back
   'mat:layers':
     'M11.99 18.54l-7.37-5.73L3 14.07l9 7 9-7-1.63-1.27-7.38 5.74zM12 16l7.36-5.73L21 9l-9-7-9 7 1.63 1.27L12 16z', // mat · layers
+  'mat:edit':
+    'M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z', // mat · edit
 };

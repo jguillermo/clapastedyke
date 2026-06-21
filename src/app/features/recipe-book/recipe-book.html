@@ -25,18 +25,24 @@
           } @else {
             <ul class="flex flex-col gap-2 m-0 p-0 list-none">
               @for (sponge of sponges(); track sponge.id) {
-                <li class="flex flex-wrap items-center justify-between gap-3 px-4 py-3 rounded-lg bg-surface-sunken">
-                  <span class="flex flex-col">
-                    <span class="font-body font-semibold text-body">{{ sponge.name }}</span>
-                    <span class="text-caption text-muted">{{ sponge.lineCount }} ingredientes</span>
-                  </span>
-                  <span class="flex flex-wrap items-center gap-1.5">
-                    @for (chip of sponge.chips; track chip) {
-                      <span class="inline-flex items-center min-h-6 px-2.5 rounded-full bg-surface-card border border-border-subtle text-caption text-body">
-                        {{ chip }}
-                      </span>
-                    }
-                  </span>
+                <li>
+                  <button
+                    type="button"
+                    class="flex flex-wrap items-center justify-between gap-3 w-full min-h-11 px-4 py-3 rounded-lg bg-surface-sunken text-start cursor-pointer transition duration-base ease-out hover:bg-surface-card hover:border-border-subtle border border-transparent focus-visible:outline-none focus-visible:shadow-focus motion-reduce:transition-none"
+                    (click)="openSponge(sponge.id)"
+                  >
+                    <span class="flex flex-col">
+                      <span class="font-body font-semibold text-body">{{ sponge.name }}</span>
+                      <span class="text-caption text-muted">{{ sponge.lineCount }} ingredientes</span>
+                    </span>
+                    <span class="flex flex-wrap items-center gap-1.5">
+                      @for (chip of sponge.chips; track chip) {
+                        <span class="inline-flex items-center min-h-6 px-2.5 rounded-full bg-surface-card border border-border-subtle text-caption text-body">
+                          {{ chip }}
+                        </span>
+                      }
+                    </span>
+                  </button>
                 </li>
               }
             </ul>
@@ -63,18 +69,24 @@
           } @else {
             <ul class="flex flex-col gap-2 m-0 p-0 list-none">
               @for (filling of fillings(); track filling.id) {
-                <li class="flex flex-wrap items-center justify-between gap-3 px-4 py-3 rounded-lg bg-surface-sunken">
-                  <span class="flex flex-col">
-                    <span class="font-body font-semibold text-body">{{ filling.name }}</span>
-                    <span class="text-caption text-muted">{{ filling.lineCount }} ingredientes</span>
-                  </span>
-                  <span class="flex flex-wrap items-center gap-1.5">
-                    @for (chip of filling.chips; track chip) {
-                      <span class="inline-flex items-center min-h-6 px-2.5 rounded-full bg-surface-card border border-border-subtle text-caption text-body">
-                        {{ chip }}
-                      </span>
-                    }
-                  </span>
+                <li>
+                  <button
+                    type="button"
+                    class="flex flex-wrap items-center justify-between gap-3 w-full min-h-11 px-4 py-3 rounded-lg bg-surface-sunken text-start cursor-pointer transition duration-base ease-out hover:bg-surface-card hover:border-border-subtle border border-transparent focus-visible:outline-none focus-visible:shadow-focus motion-reduce:transition-none"
+                    (click)="openFilling(filling.id)"
+                  >
+                    <span class="flex flex-col">
+                      <span class="font-body font-semibold text-body">{{ filling.name }}</span>
+                      <span class="text-caption text-muted">{{ filling.lineCount }} ingredientes</span>
+                    </span>
+                    <span class="flex flex-wrap items-center gap-1.5">
+                      @for (chip of filling.chips; track chip) {
+                        <span class="inline-flex items-center min-h-6 px-2.5 rounded-full bg-surface-card border border-border-subtle text-caption text-body">
+                          {{ chip }}
+                        </span>
+                      }
+                    </span>
+                  </button>
                 </li>
               }
             </ul>
@@ -101,18 +113,24 @@
           } @else {
             <ul class="flex flex-col gap-2 m-0 p-0 list-none">
               @for (covering of coverings(); track covering.id) {
-                <li class="flex flex-wrap items-center justify-between gap-3 px-4 py-3 rounded-lg bg-surface-sunken">
-                  <span class="flex flex-col">
-                    <span class="font-body font-semibold text-body">{{ covering.name }}</span>
-                    <span class="text-caption text-muted">{{ covering.lineCount }} ingredientes</span>
-                  </span>
-                  <span class="flex flex-wrap items-center gap-1.5">
-                    @for (chip of covering.chips; track chip) {
-                      <span class="inline-flex items-center min-h-6 px-2.5 rounded-full bg-surface-card border border-border-subtle text-caption text-body">
-                        {{ chip }}
-                      </span>
-                    }
-                  </span>
+                <li>
+                  <button
+                    type="button"
+                    class="flex flex-wrap items-center justify-between gap-3 w-full min-h-11 px-4 py-3 rounded-lg bg-surface-sunken text-start cursor-pointer transition duration-base ease-out hover:bg-surface-card hover:border-border-subtle border border-transparent focus-visible:outline-none focus-visible:shadow-focus motion-reduce:transition-none"
+                    (click)="openCovering(covering.id)"
+                  >
+                    <span class="flex flex-col">
+                      <span class="font-body font-semibold text-body">{{ covering.name }}</span>
+                      <span class="text-caption text-muted">{{ covering.lineCount }} ingredientes</span>
+                    </span>
+                    <span class="flex flex-wrap items-center gap-1.5">
+                      @for (chip of covering.chips; track chip) {
+                        <span class="inline-flex items-center min-h-6 px-2.5 rounded-full bg-surface-card border border-border-subtle text-caption text-body">
+                          {{ chip }}
+                        </span>
+                      }
+                    </span>
+                  </button>
                 </li>
               }
             </ul>
@@ -120,6 +138,49 @@
               <button migo-button variant="secondary" type="button" (click)="createCovering()">
                 <migo-icon icon-leading name="mat:add" size="sm" />
                 Nueva cobertura
+              </button>
+            </div>
+          }
+        </section>
+      </ng-template>
+
+      <ng-template migoSwiperSlide label="Insumos">
+        <section class="flex flex-col gap-3">
+          @if (ingredients().length === 0) {
+            <div class="flex flex-col items-start gap-3">
+              <p class="m-0 max-w-reading text-muted">
+                Tus insumos: lo que compras para tus recetas, con su precio. Crea uno o se irán
+                guardando solos al usarlos en una receta.
+              </p>
+              <button migo-button variant="secondary" type="button" (click)="createIngredient()">
+                <migo-icon icon-leading name="mat:add" size="sm" />
+                Nuevo insumo
+              </button>
+            </div>
+          } @else {
+            <ul class="flex flex-col gap-2 m-0 p-0 list-none">
+              @for (ingredient of ingredients(); track ingredient.id) {
+                <li>
+                  <button
+                    type="button"
+                    class="flex flex-wrap items-center justify-between gap-3 w-full min-h-11 px-4 py-3 rounded-lg bg-surface-sunken text-start cursor-pointer transition duration-base ease-out hover:bg-surface-card hover:border-border-subtle border border-transparent focus-visible:outline-none focus-visible:shadow-focus motion-reduce:transition-none"
+                    (click)="openIngredient(ingredient.id)"
+                  >
+                    <span class="flex flex-col">
+                      <span class="font-body font-semibold text-body">{{ ingredient.name }}</span>
+                      <span class="text-caption text-muted">{{ ingredient.usageLabel }}</span>
+                    </span>
+                    <span class="inline-flex items-center min-h-6 px-2.5 rounded-full bg-surface-card border border-border-subtle text-caption text-body">
+                      {{ ingredient.priceChip }}
+                    </span>
+                  </button>
+                </li>
+              }
+            </ul>
+            <div>
+              <button migo-button variant="secondary" type="button" (click)="createIngredient()">
+                <migo-icon icon-leading name="mat:add" size="sm" />
+                Nuevo insumo
               </button>
             </div>
           }

@@ -1,16 +1,22 @@
 <migo-card fill>
   <migo-card-header>
     <migo-icon card-icon name="mat:layers" size="lg" color="brand" />
-    <migo-card-title>Nuevo queque</migo-card-title>
+    <migo-card-title>{{ title }}</migo-card-title>
   </migo-card-header>
 
   <migo-card-body>
     <form class="flex flex-col gap-5" [formGroup]="form" (ngSubmit)="save()">
-      <migo-form-field label="Nombre" required reserveMessage [error]="nameError()">
+      <migo-form-field
+        label="Nombre"
+        required
+        reserveMessage
+        [error]="nameError()"
+        [hint]="editing ? 'El nombre no se puede cambiar al editar.' : ''"
+      >
         <migo-input formControlName="name" placeholder="Queque de vainilla" />
       </migo-form-field>
 
-      <app-ingredient-grid [ingredients]="ingredientOptions" />
+      <app-ingredient-grid [ingredients]="ingredientOptions" [initialLines]="initialLines" />
 
       @if (errorMessage()) {
         <p class="m-0 text-caption font-medium text-error" role="alert">{{ errorMessage() }}</p>
@@ -20,6 +26,7 @@
         <span class="font-body text-sm font-semibold text-body">Características</span>
         <migo-select-tag
           [types]="charTypes()"
+          [value]="initialChars"
           (valueChange)="onChars($event)"
           ariaLabel="Características del queque"
         />
@@ -32,6 +39,6 @@
 
   <migo-card-footer>
     <button migo-button variant="ghost" type="button" (click)="cancel()">Cancelar</button>
-    <button migo-button type="button" [loading]="saving()" (click)="save()">Guardar queque</button>
+    <button migo-button type="button" [loading]="saving()" (click)="save()">{{ saveLabel }}</button>
   </migo-card-footer>
 </migo-card>

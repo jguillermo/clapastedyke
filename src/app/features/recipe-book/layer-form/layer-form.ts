@@ -16,17 +16,26 @@ import { MeasureInput } from '@core/recipe-book/domain/value-objects/measure-inp
 import { SaveIngredient } from '@core/recipe-book/application/use-cases/save-ingredient.use-case';
 import { SaveFillingRecipe } from '@core/recipe-book/application/use-cases/save-filling-recipe.use-case';
 import { SaveCoveringRecipe } from '@core/recipe-book/application/use-cases/save-covering-recipe.use-case';
-import { IngredientGrid, type IngredientOption } from '../_shared/ingredient-grid/ingredient-grid';
+import { IngredientGrid, type IngredientOption, type InitialLine } from '../_shared/ingredient-grid/ingredient-grid';
 import { messageOf, union, validateMass } from '../_shared/recipe-form.utils';
 
 /** Una capa escalada por el peso del queque: relleno o cobertura (isomorfas). */
 export type LayerKind = 'filling' | 'covering';
+
+/** Capa existente proyectada para precargar el formulario al editar. */
+export interface LayerRecipePrefill {
+  name: string;
+  weightLabel: string;
+  lines: InitialLine[];
+}
 
 /** Datos del diálogo: tipo de capa, insumos existentes y pesos ya usados (sugerencias). */
 export interface LayerFormData {
   kind: LayerKind;
   ingredients: IngredientOption[];
   usedWeights: string[];
+  /** Si viene, el formulario abre en modo edición precargado (nombre bloqueado). */
+  recipe?: LayerRecipePrefill;
 }
 
 const DEFAULT_WEIGHTS = ['1 kg', '2 kg', '5 kg'];
@@ -78,13 +87,19 @@ export class LayerForm {
 
   protected readonly kind: LayerKind = this.data?.kind ?? 'filling';
   protected readonly ingredientOptions = this.data?.ingredients ?? [];
+  private readonly prefill = this.data?.recipe ?? null;
+  protected readonly editing = this.prefill !== null;
   protected readonly copy = COPY[this.kind];
+  protected readonly title = this.editing ? (this.kind === 'filling' ? 'Editar relleno' : 'Editar cobertura') : this.copy.title;
+  protected readonly saveLabel = this.editing ? 'Guardar cambios' : this.copy.saveLabel;
+  protected readonly initialLines = this.prefill?.lines ?? [];
+  protected readonly initialChars: Record<string, string> = this.prefill ? { peso: this.prefill.weightLabel } : {};
 
   protected readonly form = this.fb.nonNullable.group({
-    name: ['', Validators.required],
+    name: [{ value: this.prefill?.name ?? '', disabled: this.editing }, Validators.required],
   });
 
-  protected readonly chars = signal<Record<string, string>>({});
+  protected readonly chars = signal<Record<string, string>>(this.prefill ? { peso: this.prefill.weightLabel } : {});
   protected readonly saving = signal(false);
   protected readonly submitted = signal(false);
   protected readonly errorMessage = signal('');
@@ -152,7 +167,7 @@ export class LayerForm {
         lines.push({ ingredientId: id, quantity: item.quantity });
       }
       const request = {
-        name: this.form.controls.name.value,
+        name: this.form.getRawValue().name,
         referenceWeightGrams: weight.quantity.value,
         lines,
       };
