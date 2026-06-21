@@ -90,11 +90,16 @@ export function buildKitchenScenery(): KitchenScenery {
   root.add(sideWall);
 
   // ---- Mesada corrida (back wall) ----
-  root.add(box(5, 0.9, 1, COLOR.wood, -0.5, 0, -3.4));
-  // zócalo bajo la mesada
-  root.add(box(5, 0.2, 1, COLOR.woodDark, -0.5, 0, -3.4));
+  // Empieza a la DERECHA del horno (borde izq. en x=-2) para no incrustarse en él: si se
+  // solaparan, sus caras frontales quedarían coplanares y aparecería z-fighting (el punteado
+  // escalonado que titilaba). Ahora apenas se tocan, sin compartir volumen.
+  // El zócalo va de y[0,0.2] y la mesada se APOYA encima (base en y=0.2): así sus caras
+  // frontales cubren alturas distintas y no quedan coplanares (evita el z-fighting de la franja).
+  root.add(box(4, 0.2, 1, COLOR.woodDark, 0, 0, -3.4)); // zócalo
+  root.add(box(4, 0.7, 1, COLOR.wood, 0, 0.2, -3.4)); // mesada (apoyada sobre el zócalo)
 
   // ---- Estación OVEN (back-left, inerte en Fase 0) ----
+  // Bloque exento a la izquierda de la mesada (ocupa x[-3.2,-2]); la mesada arranca en x=-2.
   const oven = box(1.2, 1.3, 1, COLOR.oven, -2.6, 0, -3.4);
   oven.userData['station'] = KitchenStation.OVEN;
   root.add(oven);
