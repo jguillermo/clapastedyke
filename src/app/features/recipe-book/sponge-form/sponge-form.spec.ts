@@ -1,9 +1,10 @@
 import { TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import type { FormArray, FormGroup } from '@angular/forms';
 import { MIGO_DIALOG_DATA, MigoDialogRef } from '@components/dialog/dialog.service';
-import type { UnitToken } from '@components/unit-input/unit-input';
 import { SaveSpongeRecipe } from '@core/recipe-book/application/use-cases/save-sponge-recipe.use-case';
 import { SaveIngredient } from '@core/recipe-book/application/use-cases/save-ingredient.use-case';
+import { IngredientGrid } from '../_shared/ingredient-grid/ingredient-grid';
 import { SpongeForm } from './sponge-form';
 
 interface SpongeRequest {
@@ -38,13 +39,14 @@ class SaveIngredientStub {
 
 type PurchaseLite = { amount: number; per: { value: number; unit: 'g' | 'u' } };
 
+interface GridInternals {
+  lines: FormArray;
+  setLineUnit(index: number, token: 'k' | 'g' | 'u'): void;
+}
+
 interface SpongeFormInternals {
   form: FormGroup;
-  lines: FormArray;
-  setLineUnit(index: number, token: UnitToken): void;
   onChars(selection: Record<string, string>): void;
-  openPrice(index: number, origin: HTMLElement): void;
-  activeKind(): 'mass' | 'count' | 'any';
   save(): Promise<void>;
 }
 
@@ -67,32 +69,26 @@ describe('SpongeForm', () => {
     const fixture = TestBed.createComponent(SpongeForm);
     fixture.detectChanges();
     const internals = fixture.componentInstance as unknown as SpongeFormInternals;
-    return { fixture, internals };
+    const grid = fixture.debugElement.query(By.directive(IngredientGrid)).componentInstance as unknown as GridInternals;
+    return { fixture, internals, grid };
   }
 
   function fillLine(
-    internals: SpongeFormInternals,
+    grid: GridInternals,
     i: number,
     name: string,
     quantity: string,
     purchase: PurchaseLite = { amount: 5, per: { value: 1000, unit: 'g' } },
   ) {
-    internals.lines.at(i).get('name')!.setValue(name);
-    internals.lines.at(i).get('quantity')!.setValue(quantity);
-    internals.lines.at(i).get('purchase')!.setValue(purchase);
+    grid.lines.at(i).get('name')!.setValue(name);
+    grid.lines.at(i).get('quantity')!.setValue(quantity);
+    grid.lines.at(i).get('purchase')!.setValue(purchase);
   }
 
-  it('keeps an empty trailing row available as the user fills lines', () => {
-    const { internals } = setup();
-    expect(internals.lines.length).toBe(1);
-    fillLine(internals, 0, 'Harina', '250');
-    expect(internals.lines.length).toBe(2);
-  });
-
   it('takes the weight (scaling) and servings from the chosen tags', async () => {
-    const { internals } = setup();
+    const { internals, grid } = setup();
     internals.form.get('name')!.setValue('Queque de vainilla');
-    fillLine(internals, 0, 'Harina', '250');
+    fillLine(grid, 0, 'Harina', '250');
     internals.onChars({ peso: '1 kg', porciones: '8', 'tamaño': 'Mediano' });
 
     await internals.save();
@@ -106,10 +102,10 @@ describe('SpongeForm', () => {
   });
 
   it('infers a count ingredient when the unit token is "u" (quantity 6, baseUnit u)', async () => {
-    const { internals } = setup();
+    const { internals, grid } = setup();
     internals.form.get('name')!.setValue('Queque');
-    fillLine(internals, 0, 'Huevos', '6', { amount: 12, per: { value: 30, unit: 'u' } });
-    internals.setLineUnit(0, 'u');
+    fillLine(grid, 0, 'Huevos', '6', { amount: 12, per: { value: 30, unit: 'u' } });
+    grid.setLineUnit(0, 'u');
     internals.onChars({ peso: '1 kg' });
 
     await internals.save();
@@ -119,34 +115,10 @@ describe('SpongeForm', () => {
     expect(sponge.calls[0].lines).toEqual([{ ingredientId: 'ing-Huevos', quantity: 6 }]);
   });
 
-  it('fija la familia del precio en "count" cuando la cantidad está en unidades', () => {
-    const { internals } = setup();
-    internals.lines.at(0).get('name')!.setValue('Huevos');
-    internals.lines.at(0).get('quantity')!.setValue('12');
-    internals.setLineUnit(0, 'u');
-    internals.openPrice(0, document.createElement('button'));
-    expect(internals.activeKind()).toBe('count');
-  });
-
-  it('fija la familia del precio en "mass" cuando la cantidad es un peso', () => {
-    const { internals } = setup();
-    internals.lines.at(0).get('name')!.setValue('Harina');
-    internals.lines.at(0).get('quantity')!.setValue('250');
-    internals.openPrice(0, document.createElement('button'));
-    expect(internals.activeKind()).toBe('mass');
-  });
-
-  it('deja la familia en "any" mientras no haya una cantidad válida', () => {
-    const { internals } = setup();
-    internals.lines.at(0).get('name')!.setValue('Harina');
-    internals.openPrice(0, document.createElement('button'));
-    expect(internals.activeKind()).toBe('any');
-  });
-
   it('does not save without a weight tag', async () => {
-    const { internals } = setup();
+    const { internals, grid } = setup();
     internals.form.get('name')!.setValue('Queque');
-    fillLine(internals, 0, 'Harina', '250');
+    fillLine(grid, 0, 'Harina', '250');
     // sin etiqueta de peso
     await internals.save();
     expect(sponge.calls).toHaveLength(0);

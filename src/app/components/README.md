@@ -1,6 +1,7 @@
 # Librería de componentes Migo (`@components`)
 
-Componentes de UI **agnósticos** (cero lógica de negocio): comportamiento por **Angular CDK**,
+Componentes de UI **agnósticos** (cero lógica de negocio): comportamiento por **Angular CDK** (y
+**librerías de UI agnósticas aprobadas** — hoy `swiper`),
 estilo por **utilidades de Tailwind generadas del tema Migo** (`src/styles/migo/theme.css`) — sin
 CSS por componente ni valores arbitrarios. Reglas completas en
 [`.claude/rules/components-conventions.md`](../../../.claude/rules/components-conventions.md).
@@ -44,6 +45,7 @@ targets táctiles ≥ 44px (`min-h-11`). Detalle en
 | [Grid](#grid) | `migo-grid` | Hoja de cálculo (celdas + teclado) | — | ✅ |
 | [SelectTag](#selecttag) | `migo-select-tag` | Etiquetas tipo Select2 (chips + autocompletar) | — | ✅ |
 | [Dialog](#dialog) | `MigoDialog` (servicio) | Servicio (CDK Dialog) | — | ✅ |
+| [Swiper](#swiper) | `migo-swiper` (+ `migoSwiperSlide`) | Carrusel con pestañas (Swiper Element) | — | ✅ |
 
 ---
 
@@ -233,6 +235,26 @@ configura `types` e interpreta la salida. Inputs: `types` (`{key,label,values,al
 
 ```html
 <migo-select-tag [types]="charTypes()" (valueChange)="onChars($event)" placeholder="Añade…" />
+```
+
+---
+
+## Swiper
+
+`migo-swiper` — carrusel **mobile-first** con una fila de **pestañas accesibles** sincronizada con el
+swipe. Envuelve **Swiper Element** (web component): `register()` se llama una vez en `main.ts` y su CSS
+vive en el shadow DOM (no toca Tailwind ni el CSS global). El `CUSTOM_ELEMENTS_SCHEMA` queda
+**encapsulado** en el componente. Cada slide se declara con la directiva `migoSwiperSlide` sobre un
+`<ng-template>` con su `label` (texto de la pestaña). Input: `ariaLabel?`. Output: `indexChange`
+(índice activo). Método: `slideTo(i)`. Tabs con patrón ARIA (`tablist`/`tab`/`tabpanel`, roving
+tabindex, ←/→/Home/End).
+
+```html
+<migo-swiper ariaLabel="Tipos de receta">
+  <ng-template migoSwiperSlide label="Queques">…</ng-template>
+  <ng-template migoSwiperSlide label="Rellenos">…</ng-template>
+  <ng-template migoSwiperSlide label="Coberturas">…</ng-template>
+</migo-swiper>
 ```
 
 ---

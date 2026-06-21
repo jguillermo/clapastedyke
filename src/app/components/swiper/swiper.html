@@ -1,0 +1,46 @@
+<div
+  role="tablist"
+  [attr.aria-label]="ariaLabel() || null"
+  class="flex gap-1 overflow-x-auto border-b border-border-subtle"
+>
+  @for (slide of slides(); track $index) {
+    <button
+      #tab
+      type="button"
+      role="tab"
+      [id]="uid + '-tab-' + $index"
+      [attr.aria-selected]="activeIndex() === $index"
+      [attr.aria-controls]="uid + '-panel-' + $index"
+      [tabindex]="activeIndex() === $index ? 0 : -1"
+      class="min-h-11 px-4 whitespace-nowrap border-b-2 font-body text-sm font-semibold transition duration-base ease-out motion-reduce:transition-none focus-visible:shadow-focus focus-visible:outline-none"
+      [class.border-brand]="activeIndex() === $index"
+      [class.text-brand]="activeIndex() === $index"
+      [class.border-transparent]="activeIndex() !== $index"
+      [class.text-muted]="activeIndex() !== $index"
+      (click)="select($index)"
+      (keydown)="onTabKeydown($event, $index)"
+    >
+      {{ slide.label() }}
+    </button>
+  }
+</div>
+
+<swiper-container
+  #container
+  class="block"
+  slides-per-view="1"
+  (swiperslidechange)="onSlideChange($event)"
+>
+  @for (slide of slides(); track $index) {
+    <swiper-slide>
+      <div
+        role="tabpanel"
+        [id]="uid + '-panel-' + $index"
+        [attr.aria-labelledby]="uid + '-tab-' + $index"
+        class="pt-4"
+      >
+        <ng-container [ngTemplateOutlet]="slide.tpl" />
+      </div>
+    </swiper-slide>
+  }
+</swiper-container>

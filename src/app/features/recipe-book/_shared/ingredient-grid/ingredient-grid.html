@@ -1,0 +1,91 @@
+<div class="flex flex-col gap-2">
+  <span class="font-body text-sm font-semibold text-body">Ingredientes</span>
+
+  <migo-grid
+    [columns]="columns"
+    [rows]="lineControls()"
+    ariaLabel="Ingredientes de la receta"
+    (removeRow)="removeLine($event)"
+  >
+    <ng-template let-line let-r="rowIndex" let-c="colIndex">
+      <div [formGroup]="line">
+        @switch (c) {
+          @case (0) {
+            <migo-autocomplete
+              seamless
+              formControlName="name"
+              [suggestions]="ingredientNames()"
+              [invalid]="lineInvalids()[r]?.name ?? false"
+              ariaLabel="Ingrediente"
+            />
+          }
+          @case (1) {
+            <migo-unit-input
+              seamless
+              formControlName="quantity"
+              [unit]="lineUnits()[r]"
+              [invalid]="lineInvalids()[r]?.quantity ?? false"
+              (unitToken)="setLineUnit(r, $event)"
+              ariaLabel="Cantidad"
+            />
+          }
+          @case (2) {
+            @if (costViews()[r]?.hasPrice) {
+              <button
+                #costCell
+                type="button"
+                class="px-3 py-1 text-base text-body rounded-sm hover:underline focus-visible:shadow-focus focus-visible:outline-none"
+                title="Toca para ver o cambiar cómo compras el insumo"
+                (click)="openPrice(r, costCell)"
+              >
+                {{ costViews()[r].cost || '—' }}
+              </button>
+            } @else if (line.controls.name.value.trim()) {
+              <button
+                #costCell
+                type="button"
+                class="px-3 py-1 text-caption font-medium text-brand rounded-sm focus-visible:shadow-focus focus-visible:outline-none"
+                (click)="openPrice(r, costCell)"
+              >
+                ＋ precio
+              </button>
+            }
+          }
+        }
+      </div>
+    </ng-template>
+  </migo-grid>
+
+  @if (materialTotal()) {
+    <div class="flex items-center justify-between border-t border-border-subtle pt-2">
+      <span class="font-body text-sm font-semibold text-body">Costo de materiales</span>
+      <span class="font-body text-base font-semibold text-heading">{{ materialTotal() }}</span>
+    </div>
+  }
+
+  <p class="m-0 text-caption text-muted">Toca un costo para ver o cambiar cómo compras el insumo.</p>
+
+  @if (errorMessage()) {
+    <p class="m-0 text-caption font-medium text-error" role="alert">{{ errorMessage() }}</p>
+  }
+</div>
+
+@if (activeRow() !== null && activeOrigin(); as origin) {
+  <ng-template
+    cdkConnectedOverlay
+    [cdkConnectedOverlayOrigin]="origin"
+    [cdkConnectedOverlayOpen]="true"
+    [cdkConnectedOverlayHasBackdrop]="true"
+    cdkConnectedOverlayBackdropClass="cdk-overlay-transparent-backdrop"
+    (backdropClick)="closePrice()"
+    (detach)="closePrice()"
+  >
+    <app-price-capture
+      [name]="activeName()"
+      [initial]="activePurchase()"
+      [kind]="activeKind()"
+      (confirmed)="onPriceConfirmed($event)"
+      (cancelled)="closePrice()"
+    />
+  </ng-template>
+}

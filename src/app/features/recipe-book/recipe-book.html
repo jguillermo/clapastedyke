@@ -8,51 +8,127 @@
   </migo-card-header>
 
   <migo-card-body>
-    <section class="flex flex-col gap-3">
-      <h3 class="m-0 font-display text-h4 text-heading">Queques</h3>
-
-      @if (sponges().length === 0) {
-        <div class="flex flex-col items-center gap-3 py-8 text-center">
-          <p class="m-0 font-display text-lead text-heading">Tu libro está en blanco</p>
-          <p class="m-0 max-w-reading text-muted">
-            Empieza por tu queque: anota sus ingredientes y cuánto rinde.
-          </p>
-          <button migo-button type="button" (click)="createSponge()">
-            <migo-icon icon-leading name="mat:add" size="sm" />
-            Crea tu primer queque
-          </button>
-        </div>
-      } @else {
-        <ul class="flex flex-col gap-2 m-0 p-0 list-none">
-          @for (sponge of sponges(); track sponge.id) {
-            <li class="flex flex-wrap items-center justify-between gap-3 px-4 py-3 rounded-lg bg-surface-sunken">
-              <span class="flex flex-col">
-                <span class="font-body font-semibold text-body">{{ sponge.name }}</span>
-                <span class="text-caption text-muted">{{ sponge.lineCount }} ingredientes</span>
-              </span>
-              <span class="flex flex-wrap items-center gap-1.5">
-                @for (chip of sponge.chips; track chip) {
-                  <span class="inline-flex items-center min-h-6 px-2.5 rounded-full bg-surface-card border border-border-subtle text-caption text-body">
-                    {{ chip }}
+    <migo-swiper ariaLabel="Tipos de receta">
+      <ng-template migoSwiperSlide label="Queques">
+        <section class="flex flex-col gap-3">
+          @if (sponges().length === 0) {
+            <div class="flex flex-col items-center gap-3 py-8 text-center">
+              <p class="m-0 font-display text-lead text-heading">Tu libro está en blanco</p>
+              <p class="m-0 max-w-reading text-muted">
+                Empieza por tu queque: anota sus ingredientes y cuánto rinde.
+              </p>
+              <button migo-button type="button" (click)="createSponge()">
+                <migo-icon icon-leading name="mat:add" size="sm" />
+                Crea tu primer queque
+              </button>
+            </div>
+          } @else {
+            <ul class="flex flex-col gap-2 m-0 p-0 list-none">
+              @for (sponge of sponges(); track sponge.id) {
+                <li class="flex flex-wrap items-center justify-between gap-3 px-4 py-3 rounded-lg bg-surface-sunken">
+                  <span class="flex flex-col">
+                    <span class="font-body font-semibold text-body">{{ sponge.name }}</span>
+                    <span class="text-caption text-muted">{{ sponge.lineCount }} ingredientes</span>
                   </span>
-                }
-              </span>
-            </li>
+                  <span class="flex flex-wrap items-center gap-1.5">
+                    @for (chip of sponge.chips; track chip) {
+                      <span class="inline-flex items-center min-h-6 px-2.5 rounded-full bg-surface-card border border-border-subtle text-caption text-body">
+                        {{ chip }}
+                      </span>
+                    }
+                  </span>
+                </li>
+              }
+            </ul>
+            <div>
+              <button migo-button variant="secondary" type="button" (click)="createSponge()">
+                <migo-icon icon-leading name="mat:add" size="sm" />
+                Nuevo queque
+              </button>
+            </div>
           }
-        </ul>
-        <div>
-          <button migo-button variant="secondary" type="button" (click)="createSponge()">
-            <migo-icon icon-leading name="mat:add" size="sm" />
-            Nuevo queque
-          </button>
-        </div>
-      }
-    </section>
+        </section>
+      </ng-template>
 
-    <section class="flex flex-col gap-2 mt-6 pt-5 border-t border-border-subtle">
-      <p class="m-0 text-caption text-placeholder">
-        Rellenos, coberturas, toppers, empaque y componer torta llegan en el siguiente paso.
-      </p>
-    </section>
+      <ng-template migoSwiperSlide label="Rellenos">
+        <section class="flex flex-col gap-3">
+          @if (fillings().length === 0) {
+            <div class="flex flex-col items-start gap-3">
+              <p class="m-0 max-w-reading text-muted">Un relleno para tu torta. Dime para cuánto rinde y lo escalo solo.</p>
+              <button migo-button variant="secondary" type="button" (click)="createFilling()">
+                <migo-icon icon-leading name="mat:add" size="sm" />
+                Nuevo relleno
+              </button>
+            </div>
+          } @else {
+            <ul class="flex flex-col gap-2 m-0 p-0 list-none">
+              @for (filling of fillings(); track filling.id) {
+                <li class="flex flex-wrap items-center justify-between gap-3 px-4 py-3 rounded-lg bg-surface-sunken">
+                  <span class="flex flex-col">
+                    <span class="font-body font-semibold text-body">{{ filling.name }}</span>
+                    <span class="text-caption text-muted">{{ filling.lineCount }} ingredientes</span>
+                  </span>
+                  <span class="flex flex-wrap items-center gap-1.5">
+                    @for (chip of filling.chips; track chip) {
+                      <span class="inline-flex items-center min-h-6 px-2.5 rounded-full bg-surface-card border border-border-subtle text-caption text-body">
+                        {{ chip }}
+                      </span>
+                    }
+                  </span>
+                </li>
+              }
+            </ul>
+            <div>
+              <button migo-button variant="secondary" type="button" (click)="createFilling()">
+                <migo-icon icon-leading name="mat:add" size="sm" />
+                Nuevo relleno
+              </button>
+            </div>
+          }
+        </section>
+      </ng-template>
+
+      <ng-template migoSwiperSlide label="Coberturas">
+        <section class="flex flex-col gap-3">
+          @if (coverings().length === 0) {
+            <div class="flex flex-col items-start gap-3">
+              <p class="m-0 max-w-reading text-muted">Una cobertura para terminar la torta. También se escala con el queque.</p>
+              <button migo-button variant="secondary" type="button" (click)="createCovering()">
+                <migo-icon icon-leading name="mat:add" size="sm" />
+                Nueva cobertura
+              </button>
+            </div>
+          } @else {
+            <ul class="flex flex-col gap-2 m-0 p-0 list-none">
+              @for (covering of coverings(); track covering.id) {
+                <li class="flex flex-wrap items-center justify-between gap-3 px-4 py-3 rounded-lg bg-surface-sunken">
+                  <span class="flex flex-col">
+                    <span class="font-body font-semibold text-body">{{ covering.name }}</span>
+                    <span class="text-caption text-muted">{{ covering.lineCount }} ingredientes</span>
+                  </span>
+                  <span class="flex flex-wrap items-center gap-1.5">
+                    @for (chip of covering.chips; track chip) {
+                      <span class="inline-flex items-center min-h-6 px-2.5 rounded-full bg-surface-card border border-border-subtle text-caption text-body">
+                        {{ chip }}
+                      </span>
+                    }
+                  </span>
+                </li>
+              }
+            </ul>
+            <div>
+              <button migo-button variant="secondary" type="button" (click)="createCovering()">
+                <migo-icon icon-leading name="mat:add" size="sm" />
+                Nueva cobertura
+              </button>
+            </div>
+          }
+        </section>
+      </ng-template>
+    </migo-swiper>
+
+    <p class="m-0 mt-6 pt-5 border-t border-border-subtle text-caption text-placeholder">
+      Toppers, empaque y componer torta llegan en el siguiente paso.
+    </p>
   </migo-card-body>
 </migo-card>

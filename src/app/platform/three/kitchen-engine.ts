@@ -70,14 +70,18 @@ export class KitchenEngine {
     const sun = new DirectionalLight(0xffe7c2, 1.5);
     sun.position.set(5, 8, 4);
     sun.castShadow = true;
-    sun.shadow.mapSize.set(1024, 1024);
+    sun.shadow.mapSize.set(2048, 2048);
     sun.shadow.camera.near = 1;
     sun.shadow.camera.far = 30;
     sun.shadow.camera.left = -6;
     sun.shadow.camera.right = 6;
     sun.shadow.camera.top = 6;
     sun.shadow.camera.bottom = -6;
-    sun.shadow.bias = -0.0005;
+    // Anti shadow-acne: el `normalBias` desplaza el muestreo a lo largo de la normal y
+    // elimina el punteado/escalonado que titilaba en las cajas (p.ej. el horno) al mover
+    // la cámara. `bias` mínimo solo para el contacto; el peso lo lleva `normalBias`.
+    sun.shadow.bias = -0.0001;
+    sun.shadow.normalBias = 0.04;
     this.scene.add(sun);
 
     // Escena placeholder + estaciones.

@@ -41,7 +41,8 @@ A 3D in-browser cooking game (`misaevol` / "clapastedyke"). The user navigates a
 
 ```
 components/   Design-system UI library (migo- prefix). CDK behavior + Migo Tailwind tokens.
-              Zero business logic. Imports ONLY Angular, CDK, and sibling components.
+              Zero business logic. Imports ONLY Angular, CDK, approved agnostic UI libs
+              (currently `swiper`), and sibling components.
 core/         DDD bounded contexts. All business logic lives here.
 features/     Route-level pages. Inject use cases ONLY; build UI from components/.
 platform/     Cross-cutting tech (currently three/ — the 3D engine). No domain knowledge.

@@ -13,34 +13,43 @@ import { InputField } from '@components/input/input';
 import { SelectTag, type SelectTagType } from '@components/select-tag/select-tag';
 import { MIGO_DIALOG_DATA, MigoDialogRef } from '@components/dialog/dialog.service';
 import { MeasureInput } from '@core/recipe-book/domain/value-objects/measure-input';
-import { SaveSpongeRecipe } from '@core/recipe-book/application/use-cases/save-sponge-recipe.use-case';
 import { SaveIngredient } from '@core/recipe-book/application/use-cases/save-ingredient.use-case';
+import { SaveFillingRecipe } from '@core/recipe-book/application/use-cases/save-filling-recipe.use-case';
+import { SaveCoveringRecipe } from '@core/recipe-book/application/use-cases/save-covering-recipe.use-case';
 import { IngredientGrid, type IngredientOption } from '../_shared/ingredient-grid/ingredient-grid';
-import { messageOf, union, validateLabel, validateMass, validateServings } from '../_shared/recipe-form.utils';
+import { messageOf, union, validateMass } from '../_shared/recipe-form.utils';
 
-export type { IngredientOption };
+/** Una capa escalada por el peso del queque: relleno o cobertura (isomorfas). */
+export type LayerKind = 'filling' | 'covering';
 
-/** Datos del diálogo: insumos existentes (con precio) + valores por característica. */
-export interface SpongeFormData {
+/** Datos del diálogo: tipo de capa, insumos existentes y pesos ya usados (sugerencias). */
+export interface LayerFormData {
+  kind: LayerKind;
   ingredients: IngredientOption[];
-  valuesByType: Record<string, string[]>;
+  usedWeights: string[];
 }
 
-/** Valores por defecto de cada tipo (sugerencias; los añadidos se reutilizan vía `valuesByType`). */
-const DEFAULT_VALUES: Record<string, readonly string[]> = {
-  sabor: ['Vainilla', 'Chocolate'],
-  peso: ['1 kg', '2 kg', '5 kg'],
-  porciones: ['2', '4', '8', '10', '40'],
-  'tamaño': ['Grande', 'Mediano', 'Pequeño'],
+const DEFAULT_WEIGHTS = ['1 kg', '2 kg', '5 kg'];
+
+interface LayerCopy {
+  title: string;
+  saveLabel: string;
+  ariaChars: string;
+}
+
+const COPY: Record<LayerKind, LayerCopy> = {
+  filling: { title: 'Nuevo relleno', saveLabel: 'Guardar relleno', ariaChars: 'Para cuánto rinde el relleno' },
+  covering: { title: 'Nueva cobertura', saveLabel: 'Guardar cobertura', ariaChars: 'Para cuánto rinde la cobertura' },
 };
 
 /**
- * Formulario "Nuevo queque": cabecera (nombre + características) sobre la grilla de
- * ingredientes compartida ({@link IngredientGrid}). El peso de las características
- * gobierna el escalado de toda la torta.
+ * Formulario de capa (relleno / cobertura). Misma forma para ambas (isomorfas):
+ * nombre + un peso de referencia ("¿para cuánto rinde?") sobre la grilla de
+ * ingredientes compartida ({@link IngredientGrid}). El `kind` decide los textos y
+ * el caso de uso al que se guarda.
  */
 @Component({
-  selector: 'app-sponge-form',
+  selector: 'app-layer-form',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     ReactiveFormsModule,
@@ -57,16 +66,19 @@ const DEFAULT_VALUES: Record<string, readonly string[]> = {
     IngredientGrid,
   ],
   host: { '(focusout)': 'bumpInteraction()' },
-  templateUrl: './sponge-form.html',
+  templateUrl: './layer-form.html',
 })
-export class SpongeForm {
+export class LayerForm {
   private readonly fb = inject(FormBuilder);
-  private readonly saveSponge = inject(SaveSpongeRecipe);
   private readonly saveIngredient = inject(SaveIngredient);
+  private readonly saveFilling = inject(SaveFillingRecipe);
+  private readonly saveCovering = inject(SaveCoveringRecipe);
   protected readonly ref = inject<MigoDialogRef<{ id: string }>>(MigoDialogRef);
-  private readonly data = inject<SpongeFormData | null>(MIGO_DIALOG_DATA, { optional: true });
+  private readonly data = inject<LayerFormData | null>(MIGO_DIALOG_DATA, { optional: true });
 
+  protected readonly kind: LayerKind = this.data?.kind ?? 'filling';
   protected readonly ingredientOptions = this.data?.ingredients ?? [];
+  protected readonly copy = COPY[this.kind];
 
   protected readonly form = this.fb.nonNullable.group({
     name: ['', Validators.required],
@@ -81,21 +93,21 @@ export class SpongeForm {
   private readonly valueTick = toSignal(this.form.valueChanges, { initialValue: null });
   private readonly interaction = signal(0);
 
-  protected readonly charTypes = computed<SelectTagType[]>(() => {
-    const used = this.data?.valuesByType ?? {};
-    return [
-      { key: 'sabor', label: 'Sabor', values: union(DEFAULT_VALUES['sabor'], used['sabor']), allowCreate: true, validate: validateLabel },
-      { key: 'peso', label: 'Peso', values: union(DEFAULT_VALUES['peso'], used['peso']), allowCreate: true, validate: validateMass },
-      { key: 'porciones', label: 'Porciones', values: union(DEFAULT_VALUES['porciones'], used['porciones']), allowCreate: true, validate: validateServings },
-      { key: 'tamaño', label: 'Tamaño', values: union(DEFAULT_VALUES['tamaño'], used['tamaño']), allowCreate: true, validate: validateLabel },
-    ];
-  });
+  protected readonly weightTypes = computed<SelectTagType[]>(() => [
+    {
+      key: 'peso',
+      label: '¿Para cuánto rinde?',
+      values: union(DEFAULT_WEIGHTS, this.data?.usedWeights),
+      allowCreate: true,
+      validate: validateMass,
+    },
+  ]);
 
   protected readonly nameError = computed(() => this.errorFor(this.form.controls.name, 'El nombre es obligatorio.'));
 
-  protected readonly charsError = computed(() => {
+  protected readonly weightError = computed(() => {
     if (!this.submitted()) return '';
-    return MeasureInput.parse(this.chars()['peso'] ?? '', 'mass').isValid ? '' : 'Elige el peso del queque.';
+    return MeasureInput.parse(this.chars()['peso'] ?? '', 'mass').isValid ? '' : 'Elige para cuánto rinde.';
   });
 
   // --- Acciones ---
@@ -124,7 +136,7 @@ export class SpongeForm {
 
     const weight = MeasureInput.parse(this.chars()['peso'] ?? '', 'mass');
     if (!weight.quantity) {
-      return; // charsError avisa del peso
+      return; // weightError avisa del peso
     }
 
     this.saving.set(true);
@@ -139,16 +151,15 @@ export class SpongeForm {
         });
         lines.push({ ingredientId: id, quantity: item.quantity });
       }
-      const result = await this.saveSponge.execute({
+      const request = {
         name: this.form.controls.name.value,
-        flavor: this.chars()['sabor'] || undefined,
-        referenceYield: {
-          weightGrams: weight.quantity.value,
-          servings: this.servingsFromChars(),
-          size: this.chars()['tamaño'] || undefined,
-        },
+        referenceWeightGrams: weight.quantity.value,
         lines,
-      });
+      };
+      const result =
+        this.kind === 'filling'
+          ? await this.saveFilling.execute(request)
+          : await this.saveCovering.execute(request);
       this.ref.close(result);
     } catch (error) {
       this.errorMessage.set(messageOf(error));
@@ -166,12 +177,6 @@ export class SpongeForm {
   }
 
   // --- Helpers ---
-
-  private servingsFromChars(): number | undefined {
-    const raw = this.chars()['porciones'];
-    const n = raw ? Number(raw) : NaN;
-    return Number.isInteger(n) && n > 0 ? n : undefined;
-  }
 
   private shows(control: AbstractControl): boolean {
     this.valueTick();
