@@ -67,3 +67,22 @@ describe('UnitInput (ControlValueAccessor)', () => {
     expect(input.disabled).toBe(true);
   });
 });
+
+@Component({
+  imports: [ReactiveFormsModule, UnitInput],
+  template: `<migo-unit-input paper [formControl]="control" />`,
+})
+class PaperHost {
+  readonly control = new FormControl('');
+}
+
+describe('UnitInput · paper skin', () => {
+  it('uses a ledger underline and the warm book-page focus tone (no form box)', () => {
+    const fixture = TestBed.createComponent(PaperHost);
+    fixture.detectChanges();
+    const box = fixture.nativeElement.querySelector('span') as HTMLElement;
+    expect(box.className).toContain('border-b');
+    expect(box.className).toContain('focus-within:bg-surface-warm');
+    expect(box.className).not.toContain('bg-surface-card'); // no es la caja de formulario
+  });
+});

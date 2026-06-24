@@ -46,6 +46,29 @@ describe('Ingredient', () => {
         expect(events[0].data['newPrice']).toEqual({ amount: 8, per: { value: 1000, unit: 'g' } });
     });
 
+    it('renamedTo returns a new instance with the new name, same identity, no event', () => {
+        const original = Ingredient.restore({
+            id: new EntityId('IN-1'),
+            name: 'Harina',
+            baseUnit: 'g',
+            usage: 'recipe',
+            purchasePrice: price(5),
+        });
+        const renamed = original.renamedTo('  Harina sin gluten  ');
+
+        expect(renamed).not.toBe(original);
+        expect(renamed.name).toBe('Harina sin gluten'); // trimmed
+        expect(original.name).toBe('Harina'); // immutable
+        expect(renamed.id.equals(original.id)).toBe(true);
+        expect(renamed.purchasePrice.amount).toBe(5);
+        expect(renamed.pullEvents()).toHaveLength(0);
+    });
+
+    it('renamedTo rejects an empty name', () => {
+        const ingredient = Ingredient.create(new EntityId('IN-1'), 'Harina', 'g', 'recipe', price(5));
+        expect(() => ingredient.renamedTo('   ')).toThrow('Ingredient name is required');
+    });
+
     it('equals by id', () => {
         const a = Ingredient.create(new EntityId('IN-1'), 'Harina', 'g', 'recipe', price(5));
         const b = Ingredient.create(new EntityId('IN-1'), 'Otra', 'g', 'topper', price(9));

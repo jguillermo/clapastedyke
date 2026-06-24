@@ -77,6 +77,9 @@ export class CurrencyInput implements ControlValueAccessor {
   /** Variante sin borde/fondo para incrustarse en una celda de grilla. */
   readonly seamless = input(false, { transform: booleanAttribute });
 
+  /** Variante "papel": como `seamless` pero con renglón inferior y realce cálido del libro. */
+  readonly paper = input(false, { transform: booleanAttribute });
+
   private readonly control = viewChild.required<ElementRef<HTMLInputElement>>('control');
   private readonly fallbackId = `migo-currency-input-${nextCurrencyInputId++}`;
   protected readonly value = signal('');
@@ -88,6 +91,13 @@ export class CurrencyInput implements ControlValueAccessor {
   protected readonly isDisabled = computed(() => this.disabledByForm() || this.disabled());
 
   protected readonly boxClasses = computed(() => {
+    if (this.paper()) {
+      const base =
+        'flex items-center gap-1 w-full min-h-11 box-border px-3 bg-transparent font-body text-base ' +
+        'cursor-text transition duration-base ease-out border-b border-border-subtle ' +
+        'focus-within:bg-surface-warm motion-reduce:transition-none';
+      return this.isInvalid() ? `${base} text-error` : `${base} text-body`;
+    }
     if (this.seamless()) {
       const base =
         'flex items-center gap-1 w-full min-h-11 box-border px-3 bg-transparent font-body text-base ' +

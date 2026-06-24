@@ -13,27 +13,22 @@
         [error]="nameError()"
         [hint]="editing ? 'El nombre no se puede cambiar al editar.' : ''"
       >
-        <migo-input formControlName="name" placeholder="Queque de vainilla" />
+        <migo-input formControlName="name" placeholder="Manjar blanco" />
       </migo-form-field>
+
+      <div class="flex flex-col gap-2">
+        <span class="font-body text-sm font-semibold text-body">¿Para cuánto rinde?</span>
+        <migo-select-tag [types]="weightTypes()" [value]="initialChars" (valueChange)="onChars($event)" [ariaLabel]="copy.ariaChars" />
+        @if (weightError()) {
+          <p class="m-0 text-caption font-medium text-error" role="alert">{{ weightError() }}</p>
+        }
+      </div>
 
       <app-ingredient-grid [ingredients]="ingredientOptions" [initialLines]="initialLines" />
 
       @if (errorMessage()) {
         <p class="m-0 text-caption font-medium text-error" role="alert">{{ errorMessage() }}</p>
       }
-
-      <div class="flex flex-col gap-2">
-        <span class="font-body text-sm font-semibold text-body">Características</span>
-        <migo-select-tag
-          [types]="charTypes()"
-          [value]="initialChars"
-          (valueChange)="onChars($event)"
-          ariaLabel="Características del queque"
-        />
-        @if (charsError()) {
-          <p class="m-0 text-caption font-medium text-error" role="alert">{{ charsError() }}</p>
-        }
-      </div>
     </form>
   </migo-card-body>
 

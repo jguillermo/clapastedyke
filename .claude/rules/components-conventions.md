@@ -38,20 +38,27 @@ va aquí.
 
 | Permitido | Prohibido |
 |---|---|
-| Importar de `@angular/*` (core, common, forms) y `@angular/cdk/*` | Importar de `@core/`, `@features/`, `@platform/` |
+| Importar de `@angular/*` (core, common, forms), `@angular/cdk/*` y librerías de UI agnósticas aprobadas (hoy: **`swiper`**) | Importar de `@core/`, `@features/`, `@platform/` |
 | Componer con otros componentes de la librería (`@components/...`) | Inyectar servicios de dominio, use cases o repositorios |
 | Estado de **UI** con signals (`open`, `focused`, `checked`) | Estado o reglas de **negocio** |
 | Recibir datos por `input()`, emitir por `output()` | HTTP, IPC, `window.*`, `Router`, navegación |
 | Estilar con utilidades del tema (`bg-brand`, `rounded-xl`, `gap-2`…) | Valores arbitrarios (`p-[40px]`, `bg-[#fff]`), `var(--token)` o CSS crudo |
 
 > Esto es más estricto que las reglas de capas habituales: `components/` no importa de **ninguna**
-> capa de la app, solo de Angular, CDK y de sí misma.
+> capa de la app, solo de Angular, CDK, **librerías de UI agnósticas aprobadas** y de sí misma.
+>
+> **Librerías de UI externas aprobadas.** Además del CDK, `components/` puede envolver librerías de
+> UI **agnósticas** (sin lógica de negocio) que aporten comportamiento/estilo encapsulado, igual que
+> el CDK. Hoy la única es **`swiper`** (`migo-swiper`, vía Swiper Element / web components: su CSS
+> vive en el shadow DOM, así que no choca con Tailwind ni con el CSS global). Cada lib nueva se
+> **aprueba y se añade a esta lista**; el resto de reglas (cero lógica de negocio, no importar capas
+> de la app, estilo del tema) siguen vigentes.
 
 ## Import rules
 
 | Regla | Detalle |
 |---|---|
-| Solo Angular, CDK y componentes hermanos | `@angular/*`, `@angular/cdk/*`, `@components/...` |
+| Angular, CDK, libs de UI aprobadas y componentes hermanos | `@angular/*`, `@angular/cdk/*`, `swiper`, `@components/...` |
 | NUNCA `@core/`, `@features/`, `@platform/` | Sin dependencia de la app |
 | Entre componentes de la librería, usar alias | `@components/form-field/form-field` (ver [path-aliases-conventions.md](path-aliases-conventions.md)) |
 

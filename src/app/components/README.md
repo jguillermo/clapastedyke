@@ -1,6 +1,7 @@
 # Librería de componentes Migo (`@components`)
 
-Componentes de UI **agnósticos** (cero lógica de negocio): comportamiento por **Angular CDK**,
+Componentes de UI **agnósticos** (cero lógica de negocio): comportamiento por **Angular CDK** (y
+**librerías de UI agnósticas aprobadas** — hoy `swiper`),
 estilo por **utilidades de Tailwind generadas del tema Migo** (`src/styles/migo/theme.css`) — sin
 CSS por componente ni valores arbitrarios. Reglas completas en
 [`.claude/rules/components-conventions.md`](../../../.claude/rules/components-conventions.md).
@@ -44,6 +45,7 @@ targets táctiles ≥ 44px (`min-h-11`). Detalle en
 | [Grid](#grid) | `migo-grid` | Hoja de cálculo (celdas + teclado) | — | ✅ |
 | [SelectTag](#selecttag) | `migo-select-tag` | Etiquetas tipo Select2 (chips + autocompletar) | — | ✅ |
 | [Dialog](#dialog) | `MigoDialog` (servicio) | Servicio (CDK Dialog) | — | ✅ |
+| [Swiper](#swiper) | `migo-swiper` (+ `migoSwiperSlide`) | Carrusel con pestañas (Swiper Element) | — | ✅ |
 
 ---
 
@@ -81,7 +83,7 @@ en plantillas — todo icono va por `migo-icon`. Las clases de animación (`opac
 
 ## Card
 
-`migo-card` — `variant`: `elevated` \| `outlined` \| `filled` · `elevation`: `sm` \| `md` \| `lg`
+`migo-card` — `variant`: `elevated` \| `outlined` \| `filled` \| `warm` (papel cálido, hoja del libro) · `elevation`: `sm` \| `md` \| `lg`
 (solo elevated) · `interactive` · `fill`. Partes: `migo-card-header` (slots `[card-icon]`,
 `[card-actions]`), `migo-card-title`, `migo-card-subtitle`, `migo-card-body`, `migo-card-footer`.
 
@@ -141,14 +143,15 @@ el componente no interpreta ni convierte. Inputs: `unit` · `placeholder` · `ar
 ```
 
 El valor es **solo el número**; teclear `k`/`g`/`u` no escribe la letra, emite `unitToken` para que
-el consumidor fije la unidad. Variante `seamless` (sin borde) para celdas de grilla.
+el consumidor fije la unidad. Variante `seamless` (sin borde) para celdas de grilla; variante
+`paper` (renglón inferior + realce cálido `surface-warm`) para integrarse a una hoja del libro.
 
 ## Autocomplete
 
 `migo-autocomplete` — texto con **completado fantasma en línea**: al escribir, el resto de la primera
 sugerencia que coincide aparece tenue dentro del campo; se acepta con Tab / → / Enter. Sin overlay.
 `ControlValueAccessor`. Inputs: `suggestions` (string[]) · `placeholder` · `ariaLabel` · `invalid` ·
-`disabled` · `seamless`.
+`disabled` · `seamless` · `paper` (renglón + realce cálido para una hoja del libro).
 
 ```html
 <migo-autocomplete formControlName="name" [suggestions]="ingredientNames()" placeholder="Harina" />
@@ -204,7 +207,8 @@ teclado (↑/↓/Enter cambian de fila; ←/→ saltan de celda en el borde del 
 fila. Presentacional y agnóstico del editor: el consumidor proyecta una `<ng-template>` que pinta el
 control de cada celda (típicamente `migo-autocomplete`/`migo-unit-input` `seamless`). Datos y lógica
 (fila vacía, validación) los aporta el feature. Inputs: `columns` (`{label, width?}[]`) · `rows` ·
-`protectLastRow` · `ariaLabel`. Output: `removeRow` (índice).
+`protectLastRow` · `removable` (default `true`; `false` oculta la columna de acciones) · `ariaLabel`.
+Output: `removeRow` (índice).
 
 **Mobile-first**: en pantallas estrechas la grilla **scrollea en horizontal** (no se aplasta) — las
 columnas conservan ancho (`min-w-32` las flexibles, `shrink-0` las de ancho fijo).
@@ -233,6 +237,26 @@ configura `types` e interpreta la salida. Inputs: `types` (`{key,label,values,al
 
 ```html
 <migo-select-tag [types]="charTypes()" (valueChange)="onChars($event)" placeholder="Añade…" />
+```
+
+---
+
+## Swiper
+
+`migo-swiper` — carrusel **mobile-first** con una fila de **pestañas accesibles** sincronizada con el
+swipe. Envuelve **Swiper Element** (web component): `register()` se llama una vez en `main.ts` y su CSS
+vive en el shadow DOM (no toca Tailwind ni el CSS global). El `CUSTOM_ELEMENTS_SCHEMA` queda
+**encapsulado** en el componente. Cada slide se declara con la directiva `migoSwiperSlide` sobre un
+`<ng-template>` con su `label` (texto de la pestaña). Input: `ariaLabel?`. Output: `indexChange`
+(índice activo). Método: `slideTo(i)`. Tabs con patrón ARIA (`tablist`/`tab`/`tabpanel`, roving
+tabindex, ←/→/Home/End).
+
+```html
+<migo-swiper ariaLabel="Tipos de receta">
+  <ng-template migoSwiperSlide label="Queques">…</ng-template>
+  <ng-template migoSwiperSlide label="Rellenos">…</ng-template>
+  <ng-template migoSwiperSlide label="Coberturas">…</ng-template>
+</migo-swiper>
 ```
 
 ---

@@ -74,6 +74,8 @@ export class Autocomplete implements ControlValueAccessor {
   readonly disabled = input(false, { transform: booleanAttribute });
   /** Variante sin borde/fondo para incrustarse en una celda de grilla. */
   readonly seamless = input(false, { transform: booleanAttribute });
+  /** Variante "papel": como `seamless` pero con renglón inferior y realce cálido del libro. */
+  readonly paper = input(false, { transform: booleanAttribute });
 
   private readonly control = viewChild.required<ElementRef<HTMLInputElement>>('control');
   private readonly fallbackId = `migo-autocomplete-${nextAutocompleteId++}`;
@@ -86,6 +88,10 @@ export class Autocomplete implements ControlValueAccessor {
   protected readonly isDisabled = computed(() => this.disabledByForm() || this.disabled());
 
   protected readonly controlClasses = computed(() => {
+    if (this.paper()) {
+      const base = `${CONTROL_COMMON} px-3 border-x-0 border-t-0 border-b border-border-subtle rounded-none focus:bg-surface-warm`;
+      return this.isInvalid() ? `${base} text-error` : `${base} text-body`;
+    }
     if (this.seamless()) {
       const base = `${CONTROL_COMMON} px-3 border-0 rounded-none focus:bg-surface-sunken`;
       return this.isInvalid() ? `${base} text-error` : `${base} text-body`;
@@ -98,8 +104,12 @@ export class Autocomplete implements ControlValueAccessor {
 
   /** El fantasma debe replicar el padding/borde del control para alinearse. */
   protected readonly ghostClasses = computed(() => {
-    const pad = this.seamless() ? 'px-3' : 'px-4';
-    const border = this.seamless() ? '' : 'border border-transparent';
+    const pad = this.seamless() || this.paper() ? 'px-3' : 'px-4';
+    const border = this.paper()
+      ? 'border-x-0 border-t-0 border-b border-transparent'
+      : this.seamless()
+        ? ''
+        : 'border border-transparent';
     return `absolute inset-0 flex items-center ${pad} ${border} box-border font-body text-base whitespace-pre pointer-events-none`;
   });
 

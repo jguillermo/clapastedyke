@@ -50,4 +50,9 @@
       </button>
     }
   </nav>
+
+  <!-- Libro de recetas 3D a pantalla completa (overlay) -->
+  @if (bookOpen()) {
+    <app-recipe-book-3d (closed)="onRecipeBookClosed()" />
+  }
 </div>

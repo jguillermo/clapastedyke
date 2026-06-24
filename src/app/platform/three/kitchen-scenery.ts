@@ -90,11 +90,16 @@ export function buildKitchenScenery(): KitchenScenery {
   root.add(sideWall);
 
   // ---- Mesada corrida (back wall) ----
-  root.add(box(5, 0.9, 1, COLOR.wood, -0.5, 0, -3.4));
-  // zócalo bajo la mesada
-  root.add(box(5, 0.2, 1, COLOR.woodDark, -0.5, 0, -3.4));
+  // Empieza a la DERECHA del horno (borde izq. en x=-2) para no incrustarse en él: si se
+  // solaparan, sus caras frontales quedarían coplanares y aparecería z-fighting (el punteado
+  // escalonado que titilaba). Ahora apenas se tocan, sin compartir volumen.
+  // El zócalo va de y[0,0.2] y la mesada se APOYA encima (base en y=0.2): así sus caras
+  // frontales cubren alturas distintas y no quedan coplanares (evita el z-fighting de la franja).
+  root.add(box(4, 0.2, 1, COLOR.woodDark, 0, 0, -3.4)); // zócalo
+  root.add(box(4, 0.7, 1, COLOR.wood, 0, 0.2, -3.4)); // mesada (apoyada sobre el zócalo)
 
   // ---- Estación OVEN (back-left, inerte en Fase 0) ----
+  // Bloque exento a la izquierda de la mesada (ocupa x[-3.2,-2]); la mesada arranca en x=-2.
   const oven = box(1.2, 1.3, 1, COLOR.oven, -2.6, 0, -3.4);
   oven.userData['station'] = KitchenStation.OVEN;
   root.add(oven);
@@ -119,26 +124,23 @@ export function buildKitchenScenery(): KitchenScenery {
   stationHotspots.push(pantryHotspot);
   focusTargets.set(KitchenStation.PANTRY, new Vector3(-3.0, 1.6, -1.2));
 
-  // ---- Estación RECIPE_BOARD (atril con el libro, foco de la Fase 0) ----
+  // ---- Estación RECIPE_BOARD (libro de recetas cerrado, foco de la Fase 0) ----
   const board = new Group();
   // mesita
   board.add(box(1.4, 0.85, 0.9, COLOR.wood, 1.4, 0, 1.4));
-  // atril inclinado (el tablero)
-  const easel = new Mesh(new BoxGeometry(1.0, 1.0, 0.08), material(COLOR.board));
-  easel.position.set(1.4, 1.35, 1.4);
-  easel.rotation.x = -0.5;
-  easel.castShadow = true;
-  board.add(easel);
-  // hoja del libro
-  const paper = new Mesh(new PlaneGeometry(0.7, 0.7), material(COLOR.boardPaper));
-  paper.position.set(1.4, 1.37, 1.46);
-  paper.rotation.x = -0.5;
-  board.add(paper);
-  easel.userData['station'] = KitchenStation.RECIPE_BOARD;
-  paper.userData['station'] = KitchenStation.RECIPE_BOARD;
+  // Libro cerrado: tapa inferior + taco de páginas + tapa superior, apilados y
+  // ligeramente girados. Las tres piezas son hotspots de la estación.
+  const cover1 = box(0.62, 0.04, 0.82, COLOR.oven, 1.4, 0.85, 1.4);
+  const pages = box(0.56, 0.07, 0.76, COLOR.boardPaper, 1.4, 0.89, 1.4);
+  const cover2 = box(0.62, 0.04, 0.82, COLOR.oven, 1.4, 0.96, 1.4);
+  for (const piece of [cover1, pages, cover2]) {
+    piece.rotation.y = 0.3;
+    piece.userData['station'] = KitchenStation.RECIPE_BOARD;
+    board.add(piece);
+    stationHotspots.push(piece);
+  }
   root.add(board);
-  stationHotspots.push(easel, paper);
-  focusTargets.set(KitchenStation.RECIPE_BOARD, new Vector3(1.4, 1.3, 1.4));
+  focusTargets.set(KitchenStation.RECIPE_BOARD, new Vector3(1.4, 1.0, 1.4));
 
   // ---- Una plantita para dar vida (decoración, no interactiva) ----
   const pot = box(0.35, 0.35, 0.35, COLOR.woodDark, 2.6, 0.9, -3.4);

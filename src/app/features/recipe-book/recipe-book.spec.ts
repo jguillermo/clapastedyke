@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { of } from 'rxjs';
 import { MigoDialog, MigoDialogRef } from '@components/dialog/dialog.service';
 import { ListRecipeBook, type RecipeBookCatalog } from '@core/recipe-book/application/use-cases/list-recipe-book.use-case';
+import { makeRecipeBookFakes } from '@core/recipe-book/testing/recipe-book-test-doubles';
 import { RecipeBook } from './recipe-book';
 
 const emptyCatalog: RecipeBookCatalog = {
@@ -25,6 +26,7 @@ describe('RecipeBook (hub)', () => {
     TestBed.configureTestingModule({
       imports: [RecipeBook],
       providers: [
+        ...makeRecipeBookFakes().providers, // repos + EventBus para la lista de insumos embebida
         { provide: ListRecipeBook, useClass: ListRecipeBookStub },
         { provide: MigoDialog, useValue: dialog },
         { provide: MigoDialogRef, useValue: { close: () => {} } },

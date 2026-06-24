@@ -42,6 +42,11 @@ describe('Card', () => {
     fixture.detectChanges();
     expect(card.classList).toContain('border-border-subtle');
     expect(card.classList).not.toContain('shadow-lg');
+    // Warm → papel cálido (hoja del libro), sin sombra.
+    fixture.componentInstance.variant.set('warm');
+    fixture.detectChanges();
+    expect(card.classList).toContain('bg-surface-warm');
+    expect(card.classList).not.toContain('shadow-lg');
   });
 
   it('renders the projected header, body and footer parts', () => {

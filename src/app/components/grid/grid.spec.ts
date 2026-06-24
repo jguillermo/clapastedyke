@@ -66,3 +66,29 @@ describe('Grid (spreadsheet shell)', () => {
     expect(deleteButtons.length).toBe(2);
   });
 });
+
+@Component({
+  imports: [Grid],
+  template: `
+    <migo-grid [columns]="columns" [rows]="rows" [removable]="false">
+      <ng-template let-r="rowIndex" let-c="colIndex">
+        <input [attr.data-cell]="r + '-' + c" />
+      </ng-template>
+    </migo-grid>
+  `,
+})
+class HostNoRemove {
+  readonly columns: GridColumn[] = [{ label: 'Ingrediente' }, { label: 'Cantidad' }];
+  readonly rows = [0, 1, 2];
+}
+
+describe('Grid · removable=false', () => {
+  it('hides the actions column entirely', () => {
+    const fixture = TestBed.createComponent(HostNoRemove);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelectorAll('button[aria-label="Quitar fila"]').length).toBe(0);
+    // Solo las dos columnas de datos, sin la cabecera de acciones.
+    expect(el.querySelectorAll('[role="columnheader"]').length).toBe(2);
+  });
+});
