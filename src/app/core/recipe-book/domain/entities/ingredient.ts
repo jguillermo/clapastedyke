@@ -67,6 +67,14 @@ export class Ingredient extends AggregateRoot {
         return new Ingredient(data);
     }
 
+    /** Renames the ingredient; returns a new instance keeping the same identity. */
+    renamedTo(newName: string): Ingredient {
+        if (!newName.trim()) {
+            throw new Error('Ingredient name is required');
+        }
+        return new Ingredient({ ...this.data(), name: newName.trim() });
+    }
+
     /** Changes the purchase price; returns a new instance and records the change. */
     repricedTo(newPrice: PurchasePrice): Ingredient {
         if (newPrice.per.unit !== this.baseUnit) {

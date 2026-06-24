@@ -19,6 +19,14 @@ export function formatQuantity(value: number, unit: BaseUnit): string {
   return unit === 'u' ? `${value} u` : formatWeight(value);
 }
 
+/**
+ * Formatea un precio con símbolo. Entero → sin decimales (`S/ 12`); con decimales
+ * → 2 cifras (`S/ 12.50`). No añade ceros a la derecha a los enteros.
+ */
+export function formatMoney(amount: number): string {
+  return `S/ ${Number.isInteger(amount) ? amount : amount.toFixed(2)}`;
+}
+
 /** Chips de características de un queque (sabor, peso, tamaño, porciones). */
 export function spongeChips(s: SpongeRecipe): string[] {
   const chips: string[] = [];

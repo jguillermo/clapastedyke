@@ -181,7 +181,13 @@ function paintChips(
   return cy + h;
 }
 
-/** Dibuja una tabla rayada (cabecera + filas), devolviendo la `y` siguiente. */
+/**
+ * Dibuja una tabla rayada (cabecera + filas), devolviendo la `y` siguiente.
+ *
+ * Maquetación tipo "celdas invisibles": la 1ª columna va a la izquierda (nombre);
+ * las demás se alinean a la derecha sobre **anclas equiespaciadas** para que queden
+ * bien separadas (p. ej. Insumo · Cantidad · Precio), no apretadas al borde.
+ */
 function paintTable(
   ctx: CanvasRenderingContext2D,
   columns: string[],
@@ -191,40 +197,85 @@ function paintTable(
   right: number,
 ): number {
   const rowH = 64;
-  // La última columna se alinea a la derecha (cantidad/coste); el resto a la izq.
-  const lastX = right;
+  const w = right - x;
+  const anchors = columnAnchors(columns.length, x, right);
+  // El nombre (col 0) no invade la 2ª columna: deja aire antes de su zona.
+  const nameMax = columns.length > 2 ? anchors[1] - x - w * 0.2 : right - x - 24;
+
   // Cabecera.
   ctx.fillStyle = MUTED;
   ctx.font = `bold 30px ${FONT_SANS}`;
   ctx.fillText(columns[0]?.toUpperCase() ?? '', x, y);
-  if (columns.length > 1) {
-    ctx.textAlign = 'right';
-    ctx.fillText(columns[columns.length - 1].toUpperCase(), lastX, y);
-    ctx.textAlign = 'left';
+  ctx.textAlign = 'right';
+  for (let c = 1; c < columns.length; c++) {
+    ctx.fillText(columns[c].toUpperCase(), anchors[c], y);
   }
+  ctx.textAlign = 'left';
   y += 20;
   rule(ctx, x, y, right - x, COLOR.ruled, 2);
   y += rowH * 0.55;
 
   // Filas.
-  ctx.font = `40px ${FONT_SERIF}`;
   for (const row of rows) {
     ctx.fillStyle = COLOR.body;
-    const name = row.cells[0] ?? '';
-    ctx.fillText(ellipsize(ctx, name, (right - x) * 0.62), x, y);
-    if (row.cells.length > 1) {
-      ctx.textAlign = 'right';
-      ctx.fillStyle = COLOR.heading;
-      ctx.font = `bold 40px ${FONT_SERIF}`;
-      ctx.fillText(row.cells[row.cells.length - 1], lastX, y);
-      ctx.font = `40px ${FONT_SERIF}`;
-      ctx.textAlign = 'left';
+    ctx.font = `40px ${FONT_SERIF}`;
+    ctx.fillText(ellipsize(ctx, row.cells[0] ?? '', nameMax), x, y);
+    ctx.textAlign = 'right';
+    for (let c = 1; c < columns.length; c++) {
+      const last = c === columns.length - 1;
+      const cell = row.cells[c] ?? '';
+      const price = last ? /^S\/\s*(.+)$/.exec(cell) : null;
+      if (price) {
+        drawPrice(ctx, price[1], anchors[c], y);
+      } else {
+        // Columna del medio (cantidad): normal; última no-precio: en negrita.
+        ctx.fillStyle = last ? COLOR.heading : COLOR.body;
+        ctx.font = `${last ? 'bold ' : ''}40px ${FONT_SERIF}`;
+        ctx.fillText(cell, anchors[c], y);
+      }
     }
+    ctx.textAlign = 'left';
     y += rowH * 0.4;
     rule(ctx, x, y, right - x, COLOR.ruled, 1);
     y += rowH * 0.6;
   }
   return y;
+}
+
+/**
+ * Anclas X (alineadas a la derecha) por columna. La 0 es la izquierda (`x`).
+ * Con 3 columnas, cantidad y precio se **agrupan a la derecha** (no repartidas a
+ * lo ancho) para que se lean juntas y el nombre tenga espacio. `ctx` right-align
+ * + precio a 2 decimales hace que los puntos decimales queden al mismo nivel.
+ */
+function columnAnchors(count: number, x: number, right: number): number[] {
+  const w = right - x;
+  if (count <= 2) {
+    return [x, right];
+  }
+  if (count === 3) {
+    return [x, x + w * 0.74, right];
+  }
+  const anchors = [x];
+  for (let c = 1; c < count; c++) {
+    anchors.push(x + (w * c) / (count - 1));
+  }
+  return anchors;
+}
+
+/**
+ * Dibuja un precio right-aligned: el **monto** en serif negrita (color cabecera)
+ * y el símbolo `S/` más fino, pequeño y apagado a su izquierda, para que no se
+ * sature. Asume `ctx.textAlign = 'right'`.
+ */
+function drawPrice(ctx: CanvasRenderingContext2D, amount: string, anchorRight: number, y: number): void {
+  ctx.fillStyle = COLOR.heading;
+  ctx.font = `bold 40px ${FONT_SERIF}`;
+  ctx.fillText(amount, anchorRight, y);
+  const amountW = ctx.measureText(amount).width;
+  ctx.fillStyle = MUTED;
+  ctx.font = `300 28px ${FONT_SANS}`;
+  ctx.fillText('S/', anchorRight - amountW - 12, y);
 }
 
 // ---------- utilidades de dibujo ----------

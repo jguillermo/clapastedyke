@@ -83,7 +83,7 @@ en plantillas — todo icono va por `migo-icon`. Las clases de animación (`opac
 
 ## Card
 
-`migo-card` — `variant`: `elevated` \| `outlined` \| `filled` · `elevation`: `sm` \| `md` \| `lg`
+`migo-card` — `variant`: `elevated` \| `outlined` \| `filled` \| `warm` (papel cálido, hoja del libro) · `elevation`: `sm` \| `md` \| `lg`
 (solo elevated) · `interactive` · `fill`. Partes: `migo-card-header` (slots `[card-icon]`,
 `[card-actions]`), `migo-card-title`, `migo-card-subtitle`, `migo-card-body`, `migo-card-footer`.
 
@@ -143,14 +143,15 @@ el componente no interpreta ni convierte. Inputs: `unit` · `placeholder` · `ar
 ```
 
 El valor es **solo el número**; teclear `k`/`g`/`u` no escribe la letra, emite `unitToken` para que
-el consumidor fije la unidad. Variante `seamless` (sin borde) para celdas de grilla.
+el consumidor fije la unidad. Variante `seamless` (sin borde) para celdas de grilla; variante
+`paper` (renglón inferior + realce cálido `surface-warm`) para integrarse a una hoja del libro.
 
 ## Autocomplete
 
 `migo-autocomplete` — texto con **completado fantasma en línea**: al escribir, el resto de la primera
 sugerencia que coincide aparece tenue dentro del campo; se acepta con Tab / → / Enter. Sin overlay.
 `ControlValueAccessor`. Inputs: `suggestions` (string[]) · `placeholder` · `ariaLabel` · `invalid` ·
-`disabled` · `seamless`.
+`disabled` · `seamless` · `paper` (renglón + realce cálido para una hoja del libro).
 
 ```html
 <migo-autocomplete formControlName="name" [suggestions]="ingredientNames()" placeholder="Harina" />
@@ -206,7 +207,8 @@ teclado (↑/↓/Enter cambian de fila; ←/→ saltan de celda en el borde del 
 fila. Presentacional y agnóstico del editor: el consumidor proyecta una `<ng-template>` que pinta el
 control de cada celda (típicamente `migo-autocomplete`/`migo-unit-input` `seamless`). Datos y lógica
 (fila vacía, validación) los aporta el feature. Inputs: `columns` (`{label, width?}[]`) · `rows` ·
-`protectLastRow` · `ariaLabel`. Output: `removeRow` (índice).
+`protectLastRow` · `removable` (default `true`; `false` oculta la columna de acciones) · `ariaLabel`.
+Output: `removeRow` (índice).
 
 **Mobile-first**: en pantallas estrechas la grilla **scrollea en horizontal** (no se aplasta) — las
 columnas conservan ancho (`min-w-32` las flexibles, `shrink-0` las de ancho fijo).

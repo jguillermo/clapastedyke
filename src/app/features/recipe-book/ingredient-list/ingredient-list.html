@@ -1,0 +1,63 @@
+<div class="flex flex-col gap-3 rounded-lg bg-surface-warm p-3">
+  <p class="m-0 text-caption text-muted">
+    Tus insumos: escribe el nombre, cuánto compras y a qué precio. El último renglón en blanco es
+    para añadir uno nuevo.
+  </p>
+
+  <migo-grid
+    [columns]="columns"
+    [rows]="lineControls()"
+    [removable]="false"
+    ariaLabel="Insumos del libro"
+  >
+    <ng-template let-line let-r="rowIndex" let-c="colIndex">
+      <div [formGroup]="line">
+        @switch (c) {
+          @case (0) {
+            <div class="flex items-center gap-1">
+              <migo-autocomplete
+                class="flex-1"
+                paper
+                formControlName="name"
+                [suggestions]="ingredientNames()"
+                ariaLabel="Nombre del insumo"
+                placeholder="Insumo"
+              />
+              @if (line.controls.id.value && recentlyAddedId() === line.controls.id.value) {
+                <migo-icon
+                  name="mat:check"
+                  color="success"
+                  size="sm"
+                  ariaLabel="Insumo agregado"
+                  class="shrink-0 pe-2"
+                />
+              }
+            </div>
+          }
+          @case (1) {
+            <migo-unit-input
+              paper
+              formControlName="packaging"
+              [unit]="lineUnits()[r]"
+              (unitToken)="setLineUnit(r, $event)"
+              ariaLabel="Empaque: cuánto compras"
+              placeholder="1"
+            />
+          }
+          @case (2) {
+            <migo-currency-input
+              paper
+              formControlName="price"
+              ariaLabel="Precio de compra"
+              placeholder="0.00"
+            />
+          }
+        }
+      </div>
+    </ng-template>
+  </migo-grid>
+
+  @if (errorMessage()) {
+    <p class="m-0 text-caption font-medium text-error" role="alert">{{ errorMessage() }}</p>
+  }
+</div>

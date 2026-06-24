@@ -19,6 +19,11 @@ export type PageKind = 'cover' | 'section' | 'index' | 'recipe' | 'blank';
 /** Contenido de UNA cara de página, listo para pintar. Texto ya formateado. */
 export interface PageContent {
   readonly kind: PageKind;
+  /**
+   * Etiqueta opaca de sección a la que pertenece la página (la fija y la lee el
+   * feature; la plataforma no la interpreta). Permite al HUD saber qué editar.
+   */
+  readonly section?: string;
   /** Título principal (portada, sección, nombre de receta…). */
   readonly title?: string;
   /** Subtítulo / bajada (autor, tipo de sección, sabor…). */

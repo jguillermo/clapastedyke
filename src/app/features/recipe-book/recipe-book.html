@@ -1,4 +1,4 @@
-<migo-card fill>
+<migo-card fill variant="warm">
   <migo-card-header>
     <migo-icon card-icon name="mat:layers" size="lg" color="brand" />
     <migo-card-title>Mi libro de recetas</migo-card-title>
@@ -146,43 +146,8 @@
 
       <ng-template migoSwiperSlide label="Insumos">
         <section class="flex flex-col gap-3">
-          @if (ingredients().length === 0) {
-            <div class="flex flex-col items-start gap-3">
-              <p class="m-0 max-w-reading text-muted">
-                Tus insumos: lo que compras para tus recetas, con su precio. Crea uno o se irán
-                guardando solos al usarlos en una receta.
-              </p>
-              <button migo-button variant="secondary" type="button" (click)="createIngredient()">
-                <migo-icon icon-leading name="mat:add" size="sm" />
-                Nuevo insumo
-              </button>
-            </div>
-          } @else {
-            <ul class="flex flex-col gap-2 m-0 p-0 list-none">
-              @for (ingredient of ingredients(); track ingredient.id) {
-                <li>
-                  <button
-                    type="button"
-                    class="flex flex-wrap items-center justify-between gap-3 w-full min-h-11 px-4 py-3 rounded-lg bg-surface-sunken text-start cursor-pointer transition duration-base ease-out hover:bg-surface-card hover:border-border-subtle border border-transparent focus-visible:outline-none focus-visible:shadow-focus motion-reduce:transition-none"
-                    (click)="openIngredient(ingredient.id)"
-                  >
-                    <span class="flex flex-col">
-                      <span class="font-body font-semibold text-body">{{ ingredient.name }}</span>
-                      <span class="text-caption text-muted">{{ ingredient.usageLabel }}</span>
-                    </span>
-                    <span class="inline-flex items-center min-h-6 px-2.5 rounded-full bg-surface-card border border-border-subtle text-caption text-body">
-                      {{ ingredient.priceChip }}
-                    </span>
-                  </button>
-                </li>
-              }
-            </ul>
-            <div>
-              <button migo-button variant="secondary" type="button" (click)="createIngredient()">
-                <migo-icon icon-leading name="mat:add" size="sm" />
-                Nuevo insumo
-              </button>
-            </div>
+          @if (loaded()) {
+            <app-ingredient-list [ingredients]="ingredientEntities()" (changed)="reload()" />
           }
         </section>
       </ng-template>

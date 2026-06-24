@@ -16,8 +16,16 @@ import { MigoDialog, MigoDialogRef } from '@components/dialog/dialog.service';
 import { ListRecipeBook } from '@core/recipe-book/application/use-cases/list-recipe-book.use-case';
 import { BookEngine, type BookSpread } from '@platform/three/book/book-engine';
 import type { PageContent } from '@platform/three/book/page-content';
-import { RecipeBook } from '../recipe-book';
+import { RecipeBook, type RecipeBookData, type RecipeBookTab } from '../recipe-book';
 import { toPages } from './recipe-page-projector';
+
+/** Sustantivo por sección para el botón "Agregar …". */
+const SECTION_NOUN: Record<RecipeBookTab, string> = {
+  sponges: 'queque',
+  fillings: 'relleno',
+  coverings: 'cobertura',
+  ingredients: 'insumo',
+};
 
 /** Una entrada del índice (salto rápido a una página). */
 interface IndexEntry {
@@ -84,7 +92,7 @@ interface IndexEntry {
             variant="secondary"
             size="md"
             class="shadow-md"
-            [disabled]="!canPrev() || busy()"
+            [disabled]="!canPrev()"
             (click)="prev()"
             aria-label="Página anterior"
           >
@@ -102,7 +110,7 @@ interface IndexEntry {
             variant="secondary"
             size="md"
             class="shadow-md"
-            [disabled]="!canNext() || busy()"
+            [disabled]="!canNext()"
             (click)="next()"
             aria-label="Página siguiente"
           >
@@ -110,15 +118,26 @@ interface IndexEntry {
           </button>
         </div>
 
-        <div class="flex w-full items-center justify-center gap-3">
+        <div class="flex w-full flex-wrap items-center justify-center gap-3">
           <button migo-button variant="ghost" size="md" class="shadow-sm" (click)="toggleIndex()">
             <migo-icon icon-leading name="mat:layers" size="sm" />
             Índice
           </button>
-          <button migo-button variant="primary" size="md" class="shadow-md" (click)="manage()">
-            <migo-icon icon-leading name="mat:edit" size="sm" />
-            Gestionar
-          </button>
+          @if (currentSection(); as sec) {
+            <button migo-button variant="secondary" size="md" class="shadow-md" (click)="editHere(sec)">
+              <migo-icon icon-leading name="mat:edit" size="sm" />
+              Editar
+            </button>
+            <button migo-button variant="primary" size="md" class="shadow-md" (click)="addHere(sec)">
+              <migo-icon icon-leading name="mat:add" size="sm" />
+              {{ addLabel() }}
+            </button>
+          } @else {
+            <button migo-button variant="primary" size="md" class="shadow-md" (click)="manage()">
+              <migo-icon icon-leading name="mat:edit" size="sm" />
+              Gestionar
+            </button>
+          }
         </div>
       </nav>
 
@@ -156,7 +175,6 @@ export class RecipeBook3d implements AfterViewInit, OnDestroy {
   private readonly dialog = inject(MigoDialog);
 
   protected readonly webglSupported = signal(detectWebgl());
-  protected readonly busy = signal(false);
   protected readonly indexOpen = signal(false);
   protected readonly announce = signal('');
 
@@ -166,6 +184,17 @@ export class RecipeBook3d implements AfterViewInit, OnDestroy {
   protected readonly pageLabel = computed(() => {
     const s = this.spread();
     return s?.right?.title ?? s?.left?.title ?? 'Recetario';
+  });
+
+  /** Sección visible en el spread actual (para abrir el editor donde corresponde). */
+  protected readonly currentSection = computed<RecipeBookTab | null>(() => {
+    const s = this.spread();
+    return ((s?.right?.section ?? s?.left?.section) as RecipeBookTab | undefined) ?? null;
+  });
+
+  protected readonly addLabel = computed(() => {
+    const sec = this.currentSection();
+    return sec ? `Agregar ${SECTION_NOUN[sec]}` : '';
   });
 
   private readonly _indexEntries = signal<IndexEntry[]>([]);
@@ -200,22 +229,14 @@ export class RecipeBook3d implements AfterViewInit, OnDestroy {
     this.engine?.dispose();
   }
 
-  protected async next(): Promise<void> {
-    if (!this.engine || this.busy()) {
-      return;
-    }
-    this.busy.set(true);
-    await this.engine.next();
-    this.busy.set(false);
+  // No bloquea: el motor encola los volteos y acelera el que esté en curso, así
+  // pulsar rápido pasa varias hojas seguidas (como un libro real).
+  protected next(): void {
+    this.engine?.next();
   }
 
-  protected async prev(): Promise<void> {
-    if (!this.engine || this.busy()) {
-      return;
-    }
-    this.busy.set(true);
-    await this.engine.prev();
-    this.busy.set(false);
+  protected prev(): void {
+    this.engine?.prev();
   }
 
   protected jump(faceIndex: number): void {
@@ -229,6 +250,16 @@ export class RecipeBook3d implements AfterViewInit, OnDestroy {
 
   protected manage(): void {
     this.openManage(false);
+  }
+
+  /** Editar la sección de la página actual (abre el modal en su pestaña). */
+  protected editHere(section: RecipeBookTab): void {
+    this.openManage(false, { tab: section });
+  }
+
+  /** Agregar en la sección de la página actual (abre el modal listo para crear). */
+  protected addHere(section: RecipeBookTab): void {
+    this.openManage(false, { tab: section, add: true });
   }
 
   protected close(): void {
@@ -279,7 +310,12 @@ export class RecipeBook3d implements AfterViewInit, OnDestroy {
     const catalog = await this.listRecipeBook.execute();
     const pages = toPages(catalog);
     this._indexEntries.set(buildIndex(pages));
+    // Conserva la hoja actual al recargar (p. ej. tras cerrar el editor): no volver al inicio.
+    const keepLeaf = this.engine?.spread.leafIndex ?? 0;
     this.engine?.setPages(pages);
+    if (keepLeaf > 0) {
+      this.engine?.goToLeaf(keepLeaf);
+    }
   }
 
   private onSpread(spread: BookSpread): void {
@@ -288,13 +324,15 @@ export class RecipeBook3d implements AfterViewInit, OnDestroy {
   }
 
   /** Abre el hub DOM (CRUD). Si `asFallback`, al cerrarlo se sale de la experiencia. */
-  private openManage(asFallback: boolean): void {
+  private openManage(asFallback: boolean, data?: RecipeBookData): void {
     if (this.dialogRef) {
       return;
     }
-    this.dialogRef = this.dialog.open<unknown, undefined, RecipeBook>(RecipeBook, {
+    // Modal responsivo normal: tarjeta centrada en desktop, pantalla completa en móvil.
+    this.dialogRef = this.dialog.open<unknown, RecipeBookData, RecipeBook>(RecipeBook, {
       ariaLabel: 'Mi libro de recetas',
       width: '560px',
+      data,
     });
     this.dialogRef.closed.subscribe(() => {
       this.dialogRef = null;
@@ -313,7 +351,8 @@ function buildIndex(pages: PageContent[]): IndexEntry[] {
   pages.forEach((page, faceIndex) => {
     if (page.kind === 'section') {
       entries.push({ label: page.title ?? '', faceIndex, section: true });
-    } else if (page.kind === 'recipe' && page.title) {
+    } else if (page.kind === 'recipe' && page.title && (page.rows?.length || page.chips?.length)) {
+      // Las hojas vacías de sección (solo título) no entran al índice: ya está su divisor.
       entries.push({ label: page.title, faceIndex, section: false });
     }
   });

@@ -1,12 +1,14 @@
 import type { RecipeBookCatalog } from '@core/recipe-book/application/use-cases/list-recipe-book.use-case';
 import type { Ingredient } from '@core/recipe-book/domain/entities/ingredient';
 import type { IngredientLine } from '@core/recipe-book/domain/value-objects/ingredient-line';
-import type { FillingRecipe } from '@core/recipe-book/domain/entities/filling-recipe';
+import { FillingRecipe } from '@core/recipe-book/domain/entities/filling-recipe';
 import type { CoveringRecipe } from '@core/recipe-book/domain/entities/covering-recipe';
 import type { SpongeRecipe } from '@core/recipe-book/domain/entities/sponge-recipe';
 import type { PageContent } from '@platform/three/book/page-content';
-import { USAGE_LABELS } from '../_shared/ingredient-usage.labels';
-import { formatQuantity, layerChips, spongeChips } from '../_shared/recipe-format';
+import { formatMoney, formatQuantity, layerChips, spongeChips } from '../_shared/recipe-format';
+
+/** Clave de sección del libro (la lee el HUD para abrir el editor donde toca). */
+export type BookSection = 'sponges' | 'fillings' | 'coverings' | 'ingredients';
 
 /**
  * Proyecta el catálogo del libro de recetas a las páginas del libro 3D
@@ -14,7 +16,8 @@ import { formatQuantity, layerChips, spongeChips } from '../_shared/recipe-forma
  * los helpers de formato compartidos; no calcula negocio.
  *
  * Secuencia: portada → divisor + una página por receta de cada sección
- * (Queques, Rellenos, Coberturas, Insumos). Cada página es UNA cara del libro.
+ * (Queques, Rellenos, Coberturas, Insumos). Cada página es UNA cara del libro y
+ * lleva su `section` para que el HUD sepa qué editar/agregar.
  */
 export function toPages(catalog: RecipeBookCatalog): PageContent[] {
   const pages: PageContent[] = [
@@ -45,43 +48,42 @@ export function toPages(catalog: RecipeBookCatalog): PageContent[] {
       cells: [ingredientName(l.ingredientId.value), formatQuantity(l.quantity.value, l.quantity.unit)],
     }));
 
-  // --- Queques ---
-  if (catalog.sponges.length) {
-    pages.push(section('Sección', 'Queques'));
-    for (const s of catalog.sponges) {
-      pages.push(spongePage(s, rowsOf(s.lines), COLUMNS));
-    }
-  }
-
-  // --- Rellenos ---
-  if (catalog.fillings.length) {
-    pages.push(section('Sección', 'Rellenos'));
-    for (const f of catalog.fillings) {
-      pages.push(layerPage(f, rowsOf(f.lines), COLUMNS));
-    }
-  }
-
-  // --- Coberturas ---
-  if (catalog.coverings.length) {
-    pages.push(section('Sección', 'Coberturas'));
-    for (const c of catalog.coverings) {
-      pages.push(layerPage(c, rowsOf(c.lines), COLUMNS));
-    }
-  }
-
-  // --- Insumos ---
-  if (catalog.ingredients.length) {
-    pages.push(section('Sección', 'Insumos'));
-    for (const i of catalog.ingredients) {
-      pages.push(ingredientPage(i));
-    }
-  }
+  // Las 4 secciones SIEMPRE aparecen (estructura fija del libro). Vacías → una hoja
+  // con su título, para poder hojearlas y agregar la primera desde el libro.
+  pushSection(pages, 'Queques', 'sponges', catalog.sponges.map((s) => spongePage(s, rowsOf(s.lines), COLUMNS)));
+  pushSection(pages, 'Rellenos', 'fillings', catalog.fillings.map((f) => layerPage(f, rowsOf(f.lines), COLUMNS)));
+  pushSection(
+    pages,
+    'Coberturas',
+    'coverings',
+    catalog.coverings.map((c) => layerPage(c, rowsOf(c.lines), COLUMNS)),
+  );
+  pushSection(pages, 'Insumos', 'ingredients', ingredientListPages(catalog.ingredients));
 
   return pages;
 }
 
-function section(subtitle: string, title: string): PageContent {
-  return { kind: 'section', subtitle, title };
+/** Añade el divisor de la sección y su contenido (o una hoja vacía con el título). */
+function pushSection(
+  pages: PageContent[],
+  title: string,
+  key: BookSection,
+  content: PageContent[],
+): void {
+  pages.push(section('Sección', title, key));
+  pages.push(...(content.length ? content : [emptyPage(title, key)]));
+}
+
+/** Hoja en blanco de una sección sin contenido: solo el título y una invitación. */
+function emptyPage(title: string, key: BookSection): PageContent {
+  return { kind: 'recipe', section: key, title, subtitle: 'Aún no tienes nada aquí.' };
+}
+
+/** Cuántos insumos caben cómodos en una cara del libro. */
+const INGREDIENTS_PER_PAGE = 12;
+
+function section(subtitle: string, title: string, key: BookSection): PageContent {
+  return { kind: 'section', subtitle, title, section: key };
 }
 
 function spongePage(
@@ -91,6 +93,7 @@ function spongePage(
 ): PageContent {
   return {
     kind: 'recipe',
+    section: 'sponges',
     title: s.name,
     subtitle: s.flavor,
     chips: spongeChips(s),
@@ -107,6 +110,7 @@ function layerPage(
 ): PageContent {
   return {
     kind: 'recipe',
+    section: layer instanceof FillingRecipe ? 'fillings' : 'coverings',
     title: layer.name,
     chips: layerChips(layer),
     columns,
@@ -115,12 +119,30 @@ function layerPage(
   };
 }
 
-function ingredientPage(i: Ingredient): PageContent {
-  const price = i.purchasePrice;
-  return {
-    kind: 'recipe',
-    title: i.name,
-    subtitle: USAGE_LABELS[i.usage],
-    chips: [`S/ ${price.amount} · ${formatQuantity(price.per.value, price.per.unit)}`],
-  };
+/**
+ * Una o más páginas de lista de insumos. Tres columnas bien separadas
+ * (Insumo · Cantidad · Precio) para que se lea como una tabla, no apretado.
+ */
+function ingredientListPages(ingredients: readonly Ingredient[]): PageContent[] {
+  const sorted = [...ingredients].sort((a, b) => a.name.localeCompare(b.name, 'es'));
+  const rows = sorted.map((i) => ({
+    cells: [
+      i.name,
+      formatQuantity(i.purchasePrice.per.value, i.purchasePrice.per.unit),
+      formatMoney(i.purchasePrice.amount),
+    ],
+  }));
+  const pages: PageContent[] = [];
+  for (let start = 0; start < rows.length; start += INGREDIENTS_PER_PAGE) {
+    pages.push({
+      kind: 'recipe',
+      section: 'ingredients',
+      title: 'Insumos',
+      subtitle: start === 0 ? 'Lo que compras, con su precio' : undefined,
+      columns: ['Insumo', 'Cantidad', 'Precio'],
+      rows: rows.slice(start, start + INGREDIENTS_PER_PAGE),
+      footer: `${ingredients.length} insumos`,
+    });
+  }
+  return pages;
 }

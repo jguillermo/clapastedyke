@@ -1,4 +1,12 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import {
+  type AfterViewInit,
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { Button } from '@components/button/button';
 import { Card } from '@components/card/card';
 import { CardBody } from '@components/card/card-body';
@@ -7,7 +15,7 @@ import { CardTitle } from '@components/card/card-title';
 import { Icon } from '@components/icon/icon';
 import { MigoSwiper } from '@components/swiper/swiper';
 import { MigoSwiperSlide } from '@components/swiper/swiper-slide';
-import { MigoDialog, MigoDialogRef } from '@components/dialog/dialog.service';
+import { MigoDialog, MigoDialogRef, MIGO_DIALOG_DATA } from '@components/dialog/dialog.service';
 import { ListRecipeBook, type RecipeBookCatalog } from '@core/recipe-book/application/use-cases/list-recipe-book.use-case';
 import type { SpongeRecipe } from '@core/recipe-book/domain/entities/sponge-recipe';
 import type { FillingRecipe } from '@core/recipe-book/domain/entities/filling-recipe';
@@ -23,10 +31,8 @@ import {
   type RecipeDetailLine,
   type RecipeDetailResult,
 } from './recipe-detail/recipe-detail';
-import { IngredientDetail, type IngredientDetailData, type IngredientDetailResult } from './ingredient-detail/ingredient-detail';
-import { IngredientForm, type IngredientFormData } from './ingredient-form/ingredient-form';
 import type { IngredientOption, InitialLine } from './_shared/ingredient-grid/ingredient-grid';
-import { USAGE_LABELS } from './_shared/ingredient-usage.labels';
+import { IngredientList } from './ingredient-list/ingredient-list';
 import { formatQuantity, formatWeight, layerChips, spongeChips } from './_shared/recipe-format';
 
 interface RecipeView {
@@ -36,30 +42,45 @@ interface RecipeView {
   chips: string[];
 }
 
-interface IngredientView {
-  id: string;
-  name: string;
-  usageLabel: string;
-  priceChip: string;
+/** Pestaña/sección del libro que el hub puede abrir directamente. */
+export type RecipeBookTab = 'sponges' | 'fillings' | 'coverings' | 'ingredients';
+
+/** Datos opcionales al abrir el hub: en qué pestaña entrar y si arrancar "agregar". */
+export interface RecipeBookData {
+  tab?: RecipeBookTab;
+  add?: boolean;
 }
+
+/** Orden de las pestañas en el swiper. */
+const TAB_INDEX: Record<RecipeBookTab, number> = {
+  sponges: 0,
+  fillings: 1,
+  coverings: 2,
+  ingredients: 3,
+};
 
 /**
  * Hub "Mi libro de recetas": contenido de un MigoDialog que abre el mundo 3D al
  * tocar el atril de recetas. Lee el catálogo con `ListRecipeBook` y deja crear,
  * **ver** (ficha de lectura) y **editar** queques ({@link SpongeForm}), rellenos
- * y coberturas ({@link LayerForm}), además de gestionar los **insumos**
- * ({@link IngredientForm}). Inyecta solo use cases.
+ * y coberturas ({@link LayerForm}), además de gestionar los **insumos** como una
+ * lista editable en línea ({@link IngredientList}). Inyecta solo use cases.
  */
 @Component({
   selector: 'app-recipe-book',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Button, Card, CardHeader, CardTitle, CardBody, Icon, MigoSwiper, MigoSwiperSlide],
+  imports: [Button, Card, CardHeader, CardTitle, CardBody, Icon, MigoSwiper, MigoSwiperSlide, IngredientList],
   templateUrl: './recipe-book.html',
 })
-export class RecipeBook {
+export class RecipeBook implements AfterViewInit {
   private readonly listRecipeBook = inject(ListRecipeBook);
   private readonly dialog = inject(MigoDialog);
   protected readonly ref = inject<MigoDialogRef>(MigoDialogRef);
+  /** Pestaña/intención con la que se abrió (p. ej. desde un botón del libro 3D). */
+  private readonly data = inject<RecipeBookData | null>(MIGO_DIALOG_DATA, { optional: true });
+
+  private readonly swiper = viewChild(MigoSwiper);
+  private readonly ingredientList = viewChild(IngredientList);
 
   private readonly catalog = signal<RecipeBookCatalog | null>(null);
 
@@ -78,22 +99,44 @@ export class RecipeBook {
   protected readonly coverings = computed<RecipeView[]>(() =>
     (this.catalog()?.coverings ?? []).map((c) => layerView(c)),
   );
-  protected readonly ingredients = computed<IngredientView[]>(() =>
-    (this.catalog()?.ingredients ?? []).map((i) => ({
-      id: i.id.value,
-      name: i.name,
-      usageLabel: USAGE_LABELS[i.usage],
-      priceChip: `S/ ${i.purchasePrice.amount} · ${formatQuantity(i.purchasePrice.per.value, i.purchasePrice.per.unit)}`,
-    })),
-  );
+  /** Insumos del catálogo (entidades) para la lista editable de la pestaña Insumos. */
+  protected readonly ingredientEntities = computed(() => this.catalog()?.ingredients ?? []);
 
   /** Insumos indexados por id, para resolver las líneas de una receta al verla/editarla. */
   private readonly ingredientsById = computed(
     () => new Map<string, Ingredient>((this.catalog()?.ingredients ?? []).map((i) => [i.id.value, i])),
   );
 
-  constructor() {
-    void this.reload();
+  private readonly ready = this.reload();
+
+  ngAfterViewInit(): void {
+    const tab = this.data?.tab;
+    if (!tab) {
+      return;
+    }
+    // Abre en la pestaña que corresponde a la página del libro desde donde se llamó.
+    setTimeout(() => this.swiper()?.slideTo(TAB_INDEX[tab]));
+    if (this.data?.add) {
+      void this.ready.then(() => this.startAdd(tab));
+    }
+  }
+
+  /** Arranca "agregar" en la sección pedida: forms para recetas, foco al renglón para insumos. */
+  private startAdd(tab: RecipeBookTab): void {
+    switch (tab) {
+      case 'sponges':
+        this.createSponge();
+        break;
+      case 'fillings':
+        this.createFilling();
+        break;
+      case 'coverings':
+        this.createCovering();
+        break;
+      case 'ingredients':
+        setTimeout(() => this.ingredientList()?.focusNew());
+        break;
+    }
   }
 
   // --- Crear ---
@@ -113,14 +156,6 @@ export class RecipeBook {
 
   protected createCovering(): void {
     this.openLayerForm('covering', this.catalog()?.coverings ?? []);
-  }
-
-  protected createIngredient(): void {
-    const dialogRef = this.dialog.open<{ id: string }, IngredientFormData, IngredientForm>(IngredientForm, {
-      ariaLabel: 'Nuevo insumo',
-      width: '560px',
-    });
-    this.reloadOnSave(dialogRef);
   }
 
   // --- Ver (ficha de lectura) → Editar ---
@@ -149,28 +184,6 @@ export class RecipeBook {
     const ref = this.openDetail('covering', covering.name, layerChips(covering), covering.lines);
     ref.closed.subscribe((result) => {
       if (result?.action === 'edit') this.editLayer('covering', covering);
-    });
-  }
-
-  protected openIngredient(id: string): void {
-    const ingredient = (this.catalog()?.ingredients ?? []).find((i) => i.id.value === id);
-    if (!ingredient) return;
-    const data: IngredientDetailData = {
-      name: ingredient.name,
-      usage: ingredient.usage,
-      purchase: {
-        amount: ingredient.purchasePrice.amount,
-        per: { value: ingredient.purchasePrice.per.value, unit: ingredient.purchasePrice.per.unit },
-        currency: ingredient.purchasePrice.currency,
-      },
-    };
-    const ref = this.dialog.open<IngredientDetailResult, IngredientDetailData, IngredientDetail>(IngredientDetail, {
-      data,
-      ariaLabel: ingredient.name,
-      width: '560px',
-    });
-    ref.closed.subscribe((result) => {
-      if (result?.action === 'edit') this.editIngredient(ingredient);
     });
   }
 
@@ -209,26 +222,6 @@ export class RecipeBook {
       lines: this.prefillLines(layer.lines),
     };
     this.openLayerForm(kind, existing, prefill);
-  }
-
-  private editIngredient(ingredient: Ingredient): void {
-    const data: IngredientFormData = {
-      ingredient: {
-        name: ingredient.name,
-        usage: ingredient.usage,
-        purchase: {
-          amount: ingredient.purchasePrice.amount,
-          per: { value: ingredient.purchasePrice.per.value, unit: ingredient.purchasePrice.per.unit },
-          currency: ingredient.purchasePrice.currency,
-        },
-      },
-    };
-    const dialogRef = this.dialog.open<{ id: string }, IngredientFormData, IngredientForm>(IngredientForm, {
-      data,
-      ariaLabel: 'Editar insumo',
-      width: '560px',
-    });
-    this.reloadOnSave(dialogRef);
   }
 
   // --- Helpers ---
@@ -311,7 +304,7 @@ export class RecipeBook {
     });
   }
 
-  private async reload(): Promise<void> {
+  protected async reload(): Promise<void> {
     this.catalog.set(await this.listRecipeBook.execute());
   }
 }

@@ -1,4 +1,5 @@
 import {
+  booleanAttribute,
   ChangeDetectionStrategy,
   Component,
   contentChild,
@@ -51,9 +52,11 @@ export interface GridCellContext {
           {{ col.label }}
         </div>
       }
-      <div role="columnheader" class="w-12 shrink-0 px-2 py-2 border-b border-r border-border-subtle">
-        <span class="sr-only">Acciones</span>
-      </div>
+      @if (removable()) {
+        <div role="columnheader" class="w-12 shrink-0 px-2 py-2 border-b border-r border-border-subtle">
+          <span class="sr-only">Acciones</span>
+        </div>
+      }
     </div>
 
     @if (cell(); as cellTemplate) {
@@ -72,20 +75,22 @@ export interface GridCellContext {
               />
             </div>
           }
-          <div role="gridcell" class="w-12 shrink-0 flex items-center justify-center border-b border-r border-border-subtle">
-            @if (!protectLastRow() || r < rows().length - 1) {
-              <button
-                migo-button
-                variant="ghost"
-                size="sm"
-                type="button"
-                aria-label="Quitar fila"
-                (click)="removeRow.emit(r)"
-              >
-                <migo-icon icon-leading name="mat:close" size="sm" />
-              </button>
-            }
-          </div>
+          @if (removable()) {
+            <div role="gridcell" class="w-12 shrink-0 flex items-center justify-center border-b border-r border-border-subtle">
+              @if (!protectLastRow() || r < rows().length - 1) {
+                <button
+                  migo-button
+                  variant="ghost"
+                  size="sm"
+                  type="button"
+                  aria-label="Quitar fila"
+                  (click)="removeRow.emit(r)"
+                >
+                  <migo-icon icon-leading name="mat:close" size="sm" />
+                </button>
+              }
+            </div>
+          }
         </div>
       }
     }
@@ -108,6 +113,8 @@ export class Grid {
   readonly ariaLabel = input('');
   /** Desactiva eliminar en la última fila (la vacía siempre disponible). */
   readonly protectLastRow = input(true);
+  /** Muestra la columna de acciones (eliminar fila). `false` la oculta por completo. */
+  readonly removable = input(true, { transform: booleanAttribute });
 
   /** Plantilla de celda proyectada por el consumidor. */
   protected readonly cell = contentChild(TemplateRef<GridCellContext>);

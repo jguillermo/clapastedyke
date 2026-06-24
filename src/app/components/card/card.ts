@@ -6,7 +6,7 @@ import {
   input,
 } from '@angular/core';
 
-export type CardVariant = 'elevated' | 'outlined' | 'filled';
+export type CardVariant = 'elevated' | 'outlined' | 'filled' | 'warm';
 export type CardElevation = 'sm' | 'md' | 'lg';
 
 const ELEVATION_SHADOW: Record<CardElevation, string> = {
@@ -66,6 +66,10 @@ export class Card {
         break;
       case 'filled':
         parts.push('bg-surface-sunken');
+        break;
+      case 'warm':
+        // Tono papel cálido: para superficies que imitan la hoja del libro.
+        parts.push('bg-surface-warm');
         break;
       default:
         parts.push('bg-surface-card', ELEVATION_SHADOW[this.elevation()]);

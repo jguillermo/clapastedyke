@@ -58,6 +58,10 @@ export class BookEngine {
   private disposed = false;
   private aspect = 1;
 
+  /** Cola de volteos pendientes (+1 adelante, -1 atrás) y bandera de drenado. */
+  private readonly queue: (1 | -1)[] = [];
+  private draining = false;
+
   constructor(
     private readonly canvas: HTMLCanvasElement,
     private readonly reducedMotion: boolean,
@@ -105,6 +109,7 @@ export class BookEngine {
       faces.push({ kind: 'blank' });
     }
     this.clearTextures();
+    this.queue.length = 0;
     this.faces = faces;
     this.leafIndex = 0;
     this.book.leaf.visible = false;
@@ -131,9 +136,42 @@ export class BookEngine {
     };
   }
 
-  /** Voltea hacia adelante (derecha → izquierda). */
-  async next(): Promise<void> {
-    if (this.turn.animating || this.leafIndex >= this.totalLeaves) {
+  /**
+   * Pide voltear hacia adelante. **No bloquea**: si hay una hoja en curso, la
+   * acelera y encola esta, de modo que pulsar rápido pasa varias hojas seguidas
+   * (como un libro real). Las hojas encadenadas van más rápido.
+   */
+  next(): void {
+    this.enqueue(1);
+  }
+
+  /** Pide voltear hacia atrás (mismo encolado no bloqueante que {@link next}). */
+  prev(): void {
+    this.enqueue(-1);
+  }
+
+  private enqueue(dir: 1 | -1): void {
+    this.queue.push(dir);
+    this.turn.hurry(); // acelera el volteo en curso para encadenar el siguiente
+    if (!this.draining) {
+      void this.drain();
+    }
+  }
+
+  /** Procesa la cola de volteos en serie; acelera si quedan más pendientes. */
+  private async drain(): Promise<void> {
+    this.draining = true;
+    while (this.queue.length > 0) {
+      const dir = this.queue.shift() as 1 | -1;
+      const fast = this.queue.length > 0; // si vienen más, esta hoja va rápido
+      await (dir === 1 ? this.turnForward(fast) : this.turnBackward(fast));
+    }
+    this.draining = false;
+  }
+
+  /** Voltea una hoja hacia adelante (derecha → izquierda). */
+  private async turnForward(fast: boolean): Promise<void> {
+    if (this.leafIndex >= this.totalLeaves) {
       return;
     }
     const k = this.leafIndex;
@@ -144,7 +182,7 @@ export class BookEngine {
     this.setMap(this.book.rightMaterial, this.textureAt(2 * k + 2));
     this.book.leaf.visible = true;
 
-    await this.turn.start(0, 1, 0.95);
+    await this.turn.start(0, 1, fast ? 0.42 : 0.95);
 
     // La hoja aterriza a la izquierda mostrando su cara trasera.
     this.setMap(this.book.leftMaterial, this.textureAt(2 * k + 1));
@@ -153,9 +191,9 @@ export class BookEngine {
     this.emitSpread();
   }
 
-  /** Voltea hacia atrás (izquierda → derecha). */
-  async prev(): Promise<void> {
-    if (this.turn.animating || this.leafIndex <= 0) {
+  /** Voltea una hoja hacia atrás (izquierda → derecha). */
+  private async turnBackward(fast: boolean): Promise<void> {
+    if (this.leafIndex <= 0) {
       return;
     }
     const k = this.leafIndex;
@@ -166,7 +204,7 @@ export class BookEngine {
     this.setMap(this.book.leftMaterial, this.textureAt(2 * k - 3));
     this.book.leaf.visible = true;
 
-    await this.turn.start(1, 0, 0.95);
+    await this.turn.start(1, 0, fast ? 0.42 : 0.95);
 
     // La hoja aterriza a la derecha mostrando su cara frontal.
     this.setMap(this.book.rightMaterial, this.textureAt(2 * k - 2));
@@ -177,6 +215,7 @@ export class BookEngine {
 
   /** Salta sin animación a una hoja (índice de navegación). */
   goToLeaf(index: number): void {
+    this.queue.length = 0; // un salto cancela los volteos encolados
     const clamped = Math.max(0, Math.min(index, this.totalLeaves));
     if (clamped === this.leafIndex || this.turn.animating) {
       return;

@@ -31,6 +31,20 @@ export class PageTurn {
     return this.tween !== null;
   }
 
+  /**
+   * Acelera el volteo en curso para encadenar el siguiente (al pulsar de nuevo
+   * antes de terminar): acorta el remanente a un instante. Como un libro real al
+   * pasar varias hojas seguidas.
+   */
+  hurry(): void {
+    if (this.tween) {
+      const remaining = this.tween.duration - this.tween.elapsed;
+      if (remaining > 0.16) {
+        this.tween.duration = this.tween.elapsed + 0.16;
+      }
+    }
+  }
+
   /** Anima `progress` de `from` a `to`. Resuelve al terminar. */
   start(from: number, to: number, duration = 0.9): Promise<void> {
     this.tween?.resolve();
