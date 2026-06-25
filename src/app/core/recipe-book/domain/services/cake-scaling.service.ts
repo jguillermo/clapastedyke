@@ -2,9 +2,6 @@ import { Injectable } from '@angular/core';
 import { EntityId } from '../../../_common/entity-id';
 import { Quantity } from '../../../_common/quantity';
 import { CakeComposition } from '../entities/cake-composition';
-import { SpongeRecipe } from '../entities/sponge-recipe';
-import { FillingRecipe } from '../entities/filling-recipe';
-import { CoveringRecipe } from '../entities/covering-recipe';
 import { IngredientLine } from '../value-objects/ingredient-line';
 
 /** A single ingredient need after scaling, aggregated across all recipes. */
@@ -13,31 +10,31 @@ export interface ScaledIngredient {
     readonly quantity: Quantity;
 }
 
+/** Una receta a escalar: sus líneas y su peso de referencia (en gramos). */
+export interface ScalableRecipe {
+    readonly lines: readonly IngredientLine[];
+    readonly weight: Quantity;
+}
+
 export interface CakeScalingInput {
     composition: CakeComposition;
-    sponge: SpongeRecipe;
-    filling: FillingRecipe;
-    covering: CoveringRecipe;
+    recipes: ScalableRecipe[];
 }
 
 /**
- * Pure domain service (stateless): scales the three recipes to the cake's
- * target weight and aggregates ingredient needs by ingredientId. It is a
- * service — not a method of CakeComposition — because it needs the sponge,
- * filling and covering loaded, and an aggregate must not load other aggregates.
+ * Pure domain service (stateless): scales each recipe to the cake's target
+ * weight (factor = targetWeight / pesoDeReferencia) and aggregates ingredient
+ * needs by ingredientId. Es un servicio (no un método de la receta) porque
+ * necesita varias recetas y el agregado no carga otros agregados.
  */
 @Injectable({ providedIn: 'root' })
 export class CakeScalingService {
-    scale({ composition, sponge, filling, covering }: CakeScalingInput): ScaledIngredient[] {
-        const factorSponge = composition.targetWeight.ratioTo(sponge.referenceYield.weight);
-        const factorFilling = composition.targetWeight.ratioTo(filling.referenceWeight);
-        const factorCovering = composition.targetWeight.ratioTo(covering.referenceWeight);
-
+    scale({ composition, recipes }: CakeScalingInput): ScaledIngredient[] {
         const totals = new Map<string, ScaledIngredient>();
-        this.accumulate(totals, sponge.lines, factorSponge);
-        this.accumulate(totals, filling.lines, factorFilling);
-        this.accumulate(totals, covering.lines, factorCovering);
-
+        for (const recipe of recipes) {
+            const factor = composition.targetWeight.ratioTo(recipe.weight);
+            this.accumulate(totals, recipe.lines, factor);
+        }
         return [...totals.values()];
     }
 

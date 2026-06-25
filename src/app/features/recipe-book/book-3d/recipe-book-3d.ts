@@ -16,16 +16,8 @@ import { MigoDialog, MigoDialogRef } from '@components/dialog/dialog.service';
 import { ListRecipeBook } from '@core/recipe-book/application/use-cases/list-recipe-book.use-case';
 import { BookEngine, type BookSpread } from '@platform/three/book/book-engine';
 import type { PageContent } from '@platform/three/book/page-content';
-import { RecipeBook, type RecipeBookData, type RecipeBookTab } from '../recipe-book';
-import { toPages } from './recipe-page-projector';
-
-/** Sustantivo por sección para el botón "Agregar …". */
-const SECTION_NOUN: Record<RecipeBookTab, string> = {
-  sponges: 'queque',
-  fillings: 'relleno',
-  coverings: 'cobertura',
-  ingredients: 'insumo',
-};
+import { RecipeBook, type RecipeBookData } from '../recipe-book';
+import { INGREDIENTS_SECTION, toPages } from './recipe-page-projector';
 
 /** Una entrada del índice (salto rápido a una página). */
 interface IndexEntry {
@@ -55,7 +47,14 @@ interface IndexEntry {
   },
   template: `
     @if (webglSupported()) {
-      <canvas #canvas class="block h-full w-full" aria-hidden="true"></canvas>
+      <canvas
+        #canvas
+        class="block h-full w-full touch-none"
+        aria-hidden="true"
+        (pointerdown)="onSwipeStart($event)"
+        (pointerup)="onSwipeEnd($event)"
+        (pointercancel)="onSwipeCancel()"
+      ></canvas>
 
       <!-- Cerrar / volver a la cocina -->
       <button
@@ -118,50 +117,85 @@ interface IndexEntry {
           </button>
         </div>
 
-        <div class="flex w-full flex-wrap items-center justify-center gap-3">
-          <button migo-button variant="ghost" size="md" class="shadow-sm" (click)="toggleIndex()">
+        <div class="flex w-full items-center justify-center gap-3">
+          <button
+            migo-button
+            variant="ghost"
+            size="md"
+            class="shadow-sm"
+            aria-label="Índice"
+            (click)="toggleIndex()"
+          >
             <migo-icon icon-leading name="mat:layers" size="sm" />
-            Índice
+            <span class="hidden sm:inline">Índice</span>
           </button>
           @if (currentSection(); as sec) {
-            <button migo-button variant="secondary" size="md" class="shadow-md" (click)="editHere(sec)">
+            <button
+              migo-button
+              variant="secondary"
+              size="md"
+              class="shadow-md"
+              aria-label="Editar"
+              (click)="editHere(sec)"
+            >
               <migo-icon icon-leading name="mat:edit" size="sm" />
-              Editar
+              <span class="hidden sm:inline">Editar</span>
             </button>
-            <button migo-button variant="primary" size="md" class="shadow-md" (click)="addHere(sec)">
+            <button
+              migo-button
+              variant="primary"
+              size="md"
+              class="shadow-md"
+              [attr.aria-label]="addLabel"
+              (click)="addHere(sec)"
+            >
               <migo-icon icon-leading name="mat:add" size="sm" />
-              {{ addLabel() }}
+              <span class="hidden sm:inline">{{ addLabel }}</span>
             </button>
           } @else {
-            <button migo-button variant="primary" size="md" class="shadow-md" (click)="manage()">
+            <button
+              migo-button
+              variant="primary"
+              size="md"
+              class="shadow-md"
+              aria-label="Gestionar"
+              (click)="manage()"
+            >
               <migo-icon icon-leading name="mat:edit" size="sm" />
-              Gestionar
+              <span class="hidden sm:inline">Gestionar</span>
             </button>
           }
         </div>
       </nav>
 
-      <!-- Índice (salto rápido) -->
+      <!-- Índice: panel lateral izquierdo (full-bleed en móvil, columna fija en sm+) -->
       @if (indexOpen()) {
-        <div
-          class="absolute inset-x-4 bottom-32 mx-auto max-h-96 max-w-md overflow-y-auto rounded-2xl border border-border-subtle bg-surface-card p-3 shadow-lg"
-          role="menu"
+        <nav
+          class="absolute inset-y-0 left-0 z-50 flex w-full sm:w-80 flex-col bg-surface-card border-e border-border-subtle shadow-lg"
           aria-label="Índice de recetas"
         >
-          @for (entry of indexEntries(); track entry.faceIndex) {
-            <button
-              type="button"
-              role="menuitem"
-              class="block min-h-11 w-full rounded-xl px-4 py-2 text-left font-body text-sm hover:bg-surface-sunken focus-visible:shadow-focus focus-visible:outline-none"
-              [class.font-bold]="entry.section"
-              [class.text-heading]="entry.section"
-              [class.text-body]="!entry.section"
-              (click)="jump(entry.faceIndex)"
-            >
-              {{ entry.label }}
+          <div class="flex items-center justify-between gap-3 px-4 py-3 border-b border-border-subtle">
+            <span class="font-display text-heading text-sm">Índice</span>
+            <button migo-button variant="ghost" size="sm" type="button" aria-label="Cerrar índice" (click)="toggleIndex()">
+              <migo-icon icon-leading name="mat:close" size="sm" />
             </button>
-          }
-        </div>
+          </div>
+          <div class="flex-1 overflow-y-auto p-3">
+            @for (entry of indexEntries(); track entry.faceIndex) {
+              @if (entry.section) {
+                <p class="m-0 mt-3 mb-1 px-2 font-display text-heading text-sm first:mt-0">{{ entry.label }}</p>
+              } @else {
+                <button
+                  type="button"
+                  class="block min-h-11 w-full rounded-xl px-4 py-2 text-left font-body text-sm text-body hover:bg-surface-sunken focus-visible:shadow-focus focus-visible:outline-none"
+                  (click)="jump(entry.faceIndex)"
+                >
+                  {{ entry.label }}
+                </button>
+              }
+            }
+          </div>
+        </nav>
       }
     }
   `,
@@ -186,16 +220,17 @@ export class RecipeBook3d implements AfterViewInit, OnDestroy {
     return s?.right?.title ?? s?.left?.title ?? 'Recetario';
   });
 
-  /** Sección visible en el spread actual (para abrir el editor donde corresponde). */
-  protected readonly currentSection = computed<RecipeBookTab | null>(() => {
+  /**
+   * Id de la CATEGORÍA de la página actual (para editar/agregar receta ahí). Es
+   * `null` en la portada y en la sección de Insumos (entonces se ofrece "Gestionar").
+   */
+  protected readonly currentSection = computed<string | null>(() => {
     const s = this.spread();
-    return ((s?.right?.section ?? s?.left?.section) as RecipeBookTab | undefined) ?? null;
+    const section = s?.right?.section ?? s?.left?.section ?? null;
+    return section && section !== INGREDIENTS_SECTION ? section : null;
   });
 
-  protected readonly addLabel = computed(() => {
-    const sec = this.currentSection();
-    return sec ? `Agregar ${SECTION_NOUN[sec]}` : '';
-  });
+  protected readonly addLabel = 'Agregar receta';
 
   private readonly _indexEntries = signal<IndexEntry[]>([]);
   protected readonly indexEntries = this._indexEntries.asReadonly();
@@ -239,8 +274,48 @@ export class RecipeBook3d implements AfterViewInit, OnDestroy {
     this.engine?.prev();
   }
 
+  // --- Navegación sobre la hoja: deslizar (touch/ratón) o clic (ratón) ---
+  private swipeStart: { x: number; y: number } | null = null;
+  /** Distancia mínima horizontal (px) para contar como deslizamiento, no toque/clic. */
+  private static readonly SWIPE_THRESHOLD = 40;
+
+  protected onSwipeStart(event: PointerEvent): void {
+    this.swipeStart = { x: event.clientX, y: event.clientY };
+    // Captura el puntero para recibir el `up` aunque el dedo/cursor salga del canvas.
+    (event.target as Element).setPointerCapture?.(event.pointerId);
+  }
+
+  protected onSwipeEnd(event: PointerEvent): void {
+    const start = this.swipeStart;
+    this.swipeStart = null;
+    if (!start) {
+      return;
+    }
+    const dx = event.clientX - start.x;
+    const dy = event.clientY - start.y;
+    const horizontalSwipe =
+      Math.abs(dx) >= RecipeBook3d.SWIPE_THRESHOLD && Math.abs(dx) > Math.abs(dy);
+
+    if (horizontalSwipe) {
+      // Deslizamiento (touch o arrastre de ratón): izquierda → siguiente, derecha → anterior.
+      dx < 0 ? this.next() : this.prev();
+      return;
+    }
+
+    // Sin deslizamiento: con RATÓN, un clic pasa página según la mitad pulsada
+    // (derecha → siguiente, izquierda → anterior). En touch un toque no hace nada.
+    if (event.pointerType === 'mouse') {
+      const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+      event.clientX > rect.left + rect.width / 2 ? this.next() : this.prev();
+    }
+  }
+
+  protected onSwipeCancel(): void {
+    this.swipeStart = null;
+  }
+
   protected jump(faceIndex: number): void {
-    this.engine?.goToLeaf(Math.ceil(faceIndex / 2));
+    this.engine?.jumpToFace(faceIndex);
     this.indexOpen.set(false);
   }
 
@@ -252,14 +327,14 @@ export class RecipeBook3d implements AfterViewInit, OnDestroy {
     this.openManage(false);
   }
 
-  /** Editar la sección de la página actual (abre el modal en su pestaña). */
-  protected editHere(section: RecipeBookTab): void {
-    this.openManage(false, { tab: section });
+  /** Editar la categoría de la página actual (abre el hub en esa categoría). */
+  protected editHere(categoryId: string): void {
+    this.openManage(false, { categoryId });
   }
 
-  /** Agregar en la sección de la página actual (abre el modal listo para crear). */
-  protected addHere(section: RecipeBookTab): void {
-    this.openManage(false, { tab: section, add: true });
+  /** Agregar receta en la categoría de la página actual (abre el hub listo para crear). */
+  protected addHere(categoryId: string): void {
+    this.openManage(false, { categoryId, add: true });
   }
 
   protected close(): void {
@@ -290,11 +365,11 @@ export class RecipeBook3d implements AfterViewInit, OnDestroy {
         break;
       case 'Home':
         event.preventDefault();
-        this.engine?.goToLeaf(0);
+        this.engine?.home();
         break;
       case 'End':
         event.preventDefault();
-        this.engine?.goToLeaf(Number.MAX_SAFE_INTEGER);
+        this.engine?.end();
         break;
       case 'Escape':
         if (this.indexOpen()) {
@@ -310,11 +385,12 @@ export class RecipeBook3d implements AfterViewInit, OnDestroy {
     const catalog = await this.listRecipeBook.execute();
     const pages = toPages(catalog);
     this._indexEntries.set(buildIndex(pages));
-    // Conserva la hoja actual al recargar (p. ej. tras cerrar el editor): no volver al inicio.
-    const keepLeaf = this.engine?.spread.leafIndex ?? 0;
+    // Conserva la cara actual al recargar (p. ej. tras cerrar el editor): no volver
+    // al inicio. El ancla por cara funciona en ambos modos (spread y single).
+    const keepFace = this.engine?.currentFaceIndex ?? 0;
     this.engine?.setPages(pages);
-    if (keepLeaf > 0) {
-      this.engine?.goToLeaf(keepLeaf);
+    if (keepFace > 0) {
+      this.engine?.jumpToFace(keepFace);
     }
   }
 
@@ -345,10 +421,13 @@ export class RecipeBook3d implements AfterViewInit, OnDestroy {
   }
 }
 
-/** Construye el índice (secciones + recetas) a partir de las páginas. */
+/** Construye el índice (categorías + recetas) a partir de las páginas. Excluye Insumos. */
 function buildIndex(pages: PageContent[]): IndexEntry[] {
   const entries: IndexEntry[] = [];
   pages.forEach((page, faceIndex) => {
+    if (page.section === INGREDIENTS_SECTION) {
+      return; // Insumos nunca va en el índice
+    }
     if (page.kind === 'section') {
       entries.push({ label: page.title ?? '', faceIndex, section: true });
     } else if (page.kind === 'recipe' && page.title && (page.rows?.length || page.chips?.length)) {

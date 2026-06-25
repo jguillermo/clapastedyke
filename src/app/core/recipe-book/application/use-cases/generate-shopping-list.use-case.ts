@@ -3,12 +3,12 @@ import { UseCase } from '../../../_common/use-case';
 import { EntityId } from '../../../_common/entity-id';
 import { EventBus } from '../../../_common/event-bus';
 import { Ingredient } from '../../domain/entities/ingredient';
+import { Recipe } from '../../domain/entities/recipe';
 import { CakeCompositionRepository } from '../../domain/repositories/cake-composition.repository';
-import { SpongeRecipeRepository } from '../../domain/repositories/sponge-recipe.repository';
-import { FillingRecipeRepository } from '../../domain/repositories/filling-recipe.repository';
-import { CoveringRecipeRepository } from '../../domain/repositories/covering-recipe.repository';
+import { RecipeRepository } from '../../domain/repositories/recipe.repository';
+import { RecipeCategoryRepository } from '../../domain/repositories/recipe-category.repository';
 import { IngredientRepository } from '../../domain/repositories/ingredient.repository';
-import { CakeScalingService } from '../../domain/services/cake-scaling.service';
+import { CakeScalingService, ScalableRecipe } from '../../domain/services/cake-scaling.service';
 import { ShoppingListBuilder } from '../../domain/services/shopping-list-builder.service';
 import { ShoppingCategory } from '../../domain/services/shopping-list';
 import { RecipeBookEvents } from '../../domain/events/recipe-book-events';
@@ -41,9 +41,8 @@ export interface ShoppingListView {
 @Injectable({ providedIn: 'root' })
 export class GenerateShoppingList extends UseCase<GenerateShoppingListRequest, ShoppingListView> {
     private readonly compositions = inject(CakeCompositionRepository);
-    private readonly sponges = inject(SpongeRecipeRepository);
-    private readonly fillings = inject(FillingRecipeRepository);
-    private readonly coverings = inject(CoveringRecipeRepository);
+    private readonly recipes = inject(RecipeRepository);
+    private readonly categories = inject(RecipeCategoryRepository);
     private readonly ingredients = inject(IngredientRepository);
     private readonly scaling = inject(CakeScalingService);
     private readonly builder = inject(ShoppingListBuilder);
@@ -55,16 +54,17 @@ export class GenerateShoppingList extends UseCase<GenerateShoppingListRequest, S
             throw new Error(`Cake composition ${compositionId} does not exist`);
         }
 
-        const sponge = await this.sponges.byId(composition.spongeRecipeId);
-        const filling = await this.fillings.byId(composition.fillingRecipeId);
-        const covering = await this.coverings.byId(composition.coveringRecipeId);
+        const sponge = await this.recipes.byId(composition.spongeRecipeId);
+        const filling = await this.recipes.byId(composition.fillingRecipeId);
+        const covering = await this.recipes.byId(composition.coveringRecipeId);
         const box = await this.ingredients.byId(composition.suggestedBoxId);
         const base = await this.ingredients.byId(composition.suggestedBaseId);
         if (!sponge || !filling || !covering || !box || !base) {
             throw new Error('Composition is incomplete: a referenced recipe or packaging ingredient is missing');
         }
 
-        const scaled = this.scaling.scale({ composition, sponge, filling, covering });
+        const scalable = await Promise.all([sponge, filling, covering].map((r) => this.toScalable(r)));
+        const scaled = this.scaling.scale({ composition, recipes: scalable });
         const ingredients = await this.loadIngredients(scaled.map((s) => s.ingredientId));
         const topper = composition.topperId ? await this.ingredients.byId(composition.topperId) : null;
 
@@ -85,5 +85,16 @@ export class GenerateShoppingList extends UseCase<GenerateShoppingListRequest, S
     private async loadIngredients(ids: EntityId[]): Promise<Ingredient[]> {
         const loaded = await Promise.all(ids.map((id) => this.ingredients.byId(id)));
         return loaded.filter((i): i is Ingredient => i !== null);
+    }
+
+    /** Resuelve el peso de escalado de una receta desde la propiedad de peso de su categoría. */
+    private async toScalable(recipe: Recipe): Promise<ScalableRecipe> {
+        const category = await this.categories.byId(recipe.categoryId);
+        const weightProperty = category?.weightProperty();
+        const weight = weightProperty ? recipe.weightFor(weightProperty.id) : undefined;
+        if (!weight) {
+            throw new Error(`Recipe "${recipe.name}" has no scaling weight`);
+        }
+        return { lines: recipe.lines, weight };
     }
 }

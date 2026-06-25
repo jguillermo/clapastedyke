@@ -4,17 +4,18 @@ import { BaseUnit, Quantity } from '../../_common/quantity';
 import { DomainEvent } from '../../_common/domain-event';
 import { EventBus, EventHandler } from '../../_common/event-bus';
 import { Ingredient } from '../domain/entities/ingredient';
-import { SpongeRecipe } from '../domain/entities/sponge-recipe';
-import { FillingRecipe } from '../domain/entities/filling-recipe';
-import { CoveringRecipe } from '../domain/entities/covering-recipe';
+import { Recipe } from '../domain/entities/recipe';
+import { RecipeCategory } from '../domain/entities/recipe-category';
 import { PackagingRule } from '../domain/entities/packaging-rule';
 import { CakeComposition } from '../domain/entities/cake-composition';
 import { PurchasePrice } from '../domain/value-objects/purchase-price';
 import { IngredientUsage } from '../domain/value-objects/ingredient-usage';
+import { IngredientLine } from '../domain/value-objects/ingredient-line';
+import { RecipeProperty } from '../domain/value-objects/recipe-property';
+import { RecipePropertyValue } from '../domain/value-objects/recipe-property-value';
 import { IngredientRepository } from '../domain/repositories/ingredient.repository';
-import { SpongeRecipeRepository } from '../domain/repositories/sponge-recipe.repository';
-import { FillingRecipeRepository } from '../domain/repositories/filling-recipe.repository';
-import { CoveringRecipeRepository } from '../domain/repositories/covering-recipe.repository';
+import { RecipeRepository } from '../domain/repositories/recipe.repository';
+import { RecipeCategoryRepository } from '../domain/repositories/recipe-category.repository';
 import { PackagingRuleRepository } from '../domain/repositories/packaging-rule.repository';
 import { CakeCompositionRepository } from '../domain/repositories/cake-composition.repository';
 import {
@@ -60,30 +61,30 @@ class InMemoryIngredientRepository extends IngredientRepository {
     all = async () => this.store.all();
 }
 
-class InMemorySpongeRecipeRepository extends SpongeRecipeRepository {
-    private readonly store = new Store<SpongeRecipe>('SP');
+class InMemoryRecipeCategoryRepository extends RecipeCategoryRepository {
+    private readonly store = new Store<RecipeCategory>('CAT');
     nextIdentity = () => this.store.next();
     byId = async (id: EntityId) => this.store.byId(id);
-    byName = async (name: string) => this.store.byName(name, (r) => r.name);
-    save = async (r: SpongeRecipe) => this.store.save(r);
+    byName = async (name: string) => this.store.byName(name, (c) => c.name);
+    save = async (c: RecipeCategory) => this.store.save(c);
     all = async () => this.store.all();
 }
 
-class InMemoryFillingRecipeRepository extends FillingRecipeRepository {
-    private readonly store = new Store<FillingRecipe>('FL');
+class InMemoryRecipeRepository extends RecipeRepository {
+    private readonly store = new Store<Recipe>('RE');
     nextIdentity = () => this.store.next();
     byId = async (id: EntityId) => this.store.byId(id);
-    byName = async (name: string) => this.store.byName(name, (r) => r.name);
-    save = async (r: FillingRecipe) => this.store.save(r);
-    all = async () => this.store.all();
-}
-
-class InMemoryCoveringRecipeRepository extends CoveringRecipeRepository {
-    private readonly store = new Store<CoveringRecipe>('CV');
-    nextIdentity = () => this.store.next();
-    byId = async (id: EntityId) => this.store.byId(id);
-    byName = async (name: string) => this.store.byName(name, (r) => r.name);
-    save = async (r: CoveringRecipe) => this.store.save(r);
+    byNameInCategory = async (categoryId: EntityId, name: string) => {
+        const target = name.trim().toLowerCase();
+        return (
+            this.store
+                .all()
+                .find((r) => r.categoryId.equals(categoryId) && r.name.toLowerCase() === target) ?? null
+        );
+    };
+    byCategory = async (categoryId: EntityId) =>
+        this.store.all().filter((r) => r.categoryId.equals(categoryId));
+    save = async (r: Recipe) => this.store.save(r);
     all = async () => this.store.all();
 }
 
@@ -130,9 +131,8 @@ export class RecordingEventBus extends EventBus {
 /** The aggregate repository bindings to in-memory doubles (no EventBus). */
 export const recipeBookRepositoryProviders: Provider[] = [
     { provide: IngredientRepository, useClass: InMemoryIngredientRepository },
-    { provide: SpongeRecipeRepository, useClass: InMemorySpongeRecipeRepository },
-    { provide: FillingRecipeRepository, useClass: InMemoryFillingRecipeRepository },
-    { provide: CoveringRecipeRepository, useClass: InMemoryCoveringRecipeRepository },
+    { provide: RecipeRepository, useClass: InMemoryRecipeRepository },
+    { provide: RecipeCategoryRepository, useClass: InMemoryRecipeCategoryRepository },
     { provide: PackagingRuleRepository, useClass: InMemoryPackagingRuleRepository },
     { provide: CakeCompositionRepository, useClass: InMemoryCakeCompositionRepository },
     { provide: IngredientPriceHistoryRepository, useClass: InMemoryIngredientPriceHistoryRepository },
@@ -153,6 +153,34 @@ export function makeRecipeBookFakes(): RecipeBookFakes {
 /** Test helper: a purchase-price request literal for SaveIngredient. */
 export function aPurchase(unit: BaseUnit = 'g', amount = 5): { amount: number; per: { value: number; unit: BaseUnit } } {
     return { amount, per: { value: unit === 'u' ? 10 : 1000, unit } };
+}
+
+/** Test helper: una categoría con una propiedad de Peso (rol de escalado). */
+export function makeWeightCategory(id: string, name: string, order = 0, system = true): RecipeCategory {
+    return RecipeCategory.create(
+        new EntityId(id),
+        name,
+        order,
+        [RecipeProperty.create(`${id}-peso`, 'Peso', 'weight', true, true, 'scaling-weight')],
+        system,
+    );
+}
+
+/** Test helper: una receta con un valor de peso (en gramos) y sus líneas. */
+export function makeRecipe(
+    id: string,
+    categoryId: string,
+    name: string,
+    weightGrams: number,
+    lines: IngredientLine[],
+): Recipe {
+    return Recipe.create(
+        new EntityId(id),
+        new EntityId(categoryId),
+        name,
+        [RecipePropertyValue.of(`${categoryId}-peso`, 'weight', Quantity.of(weightGrams, 'g'))],
+        lines,
+    );
 }
 
 /** Test helper: a priced ingredient (uses `restore` to avoid recording events). */

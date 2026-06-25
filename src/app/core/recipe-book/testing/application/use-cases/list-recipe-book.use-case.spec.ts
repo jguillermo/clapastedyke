@@ -11,7 +11,8 @@ describe('ListRecipeBook', () => {
     it('returns an empty catalog when nothing has been saved', async () => {
         const catalog = await TestBed.inject(ListRecipeBook).execute();
         expect(catalog.ingredients).toHaveLength(0);
-        expect(catalog.sponges).toHaveLength(0);
+        expect(catalog.categories).toHaveLength(0);
+        expect(catalog.recipes).toHaveLength(0);
     });
 
     it('returns every saved ingredient, including topper/box/base (told apart by usage)', async () => {

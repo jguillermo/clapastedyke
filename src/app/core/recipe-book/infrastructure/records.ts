@@ -1,5 +1,6 @@
 import { BaseUnit } from '../../_common/quantity';
 import { IngredientUsage } from '../domain/value-objects/ingredient-usage';
+import { PropertyRole, PropertyType } from '../domain/value-objects/recipe-property';
 
 /**
  * Flat storage documents (primitives only) persisted in IndexedDB. They are
@@ -31,22 +32,36 @@ export interface IngredientRecord {
     purchasePrice: PurchasePriceRecord;
 }
 
-export interface SpongeRecipeRecord {
+export interface RecipePropertyRecord {
     id: string;
     name: string;
-    flavor?: string;
-    referenceYield: { weight: QuantityRecord; servings?: number; size?: string };
-    lines: IngredientLineRecord[];
+    type: PropertyType;
+    required: boolean;
+    locked: boolean;
+    role?: PropertyRole;
 }
 
-export interface FillingRecipeRecord {
+export interface RecipeCategoryRecord {
     id: string;
     name: string;
-    referenceWeight: QuantityRecord;
-    lines: IngredientLineRecord[];
+    order: number;
+    system: boolean;
+    properties: RecipePropertyRecord[];
 }
 
-export type CoveringRecipeRecord = FillingRecipeRecord;
+export interface RecipePropertyValueRecord {
+    propertyId: string;
+    type: PropertyType;
+    value: string | number | QuantityRecord;
+}
+
+export interface RecipeRecord {
+    id: string;
+    categoryId: string;
+    name: string;
+    values: RecipePropertyValueRecord[];
+    lines: IngredientLineRecord[];
+}
 
 export interface PackagingRuleRecord {
     id: string;

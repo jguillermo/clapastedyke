@@ -11,9 +11,6 @@ import { Icon } from '@components/icon/icon';
 import { MIGO_DIALOG_DATA, MigoDialogRef } from '@components/dialog/dialog.service';
 import { PreviewRecipeCost } from '@core/recipe-book/application/use-cases/preview-recipe-cost.use-case';
 
-/** Tipo de receta que muestra la ficha (gobierna solo el subtítulo). */
-export type RecipeDetailKind = 'sponge' | 'filling' | 'covering';
-
 /** Una línea de la receta lista para pintar; lleva los datos para calcular su costo. */
 export interface RecipeDetailLine {
   name: string;
@@ -24,7 +21,8 @@ export interface RecipeDetailLine {
 
 /** Datos del diálogo de lectura de una receta. */
 export interface RecipeDetailData {
-  kind: RecipeDetailKind;
+  /** Subtítulo de la ficha (el nombre de la categoría). */
+  subtitle: string;
   name: string;
   chips: string[];
   lines: RecipeDetailLine[];
@@ -34,12 +32,6 @@ export interface RecipeDetailData {
 export interface RecipeDetailResult {
   action: 'edit';
 }
-
-const SUBTITLE: Record<RecipeDetailKind, string> = {
-  sponge: 'Queque',
-  filling: 'Relleno',
-  covering: 'Cobertura',
-};
 
 interface LineView {
   name: string;
@@ -123,7 +115,7 @@ export class RecipeDetail {
   protected readonly data = inject<RecipeDetailData>(MIGO_DIALOG_DATA);
   private readonly previewCost = inject(PreviewRecipeCost);
 
-  protected readonly subtitle = SUBTITLE[this.data.kind];
+  protected readonly subtitle = this.data.subtitle;
   protected readonly total = signal('');
   private readonly costs = signal<string[]>([]);
 

@@ -2,6 +2,7 @@
   <migo-card-header>
     <migo-icon card-icon name="mat:layers" size="lg" color="brand" />
     <migo-card-title>{{ title }}</migo-card-title>
+    <migo-card-subtitle>{{ category.name }}</migo-card-subtitle>
   </migo-card-header>
 
   <migo-card-body>
@@ -13,7 +14,7 @@
         [error]="nameError()"
         [hint]="editing ? 'El nombre no se puede cambiar al editar.' : ''"
       >
-        <migo-input formControlName="name" placeholder="Queque de vainilla" />
+        <migo-input formControlName="name" placeholder="Nombre de la receta" />
       </migo-form-field>
 
       <app-ingredient-grid [ingredients]="ingredientOptions" [initialLines]="initialLines" />
@@ -22,18 +23,20 @@
         <p class="m-0 text-caption font-medium text-error" role="alert">{{ errorMessage() }}</p>
       }
 
-      <div class="flex flex-col gap-2">
-        <span class="font-body text-sm font-semibold text-body">Características</span>
-        <migo-select-tag
-          [types]="charTypes()"
-          [value]="initialChars"
-          (valueChange)="onChars($event)"
-          ariaLabel="Características del queque"
-        />
-        @if (charsError()) {
-          <p class="m-0 text-caption font-medium text-error" role="alert">{{ charsError() }}</p>
-        }
-      </div>
+      @if (hasProperties) {
+        <div class="flex flex-col gap-2">
+          <span class="font-body text-sm font-semibold text-body">Propiedades</span>
+          <migo-select-tag
+            [types]="charTypes()"
+            [value]="initialChars"
+            (valueChange)="onChars($event)"
+            ariaLabel="Propiedades de la receta"
+          />
+          @if (charsError()) {
+            <p class="m-0 text-caption font-medium text-error" role="alert">{{ charsError() }}</p>
+          }
+        </div>
+      }
     </form>
   </migo-card-body>
 

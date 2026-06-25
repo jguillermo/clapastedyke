@@ -1,7 +1,6 @@
 import { BaseUnit } from '@core/_common/quantity';
-import type { SpongeRecipe } from '@core/recipe-book/domain/entities/sponge-recipe';
-import type { FillingRecipe } from '@core/recipe-book/domain/entities/filling-recipe';
-import type { CoveringRecipe } from '@core/recipe-book/domain/entities/covering-recipe';
+import type { Recipe } from '@core/recipe-book/domain/entities/recipe';
+import type { RecipeCategory } from '@core/recipe-book/domain/entities/recipe-category';
 
 /**
  * Helpers de **presentación** del libro de recetas (solo formato, sin cálculo de
@@ -27,17 +26,24 @@ export function formatMoney(amount: number): string {
   return `S/ ${Number.isInteger(amount) ? amount : amount.toFixed(2)}`;
 }
 
-/** Chips de características de un queque (sabor, peso, tamaño, porciones). */
-export function spongeChips(s: SpongeRecipe): string[] {
+/**
+ * Chips de una receta a partir de los valores de las propiedades de su categoría,
+ * en el orden del esquema. Peso → "1 kg"; número → "4 porciones"; texto → su valor.
+ */
+export function recipeChips(recipe: Recipe, category: RecipeCategory): string[] {
   const chips: string[] = [];
-  if (s.flavor) chips.push(s.flavor);
-  chips.push(formatWeight(s.referenceYield.weight.value));
-  if (s.referenceYield.size) chips.push(s.referenceYield.size);
-  if (s.referenceYield.servings) chips.push(`${s.referenceYield.servings} porciones`);
+  for (const property of category.properties) {
+    const value = recipe.valueOf(property.id);
+    if (!value) {
+      continue;
+    }
+    if (property.type === 'weight') {
+      chips.push(formatWeight(value.asWeight().value));
+    } else if (property.type === 'number') {
+      chips.push(`${value.value} ${property.name.toLowerCase()}`);
+    } else {
+      chips.push(String(value.value));
+    }
+  }
   return chips;
-}
-
-/** Chips de una capa (relleno/cobertura): su peso de referencia. */
-export function layerChips(layer: FillingRecipe | CoveringRecipe): string[] {
-  return [`Rinde ${formatWeight(layer.referenceWeight.value)}`];
 }

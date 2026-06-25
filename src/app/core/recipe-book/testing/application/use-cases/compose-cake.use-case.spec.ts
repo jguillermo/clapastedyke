@@ -1,10 +1,18 @@
 import { TestBed } from '@angular/core/testing';
-import { aPurchase, makeRecipeBookFakes, RecordingEventBus } from '../../recipe-book-test-doubles';
+import {
+    aPurchase,
+    makeRecipe,
+    makeRecipeBookFakes,
+    makeWeightCategory,
+    RecordingEventBus,
+} from '../../recipe-book-test-doubles';
+import { EntityId } from '../../../../_common/entity-id';
+import { Quantity } from '../../../../_common/quantity';
 import { EventBus } from '../../../../_common/event-bus';
+import { IngredientLine } from '../../../domain/value-objects/ingredient-line';
+import { RecipeRepository } from '../../../domain/repositories/recipe.repository';
+import { RecipeCategoryRepository } from '../../../domain/repositories/recipe-category.repository';
 import { SaveIngredient } from '../../../application/use-cases/save-ingredient.use-case';
-import { SaveSpongeRecipe } from '../../../application/use-cases/save-sponge-recipe.use-case';
-import { SaveFillingRecipe } from '../../../application/use-cases/save-filling-recipe.use-case';
-import { SaveCoveringRecipe } from '../../../application/use-cases/save-covering-recipe.use-case';
 import { SavePackagingRule } from '../../../application/use-cases/save-packaging-rule.use-case';
 import { ComposeCake } from '../../../application/use-cases/compose-cake.use-case';
 
@@ -14,34 +22,23 @@ interface Seeded {
     coveringId: string;
 }
 
+const CAT = 'cat-test';
+
 async function seedRecipes(): Promise<Seeded> {
     const ing = TestBed.inject(SaveIngredient);
     const flour = (await ing.execute({ name: 'Harina', baseUnit: 'g', usage: 'recipe', purchasePrice: aPurchase('g') })).id;
     const manjar = (await ing.execute({ name: 'Manjar', baseUnit: 'g', usage: 'recipe', purchasePrice: aPurchase('g') })).id;
     const cream = (await ing.execute({ name: 'Chantilly', baseUnit: 'g', usage: 'recipe', purchasePrice: aPurchase('g') })).id;
 
-    const spongeId = (
-        await TestBed.inject(SaveSpongeRecipe).execute({
-            name: 'Vainilla',
-            referenceYield: { weightGrams: 1000 },
-            lines: [{ ingredientId: flour, quantity: 250 }],
-        })
-    ).id;
-    const fillingId = (
-        await TestBed.inject(SaveFillingRecipe).execute({
-            name: 'Manjar blanco',
-            referenceWeightGrams: 1000,
-            lines: [{ ingredientId: manjar, quantity: 300 }],
-        })
-    ).id;
-    const coveringId = (
-        await TestBed.inject(SaveCoveringRecipe).execute({
-            name: 'Cobertura',
-            referenceWeightGrams: 1000,
-            lines: [{ ingredientId: cream, quantity: 200 }],
-        })
-    ).id;
-    return { spongeId, fillingId, coveringId };
+    const categories = TestBed.inject(RecipeCategoryRepository);
+    const recipes = TestBed.inject(RecipeRepository);
+    await categories.save(makeWeightCategory(CAT, 'Queques'));
+
+    const ln = (id: string, value: number) => IngredientLine.of(new EntityId(id), Quantity.of(value, 'g'));
+    await recipes.save(makeRecipe('r-sponge', CAT, 'Vainilla', 1000, [ln(flour, 250)]));
+    await recipes.save(makeRecipe('r-filling', CAT, 'Manjar blanco', 1000, [ln(manjar, 300)]));
+    await recipes.save(makeRecipe('r-covering', CAT, 'Cobertura', 1000, [ln(cream, 200)]));
+    return { spongeId: 'r-sponge', fillingId: 'r-filling', coveringId: 'r-covering' };
 }
 
 describe('ComposeCake', () => {
@@ -52,7 +49,7 @@ describe('ComposeCake', () => {
         bus = TestBed.inject(EventBus) as RecordingEventBus;
     });
 
-    it('throws when no packaging rule covers the target weight (§11.2)', async () => {
+    it('throws when no packaging rule covers the target weight', async () => {
         const { spongeId, fillingId, coveringId } = await seedRecipes();
         await expect(
             TestBed.inject(ComposeCake).execute({ targetWeightGrams: 1000, spongeId, fillingId, coveringId }),

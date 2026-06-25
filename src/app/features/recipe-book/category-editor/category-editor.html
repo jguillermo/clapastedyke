@@ -1,0 +1,74 @@
+<migo-card fill>
+  <migo-card-header>
+    <migo-icon card-icon name="mat:layers" size="lg" color="brand" />
+    <migo-card-title>{{ title }}</migo-card-title>
+    <button card-actions migo-button variant="ghost" type="button" aria-label="Cerrar" (click)="cancel()">
+      <migo-icon icon-leading name="mat:close" size="sm" />
+    </button>
+  </migo-card-header>
+
+  <migo-card-body>
+    <form class="flex flex-col gap-5" [formGroup]="form" (ngSubmit)="save()">
+      <migo-form-field label="Nombre de la categoría" required reserveMessage [error]="nameError">
+        <migo-input formControlName="name" placeholder="Galletas, Pie…" />
+      </migo-form-field>
+
+      <div class="flex flex-col gap-3">
+        <span class="font-body text-sm font-semibold text-body">Propiedades de sus recetas</span>
+        <p class="m-0 text-caption text-muted">
+          Toda receta tiene título e ingredientes. Añade aquí las propiedades extra (sabor, peso…).
+        </p>
+
+        <ul class="flex flex-col gap-3 m-0 p-0 list-none" formArrayName="properties">
+          @for (group of properties.controls; track $index) {
+            <li
+              class="flex flex-wrap items-end gap-3 p-3 rounded-lg bg-surface-sunken border border-border-subtle"
+              [formGroupName]="$index"
+            >
+              <migo-form-field label="Nombre" class="flex-1 min-w-40">
+                <migo-input formControlName="name" placeholder="Sabor, Peso…" />
+              </migo-form-field>
+              <migo-form-field label="Tipo" class="w-32">
+                <migo-select formControlName="type" [options]="typeOptions" ariaLabel="Tipo de propiedad" />
+              </migo-form-field>
+              <div class="flex items-center min-h-11">
+                <migo-checkbox formControlName="required">Obligatoria</migo-checkbox>
+              </div>
+              @if (!group.getRawValue().locked) {
+                <button
+                  migo-button
+                  variant="ghost"
+                  type="button"
+                  aria-label="Quitar propiedad"
+                  (click)="removeProperty($index)"
+                >
+                  <migo-icon icon-leading name="mat:close" size="sm" />
+                </button>
+              } @else {
+                <span class="inline-flex items-center min-h-6 px-2.5 rounded-full bg-surface-card border border-border-subtle text-caption text-muted">
+                  Fija
+                </span>
+              }
+            </li>
+          }
+        </ul>
+
+        <div>
+          <button migo-button variant="secondary" type="button" (click)="addProperty()">
+            <migo-icon icon-leading name="mat:add" size="sm" />
+            Añadir propiedad
+          </button>
+        </div>
+      </div>
+
+      @if (errorMessage()) {
+        <p class="m-0 text-caption font-medium text-error" role="alert">{{ errorMessage() }}</p>
+      }
+    </form>
+  </migo-card-body>
+
+  <migo-card-footer>
+    <button migo-button variant="ghost" type="button" (click)="cancel()">Cancelar</button>
+    <button migo-button type="button" [loading]="saving()" (click)="save()">Guardar categoría</button>
+  </migo-card-footer>
+</migo-card>

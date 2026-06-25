@@ -31,3 +31,14 @@ export function validateServings(value: string): string | null {
 export function validateLabel(value: string): string | null {
   return value.trim() ? null : 'Escribe un valor.';
 }
+
+export function validateNumber(value: string): string | null {
+  return Number.isFinite(Number(value)) && value.trim() !== '' ? null : 'Escribe un número.';
+}
+
+/** Validación de un valor según el tipo de propiedad (para el SelectTag dinámico). */
+export function validateForType(type: 'text' | 'number' | 'weight'): (value: string) => string | null {
+  if (type === 'weight') return validateMass;
+  if (type === 'number') return validateNumber;
+  return validateLabel;
+}
