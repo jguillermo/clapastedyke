@@ -36,8 +36,9 @@ export class RecipePropertyValue {
         if (type === 'number' && typeof value !== 'number') {
             throw new Error(`Property ${propertyId} of type number must hold a number`);
         }
-        if (type === 'text' && typeof value !== 'string') {
-            throw new Error(`Property ${propertyId} of type text must hold a string`);
+        // text / flavor / options guardan el label como string.
+        if ((type === 'text' || type === 'flavor' || type === 'options') && typeof value !== 'string') {
+            throw new Error(`Property ${propertyId} of type ${type} must hold a string`);
         }
         return new RecipePropertyValue({ propertyId, type, value });
     }

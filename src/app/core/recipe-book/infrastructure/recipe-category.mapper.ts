@@ -10,10 +10,12 @@ const propertyToRecord = (p: RecipeProperty): RecipePropertyRecord => ({
     required: p.required,
     locked: p.locked,
     role: p.role,
+    group: p.group,
+    selectable: p.selectable,
 });
 
 const propertyToDomain = (r: RecipePropertyRecord): RecipeProperty =>
-    RecipeProperty.create(r.id, r.name, r.type, r.required, r.locked ?? false, r.role);
+    RecipeProperty.create(r.id, r.name, r.type, r.required, r.locked ?? false, r.role, r.group, r.selectable ?? false);
 
 export const RecipeCategoryMapper = {
     toRecord(category: RecipeCategory): RecipeCategoryRecord {

@@ -10,6 +10,8 @@ const emptyCatalog: RecipeBookCatalog = {
   categories: [],
   recipes: [],
   packagingRules: [],
+  flavors: [],
+  conversionOptions: [],
 };
 
 class ListRecipeBookStub {
@@ -44,19 +46,20 @@ describe('RecipeBook (hub)', () => {
     ) as HTMLButtonElement;
   }
 
-  it('always offers creating a category and the ingredients section', async () => {
+  it('shows the ingredients section and no "create category" action', async () => {
     const { fixture } = setup();
     await fixture.whenStable();
     fixture.detectChanges();
-    expect(fixture.nativeElement.textContent).toContain('Crear categoría');
     expect(fixture.nativeElement.textContent).toContain('Insumos');
+    expect(fixture.nativeElement.textContent).not.toContain('Crear categoría');
   });
 
-  it('opens the category editor when "Crear categoría" is clicked', async () => {
-    const { fixture, dialog } = setup();
+  it('opens the category editor when "Editar categoría" is clicked', async () => {
+    const category = makeWeightCategory('cat-q', 'Queques');
+    const { fixture, dialog } = setup({ ...emptyCatalog, categories: [category] });
     await fixture.whenStable();
     fixture.detectChanges();
-    findButton(fixture, 'Crear categoría').click();
+    findButton(fixture, 'Editar categoría').click();
     expect(dialog.open).toHaveBeenCalledTimes(1);
   });
 

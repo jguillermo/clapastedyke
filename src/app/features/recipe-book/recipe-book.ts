@@ -147,21 +147,11 @@ export class RecipeBook implements AfterViewInit {
   /** Última pestaña "real" (categoría o Insumos) para volver tras la acción "Crear categoría". */
   private lastRealTab = 0;
 
-  /**
-   * La última pestaña es la acción "Crear categoría": al activarla abre el diálogo y
-   * vuelve a la pestaña anterior (se comporta como un botón, no como un panel navegable).
-   */
+  /** Cambia la pestaña visible (categorías + Insumos). El foco sigue a la pestaña. */
   protected onTabChange(index: number): void {
     const categories = this.categoryViews();
     const insumosTab = categories.length;
-    const createTab = categories.length + 1;
-    if (index === createTab) {
-      this.createCategory();
-      setTimeout(() => this.swiper()?.slideTo(this.lastRealTab));
-      return;
-    }
     this.lastRealTab = index;
-    // El foco sigue a la pestaña visible (salvo que luego se cree/edite algo dentro).
     this.focusRecipeId = null;
     if (index === insumosTab) {
       this.focusIngredients = true;
@@ -174,24 +164,29 @@ export class RecipeBook implements AfterViewInit {
 
   // --- Categorías ---
 
-  protected createCategory(): void {
+  protected editCategoryById(id: string): void {
+    const category = this.categoriesById().get(id);
+    if (!category) return;
     const ref = this.dialog.open<{ id: string }, CategoryEditorData, CategoryEditor>(CategoryEditor, {
-      data: {},
-      ariaLabel: 'Nueva categoría',
+      data: { category, ...this.categoryEditorCatalog() },
+      ariaLabel: 'Editar categoría',
       width: '640px',
     });
     this.onCategorySaved(ref);
   }
 
-  protected editCategoryById(id: string): void {
-    const category = this.categoriesById().get(id);
-    if (!category) return;
-    const ref = this.dialog.open<{ id: string }, CategoryEditorData, CategoryEditor>(CategoryEditor, {
-      data: { category },
-      ariaLabel: 'Editar categoría',
-      width: '640px',
-    });
-    this.onCategorySaved(ref);
+  /** Catálogos (sabores + opciones de conversión) en forma plana para el editor de categoría. */
+  private categoryEditorCatalog(): Omit<CategoryEditorData, 'category'> {
+    const catalog = this.catalog();
+    return {
+      flavors: (catalog?.flavors ?? []).map((f) => ({ id: f.id.value, label: f.label })),
+      conversionOptions: (catalog?.conversionOptions ?? []).map((o) => ({
+        id: o.id.value,
+        group: o.group,
+        label: o.label,
+        factor: o.factor,
+      })),
+    };
   }
 
   // --- Recetas ---
@@ -348,12 +343,29 @@ export class RecipeBook implements AfterViewInit {
     return values;
   }
 
-  /** Sugerencias por propiedad: valores ya usados por otras recetas de la categoría. */
+  /**
+   * Opciones/sugerencias por propiedad para el formulario. Para propiedades de
+   * catálogo (`flavor` → sabores; `options` → opciones de conversión del grupo) se
+   * siembran los labels del catálogo (esto restaura los sabores/tamaños/moldes
+   * predefinidos al crear una receta); se añaden además los valores ya usados.
+   */
   private valuesByProp(category: RecipeCategory): Record<string, string[]> {
     const result: Record<string, string[]> = {};
     const recipes = this.recipesOf(category);
+    const catalog = this.catalog();
     for (const property of category.properties) {
       const set = new Set<string>();
+      if (property.type === 'flavor') {
+        for (const flavor of catalog?.flavors ?? []) {
+          set.add(flavor.label);
+        }
+      } else if (property.type === 'options' && property.group) {
+        for (const option of catalog?.conversionOptions ?? []) {
+          if (option.group === property.group) {
+            set.add(option.label);
+          }
+        }
+      }
       for (const recipe of recipes) {
         const value = recipe.valueOf(property.id);
         if (value) {

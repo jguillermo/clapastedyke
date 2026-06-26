@@ -3,7 +3,7 @@ import { UseCase } from '../../../_common/use-case';
 import { EntityId } from '../../../_common/entity-id';
 import { EventBus } from '../../../_common/event-bus';
 import { RecipeCategory } from '../../domain/entities/recipe-category';
-import { RecipeProperty, PropertyType } from '../../domain/value-objects/recipe-property';
+import { RecipeProperty, PropertyRole, PropertyType } from '../../domain/value-objects/recipe-property';
 import { RecipeCategoryRepository } from '../../domain/repositories/recipe-category.repository';
 import { RecipeBookEvents } from '../../domain/events/recipe-book-events';
 
@@ -12,6 +12,10 @@ export interface RecipePropertyInput {
     name: string;
     type: PropertyType;
     required: boolean;
+    /** Grupo del catálogo de conversión (solo para propiedades de tipo `options`). */
+    group?: string;
+    /** Se muestra al seleccionar la receta (visible al elegir tamaño). */
+    selectable?: boolean;
 }
 
 export interface SaveRecipeCategoryRequest {
@@ -51,6 +55,7 @@ export class SaveRecipeCategory extends UseCase<SaveRecipeCategoryRequest, { id:
             order,
             properties.map((p) => this.toProperty(p)),
         );
+        // (create) las propiedades nuevas no tienen prior: rol nunca, grupo desde el input.
         await this.categories.save(category);
         await this.bus.publish([RecipeBookEvents.recipeCategorySaved(newId.value, true)]);
         return { id: newId.value };
@@ -71,7 +76,9 @@ export class SaveRecipeCategory extends UseCase<SaveRecipeCategoryRequest, { id:
             if (prior?.locked) {
                 return prior; // bloqueada: intacta
             }
-            return this.toProperty(input, prior?.type);
+            // Conserva el tipo/rol/grupo de la propiedad previa (el editor no los cambia); solo
+            // puede cambiar la visibilidad (`selectable`).
+            return this.toProperty(input, prior?.type, prior?.role, prior?.group, prior?.selectable);
         });
         const category = existing.redefine(name, merged);
         await this.categories.save(category);
@@ -79,12 +86,25 @@ export class SaveRecipeCategory extends UseCase<SaveRecipeCategoryRequest, { id:
         return { id };
     }
 
-    private toProperty(input: RecipePropertyInput, fixedType?: PropertyType): RecipeProperty {
+    private toProperty(
+        input: RecipePropertyInput,
+        fixedType?: PropertyType,
+        role?: PropertyRole,
+        priorGroup?: string,
+        priorSelectable?: boolean,
+    ): RecipeProperty {
+        const type = fixedType ?? input.type;
+        const group = type === 'options' ? (input.group ?? priorGroup) : undefined;
+        const selectable = input.selectable ?? priorSelectable ?? true;
         return RecipeProperty.create(
             input.id ?? crypto.randomUUID(),
             input.name,
-            fixedType ?? input.type,
+            type,
             input.required,
+            false,
+            role,
+            group,
+            selectable,
         );
     }
 }

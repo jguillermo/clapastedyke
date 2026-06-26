@@ -1,4 +1,5 @@
 import { BaseUnit } from '../../_common/quantity';
+import { ConversionGroup } from '../domain/entities/conversion-option';
 import { IngredientUsage } from '../domain/value-objects/ingredient-usage';
 import { PropertyRole, PropertyType } from '../domain/value-objects/recipe-property';
 
@@ -39,6 +40,28 @@ export interface RecipePropertyRecord {
     required: boolean;
     locked: boolean;
     role?: PropertyRole;
+    group?: string; // solo propiedades `options`: grupo del catálogo de conversión
+    selectable?: boolean; // se muestra al seleccionar la receta (default true para records viejos)
+}
+
+export interface FlavorRecord {
+    id: string;
+    label: string;
+}
+
+export interface ConversionOptionRecord {
+    id: string;
+    group: ConversionGroup;
+    label: string;
+    factor: number;
+}
+
+export interface RecipeSelectionRecord {
+    id: string;
+    recipeId: string;
+    flavorLabel?: string;
+    portionsOptionId?: string;
+    moldOptionId?: string;
 }
 
 export interface RecipeCategoryRecord {

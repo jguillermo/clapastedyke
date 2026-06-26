@@ -5,13 +5,17 @@
  */
 
 export const DB_NAME = 'clapastedyke';
-export const DB_VERSION = 3;
+export const DB_VERSION = 4;
 
 const STORES = [
     'ingredients',
     // Recetario por categorías: una receta genérica + su categoría.
     'recipes',
     'recipe_categories',
+    // Catálogos de sabores y opciones de conversión (tamaño/molde/porciones) + selecciones.
+    'flavors',
+    'conversion_options',
+    'recipe_selections',
     // 'sponge_recipes'/'filling_recipes'/'covering_recipes' son legacy (el recetario
     // se unificó en 'recipes'); 'toppers'/'packaging_items' también. Se conservan en
     // la lista para no romper DBs existentes, pero ya no se leen.

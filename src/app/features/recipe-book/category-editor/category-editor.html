@@ -10,55 +10,77 @@
   <migo-card-body>
     <form class="flex flex-col gap-5" [formGroup]="form" (ngSubmit)="save()">
       <migo-form-field label="Nombre de la categoría" required reserveMessage [error]="nameError">
-        <migo-input formControlName="name" placeholder="Galletas, Pie…" />
+        <migo-input formControlName="name" placeholder="Queques…" />
       </migo-form-field>
 
       <div class="flex flex-col gap-3">
         <span class="font-body text-sm font-semibold text-body">Propiedades de sus recetas</span>
         <p class="m-0 text-caption text-muted">
-          Toda receta tiene título e ingredientes. Añade aquí las propiedades extra (sabor, peso…).
+          Las propiedades son fijas. Marca cuáles aparecen en el formulario de receta y gestiona sus opciones.
         </p>
 
         <ul class="flex flex-col gap-3 m-0 p-0 list-none" formArrayName="properties">
-          @for (group of properties.controls; track $index) {
+          @for (group of properties.controls; track $index; let pIndex = $index) {
             <li
-              class="flex flex-wrap items-end gap-3 p-3 rounded-lg bg-surface-sunken border border-border-subtle"
+              class="flex flex-col gap-3 p-3 rounded-lg bg-surface-sunken border border-border-subtle"
               [formGroupName]="$index"
             >
-              <migo-form-field label="Nombre" class="flex-1 min-w-40">
-                <migo-input formControlName="name" placeholder="Sabor, Peso…" />
-              </migo-form-field>
-              <migo-form-field label="Tipo" class="w-32">
-                <migo-select formControlName="type" [options]="typeOptions" ariaLabel="Tipo de propiedad" />
-              </migo-form-field>
-              <div class="flex items-center min-h-11">
-                <migo-checkbox formControlName="required">Obligatoria</migo-checkbox>
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <span class="font-body font-semibold text-body">{{ propertyName($index) }}</span>
+                <migo-checkbox formControlName="selectable">Visible en el formulario</migo-checkbox>
               </div>
-              @if (!group.getRawValue().locked) {
-                <button
-                  migo-button
-                  variant="ghost"
-                  type="button"
-                  aria-label="Quitar propiedad"
-                  (click)="removeProperty($index)"
-                >
-                  <migo-icon icon-leading name="mat:close" size="sm" />
-                </button>
-              } @else {
-                <span class="inline-flex items-center min-h-6 px-2.5 rounded-full bg-surface-card border border-border-subtle text-caption text-muted">
-                  Fija
-                </span>
+
+              @if (isCatalog($index)) {
+                <div class="flex flex-col gap-2 pt-2 border-t border-border-subtle">
+                  <span class="text-caption text-muted">
+                    @if (isNumericGroup($index)) {
+                      Porciones (número)
+                    } @else if (hasFactor($index)) {
+                      Opciones (nombre y factor de conversión)
+                    } @else {
+                      Sabores del catálogo
+                    }
+                  </span>
+                  <ul class="flex flex-col gap-2 m-0 p-0 list-none" formArrayName="items">
+                    @for (item of itemsAt(pIndex).controls; track $index; let itemIndex = $index) {
+                      <li class="flex items-end gap-2" [formGroupName]="itemIndex">
+                        @if (isNumericGroup(pIndex)) {
+                          <migo-form-field label="Porciones" class="flex-1 min-w-32">
+                            <migo-input formControlName="factor" type="number" placeholder="10, 20, 40" />
+                          </migo-form-field>
+                        } @else {
+                          <migo-form-field label="Nombre" class="flex-1 min-w-32">
+                            <migo-input formControlName="label" placeholder="Vainilla, Molde grande…" />
+                          </migo-form-field>
+                          @if (hasFactor(pIndex)) {
+                            <migo-form-field label="Factor" class="w-24">
+                              <migo-input formControlName="factor" placeholder="1, 0.5, 2" />
+                            </migo-form-field>
+                          }
+                        }
+                        <button
+                          migo-button
+                          variant="ghost"
+                          type="button"
+                          aria-label="Quitar opción"
+                          (click)="removeItem(pIndex, itemIndex)"
+                        >
+                          <migo-icon icon-leading name="mat:close" size="sm" />
+                        </button>
+                      </li>
+                    }
+                  </ul>
+                  <div>
+                    <button migo-button variant="secondary" type="button" (click)="addItem($index)">
+                      <migo-icon icon-leading name="mat:add" size="sm" />
+                      <migo-spacer />{{ isNumericGroup($index) ? 'Añadir porciones' : (hasFactor($index) ? 'Añadir opción' : 'Añadir sabor') }}
+                    </button>
+                  </div>
+                </div>
               }
             </li>
           }
         </ul>
-
-        <div>
-          <button migo-button variant="secondary" type="button" (click)="addProperty()">
-            <migo-icon icon-leading name="mat:add" size="sm" />
-            <migo-spacer />Añadir propiedad
-          </button>
-        </div>
       </div>
 
       @if (errorMessage()) {

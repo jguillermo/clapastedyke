@@ -104,36 +104,21 @@ export const SYSTEM_CATEGORY_IDS = {
     coberturas: 'sys-coberturas',
 } as const;
 
-/** Construye las 3 categorías de sistema con su esquema (ids estables). */
+/**
+ * Construye las categorías de sistema. **Todas cargan el mismo esquema** (Sabor,
+ * Porciones, Molde) — sin Peso. La **visibilidad** (qué aparece en el formulario)
+ * se decide por categoría: por defecto **oculto**, salvo Queques (el ejemplo ya
+ * configurado). Sabor es obligatorio solo donde es visible.
+ */
 export function buildSystemCategories(): RecipeCategory[] {
-    const weight = (id: string): RecipeProperty =>
-        RecipeProperty.create(id, 'Peso', 'weight', true, true, 'scaling-weight');
+    const props = (cat: string, visible: boolean): RecipeProperty[] => [
+        RecipeProperty.create(`prop-sabor-${cat}`, 'Sabor', 'flavor', visible, false, undefined, undefined, visible),
+        RecipeProperty.create(`prop-porciones-${cat}`, 'Porciones', 'options', false, false, undefined, 'portions', visible),
+        RecipeProperty.create(`prop-molde-${cat}`, 'Molde', 'options', false, false, undefined, 'mold', visible),
+    ];
 
-    const queques = RecipeCategory.create(
-        new EntityId(SYSTEM_CATEGORY_IDS.queques),
-        'Queques',
-        0,
-        [
-            weight('prop-peso-queques'),
-            RecipeProperty.create('prop-sabor-queques', 'Sabor', 'text', false),
-            RecipeProperty.create('prop-porciones-queques', 'Porciones', 'number', false),
-            RecipeProperty.create('prop-tamano-queques', 'Tamaño', 'text', false),
-        ],
-        true,
-    );
-    const rellenos = RecipeCategory.create(
-        new EntityId(SYSTEM_CATEGORY_IDS.rellenos),
-        'Rellenos',
-        1,
-        [weight('prop-peso-rellenos')],
-        true,
-    );
-    const coberturas = RecipeCategory.create(
-        new EntityId(SYSTEM_CATEGORY_IDS.coberturas),
-        'Coberturas',
-        2,
-        [weight('prop-peso-coberturas')],
-        true,
-    );
+    const queques = RecipeCategory.create(new EntityId(SYSTEM_CATEGORY_IDS.queques), 'Queques', 0, props('queques', true), true);
+    const rellenos = RecipeCategory.create(new EntityId(SYSTEM_CATEGORY_IDS.rellenos), 'Rellenos', 1, props('rellenos', false), true);
+    const coberturas = RecipeCategory.create(new EntityId(SYSTEM_CATEGORY_IDS.coberturas), 'Coberturas', 2, props('coberturas', false), true);
     return [queques, rellenos, coberturas];
 }

@@ -60,16 +60,6 @@
             <app-ingredient-list [ingredients]="ingredientEntities()" (changed)="onIngredientsChanged()" />
           </section>
         </ng-template>
-
-        <ng-template migoSwiperSlide label="+ Crear categoría">
-          <section class="flex flex-col items-start gap-3">
-            <p class="m-0 text-muted">Crea una nueva categoría para organizar tus recetas.</p>
-            <button migo-button variant="secondary" type="button" (click)="createCategory()">
-              <migo-icon icon-leading name="mat:add" size="sm" />
-              <migo-spacer />Crear categoría
-            </button>
-          </section>
-        </ng-template>
       </migo-swiper>
     }
   </migo-card-body>

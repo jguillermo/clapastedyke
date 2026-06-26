@@ -8,6 +8,9 @@ import { Recipe } from '../domain/entities/recipe';
 import { RecipeCategory } from '../domain/entities/recipe-category';
 import { PackagingRule } from '../domain/entities/packaging-rule';
 import { CakeComposition } from '../domain/entities/cake-composition';
+import { Flavor } from '../domain/entities/flavor';
+import { ConversionGroup, ConversionOption } from '../domain/entities/conversion-option';
+import { RecipeSelection } from '../domain/entities/recipe-selection';
 import { PurchasePrice } from '../domain/value-objects/purchase-price';
 import { IngredientUsage } from '../domain/value-objects/ingredient-usage';
 import { IngredientLine } from '../domain/value-objects/ingredient-line';
@@ -18,6 +21,9 @@ import { RecipeRepository } from '../domain/repositories/recipe.repository';
 import { RecipeCategoryRepository } from '../domain/repositories/recipe-category.repository';
 import { PackagingRuleRepository } from '../domain/repositories/packaging-rule.repository';
 import { CakeCompositionRepository } from '../domain/repositories/cake-composition.repository';
+import { FlavorRepository } from '../domain/repositories/flavor.repository';
+import { ConversionOptionRepository } from '../domain/repositories/conversion-option.repository';
+import { RecipeSelectionRepository } from '../domain/repositories/recipe-selection.repository';
 import {
     IngredientPriceHistoryRepository,
     PriceHistoryEntry,
@@ -104,6 +110,39 @@ class InMemoryCakeCompositionRepository extends CakeCompositionRepository {
     all = async () => this.store.all();
 }
 
+class InMemoryFlavorRepository extends FlavorRepository {
+    private readonly store = new Store<Flavor>('FL');
+    nextIdentity = () => this.store.next();
+    byId = async (id: EntityId) => this.store.byId(id);
+    save = async (f: Flavor) => this.store.save(f);
+    all = async () => this.store.all();
+    delete = async (id: EntityId) => {
+        this.store.items.delete(id.value);
+    };
+}
+
+class InMemoryConversionOptionRepository extends ConversionOptionRepository {
+    private readonly store = new Store<ConversionOption>('CO');
+    nextIdentity = () => this.store.next();
+    byId = async (id: EntityId) => this.store.byId(id);
+    byGroup = async (group: ConversionGroup) => this.store.all().filter((o) => o.group === group);
+    save = async (o: ConversionOption) => this.store.save(o);
+    all = async () => this.store.all();
+    delete = async (id: EntityId) => {
+        this.store.items.delete(id.value);
+    };
+}
+
+class InMemoryRecipeSelectionRepository extends RecipeSelectionRepository {
+    private readonly store = new Store<RecipeSelection>('SEL');
+    nextIdentity = () => this.store.next();
+    byId = async (id: EntityId) => this.store.byId(id);
+    byRecipe = async (recipeId: EntityId) =>
+        this.store.all().filter((s) => s.recipeId.equals(recipeId));
+    save = async (s: RecipeSelection) => this.store.save(s);
+    all = async () => this.store.all();
+}
+
 /** In-memory append-only price history. */
 export class InMemoryIngredientPriceHistoryRepository extends IngredientPriceHistoryRepository {
     readonly entries: PriceHistoryEntry[] = [];
@@ -136,6 +175,9 @@ export const recipeBookRepositoryProviders: Provider[] = [
     { provide: PackagingRuleRepository, useClass: InMemoryPackagingRuleRepository },
     { provide: CakeCompositionRepository, useClass: InMemoryCakeCompositionRepository },
     { provide: IngredientPriceHistoryRepository, useClass: InMemoryIngredientPriceHistoryRepository },
+    { provide: FlavorRepository, useClass: InMemoryFlavorRepository },
+    { provide: ConversionOptionRepository, useClass: InMemoryConversionOptionRepository },
+    { provide: RecipeSelectionRepository, useClass: InMemoryRecipeSelectionRepository },
 ];
 
 export interface RecipeBookFakes {
@@ -181,6 +223,34 @@ export function makeRecipe(
         [RecipePropertyValue.of(`${categoryId}-peso`, 'weight', Quantity.of(weightGrams, 'g'))],
         lines,
     );
+}
+
+/**
+ * Test helper: una categoría tipo Queques convertible — Sabor (flavor), Porciones
+ * (opciones del grupo `portions`) y Molde (opciones del grupo `mold`). Sin Peso.
+ */
+export function makeConvertibleCategory(id: string): RecipeCategory {
+    return RecipeCategory.create(
+        new EntityId(id),
+        'Queques',
+        0,
+        [
+            RecipeProperty.create(`${id}-sabor`, 'Sabor', 'flavor', false, false, undefined, undefined, true),
+            RecipeProperty.create(`${id}-porciones`, 'Porciones', 'options', false, false, undefined, 'portions', true),
+            RecipeProperty.create(`${id}-molde`, 'Molde', 'options', false, false, undefined, 'mold', true),
+        ],
+        true,
+    );
+}
+
+/** Test helper: una receta base (factor 1) con sus líneas. */
+export function makeConvertibleRecipe(
+    id: string,
+    categoryId: string,
+    name: string,
+    lines: IngredientLine[],
+): Recipe {
+    return Recipe.create(new EntityId(id), new EntityId(categoryId), name, [], lines);
 }
 
 /** Test helper: a priced ingredient (uses `restore` to avoid recording events). */

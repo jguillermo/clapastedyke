@@ -4,6 +4,7 @@ import { EntityId } from '../../../_common/entity-id';
 import { Quantity } from '../../../_common/quantity';
 import { EventBus } from '../../../_common/event-bus';
 import { Recipe } from '../../domain/entities/recipe';
+import { RecipeCategory } from '../../domain/entities/recipe-category';
 import { IngredientLine } from '../../domain/value-objects/ingredient-line';
 import { RecipePropertyValue } from '../../domain/value-objects/recipe-property-value';
 import { RecipeCategoryRepository } from '../../domain/repositories/recipe-category.repository';
@@ -62,10 +63,7 @@ export class SaveRecipe extends UseCase<SaveRecipeRequest, { id: string }> {
         return { id: id.value };
     }
 
-    private toValue(
-        category: { property(id: string): { type: 'text' | 'number' | 'weight' } | undefined },
-        input: RecipeValueInput,
-    ): RecipePropertyValue {
+    private toValue(category: RecipeCategory, input: RecipeValueInput): RecipePropertyValue {
         const property = category.property(input.propertyId);
         if (!property) {
             throw new Error(`Unknown property ${input.propertyId}`);
@@ -76,7 +74,8 @@ export class SaveRecipe extends UseCase<SaveRecipeRequest, { id: string }> {
         if (property.type === 'number') {
             return RecipePropertyValue.of(input.propertyId, 'number', Number(input.value));
         }
-        return RecipePropertyValue.of(input.propertyId, 'text', String(input.value));
+        // text / flavor / options: el valor guardado es el label (string).
+        return RecipePropertyValue.of(input.propertyId, property.type, String(input.value));
     }
 
     private async buildLines(lines: RecipeLineInput[]): Promise<IngredientLine[]> {

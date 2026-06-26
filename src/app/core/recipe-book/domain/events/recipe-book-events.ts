@@ -16,6 +16,9 @@ export const RecipeBookEventName = {
     PACKAGING_RULE_SAVED: 'PackagingRuleSaved',
     CAKE_COMPOSED: 'CakeComposed',
     SHOPPING_LIST_GENERATED: 'ShoppingListGenerated',
+    FLAVOR_SAVED: 'FlavorSaved',
+    CONVERSION_OPTION_SAVED: 'ConversionOptionSaved',
+    RECIPE_SELECTED: 'RecipeSelected',
 } as const;
 
 /** Primitive shape of a purchase price carried by events (Published Language). */
@@ -41,4 +44,10 @@ export const RecipeBookEvents = {
         domainEvent(RecipeBookEventName.CAKE_COMPOSED, compositionId),
     shoppingListGenerated: (compositionId: string, itemCount: number): DomainEvent =>
         domainEvent(RecipeBookEventName.SHOPPING_LIST_GENERATED, compositionId, { itemCount }),
+    flavorSaved: (flavorId: string, isNew: boolean): DomainEvent =>
+        domainEvent(RecipeBookEventName.FLAVOR_SAVED, flavorId, { isNew }),
+    conversionOptionSaved: (optionId: string, isNew: boolean): DomainEvent =>
+        domainEvent(RecipeBookEventName.CONVERSION_OPTION_SAVED, optionId, { isNew }),
+    recipeSelected: (selectionId: string, recipeId: string): DomainEvent =>
+        domainEvent(RecipeBookEventName.RECIPE_SELECTED, selectionId, { recipeId }),
 };

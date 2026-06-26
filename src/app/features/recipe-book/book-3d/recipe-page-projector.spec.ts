@@ -6,7 +6,7 @@ import { makeIngredient, makeRecipe, makeWeightCategory } from '@core/recipe-boo
 import { toPages } from './recipe-page-projector';
 
 function emptyCatalog(): RecipeBookCatalog {
-  return { ingredients: [], categories: [], recipes: [], packagingRules: [] };
+  return { ingredients: [], categories: [], recipes: [], packagingRules: [], flavors: [], conversionOptions: [] };
 }
 
 describe('recipe-page-projector', () => {

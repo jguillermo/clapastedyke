@@ -13,8 +13,16 @@ describe('RecipeBookSeed', () => {
     const categories = await TestBed.inject(RecipeCategoryRepository).all();
     expect(categories.map((c) => c.name).sort()).toEqual(['Coberturas', 'Queques', 'Rellenos']);
     expect(categories.every((c) => c.system)).toBe(true);
+    // Todas cargan el mismo esquema (Sabor, Porciones, Molde). Ninguna tiene Peso.
+    for (const c of categories) {
+      expect(c.properties.map((p) => p.name)).toEqual(['Sabor', 'Porciones', 'Molde']);
+      expect(c.weightProperty()).toBeUndefined();
+    }
+    // Por defecto oculto, salvo Queques (visible).
     const queques = categories.find((c) => c.name === 'Queques');
-    expect(queques?.weightProperty()?.required).toBe(true);
+    const rellenos = categories.find((c) => c.name === 'Rellenos');
+    expect(queques?.properties.every((p) => p.selectable)).toBe(true);
+    expect(rellenos?.properties.every((p) => !p.selectable)).toBe(true);
   });
 
   it('is idempotent: running again does not duplicate', async () => {

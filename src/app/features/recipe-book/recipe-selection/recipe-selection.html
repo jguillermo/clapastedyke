@@ -1,0 +1,63 @@
+<migo-card fill>
+  <migo-card-header>
+    <migo-icon card-icon name="mat:layers" size="lg" color="brand" />
+    <migo-card-title>Elegir tamaño</migo-card-title>
+    <migo-card-subtitle>{{ recipeName }}</migo-card-subtitle>
+    <button card-actions migo-button variant="ghost" type="button" aria-label="Cerrar" (click)="cancel()">
+      <migo-icon icon-leading name="mat:close" size="sm" />
+    </button>
+  </migo-card-header>
+
+  <migo-card-body>
+    <form class="flex flex-col gap-5" [formGroup]="form">
+      @for (field of fields; track field.propertyId) {
+        <migo-form-field [label]="field.label">
+          <migo-combobox
+            [formControlName]="field.propertyId"
+            [suggestions]="field.suggestions"
+            [ariaLabel]="field.label"
+            placeholder="Elige…"
+            [attr.data-test-id]="'selection-field-' + field.propertyId"
+          />
+        </migo-form-field>
+      }
+
+      @if (preview(); as p) {
+        <div class="flex flex-col gap-3 p-4 rounded-lg bg-surface-sunken border border-border-subtle">
+          <div class="flex items-baseline justify-between gap-3">
+            <span class="text-sm text-muted">Factor</span>
+            <span class="text-h4 font-semibold text-heading" data-test-id="selection-factor">×{{ p.factor }}</span>
+          </div>
+          @if (p.optionLabels.length) {
+            <p class="m-0 text-sm text-body">{{ p.optionLabels.join(' · ') }}</p>
+          }
+
+          <ul class="flex flex-col gap-1 m-0 p-0 list-none">
+            @for (line of previewLines(); track $index) {
+              <li class="flex items-baseline justify-between gap-3 text-sm">
+                <span class="text-body">{{ line.name }}</span>
+                <span class="text-muted">{{ line.quantityLabel }} · {{ line.cost }}</span>
+              </li>
+            }
+          </ul>
+
+          <div class="flex items-baseline justify-between gap-3 pt-2 border-t border-border-subtle">
+            <span class="text-sm font-semibold text-body">Total materiales</span>
+            <span class="text-sm font-semibold text-heading" data-test-id="selection-total">{{ p.total }}</span>
+          </div>
+        </div>
+      }
+
+      @if (errorMessage()) {
+        <p class="m-0 text-caption font-medium text-error" role="alert">{{ errorMessage() }}</p>
+      }
+    </form>
+  </migo-card-body>
+
+  <migo-card-footer>
+    <button migo-button variant="ghost" type="button" (click)="cancel()">Cancelar</button>
+    <button migo-button type="button" [loading]="saving()" data-test-id="selection-save" (click)="save()">
+      Guardar selección
+    </button>
+  </migo-card-footer>
+</migo-card>

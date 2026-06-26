@@ -17,8 +17,10 @@ import { MeasureInput } from '@core/recipe-book/domain/value-objects/measure-inp
 import type { RecipeCategory } from '@core/recipe-book/domain/entities/recipe-category';
 import { SaveRecipe } from '@core/recipe-book/application/use-cases/save-recipe.use-case';
 import { SaveIngredient } from '@core/recipe-book/application/use-cases/save-ingredient.use-case';
+import { SaveFlavor } from '@core/recipe-book/application/use-cases/save-flavor.use-case';
+import { SaveConversionOption } from '@core/recipe-book/application/use-cases/save-conversion-option.use-case';
 import { IngredientGrid, type IngredientOption, type InitialLine } from '../_shared/ingredient-grid/ingredient-grid';
-import { messageOf, union, validateForType } from '../_shared/recipe-form.utils';
+import { messageOf, union, validateForType, validateServings } from '../_shared/recipe-form.utils';
 
 export type { IngredientOption };
 
@@ -72,6 +74,8 @@ export class RecipeForm {
   private readonly fb = inject(FormBuilder);
   private readonly saveRecipe = inject(SaveRecipe);
   private readonly saveIngredient = inject(SaveIngredient);
+  private readonly saveFlavor = inject(SaveFlavor);
+  private readonly saveConversionOption = inject(SaveConversionOption);
   protected readonly ref = inject<MigoDialogRef<{ id: string }>>(MigoDialogRef);
   private readonly data = inject<RecipeFormData>(MIGO_DIALOG_DATA);
 
@@ -83,7 +87,9 @@ export class RecipeForm {
   protected readonly saveLabel = this.editing ? 'Guardar cambios' : 'Guardar receta';
   protected readonly initialLines = this.prefill?.lines ?? [];
   protected readonly initialChars: Record<string, string> = this.prefill?.values ?? {};
-  protected readonly hasProperties = this.category.properties.length > 0;
+  // Solo las propiedades marcadas visibles aparecen como inputs en el formulario.
+  private readonly visibleProperties = this.category.properties.filter((p) => p.selectable);
+  protected readonly hasProperties = this.visibleProperties.length > 0;
 
   protected readonly form = this.fb.nonNullable.group({
     name: [{ value: this.prefill?.name ?? '', disabled: this.editing }, Validators.required],
@@ -99,13 +105,19 @@ export class RecipeForm {
   private readonly interaction = signal(0);
 
   protected readonly charTypes = computed<SelectTagType[]>(() =>
-    this.category.properties.map((property) => ({
-      key: property.id,
-      label: property.required ? property.name : `${property.name} (opcional)`,
-      values: union([], this.data.valuesByProp[property.id]),
-      allowCreate: true,
-      validate: validateForType(property.type),
-    })),
+    this.visibleProperties.map((property) => {
+      const isPortions = property.type === 'options' && property.group === 'portions';
+      const isMold = property.type === 'options' && property.group === 'mold';
+      return {
+        key: property.id,
+        label: property.name,
+        values: union([], this.data.valuesByProp[property.id]),
+        // Molde no se puede crear desde aquí (necesita un factor de conversión); se elige del catálogo.
+        allowCreate: !isMold,
+        // Las porciones son números enteros positivos; el resto, etiqueta libre.
+        validate: isPortions ? validateServings : validateForType(property.type),
+      };
+    }),
   );
 
   protected readonly nameError = computed(() => this.errorFor(this.form.controls.name, 'El nombre es obligatorio.'));
@@ -157,6 +169,7 @@ export class RecipeForm {
         });
         lines.push({ ingredientId: id, quantity: item.quantity });
       }
+      await this.ensureCatalog();
       const result = await this.saveRecipe.execute({
         categoryId: this.category.id.value,
         name: this.form.getRawValue().name,
@@ -181,10 +194,33 @@ export class RecipeForm {
 
   // --- Helpers ---
 
+  /**
+   * Crea en el catálogo los valores nuevos elegidos: el Sabor y las Porciones
+   * (número entero = label y factor) se persisten si no existían. El Molde no se
+   * crea aquí (necesita factor; se gestiona en la categoría). Dedup por label en
+   * los use cases evita duplicados al reusar valores existentes.
+   */
+  private async ensureCatalog(): Promise<void> {
+    for (const property of this.visibleProperties) {
+      const raw = this.chars()[property.id]?.trim();
+      if (!raw) {
+        continue;
+      }
+      if (property.type === 'flavor') {
+        await this.saveFlavor.execute({ label: raw });
+      } else if (property.type === 'options' && property.group === 'portions') {
+        const n = Number(raw);
+        if (Number.isInteger(n) && n > 0) {
+          await this.saveConversionOption.execute({ group: 'portions', label: raw, factor: n });
+        }
+      }
+    }
+  }
+
   /** Convierte los valores del select-tag a la entrada de SaveRecipe (peso → gramos). */
   private buildValues(): { propertyId: string; value: string | number }[] | null {
     const out: { propertyId: string; value: string | number }[] = [];
-    for (const property of this.category.properties) {
+    for (const property of this.visibleProperties) {
       const raw = this.chars()[property.id]?.trim();
       if (!raw) {
         continue;
@@ -207,7 +243,7 @@ export class RecipeForm {
 
   /** Nombre de la primera propiedad obligatoria sin valor válido (o null si todas ok). */
   private firstMissingRequired(): string | null {
-    for (const property of this.category.properties) {
+    for (const property of this.visibleProperties) {
       if (!property.required) {
         continue;
       }
