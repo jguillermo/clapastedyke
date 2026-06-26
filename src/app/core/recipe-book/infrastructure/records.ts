@@ -56,14 +56,6 @@ export interface ConversionOptionRecord {
     factor: number;
 }
 
-export interface RecipeSelectionRecord {
-    id: string;
-    recipeId: string;
-    flavorLabel?: string;
-    portionsOptionId?: string;
-    moldOptionId?: string;
-}
-
 export interface RecipeCategoryRecord {
     id: string;
     name: string;

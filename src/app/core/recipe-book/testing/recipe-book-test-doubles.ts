@@ -10,7 +10,6 @@ import { PackagingRule } from '../domain/entities/packaging-rule';
 import { CakeComposition } from '../domain/entities/cake-composition';
 import { Flavor } from '../domain/entities/flavor';
 import { ConversionGroup, ConversionOption } from '../domain/entities/conversion-option';
-import { RecipeSelection } from '../domain/entities/recipe-selection';
 import { PurchasePrice } from '../domain/value-objects/purchase-price';
 import { IngredientUsage } from '../domain/value-objects/ingredient-usage';
 import { IngredientLine } from '../domain/value-objects/ingredient-line';
@@ -23,7 +22,6 @@ import { PackagingRuleRepository } from '../domain/repositories/packaging-rule.r
 import { CakeCompositionRepository } from '../domain/repositories/cake-composition.repository';
 import { FlavorRepository } from '../domain/repositories/flavor.repository';
 import { ConversionOptionRepository } from '../domain/repositories/conversion-option.repository';
-import { RecipeSelectionRepository } from '../domain/repositories/recipe-selection.repository';
 import {
     IngredientPriceHistoryRepository,
     PriceHistoryEntry,
@@ -133,16 +131,6 @@ class InMemoryConversionOptionRepository extends ConversionOptionRepository {
     };
 }
 
-class InMemoryRecipeSelectionRepository extends RecipeSelectionRepository {
-    private readonly store = new Store<RecipeSelection>('SEL');
-    nextIdentity = () => this.store.next();
-    byId = async (id: EntityId) => this.store.byId(id);
-    byRecipe = async (recipeId: EntityId) =>
-        this.store.all().filter((s) => s.recipeId.equals(recipeId));
-    save = async (s: RecipeSelection) => this.store.save(s);
-    all = async () => this.store.all();
-}
-
 /** In-memory append-only price history. */
 export class InMemoryIngredientPriceHistoryRepository extends IngredientPriceHistoryRepository {
     readonly entries: PriceHistoryEntry[] = [];
@@ -177,7 +165,6 @@ export const recipeBookRepositoryProviders: Provider[] = [
     { provide: IngredientPriceHistoryRepository, useClass: InMemoryIngredientPriceHistoryRepository },
     { provide: FlavorRepository, useClass: InMemoryFlavorRepository },
     { provide: ConversionOptionRepository, useClass: InMemoryConversionOptionRepository },
-    { provide: RecipeSelectionRepository, useClass: InMemoryRecipeSelectionRepository },
 ];
 
 export interface RecipeBookFakes {
@@ -241,16 +228,6 @@ export function makeConvertibleCategory(id: string): RecipeCategory {
         ],
         true,
     );
-}
-
-/** Test helper: una receta base (factor 1) con sus líneas. */
-export function makeConvertibleRecipe(
-    id: string,
-    categoryId: string,
-    name: string,
-    lines: IngredientLine[],
-): Recipe {
-    return Recipe.create(new EntityId(id), new EntityId(categoryId), name, [], lines);
 }
 
 /** Test helper: a priced ingredient (uses `restore` to avoid recording events). */

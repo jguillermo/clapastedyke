@@ -12,9 +12,11 @@ const STORES = [
     // Recetario por categorías: una receta genérica + su categoría.
     'recipes',
     'recipe_categories',
-    // Catálogos de sabores y opciones de conversión (tamaño/molde/porciones) + selecciones.
+    // Catálogos de sabores y opciones de conversión (porciones/molde).
     'flavors',
     'conversion_options',
+    // 'recipe_selections' es legacy: la "selección por tamaño" se retiró; el store se conserva
+    // (los stores solo se AÑADEN, nunca se quitan) aunque ya no tenga repositorio.
     'recipe_selections',
     // 'sponge_recipes'/'filling_recipes'/'covering_recipes' son legacy (el recetario
     // se unificó en 'recipes'); 'toppers'/'packaging_items' también. Se conservan en
