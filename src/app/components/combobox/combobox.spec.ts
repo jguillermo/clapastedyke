@@ -5,11 +5,17 @@ import { Combobox } from './combobox';
 
 @Component({
   imports: [ReactiveFormsModule, Combobox],
-  template: `<migo-combobox [formControl]="control" [suggestions]="suggestions" [invalid]="invalid" />`,
+  template: `<migo-combobox
+    [formControl]="control"
+    [suggestions]="suggestions"
+    [invalid]="invalid"
+    (selected)="picked.push($event)"
+  />`,
 })
 class Host {
   readonly control = new FormControl('');
   invalid = false;
+  readonly picked: string[] = [];
   readonly suggestions = ['Harina', 'Harina integral', 'Huevos', 'Hojaldre', 'Azúcar'];
 }
 
@@ -58,11 +64,22 @@ describe('Combobox (ghost + dropdown)', () => {
     expect(options()).toHaveLength(0);
   });
 
-  it('accepts the ghost on Tab, completing with the suggestion casing', () => {
+  it('accepts the ghost on Tab, completing with the suggestion casing and emitting selected', () => {
     const { fixture, input } = setup();
     type(input, 'hue');
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', cancelable: true, bubbles: true }));
     expect(fixture.componentInstance.control.value).toBe('Huevos');
+    expect(fixture.componentInstance.picked).toEqual(['Huevos']); // → avanzar al siguiente campo
+  });
+
+  it('completing inline with ArrowRight fills but does NOT emit selected (no advance)', () => {
+    const { fixture, input } = setup();
+    type(input, 'hue');
+    // caret al final para que → acepte
+    input.setSelectionRange(input.value.length, input.value.length);
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', cancelable: true, bubbles: true }));
+    expect(fixture.componentInstance.control.value).toBe('Huevos');
+    expect(fixture.componentInstance.picked).toEqual([]); // → solo completa, no avanza
   });
 
   it('two+ matches → dropdown (no ghost); clicking an option commits it', () => {
@@ -74,6 +91,7 @@ describe('Combobox (ghost + dropdown)', () => {
     (opts[1] as HTMLElement).click();
     fixture.detectChanges();
     expect(fixture.componentInstance.control.value).toBe('Harina integral');
+    expect(fixture.componentInstance.picked).toEqual(['Harina integral']); // → avanzar al siguiente campo
   });
 
   it('single contains-only match (not a prefix) → 1-item dropdown, no ghost', () => {
@@ -97,6 +115,32 @@ describe('Combobox (ghost + dropdown)', () => {
     fixture.detectChanges();
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', cancelable: true, bubbles: true }));
     expect(fixture.componentInstance.control.value).toBe('Harina integral');
+    expect(fixture.componentInstance.picked).toEqual(['Harina integral']); // → avanzar al siguiente campo
+  });
+
+  it('single prefix match → ghost is rendered AFTER the input (paints on top)', () => {
+    const { input } = setup();
+    type(input, 'Hue');
+    const ghostEl = ghost()!;
+    // El fantasma debe ir después del input en el DOM para pintarse encima del fondo de foco.
+    expect(input.compareDocumentPosition(ghostEl) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('with a dropdown open, ArrowDown is handled and does NOT bubble (grid keeps its cell)', () => {
+    const { input } = setup();
+    type(input, 'Har'); // 2 matches → dropdown
+    let bubbledToHost = false;
+    // Un ancestro (como el host de migo-grid) escucha keydown por burbujeo.
+    const spy = () => (bubbledToHost = true);
+    document.addEventListener('keydown', spy);
+    try {
+      const event = new KeyboardEvent('keydown', { key: 'ArrowDown', cancelable: true, bubbles: true });
+      input.dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(true);
+      expect(bubbledToHost).toBe(false);
+    } finally {
+      document.removeEventListener('keydown', spy);
+    }
   });
 
   it('reflects invalid state on the input', () => {

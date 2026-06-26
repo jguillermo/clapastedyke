@@ -9,6 +9,7 @@ import {
   forwardRef,
   inject,
   input,
+  output,
   signal,
   viewChild,
 } from '@angular/core';
@@ -46,11 +47,6 @@ const CONTROL_COMMON =
   imports: [OverlayModule],
   template: `
     <span #wrapper class="relative block" cdkOverlayOrigin #origin="cdkOverlayOrigin">
-      @if (ghostSuffix()) {
-        <span #ghost [class]="ghostClasses()" aria-hidden="true">
-          <span class="invisible">{{ value() }}</span><span class="text-placeholder">{{ ghostSuffix() }}</span>
-        </span>
-      }
       <input
         #control
         class="relative {{ controlClasses() }}"
@@ -74,6 +70,13 @@ const CONTROL_COMMON =
         (scroll)="syncGhost()"
         (blur)="onBlur()"
       />
+      <!-- El fantasma va DESPUÉS del input para pintarse ENCIMA (si no, el fondo de foco del
+           input lo taparía). El tramo tecleado es invisible: deja ver el texto real del input. -->
+      @if (ghostSuffix()) {
+        <span #ghost [class]="ghostClasses()" aria-hidden="true">
+          <span class="invisible">{{ value() }}</span><span class="text-placeholder">{{ ghostSuffix() }}</span>
+        </span>
+      }
     </span>
 
     <ng-template
@@ -123,6 +126,13 @@ export class Combobox implements ControlValueAccessor {
   readonly seamless = input(false, { transform: booleanAttribute });
   /** Variante "papel": como `seamless` pero con renglón inferior y realce cálido del libro. */
   readonly paper = input(false, { transform: booleanAttribute });
+
+  /**
+   * Emite la sugerencia elegida cuando el usuario **termina** la selección (Tab / Enter, o
+   * clic en el desplegable). El consumidor puede avanzar el foco al siguiente campo. No se
+   * emite al **completar en línea con →** (eso solo rellena, deja seguir escribiendo).
+   */
+  readonly selected = output<string>();
 
   protected readonly positions = POSITIONS;
   private readonly wrapper = viewChild.required<ElementRef<HTMLElement>>('wrapper');
@@ -206,16 +216,20 @@ export class Combobox implements ControlValueAccessor {
   }
 
   protected onKeydown(event: KeyboardEvent): void {
+    const hasDropdown = this.dropdownOptions().length > 0;
+
+    // Las flechas abren/navegan el desplegable. Importante: además de preventDefault, se
+    // **detiene la propagación** para que el (keydown) del migo-grid no cambie de celda.
+    if (hasDropdown && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
+      event.preventDefault();
+      event.stopPropagation();
+      this.open.set(true);
+      this.move(event.key === 'ArrowDown' ? 1 : -1);
+      return;
+    }
+
     if (this.showDropdown()) {
       switch (event.key) {
-        case 'ArrowDown':
-          event.preventDefault();
-          this.move(1);
-          return;
-        case 'ArrowUp':
-          event.preventDefault();
-          this.move(-1);
-          return;
         case 'Enter':
           event.preventDefault();
           event.stopPropagation();
@@ -224,6 +238,7 @@ export class Combobox implements ControlValueAccessor {
         case 'Tab':
           if (!event.shiftKey) {
             event.preventDefault();
+            event.stopPropagation();
             this.pick(this.dropdownOptions()[this.activeIndex()]);
           }
           return;
@@ -244,20 +259,19 @@ export class Combobox implements ControlValueAccessor {
     const input = this.control().nativeElement;
     const caretAtEnd =
       input.selectionStart === input.value.length && input.selectionEnd === input.value.length;
-    const accepts =
-      event.key === 'Enter' ||
-      (event.key === 'Tab' && !event.shiftKey) ||
-      (event.key === 'ArrowRight' && caretAtEnd);
-    if (!accepts) {
+    const finishes = event.key === 'Enter' || (event.key === 'Tab' && !event.shiftKey);
+    const completesInline = event.key === 'ArrowRight' && caretAtEnd;
+    if (!finishes && !completesInline) {
       return;
     }
     event.preventDefault();
     event.stopPropagation();
-    this.commit(match);
+    // Tab/Enter cierran el campo → avanzan al siguiente; → solo completa en línea (sin avanzar).
+    this.commit(match, finishes);
   }
 
   protected pick(option: string): void {
-    this.commit(option);
+    this.commit(option, true); // elegir del desplegable termina la selección → avanza
   }
 
   protected close(): void {
@@ -271,8 +285,11 @@ export class Combobox implements ControlValueAccessor {
     }
   }
 
-  /** Acepta una sugerencia (respeta su capitalización), cierra el panel y deja el caret al final. */
-  private commit(match: string): void {
+  /**
+   * Acepta una sugerencia (respeta su capitalización), cierra el panel y deja el caret al final.
+   * Si `advance`, emite `selected` para que el consumidor pase al siguiente campo.
+   */
+  private commit(match: string, advance: boolean): void {
     this.value.set(match);
     this.onChange(match);
     this.open.set(false);
@@ -280,6 +297,9 @@ export class Combobox implements ControlValueAccessor {
     const input = this.control().nativeElement;
     input.value = match;
     input.setSelectionRange(match.length, match.length);
+    if (advance) {
+      this.selected.emit(match);
+    }
   }
 
   /** Iguala el desplazamiento horizontal del fantasma al del input (nombres largos). */

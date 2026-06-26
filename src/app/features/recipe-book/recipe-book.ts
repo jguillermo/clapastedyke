@@ -72,6 +72,8 @@ export interface RecipeBookResult {
   selector: 'app-recipe-book',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [Button, Card, CardHeader, CardTitle, CardBody, Icon, IngredientList, MigoSwiper, MigoSwiperSlide],
+  // `contents`: el card `fill` es hijo flex directo del diálogo y llena la pantalla en móvil.
+  host: { class: 'contents' },
   templateUrl: './recipe-book.html',
 })
 export class RecipeBook implements AfterViewInit {

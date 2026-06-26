@@ -56,6 +56,8 @@ type PropertyGroup = FormGroup<{
     Select,
     Checkbox,
   ],
+  // `contents`: el card `fill` es hijo flex directo del diálogo y llena la pantalla en móvil.
+  host: { class: 'contents' },
   templateUrl: './category-editor.html',
 })
 export class CategoryEditor {

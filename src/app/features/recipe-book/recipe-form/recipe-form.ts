@@ -63,7 +63,9 @@ export interface RecipeFormData {
     SelectTag,
     IngredientGrid,
   ],
-  host: { '(focusout)': 'bumpInteraction()' },
+  // `contents`: el host no genera caja, así el `migo-card fill` es el hijo flex directo del
+  // contenedor del diálogo y llena la pantalla en móvil (solo el body scrollea, sin scroll de página).
+  host: { class: 'contents', '(focusout)': 'bumpInteraction()' },
   templateUrl: './recipe-form.html',
 })
 export class RecipeForm {

@@ -70,10 +70,11 @@ export class IngredientList implements OnInit {
   /** Se emite tras guardar para que el hub recargue el catálogo (libro 3D, etc.). */
   readonly changed = output<void>();
 
+  // Insumo crece (flex-1); empaque y precio se ajustan a su contenido (anchos compactos).
   protected readonly columns: readonly GridColumn[] = [
     { label: 'Insumo' },
-    { label: 'Empaque', width: 'w-36' },
-    { label: 'Precio', width: 'w-32' },
+    { label: 'Empaque', width: 'w-28' },
+    { label: 'Precio', width: 'w-28' },
   ];
 
   protected readonly lines = this.fb.array<LineGroup>([this.newLine()]);

@@ -50,6 +50,8 @@ interface LineView {
   selector: 'app-recipe-detail',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [Button, Card, CardHeader, CardTitle, CardSubtitle, CardBody, CardFooter, Icon],
+  // `contents`: el card `fill` es hijo flex directo del diálogo y llena la pantalla en móvil.
+  host: { class: 'contents' },
   template: `
     <migo-card fill>
       <migo-card-header>

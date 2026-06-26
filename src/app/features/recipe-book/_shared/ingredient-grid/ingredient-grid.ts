@@ -67,10 +67,11 @@ export class IngredientGrid implements OnInit {
   /** Líneas para precargar al editar una receta (vacío = grilla nueva en blanco). */
   readonly initialLines = input<InitialLine[]>([]);
 
+  // Ingrediente crece (flex-1); cantidad y costo se ajustan a su contenido (anchos compactos).
   protected readonly columns: readonly GridColumn[] = [
     { label: 'Ingrediente' },
-    { label: 'Cantidad', width: 'w-32' },
-    { label: 'Costo', width: 'w-44' },
+    { label: 'Cantidad', width: 'w-28' },
+    { label: 'Costo', width: 'w-28' },
   ];
 
   protected readonly lines = this.fb.array<LineGroup>([this.newLine()]);
@@ -240,6 +241,11 @@ export class IngredientGrid implements OnInit {
 
   protected setLineUnit(index: number, token: UnitToken): void {
     this.lines.at(index)?.controls.unit.setValue(token);
+  }
+
+  /** Tras elegir un insumo (Tab/Enter o clic en el desplegable), avanza a la cantidad (col 1). */
+  protected onIngredientPicked(index: number): void {
+    setTimeout(() => this.gridRef()?.focusCell(index, 1));
   }
 
   protected removeLine(index: number): void {

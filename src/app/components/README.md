@@ -170,7 +170,10 @@ sugerencia que coincide aparece tenue dentro del campo; se acepta con Tab / → 
 La coincidencia del desplegable es **por contenido** (substring); el fantasma solo completa **por
 prefijo**. `ControlValueAccessor` (valor `string`); se integra con `<migo-form-field>`. Inputs iguales
 a Autocomplete: `suggestions` (string[]) · `placeholder` · `ariaLabel` · `invalid` · `disabled` ·
-`seamless` · `paper`. Es el control de nombre que usa la grilla de insumos (`seamless`).
+`seamless` · `paper`. Output `selected` (string): se emite al **terminar** la selección (Tab / Enter o
+clic en el desplegable, **no** al completar en línea con →), para que el consumidor avance al siguiente
+campo (p. ej. la grilla de insumos enfoca la columna de cantidad). Es el control de nombre que usa la
+grilla de insumos (`seamless`).
 
 ```html
 <migo-combobox seamless formControlName="name" [suggestions]="ingredientNames()" ariaLabel="Ingrediente" />

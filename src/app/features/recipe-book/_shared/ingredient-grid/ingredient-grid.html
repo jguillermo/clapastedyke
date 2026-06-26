@@ -17,6 +17,7 @@
               [suggestions]="ingredientNames()"
               [invalid]="lineInvalids()[r]?.name ?? false"
               ariaLabel="Ingrediente"
+              (selected)="onIngredientPicked(r)"
             />
           }
           @case (1) {
