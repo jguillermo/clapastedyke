@@ -97,9 +97,34 @@ describe('recipe-page-projector', () => {
 
     const listPages = toPages(catalog).filter((p) => p.section === 'ingredients' && p.rows);
     expect(listPages).toHaveLength(2);
-    expect(listPages[0].rows).toHaveLength(12);
-    expect(listPages[1].rows).toHaveLength(3);
-    expect(listPages[1].subtitle).toBeUndefined();
+    expect(listPages[0].rows).toHaveLength(10); // primera cara: 10 (comparte con el subtítulo)
+    expect(listPages[1].rows).toHaveLength(5); // continuación: el resto
+    expect(listPages[0].continued).toBeFalsy();
+    expect(listPages[1].continued).toBe(true);
+    expect(listPages[1].subtitle).toBe('continuación');
+  });
+
+  it('paginates a recipe with many insumos onto continuation pages (out of the index)', () => {
+    const ingredients = Array.from({ length: 15 }, (_, n) => makeIngredient(`IN-${n}`, `Insumo ${n}`));
+    const category = makeWeightCategory('cat-q', 'Queques');
+    const recipe = makeRecipe(
+      'RE-1',
+      'cat-q',
+      'Receta grande',
+      2500,
+      ingredients.map((i) => IngredientLine.of(new EntityId(i.id.value), Quantity.of(100, 'g'))),
+    );
+    const catalog: RecipeBookCatalog = { ...emptyCatalog(), ingredients, categories: [category], recipes: [recipe] };
+
+    const recipePages = toPages(catalog).filter((p) => p.kind === 'recipe' && p.section === 'cat-q');
+    expect(recipePages).toHaveLength(2);
+    expect(recipePages[0].rows).toHaveLength(10);
+    expect(recipePages[0].chips).toContain('2.5 kg'); // chips solo en la primera
+    expect(recipePages[0].footer).toBe('Continúa…');
+    expect(recipePages[1].rows).toHaveLength(5);
+    expect(recipePages[1].continued).toBe(true);
+    expect(recipePages[1].chips).toBeUndefined();
+    expect(recipePages[1].footer).toBe('15 insumos');
   });
 });
 

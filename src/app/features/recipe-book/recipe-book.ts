@@ -1,10 +1,20 @@
-import { type AfterViewInit, ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import {
+  type AfterViewInit,
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { Button } from '@components/button/button';
 import { Card } from '@components/card/card';
 import { CardBody } from '@components/card/card-body';
 import { CardHeader } from '@components/card/card-header';
 import { CardTitle } from '@components/card/card-title';
 import { Icon } from '@components/icon/icon';
+import { MigoSwiper } from '@components/swiper/swiper';
+import { MigoSwiperSlide } from '@components/swiper/swiper-slide';
 import { MigoDialog, MigoDialogRef, MIGO_DIALOG_DATA } from '@components/dialog/dialog.service';
 import { ListRecipeBook, type RecipeBookCatalog } from '@core/recipe-book/application/use-cases/list-recipe-book.use-case';
 import type { Recipe } from '@core/recipe-book/domain/entities/recipe';
@@ -43,6 +53,16 @@ export interface RecipeBookData {
 }
 
 /**
+ * Resultado al cerrar el hub: a dónde debe saltar el libro 3D para reflejar lo
+ * último que se tocó (la receta recién guardada, su categoría, o los insumos).
+ */
+export interface RecipeBookResult {
+  categoryId?: string;
+  recipeName?: string;
+  ingredients?: boolean;
+}
+
+/**
  * Hub "Mi libro de recetas": contenido de un MigoDialog. Lee el catálogo con
  * `ListRecipeBook` y deja crear/editar **categorías** y, dentro de cada una,
  * crear, **ver** y **editar** recetas con un formulario dinámico según el esquema
@@ -51,14 +71,21 @@ export interface RecipeBookData {
 @Component({
   selector: 'app-recipe-book',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Button, Card, CardHeader, CardTitle, CardBody, Icon, IngredientList],
+  imports: [Button, Card, CardHeader, CardTitle, CardBody, Icon, IngredientList, MigoSwiper, MigoSwiperSlide],
   templateUrl: './recipe-book.html',
 })
 export class RecipeBook implements AfterViewInit {
   private readonly listRecipeBook = inject(ListRecipeBook);
   private readonly dialog = inject(MigoDialog);
-  protected readonly ref = inject<MigoDialogRef>(MigoDialogRef);
+  protected readonly ref = inject<MigoDialogRef<RecipeBookResult>>(MigoDialogRef);
   private readonly data = inject<RecipeBookData | null>(MIGO_DIALOG_DATA, { optional: true });
+
+  /** Foco a devolver al libro 3D: última receta/categoría/insumos que se tocó. */
+  private focusRecipeId: string | null = null;
+  private focusCategoryId: string | null = this.data?.categoryId ?? null;
+  private focusIngredients = false;
+
+  private readonly swiper = viewChild(MigoSwiper);
 
   private readonly catalog = signal<RecipeBookCatalog | null>(null);
 
@@ -94,13 +121,51 @@ export class RecipeBook implements AfterViewInit {
 
   ngAfterViewInit(): void {
     const categoryId = this.data?.categoryId;
-    if (categoryId && this.data?.add) {
-      void this.ready.then(() => {
+    if (!categoryId) {
+      return;
+    }
+    void this.ready.then(() => {
+      // Abre la pestaña de la categoría desde la que se llamó (página del libro).
+      const index = this.categoryViews().findIndex((c) => c.id === categoryId);
+      if (index >= 0) {
+        setTimeout(() => this.swiper()?.slideTo(index));
+      }
+      if (this.data?.add) {
         const category = this.categoriesById().get(categoryId);
         if (category) {
           this.createRecipe(category);
         }
-      });
+      }
+    });
+  }
+
+  // --- Pestañas ---
+
+  /** Última pestaña "real" (categoría o Insumos) para volver tras la acción "Crear categoría". */
+  private lastRealTab = 0;
+
+  /**
+   * La última pestaña es la acción "Crear categoría": al activarla abre el diálogo y
+   * vuelve a la pestaña anterior (se comporta como un botón, no como un panel navegable).
+   */
+  protected onTabChange(index: number): void {
+    const categories = this.categoryViews();
+    const insumosTab = categories.length;
+    const createTab = categories.length + 1;
+    if (index === createTab) {
+      this.createCategory();
+      setTimeout(() => this.swiper()?.slideTo(this.lastRealTab));
+      return;
+    }
+    this.lastRealTab = index;
+    // El foco sigue a la pestaña visible (salvo que luego se cree/edite algo dentro).
+    this.focusRecipeId = null;
+    if (index === insumosTab) {
+      this.focusIngredients = true;
+      this.focusCategoryId = null;
+    } else if (index >= 0 && index < categories.length) {
+      this.focusIngredients = false;
+      this.focusCategoryId = categories[index].id;
     }
   }
 
@@ -112,7 +177,7 @@ export class RecipeBook implements AfterViewInit {
       ariaLabel: 'Nueva categoría',
       width: '640px',
     });
-    this.reloadOnSave(ref);
+    this.onCategorySaved(ref);
   }
 
   protected editCategoryById(id: string): void {
@@ -123,7 +188,7 @@ export class RecipeBook implements AfterViewInit {
       ariaLabel: 'Editar categoría',
       width: '640px',
     });
-    this.reloadOnSave(ref);
+    this.onCategorySaved(ref);
   }
 
   // --- Recetas ---
@@ -144,7 +209,51 @@ export class RecipeBook implements AfterViewInit {
   }
 
   protected close(): void {
-    this.ref.close();
+    this.ref.close(this.buildResult());
+  }
+
+  protected onIngredientsChanged(): void {
+    this.focusIngredients = true;
+    this.focusCategoryId = null;
+    this.focusRecipeId = null;
+    void this.reload();
+  }
+
+  /** Foco a devolver al libro: insumos > receta recién tocada > categoría visible. */
+  private buildResult(): RecipeBookResult {
+    if (this.focusIngredients) {
+      return { ingredients: true };
+    }
+    const recipe = this.focusRecipeId ? this.recipesById().get(this.focusRecipeId) : null;
+    if (recipe) {
+      return { categoryId: recipe.categoryId.value, recipeName: recipe.name };
+    }
+    return this.focusCategoryId ? { categoryId: this.focusCategoryId } : {};
+  }
+
+  private onCategorySaved(dialogRef: {
+    closed: { subscribe(fn: (result: { id: string } | undefined) => void): unknown };
+  }): void {
+    dialogRef.closed.subscribe((result) => {
+      if (result) {
+        this.focusCategoryId = result.id;
+        this.focusRecipeId = null;
+        this.focusIngredients = false;
+        void this.reload();
+      }
+    });
+  }
+
+  private onRecipeSaved(dialogRef: {
+    closed: { subscribe(fn: (result: { id: string } | undefined) => void): unknown };
+  }): void {
+    dialogRef.closed.subscribe((result) => {
+      if (result) {
+        this.focusRecipeId = result.id;
+        this.focusIngredients = false;
+        void this.reload();
+      }
+    });
   }
 
   // --- Helpers de diálogos ---
@@ -159,7 +268,7 @@ export class RecipeBook implements AfterViewInit {
       ariaLabel: `Nueva receta en ${category.name}`,
       width: '640px',
     });
-    this.reloadOnSave(ref);
+    this.onRecipeSaved(ref);
   }
 
   private editRecipe(recipe: Recipe, category: RecipeCategory): void {
@@ -178,7 +287,7 @@ export class RecipeBook implements AfterViewInit {
       ariaLabel: `Editar ${recipe.name}`,
       width: '640px',
     });
-    this.reloadOnSave(ref);
+    this.onRecipeSaved(ref);
   }
 
   private openDetail(
@@ -267,16 +376,6 @@ export class RecipeBook implements AfterViewInit {
 
   private recipeIngredients(): IngredientOption[] {
     return (this.catalog()?.ingredients ?? []).filter((i) => i.usage === 'recipe').map(toIngredientOption);
-  }
-
-  private reloadOnSave(dialogRef: {
-    closed: { subscribe(fn: (result: { id: string } | undefined) => void): unknown };
-  }): void {
-    dialogRef.closed.subscribe((result) => {
-      if (result) {
-        void this.reload();
-      }
-    });
   }
 
   protected async reload(): Promise<void> {

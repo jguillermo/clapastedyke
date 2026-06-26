@@ -14,7 +14,7 @@ import { toSignal, takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { OverlayModule } from '@angular/cdk/overlay';
 import { BaseUnit } from '@core/_common/quantity';
 import { UnitInput, type UnitToken } from '@components/unit-input/unit-input';
-import { Autocomplete } from '@components/autocomplete/autocomplete';
+import { Combobox } from '@components/combobox/combobox';
 import { Grid, type GridColumn } from '@components/grid/grid';
 import { MeasureInput, type MeasureKind } from '@core/recipe-book/domain/value-objects/measure-input';
 import { PreviewRecipeCost } from '@core/recipe-book/application/use-cases/preview-recipe-cost.use-case';
@@ -53,7 +53,7 @@ interface CostView {
 @Component({
   selector: 'app-ingredient-grid',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, OverlayModule, UnitInput, Autocomplete, Grid, PriceCapture],
+  imports: [ReactiveFormsModule, OverlayModule, UnitInput, Combobox, Grid, PriceCapture],
   host: { '(focusout)': 'bumpInteraction()' },
   templateUrl: './ingredient-grid.html',
 })

@@ -43,7 +43,7 @@ export function toPages(catalog: RecipeBookCatalog): PageContent[] {
       continue;
     }
     for (const recipe of recipes) {
-      pages.push(recipePage(recipe, category, rowsOf(recipe.lines), COLUMNS));
+      pages.push(...recipePages(recipe, category, rowsOf(recipe.lines), COLUMNS));
     }
   }
 
@@ -56,25 +56,56 @@ function nameResolver(ingredients: readonly Ingredient[]): (id: string) => strin
   return (id) => byId.get(id)?.name ?? '—';
 }
 
-function recipePage(
+/**
+ * Filas que caben en una cara: menos en la **primera** (comparte espacio con el
+ * título y los chips) y más en las de **continuación** (solo título + tabla).
+ */
+const ROWS_FIRST = 10;
+const ROWS_CONT = 14;
+
+/** Reparte filas en grupos: la primera con `first`, el resto con `rest`. */
+function chunkRows<T>(items: readonly T[], first: number, rest: number): T[][] {
+  if (items.length === 0) return [];
+  const groups: T[][] = [items.slice(0, first)];
+  for (let i = first; i < items.length; i += rest) {
+    groups.push(items.slice(i, i + rest));
+  }
+  return groups;
+}
+
+/**
+ * Una receta como una o varias caras: la primera con título + chips + tabla; si
+ * los insumos no caben, **continúan** en las siguientes (marcadas `continued`,
+ * fuera del índice). El pie muestra «Continúa…» salvo en la última (total).
+ */
+function recipePages(
   recipe: Recipe,
   category: RecipeCategory,
   rows: { cells: string[] }[],
   columns: string[],
-): PageContent {
-  return {
-    kind: 'recipe',
-    section: category.id.value,
-    title: recipe.name,
-    chips: recipeChips(recipe, category),
-    columns,
-    rows,
-    footer: `${recipe.lines.length} insumos`,
-  };
+): PageContent[] {
+  const chips = recipeChips(recipe, category);
+  const total = `${recipe.lines.length} insumos`;
+  const groups = chunkRows(rows, ROWS_FIRST, ROWS_CONT);
+  if (groups.length <= 1) {
+    return [{ kind: 'recipe', section: category.id.value, title: recipe.name, chips, columns, rows, footer: total }];
+  }
+  return groups.map((group, i) => {
+    const last = i === groups.length - 1;
+    return i === 0
+      ? { kind: 'recipe', section: category.id.value, title: recipe.name, chips, columns, rows: group, footer: 'Continúa…' }
+      : {
+          kind: 'recipe',
+          section: category.id.value,
+          title: recipe.name,
+          subtitle: 'continuación',
+          columns,
+          rows: group,
+          continued: true,
+          footer: last ? total : 'Continúa…',
+        };
+  });
 }
-
-/** Cuántos insumos caben cómodos en una cara del libro. */
-const INGREDIENTS_PER_PAGE = 12;
 
 /**
  * Una o más páginas de lista de insumos. Tres columnas bien separadas
@@ -101,16 +132,20 @@ function ingredientListPages(ingredients: readonly Ingredient[]): PageContent[] 
       formatMoney(i.purchasePrice.amount),
     ],
   }));
-  for (let start = 0; start < rows.length; start += INGREDIENTS_PER_PAGE) {
+  const total = `${ingredients.length} insumos`;
+  const groups = chunkRows(rows, ROWS_FIRST, ROWS_CONT);
+  groups.forEach((group, i) => {
+    const last = i === groups.length - 1;
     pages.push({
       kind: 'recipe',
       section: INGREDIENTS_SECTION,
       title: 'Insumos',
-      subtitle: start === 0 ? 'Lo que compras, con su precio' : undefined,
+      subtitle: i === 0 ? 'Lo que compras, con su precio' : 'continuación',
       columns: ['Insumo', 'Cantidad', 'Precio'],
-      rows: rows.slice(start, start + INGREDIENTS_PER_PAGE),
-      footer: `${ingredients.length} insumos`,
+      rows: group,
+      continued: i > 0,
+      footer: last ? total : 'Continúa…',
     });
-  }
+  });
   return pages;
 }

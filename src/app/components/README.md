@@ -40,6 +40,7 @@ targets táctiles ≥ 44px (`min-h-11`). Detalle en
 | [Input](#input) | `migo-input` | Control de texto | ✅ | ✅ |
 | [UnitInput](#unitinput) | `migo-unit-input` | Control numérico con unidad dentro | ✅ | ✅ |
 | [Autocomplete](#autocomplete) | `migo-autocomplete` | Texto con completado fantasma | ✅ | ✅ |
+| [Combobox](#combobox) | `migo-combobox` | Texto: fantasma (1) + desplegable (2+) | ✅ | ✅ |
 | [Checkbox](#checkbox) | `migo-checkbox` | Control booleano | ✅ | ✅ |
 | [Select](#select) | `migo-select` | Control (CDK Overlay+Listbox) | ✅ | ✅ |
 | [Grid](#grid) | `migo-grid` | Hoja de cálculo (celdas + teclado) | — | ✅ |
@@ -157,6 +158,24 @@ sugerencia que coincide aparece tenue dentro del campo; se acepta con Tab / → 
 <migo-autocomplete formControlName="name" [suggestions]="ingredientNames()" placeholder="Harina" />
 ```
 
+## Combobox
+
+`migo-combobox` — texto con **dos modos** según las coincidencias de lo tecleado:
+
+- **1 coincidencia que empieza por** lo escrito → **fantasma en línea** (sufijo tenue; se acepta con
+  Tab / → / Enter), con el scroll sincronizado al input para que **no se desalinee** con nombres largos.
+- **2+ coincidencias**, o **1 que solo contiene** lo escrito → **desplegable** debajo (CDK Overlay +
+  `role="listbox"`) para elegir con ratón o teclado (↑/↓, Enter, Tab, Esc).
+
+La coincidencia del desplegable es **por contenido** (substring); el fantasma solo completa **por
+prefijo**. `ControlValueAccessor` (valor `string`); se integra con `<migo-form-field>`. Inputs iguales
+a Autocomplete: `suggestions` (string[]) · `placeholder` · `ariaLabel` · `invalid` · `disabled` ·
+`seamless` · `paper`. Es el control de nombre que usa la grilla de insumos (`seamless`).
+
+```html
+<migo-combobox seamless formControlName="name" [suggestions]="ingredientNames()" ariaLabel="Ingrediente" />
+```
+
 ## Checkbox
 
 `migo-checkbox` — control booleano, `ControlValueAccessor`. `indeterminate` · `invalid` ·
@@ -205,7 +224,7 @@ Ejemplo vivo de todos los componentes: ruta **`/ui`** (`features/ui-showcase/`).
 `migo-grid` — shell de **hoja de cálculo**: cabecera por columna, celdas pegadas, navegación por
 teclado (↑/↓/Enter cambian de fila; ←/→ saltan de celda en el borde del cursor) y botón de eliminar
 fila. Presentacional y agnóstico del editor: el consumidor proyecta una `<ng-template>` que pinta el
-control de cada celda (típicamente `migo-autocomplete`/`migo-unit-input` `seamless`). Datos y lógica
+control de cada celda (típicamente `migo-combobox`/`migo-unit-input` `seamless`). Datos y lógica
 (fila vacía, validación) los aporta el feature. Inputs: `columns` (`{label, width?}[]`) · `rows` ·
 `protectLastRow` · `removable` (default `true`; `false` oculta la columna de acciones) · `ariaLabel`.
 Output: `removeRow` (índice).
@@ -218,7 +237,7 @@ columnas conservan ancho (`min-w-32` las flexibles, `shrink-0` las de ancho fijo
   <ng-template let-line let-r="rowIndex" let-c="colIndex">
     <div [formGroup]="line">
       @switch (c) {
-        @case (0) { <migo-autocomplete seamless formControlName="name" [suggestions]="names()" /> }
+        @case (0) { <migo-combobox seamless formControlName="name" [suggestions]="names()" /> }
         @case (1) { <migo-unit-input seamless formControlName="quantity" [unit]="unit(r)" /> }
       }
     </div>
@@ -284,7 +303,7 @@ Pendiente (ningún componente de abajo existe todavía). Orden sugerido por uso 
 ### Prioridad baja (datos / formularios avanzados)
 - [ ] **Table** (`migo-table`, CDK Table) — orden, selección.
 - [ ] **Pagination** (`migo-paginator`).
-- [ ] **Tag input / Autocomplete** (CDK Overlay + Listbox).
+- [x] **Combobox / Autocomplete** (CDK Overlay + Listbox) — ✅ hecho: `migo-combobox` (fantasma 1 + desplegable 2+).
 - [ ] **Date picker** (CDK Overlay + calendario).
 - [ ] **Slider** (`migo-slider`).
 - [x] **Icon** (`migo-icon`) — ✅ hecho: registro SVG tipado de Material (`icon/icon.registry.ts`),

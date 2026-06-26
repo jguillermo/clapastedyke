@@ -16,7 +16,7 @@ import { MigoDialog, MigoDialogRef } from '@components/dialog/dialog.service';
 import { ListRecipeBook } from '@core/recipe-book/application/use-cases/list-recipe-book.use-case';
 import { BookEngine, type BookSpread } from '@platform/three/book/book-engine';
 import type { PageContent } from '@platform/three/book/page-content';
-import { RecipeBook, type RecipeBookData } from '../recipe-book';
+import { RecipeBook, type RecipeBookData, type RecipeBookResult } from '../recipe-book';
 import { INGREDIENTS_SECTION, toPages } from './recipe-page-projector';
 
 /** Una entrada del índice (salto rápido a una página). */
@@ -90,7 +90,7 @@ interface IndexEntry {
             migo-button
             variant="secondary"
             size="md"
-            class="shadow-md"
+            class="flex-1 justify-center shadow-md"
             [disabled]="!canPrev()"
             (click)="prev()"
             aria-label="Página anterior"
@@ -98,17 +98,23 @@ interface IndexEntry {
             <migo-icon icon-leading name="mat:chevron_right" size="md" class="rotate-180" />
           </button>
 
-          <span
-            class="min-w-0 flex-1 truncate rounded-full border border-border-subtle bg-surface-card px-4 py-2 text-center font-body text-sm text-body shadow-md"
+          <button
+            migo-button
+            variant="secondary"
+            size="md"
+            class="min-w-0 flex-auto justify-center shadow-md"
+            aria-label="Índice"
+            (click)="toggleIndex()"
           >
-            {{ pageLabel() }}
-          </span>
+            <migo-icon icon-leading name="mat:layers" size="sm" />
+            Índice
+          </button>
 
           <button
             migo-button
             variant="secondary"
             size="md"
-            class="shadow-md"
+            class="flex-1 justify-center shadow-md"
             [disabled]="!canNext()"
             (click)="next()"
             aria-label="Página siguiente"
@@ -118,17 +124,6 @@ interface IndexEntry {
         </div>
 
         <div class="flex w-full items-center justify-center gap-3">
-          <button
-            migo-button
-            variant="ghost"
-            size="md"
-            class="shadow-sm"
-            aria-label="Índice"
-            (click)="toggleIndex()"
-          >
-            <migo-icon icon-leading name="mat:layers" size="sm" />
-            <span class="hidden sm:inline">Índice</span>
-          </button>
           @if (currentSection(); as sec) {
             <button
               migo-button
@@ -215,10 +210,6 @@ export class RecipeBook3d implements AfterViewInit, OnDestroy {
   private readonly spread = signal<BookSpread | null>(null);
   protected readonly canPrev = computed(() => this.spread()?.canPrev ?? false);
   protected readonly canNext = computed(() => this.spread()?.canNext ?? false);
-  protected readonly pageLabel = computed(() => {
-    const s = this.spread();
-    return s?.right?.title ?? s?.left?.title ?? 'Recetario';
-  });
 
   /**
    * Id de la CATEGORÍA de la página actual (para editar/agregar receta ahí). Es
@@ -236,7 +227,7 @@ export class RecipeBook3d implements AfterViewInit, OnDestroy {
   protected readonly indexEntries = this._indexEntries.asReadonly();
 
   private engine: BookEngine | null = null;
-  private dialogRef: MigoDialogRef<unknown, RecipeBook> | null = null;
+  private dialogRef: MigoDialogRef<RecipeBookResult, RecipeBook> | null = null;
   private readonly reducedMotion =
     window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 
@@ -381,16 +372,18 @@ export class RecipeBook3d implements AfterViewInit, OnDestroy {
     }
   }
 
-  private async load(): Promise<void> {
+  private async load(focus?: RecipeBookResult): Promise<void> {
     const catalog = await this.listRecipeBook.execute();
     const pages = toPages(catalog);
     this._indexEntries.set(buildIndex(pages));
-    // Conserva la cara actual al recargar (p. ej. tras cerrar el editor): no volver
-    // al inicio. El ancla por cara funciona en ambos modos (spread y single).
-    const keepFace = this.engine?.currentFaceIndex ?? 0;
+    // Tras cerrar el hub salta a lo último que se tocó (receta/categoría/insumos);
+    // si no hay foco, conserva la cara actual (no volver al inicio). El ancla por
+    // cara funciona en ambos modos (spread y single).
+    const target = focus ? resolveFace(pages, focus) : -1;
+    const face = target >= 0 ? target : this.engine?.currentFaceIndex ?? 0;
     this.engine?.setPages(pages);
-    if (keepFace > 0) {
-      this.engine?.jumpToFace(keepFace);
+    if (face > 0) {
+      this.engine?.jumpToFace(face);
     }
   }
 
@@ -405,20 +398,40 @@ export class RecipeBook3d implements AfterViewInit, OnDestroy {
       return;
     }
     // Modal responsivo normal: tarjeta centrada en desktop, pantalla completa en móvil.
-    this.dialogRef = this.dialog.open<unknown, RecipeBookData, RecipeBook>(RecipeBook, {
+    this.dialogRef = this.dialog.open<RecipeBookResult, RecipeBookData, RecipeBook>(RecipeBook, {
       ariaLabel: 'Mi libro de recetas',
       width: '560px',
       data,
     });
-    this.dialogRef.closed.subscribe(() => {
+    this.dialogRef.closed.subscribe((result) => {
       this.dialogRef = null;
       if (asFallback) {
         this.closed.emit();
       } else {
-        void this.load(); // reflejar cambios hechos en el hub
+        void this.load(result ?? undefined); // reflejar y saltar a lo tocado
       }
     });
   }
+}
+
+/**
+ * Cara a la que saltar tras cerrar el hub: la receta recién guardada (su 1ª cara),
+ * o el divisor de su categoría, o la 1ª cara de Insumos. `-1` si no se resuelve.
+ */
+function resolveFace(pages: PageContent[], focus: RecipeBookResult): number {
+  if (focus.ingredients) {
+    return pages.findIndex((p) => p.section === INGREDIENTS_SECTION && p.kind === 'recipe');
+  }
+  if (focus.recipeName && focus.categoryId) {
+    const i = pages.findIndex(
+      (p) => p.kind === 'recipe' && !p.continued && p.section === focus.categoryId && p.title === focus.recipeName,
+    );
+    if (i >= 0) return i;
+  }
+  if (focus.categoryId) {
+    return pages.findIndex((p) => p.kind === 'section' && p.section === focus.categoryId);
+  }
+  return -1;
 }
 
 /** Construye el índice (categorías + recetas) a partir de las páginas. Excluye Insumos. */
@@ -427,6 +440,9 @@ function buildIndex(pages: PageContent[]): IndexEntry[] {
   pages.forEach((page, faceIndex) => {
     if (page.section === INGREDIENTS_SECTION) {
       return; // Insumos nunca va en el índice
+    }
+    if (page.continued) {
+      return; // las hojas de continuación no se listan aparte
     }
     if (page.kind === 'section') {
       entries.push({ label: page.title ?? '', faceIndex, section: true });

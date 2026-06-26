@@ -36,4 +36,9 @@ export interface PageContent {
   readonly rows?: PageRow[];
   /** Pie de página (numeración, totales, nota). */
   readonly footer?: string;
+  /**
+   * `true` si esta cara **continúa** la anterior (la tabla no cabía en una hoja).
+   * El feature la marca para no duplicarla en el índice; la plataforma no la usa.
+   */
+  readonly continued?: boolean;
 }

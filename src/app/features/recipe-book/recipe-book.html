@@ -9,72 +9,68 @@
 
   <migo-card-body>
     @if (loaded()) {
-      <div class="flex flex-col gap-8">
+      <migo-swiper ariaLabel="Categorías del recetario" (indexChange)="onTabChange($event)">
         @for (category of categoryViews(); track category.id) {
-          <section class="flex flex-col gap-3">
-            <div class="flex items-center justify-between gap-3">
-              <h3 class="m-0 font-display text-lead text-heading">{{ category.name }}</h3>
-              <button
-                migo-button
-                variant="ghost"
-                size="sm"
-                type="button"
-                [attr.aria-label]="'Editar categoría ' + category.name"
-                (click)="editCategoryById(category.id)"
-              >
-                <migo-icon icon-leading name="mat:edit" size="sm" />
-              </button>
-            </div>
+          <ng-template migoSwiperSlide [label]="category.name">
+            <section class="flex flex-col gap-3">
+              @if (category.recipes.length === 0) {
+                <p class="m-0 text-muted">Aún no hay recetas aquí.</p>
+              } @else {
+                <ul class="flex flex-col gap-2 m-0 p-0 list-none">
+                  @for (recipe of category.recipes; track recipe.id) {
+                    <li>
+                      <button
+                        type="button"
+                        class="flex flex-wrap items-center justify-between gap-3 w-full min-h-11 px-4 py-3 rounded-lg bg-surface-sunken text-start cursor-pointer transition duration-base ease-out hover:bg-surface-card hover:border-border-subtle border border-transparent focus-visible:outline-none focus-visible:shadow-focus motion-reduce:transition-none"
+                        (click)="openRecipe(recipe.id)"
+                      >
+                        <span class="flex flex-col">
+                          <span class="font-body font-semibold text-body">{{ recipe.name }}</span>
+                          <span class="text-caption text-muted">{{ recipe.lineCount }} ingredientes</span>
+                        </span>
+                        <span class="flex flex-wrap items-center gap-1.5">
+                          @for (chip of recipe.chips; track chip) {
+                            <span class="inline-flex items-center min-h-6 px-2.5 rounded-full bg-surface-card border border-border-subtle text-caption text-body">
+                              {{ chip }}
+                            </span>
+                          }
+                        </span>
+                      </button>
+                    </li>
+                  }
+                </ul>
+              }
 
-            @if (category.recipes.length === 0) {
-              <p class="m-0 text-muted">Aún no hay recetas aquí.</p>
-            } @else {
-              <ul class="flex flex-col gap-2 m-0 p-0 list-none">
-                @for (recipe of category.recipes; track recipe.id) {
-                  <li>
-                    <button
-                      type="button"
-                      class="flex flex-wrap items-center justify-between gap-3 w-full min-h-11 px-4 py-3 rounded-lg bg-surface-sunken text-start cursor-pointer transition duration-base ease-out hover:bg-surface-card hover:border-border-subtle border border-transparent focus-visible:outline-none focus-visible:shadow-focus motion-reduce:transition-none"
-                      (click)="openRecipe(recipe.id)"
-                    >
-                      <span class="flex flex-col">
-                        <span class="font-body font-semibold text-body">{{ recipe.name }}</span>
-                        <span class="text-caption text-muted">{{ recipe.lineCount }} ingredientes</span>
-                      </span>
-                      <span class="flex flex-wrap items-center gap-1.5">
-                        @for (chip of recipe.chips; track chip) {
-                          <span class="inline-flex items-center min-h-6 px-2.5 rounded-full bg-surface-card border border-border-subtle text-caption text-body">
-                            {{ chip }}
-                          </span>
-                        }
-                      </span>
-                    </button>
-                  </li>
-                }
-              </ul>
-            }
-
-            <div>
-              <button migo-button variant="secondary" type="button" (click)="addRecipe(category.id)">
-                <migo-icon icon-leading name="mat:add" size="sm" />
-                Agregar receta
-              </button>
-            </div>
-          </section>
+              <div class="flex flex-wrap items-center gap-3">
+                <button migo-button variant="secondary" type="button" (click)="addRecipe(category.id)">
+                  <migo-icon icon-leading name="mat:add" size="sm" />
+                  Agregar receta
+                </button>
+                <button migo-button variant="ghost" type="button" (click)="editCategoryById(category.id)">
+                  <migo-icon icon-leading name="mat:edit" size="sm" />
+                  Editar categoría
+                </button>
+              </div>
+            </section>
+          </ng-template>
         }
 
-        <div class="pt-2">
-          <button migo-button type="button" (click)="createCategory()">
-            <migo-icon icon-leading name="mat:add" size="sm" />
-            Crear categoría
-          </button>
-        </div>
+        <ng-template migoSwiperSlide label="Insumos">
+          <section class="flex flex-col gap-3">
+            <app-ingredient-list [ingredients]="ingredientEntities()" (changed)="onIngredientsChanged()" />
+          </section>
+        </ng-template>
 
-        <section class="flex flex-col gap-3 pt-6 border-t border-border-subtle">
-          <h3 class="m-0 font-display text-lead text-heading">Insumos</h3>
-          <app-ingredient-list [ingredients]="ingredientEntities()" (changed)="reload()" />
-        </section>
-      </div>
+        <ng-template migoSwiperSlide label="+ Crear categoría">
+          <section class="flex flex-col items-start gap-3">
+            <p class="m-0 text-muted">Crea una nueva categoría para organizar tus recetas.</p>
+            <button migo-button variant="secondary" type="button" (click)="createCategory()">
+              <migo-icon icon-leading name="mat:add" size="sm" />
+              Crear categoría
+            </button>
+          </section>
+        </ng-template>
+      </migo-swiper>
     }
   </migo-card-body>
 </migo-card>

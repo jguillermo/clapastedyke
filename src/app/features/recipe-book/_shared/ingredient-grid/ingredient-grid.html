@@ -11,7 +11,7 @@
       <div [formGroup]="line">
         @switch (c) {
           @case (0) {
-            <migo-autocomplete
+            <migo-combobox
               seamless
               formControlName="name"
               [suggestions]="ingredientNames()"
