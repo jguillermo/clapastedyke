@@ -12,7 +12,7 @@ import {
 } from '@angular/core';
 import { FormArray, FormBuilder, FormGroup, ReactiveFormsModule, type FormControl } from '@angular/forms';
 import { toSignal, takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { Grid, type GridColumn } from '@components/grid/grid';
+import { Table, type TableColumn } from '@components/table/table';
 import { Autocomplete } from '@components/autocomplete/autocomplete';
 import { UnitInput, type UnitToken } from '@components/unit-input/unit-input';
 import { CurrencyInput } from '@components/currency-input/currency-input';
@@ -53,7 +53,7 @@ interface RowPurchase {
 @Component({
   selector: 'app-ingredient-list',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, Grid, Autocomplete, UnitInput, CurrencyInput, Icon],
+  imports: [ReactiveFormsModule, Table, Autocomplete, UnitInput, CurrencyInput, Icon],
   host: { '(focusout)': 'onFocusOut($event)' },
   templateUrl: './ingredient-list.html',
 })
@@ -70,11 +70,11 @@ export class IngredientList implements OnInit {
   /** Se emite tras guardar para que el hub recargue el catálogo (libro 3D, etc.). */
   readonly changed = output<void>();
 
-  // Insumo crece (flex-1); empaque y precio se ajustan a su contenido (anchos compactos).
-  protected readonly columns: readonly GridColumn[] = [
-    { label: 'Insumo' },
-    { label: 'Empaque', width: 'w-28' },
-    { label: 'Precio', width: 'w-28' },
+  // Insumo flexible (absorbe el espacio); empaque y precio fijos compactos (llevan input).
+  protected readonly columns: readonly TableColumn[] = [
+    { name: 'Insumo' },
+    { name: 'Empaque', size: 96 },
+    { name: 'Precio', size: 96 },
   ];
 
   protected readonly lines = this.fb.array<LineGroup>([this.newLine()]);

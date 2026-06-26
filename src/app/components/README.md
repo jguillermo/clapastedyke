@@ -43,7 +43,7 @@ targets táctiles ≥ 44px (`min-h-11`). Detalle en
 | [Combobox](#combobox) | `migo-combobox` | Texto: fantasma (1) + desplegable (2+) | ✅ | ✅ |
 | [Checkbox](#checkbox) | `migo-checkbox` | Control booleano | ✅ | ✅ |
 | [Select](#select) | `migo-select` | Control (CDK Overlay+Listbox) | ✅ | ✅ |
-| [Grid](#grid) | `migo-grid` | Hoja de cálculo (celdas + teclado) | — | ✅ |
+| [Table](#table) | `migo-table` | Hoja de cálculo (`<table>` + teclado) | — | ✅ |
 | [SelectTag](#selecttag) | `migo-select-tag` | Etiquetas tipo Select2 (chips + autocompletar) | — | ✅ |
 | [Dialog](#dialog) | `MigoDialog` (servicio) | Servicio (CDK Dialog) | — | ✅ |
 | [Swiper](#swiper) | `migo-swiper` (+ `migoSwiperSlide`) | Carrusel con pestañas (Swiper Element) | — | ✅ |
@@ -222,30 +222,62 @@ protected readonly data = inject<ConfirmDialogData>(MIGO_DIALOG_DATA);
 
 Ejemplo vivo de todos los componentes: ruta **`/ui`** (`features/ui-showcase/`).
 
-## Grid
+## Table
 
-`migo-grid` — shell de **hoja de cálculo**: cabecera por columna, celdas pegadas, navegación por
-teclado (↑/↓/Enter cambian de fila; ←/→ saltan de celda en el borde del cursor) y botón de eliminar
-fila. Presentacional y agnóstico del editor: el consumidor proyecta una `<ng-template>` que pinta el
-control de cada celda (típicamente `migo-combobox`/`migo-unit-input` `seamless`). Datos y lógica
-(fila vacía, validación) los aporta el feature. Inputs: `columns` (`{label, width?}[]`) · `rows` ·
-`protectLastRow` · `removable` (default `true`; `false` oculta la columna de acciones) · `ariaLabel`.
-Output: `removeRow` (índice).
+`migo-table` — shell de **hoja de cálculo** sobre un `<table>` real (`role="grid"`): cabecera por
+columna, celdas pegadas y navegación por teclado (↑/↓/Enter cambian de fila; ←/→ saltan de celda en
+el borde del cursor; **Tab nativo** fila-mayor). Presentacional y agnóstico del editor: el consumidor
+proyecta una `<ng-template>` que pinta el control de cada celda (típicamente
+`migo-combobox`/`migo-unit-input` `seamless`). Datos y lógica (fila vacía, validación) los aporta el
+feature.
 
-**Mobile-first**: en pantallas estrechas la grilla **scrollea en horizontal** (no se aplasta) — las
-columnas conservan ancho (`min-w-32` las flexibles, `shrink-0` las de ancho fijo).
+**Eliminar fila**: la tabla **no** trae columna de acciones. Si el feature necesita borrar, añade su
+propia columna con un botón y llama a `migo-table.remove(rowIndex)` (vía referencia de plantilla
+`#table`), que dispara la salida `removeRow`. Así el feature decide cuándo/dónde mostrar el botón.
+
+**Tamaño de columna** (`size`): los anchos se expresan **en la escala del tema** (no valores
+arbitrarios ni `[style]`): `table-auto` da `'fit'` y la pista compartida nativamente; px/`%`/flexible
+se mapean a utilidades del tema vía mapas de literales.
+
+| `size` | Comportamiento | Utilidad |
+|---|---|---|
+| `number` (px) | ancho fijo | `w-*` (p.ej. `96`→`w-24`) |
+| `'40%'` | porcentaje | fracción (`w-2/5`) |
+| `'fit'` | ajustado al contenido (sin partirse) | `w-px whitespace-nowrap` |
+| *(omitido)* | flexible (absorbe lo que sobra) | `auto` (sin width) |
+
+Inputs: `columns` (`{ name, size?, align?, max? }[]`) · `rows` · `ariaLabel` · `bleed` (en móvil
+rompe el padding del padre y va borde a borde) · `maxWidth` (`'reading'|'page'`). Output: `removeRow`
+(índice). Métodos públicos: `focusCell(r, c)` · `remove(index)` (dispara `removeRow`).
+
+**Mobile-first**: vertical **nunca scrollea** (crece; scrollea el contenedor exterior). Las columnas
+flexibles (`auto`) absorben el ancho sobrante; si las fijas/% suman de más, hay **scroll horizontal**
+de fallback. `bleed` lleva la tabla a los bordes en móvil. Los inputs de celda llevan `min-w-0`
+(variante `[&_input]:`) para que `table-auto` respete los anchos fijos.
 
 ```html
-<migo-grid [columns]="columns" [rows]="lineControls()" (removeRow)="removeLine($event)">
+<migo-table
+  #table
+  [columns]="[{ name: 'Insumo' }, { name: 'Cantidad', size: 'fit', align: 'center' }, { name: '', size: 'fit' }]"
+  [rows]="lineControls()"
+  bleed
+  (removeRow)="removeLine($event)"
+>
   <ng-template let-line let-r="rowIndex" let-c="colIndex">
     <div [formGroup]="line">
       @switch (c) {
         @case (0) { <migo-combobox seamless formControlName="name" [suggestions]="names()" /> }
         @case (1) { <migo-unit-input seamless formControlName="quantity" [unit]="unit(r)" /> }
+        @case (2) {
+          <!-- botón de eliminar: lo pinta el feature y dispara removeRow vía la API de la tabla -->
+          <button migo-button variant="ghost" size="sm" aria-label="Quitar fila" (click)="table.remove(r)">
+            <migo-icon icon-leading name="mat:close" size="sm" />
+          </button>
+        }
       }
     </div>
   </ng-template>
-</migo-grid>
+</migo-table>
 ```
 
 ## SelectTag

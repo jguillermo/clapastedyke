@@ -130,7 +130,7 @@ describe('Combobox (ghost + dropdown)', () => {
     const { input } = setup();
     type(input, 'Har'); // 2 matches → dropdown
     let bubbledToHost = false;
-    // Un ancestro (como el host de migo-grid) escucha keydown por burbujeo.
+    // Un ancestro (como el host de migo-table) escucha keydown por burbujeo.
     const spy = () => (bubbledToHost = true);
     document.addEventListener('keydown', spy);
     try {

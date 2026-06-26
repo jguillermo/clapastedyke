@@ -219,7 +219,7 @@ export class Combobox implements ControlValueAccessor {
     const hasDropdown = this.dropdownOptions().length > 0;
 
     // Las flechas abren/navegan el desplegable. Importante: además de preventDefault, se
-    // **detiene la propagación** para que el (keydown) del migo-grid no cambie de celda.
+    // **detiene la propagación** para que el (keydown) del migo-table no cambie de celda.
     if (hasDropdown && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
       event.preventDefault();
       event.stopPropagation();

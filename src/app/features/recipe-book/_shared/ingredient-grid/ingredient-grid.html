@@ -1,7 +1,8 @@
 <div class="flex flex-col gap-2">
   <span class="font-body text-sm font-semibold text-body">Ingredientes</span>
 
-  <migo-grid
+  <migo-table
+    #table
     [columns]="columns"
     [rows]="lineControls()"
     ariaLabel="Ingredientes de la receta"
@@ -52,13 +53,27 @@
               </button>
             }
           }
+          @case (3) {
+            @if (r < lineControls().length - 1) {
+              <button
+                migo-button
+                variant="ghost"
+                size="sm"
+                type="button"
+                aria-label="Quitar fila"
+                (click)="table.remove(r)"
+              >
+                <migo-icon icon-leading name="mat:close" size="sm" />
+              </button>
+            }
+          }
         }
       </div>
     </ng-template>
-  </migo-grid>
+  </migo-table>
 
   @if (materialTotal()) {
-    <div class="flex items-center justify-between border-t border-border-subtle pt-2">
+    <div class="flex items-center justify-between border-border-subtle pt-2">
       <span class="font-body text-sm font-semibold text-body">Costo de materiales</span>
       <span class="font-body text-base font-semibold text-heading">{{ materialTotal() }}</span>
     </div>

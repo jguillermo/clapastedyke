@@ -15,7 +15,9 @@ import { OverlayModule } from '@angular/cdk/overlay';
 import { BaseUnit } from '@core/_common/quantity';
 import { UnitInput, type UnitToken } from '@components/unit-input/unit-input';
 import { Combobox } from '@components/combobox/combobox';
-import { Grid, type GridColumn } from '@components/grid/grid';
+import { Table, type TableColumn } from '@components/table/table';
+import { Button } from '@components/button/button';
+import { Icon } from '@components/icon/icon';
 import { MeasureInput, type MeasureKind } from '@core/recipe-book/domain/value-objects/measure-input';
 import { PreviewRecipeCost } from '@core/recipe-book/application/use-cases/preview-recipe-cost.use-case';
 import { PriceCapture, type PurchaseValue } from '../price-capture/price-capture';
@@ -53,7 +55,7 @@ interface CostView {
 @Component({
   selector: 'app-ingredient-grid',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, OverlayModule, UnitInput, Combobox, Grid, PriceCapture],
+  imports: [ReactiveFormsModule, OverlayModule, UnitInput, Combobox, Table, Button, Icon, PriceCapture],
   host: { '(focusout)': 'bumpInteraction()' },
   templateUrl: './ingredient-grid.html',
 })
@@ -67,11 +69,14 @@ export class IngredientGrid implements OnInit {
   /** Líneas para precargar al editar una receta (vacío = grilla nueva en blanco). */
   readonly initialLines = input<InitialLine[]>([]);
 
-  // Ingrediente crece (flex-1); cantidad y costo se ajustan a su contenido (anchos compactos).
-  protected readonly columns: readonly GridColumn[] = [
-    { label: 'Ingrediente' },
-    { label: 'Cantidad', width: 'w-28' },
-    { label: 'Costo', width: 'w-28' },
+  // Ingrediente flexible (absorbe el espacio); Cantidad y Costo 'fit' centradas (se encogen a su
+  // contenido: la cantidad usa field-sizing y el costo es un botón de texto). La 4ª columna ('')
+  // es la de eliminar fila: el botón lo pinta el feature y llama a `migo-table.remove(r)`.
+  protected readonly columns: readonly TableColumn[] = [
+    { name: 'Ingrediente' },
+    { name: 'Cantidad', size: 'fit', align: 'center' },
+    { name: 'Costo', size: 'fit', align: 'center' },
+    { name: '', size: 'fit', align: 'center' },
   ];
 
   protected readonly lines = this.fb.array<LineGroup>([this.newLine()]);
@@ -81,7 +86,7 @@ export class IngredientGrid implements OnInit {
   protected readonly costViews = signal<CostView[]>([]);
   protected readonly materialTotal = signal('');
 
-  private readonly gridRef = viewChild(Grid);
+  private readonly tableRef = viewChild(Table);
 
   // Popover de precio anclado a la fila activa.
   protected readonly activeRow = signal<number | null>(null);
@@ -92,7 +97,10 @@ export class IngredientGrid implements OnInit {
 
   /** Opciones del catálogo indexadas por nombre (para jalar el precio). */
   private readonly optionsByName = computed(
-    () => new Map<string, IngredientOption>(this.ingredients().map((opt) => [opt.name.trim().toLowerCase(), opt])),
+    () =>
+      new Map<string, IngredientOption>(
+        this.ingredients().map((opt) => [opt.name.trim().toLowerCase(), opt]),
+      ),
   );
 
   constructor() {
@@ -232,7 +240,12 @@ export class IngredientGrid implements OnInit {
         this.errorMessage.set(`La unidad de "${name}" no coincide con cómo lo compras.`);
         return null;
       }
-      parsed.push({ name, baseUnit: purchase.per.unit, quantity: measure.quantity.value, purchase });
+      parsed.push({
+        name,
+        baseUnit: purchase.per.unit,
+        quantity: measure.quantity.value,
+        purchase,
+      });
     }
     return parsed;
   }
@@ -245,7 +258,7 @@ export class IngredientGrid implements OnInit {
 
   /** Tras elegir un insumo (Tab/Enter o clic en el desplegable), avanza a la cantidad (col 1). */
   protected onIngredientPicked(index: number): void {
-    setTimeout(() => this.gridRef()?.focusCell(index, 1));
+    setTimeout(() => this.tableRef()?.focusCell(index, 1));
   }
 
   protected removeLine(index: number): void {
@@ -273,7 +286,7 @@ export class IngredientGrid implements OnInit {
       this.lines.at(r)?.controls.purchase.setValue(purchase);
       this.activeRow.set(null);
       this.activeOrigin.set(null);
-      setTimeout(() => this.gridRef()?.focusCell(r + 1, 0));
+      setTimeout(() => this.tableRef()?.focusCell(r + 1, 0));
     }
   }
 
@@ -320,11 +333,15 @@ export class IngredientGrid implements OnInit {
         const measure = this.measureOf(line);
         return {
           purchasePrice: purchases[i],
-          quantity: measure.quantity ? { value: measure.quantity.value, unit: measure.baseUnit } : undefined,
+          quantity: measure.quantity
+            ? { value: measure.quantity.value, unit: measure.baseUnit }
+            : undefined,
         };
       }),
     });
-    this.costViews.set(result.items.map((item, i) => ({ hasPrice: purchases[i] !== null, cost: item.cost })));
+    this.costViews.set(
+      result.items.map((item, i) => ({ hasPrice: purchases[i] !== null, cost: item.cost })),
+    );
     this.materialTotal.set(purchases.some((p) => p !== null) ? result.total : '');
   }
 

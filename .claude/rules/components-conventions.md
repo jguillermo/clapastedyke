@@ -270,6 +270,25 @@ El `Select` (panel desplegable) sí usa **CDK Overlay** declarativo:
   `aria-selected:` (+ `group`/`group-aria-selected:` para el check interior) y `aria-disabled:`,
   no con clases propias; el resaltado de teclado del CDK con `[&.cdk-option-active]:bg-surface-sunken`.
 
+## Table (hoja de cálculo)
+
+`migo-table` es el shell de hoja de cálculo: un **`<table>` real** con `role="grid"`
+(`<thead>/<tbody>/<tr>/<th scope="col">/<td>`), navegación por teclado entre celdas (↑/↓/Enter/←/→ y
+**Tab nativo** fila-mayor) y eliminar fila. Agnóstico: el consumidor proyecta una `<ng-template>` con
+el control de cada celda.
+
+- **Tamaño de columna con utilidades del tema, sin excepción de estilo.** La API
+  `{ name, size?, align?, max? }` mapea `size` a clases del tema: `'fit'` y la pista compartida los
+  da `table-auto` nativamente; `number`→`w-*`, `'NN%'`→fracción (`w-2/5`), omitido→`w-full`. **No** se
+  usa `[style.gridTemplateColumns]` ni valores arbitrarios: el mapeo vive en **mapas de literales**
+  dentro del componente (Tailwind solo emite las clases que aparecen literalmente en el código; no se
+  pueden construir `w-${n}` en runtime). Los tamaños se **ajustan a la escala del tema**.
+- **Inputs de celda con `min-w-0`** (variante estructural `[&_input]:min-w-0` en el `<td>`) para que
+  `table-auto` respete los anchos fijos (si no, el ancho intrínseco del input los ensancha).
+- **Mobile-first**: vertical nunca scrollea (crece); `bleed` lleva la tabla borde a borde rompiendo
+  el padding del padre en móvil; `maxWidth` la centra en `sm+`. Ver
+  [mobile-first-conventions.md](mobile-first-conventions.md).
+
 ## Accesibilidad (requisito duro)
 
 - Debe pasar **todos los checks de AXE** y cumplir **WCAG AA** (contraste, foco, ARIA). **Única
