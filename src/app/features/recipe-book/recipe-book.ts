@@ -13,6 +13,7 @@ import { CardBody } from '@components/card/card-body';
 import { CardHeader } from '@components/card/card-header';
 import { CardTitle } from '@components/card/card-title';
 import { Icon } from '@components/icon/icon';
+import { Spacer } from '@components/spacer/spacer';
 import { MigoSwiper } from '@components/swiper/swiper';
 import { MigoSwiperSlide } from '@components/swiper/swiper-slide';
 import { MigoDialog, MigoDialogRef, MIGO_DIALOG_DATA } from '@components/dialog/dialog.service';
@@ -71,7 +72,7 @@ export interface RecipeBookResult {
 @Component({
   selector: 'app-recipe-book',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Button, Card, CardHeader, CardTitle, CardBody, Icon, IngredientList, MigoSwiper, MigoSwiperSlide],
+  imports: [Button, Card, CardHeader, CardTitle, CardBody, Icon, Spacer, IngredientList, MigoSwiper, MigoSwiperSlide],
   // `contents`: el card `fill` es hijo flex directo del diálogo y llena la pantalla en móvil.
   host: { class: 'contents' },
   templateUrl: './recipe-book.html',

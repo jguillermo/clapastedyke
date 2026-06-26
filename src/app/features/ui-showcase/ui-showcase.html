@@ -26,9 +26,28 @@
       Tamaños
     </h3>
     <div class="flex flex-wrap gap-3 items-baseline">
+      <button migo-button size="2xs">2XSmall</button>
+      <button migo-button size="xs">XSmall</button>
       <button migo-button size="sm">Small</button>
       <button migo-button size="md">Medium</button>
       <button migo-button size="lg">Large</button>
+      <button migo-button size="xl">XLarge</button>
+      <button migo-button size="2xl">2XLarge</button>
+    </div>
+
+    <h3 class="mt-2 mb-0 font-body text-eyebrow font-semibold tracking-overline uppercase text-muted">
+      Icono + spacer
+    </h3>
+    <div class="flex flex-wrap gap-3 items-center">
+      <button migo-button variant="secondary">
+        <migo-icon icon-leading name="mat:add" size="sm" /><migo-spacer />Con icono
+      </button>
+      <button migo-button variant="ghost">
+        Siguiente<migo-spacer /><migo-icon icon-trailing name="mat:chevron_right" size="sm" />
+      </button>
+      <button migo-button variant="ghost" aria-label="Cerrar">
+        <migo-icon icon-leading name="mat:close" size="sm" />
+      </button>
     </div>
 
     <h3 class="mt-2 mb-0 font-body text-eyebrow font-semibold tracking-overline uppercase text-muted">
@@ -45,6 +64,39 @@
       Ancho completo
     </h3>
     <button migo-button block>Block</button>
+  </section>
+
+  <!-- ============================ Spacer ============================ -->
+  <section
+    class="flex flex-col gap-4 p-6 bg-surface-card border border-border-subtle rounded-xl shadow-sm"
+  >
+    <h2 class="m-0 text-h2">Spacer</h2>
+    <p class="m-0 text-muted">
+      Separador horizontal sin nada visible. Solo añade hueco entre dos elementos en línea.
+    </p>
+
+    <h3 class="mt-2 mb-0 font-body text-eyebrow font-semibold tracking-overline uppercase text-muted">
+      Tamaños
+    </h3>
+    <div class="flex flex-col gap-2">
+      <span class="inline-flex items-center bg-surface-sunken rounded-md self-start">
+        <span class="px-2 py-1 text-sm text-body">A</span><migo-spacer size="sm" /><span class="px-2 py-1 text-sm text-body">B (sm · 4px)</span>
+      </span>
+      <span class="inline-flex items-center bg-surface-sunken rounded-md self-start">
+        <span class="px-2 py-1 text-sm text-body">A</span><migo-spacer size="md" /><span class="px-2 py-1 text-sm text-body">B (md · 8px)</span>
+      </span>
+      <span class="inline-flex items-center bg-surface-sunken rounded-md self-start">
+        <span class="px-2 py-1 text-sm text-body">A</span><migo-spacer size="lg" /><span class="px-2 py-1 text-sm text-body">B (lg · 12px)</span>
+      </span>
+    </div>
+
+    <h3 class="mt-2 mb-0 font-body text-eyebrow font-semibold tracking-overline uppercase text-muted">
+      hideOnMobile (oculto &lt;640px)
+    </h3>
+    <button migo-button variant="secondary">
+      <migo-icon icon-leading name="mat:edit" size="sm" />
+      <migo-spacer hideOnMobile /><span class="hidden sm:inline">Editar</span>
+    </button>
   </section>
 
   <!-- ====================== FormField + Input ====================== -->

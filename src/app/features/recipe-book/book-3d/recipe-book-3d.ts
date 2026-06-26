@@ -12,6 +12,7 @@ import {
 } from '@angular/core';
 import { Button } from '@components/button/button';
 import { Icon } from '@components/icon/icon';
+import { Spacer } from '@components/spacer/spacer';
 import { MigoDialog, MigoDialogRef } from '@components/dialog/dialog.service';
 import { ListRecipeBook } from '@core/recipe-book/application/use-cases/list-recipe-book.use-case';
 import { BookEngine, type BookSpread } from '@platform/three/book/book-engine';
@@ -39,7 +40,7 @@ interface IndexEntry {
 @Component({
   selector: 'app-recipe-book-3d',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Button, Icon],
+  imports: [Button, Icon, Spacer],
   host: {
     class: 'fixed inset-0 z-40 block bg-surface-page',
     '(window:resize)': 'onResize()',
@@ -65,7 +66,7 @@ interface IndexEntry {
         (click)="close()"
       >
         <migo-icon icon-leading name="mat:arrow_back" size="sm" />
-        Volver
+        <migo-spacer />Volver
       </button>
 
       <!-- Título del libro -->
@@ -107,7 +108,7 @@ interface IndexEntry {
             (click)="toggleIndex()"
           >
             <migo-icon icon-leading name="mat:layers" size="sm" />
-            Índice
+            <migo-spacer />Índice
           </button>
 
           <button
@@ -134,7 +135,7 @@ interface IndexEntry {
               (click)="editHere(sec)"
             >
               <migo-icon icon-leading name="mat:edit" size="sm" />
-              <span class="hidden sm:inline">Editar</span>
+              <migo-spacer hideOnMobile /><span class="hidden sm:inline">Editar</span>
             </button>
             <button
               migo-button
@@ -145,7 +146,7 @@ interface IndexEntry {
               (click)="addHere(sec)"
             >
               <migo-icon icon-leading name="mat:add" size="sm" />
-              <span class="hidden sm:inline">{{ addLabel }}</span>
+              <migo-spacer hideOnMobile /><span class="hidden sm:inline">{{ addLabel }}</span>
             </button>
           } @else {
             <button
@@ -157,7 +158,7 @@ interface IndexEntry {
               (click)="manage()"
             >
               <migo-icon icon-leading name="mat:edit" size="sm" />
-              <span class="hidden sm:inline">Gestionar</span>
+              <migo-spacer hideOnMobile /><span class="hidden sm:inline">Gestionar</span>
             </button>
           }
         </div>

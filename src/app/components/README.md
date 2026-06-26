@@ -35,6 +35,7 @@ targets táctiles ≥ 44px (`min-h-11`). Detalle en
 |---|---|---|:---:|:---:|
 | [Icon](#icon) | `migo-icon` | Presentacional | — | ✅ |
 | [Button](#button) | `button[migo-button]`, `a[migo-button]` | Presentacional | — | ✅ |
+| [Spacer](#spacer) | `migo-spacer` | Presentacional (separador horizontal) | — | ✅ |
 | [Card](#card) (+ partes) | `migo-card` (+ `-header/-title/-subtitle/-body/-footer`) | Presentacional | — | ✅ |
 | [FormField](#formfield) | `migo-form-field` | Layout de campo | — | ✅ |
 | [Input](#input) | `migo-input` | Control de texto | ✅ | ✅ |
@@ -74,12 +75,43 @@ en plantillas — todo icono va por `migo-icon`. Las clases de animación (`opac
 
 ## Button
 
-`variant`: `primary` \| `secondary` \| `ghost` \| `danger` · `size`: `sm` \| `md` \| `lg` ·
-`loading` · `block` · `disabled`. Slots: `[icon-leading]`, contenido (label), `[icon-trailing]`.
+`variant`: `primary` \| `secondary` \| `ghost` \| `danger` · `size`: `2xs` (28) \| `xs` (32) \|
+`sm` (36) \| `md` (44, default) \| `lg` (52) \| `xl` (56) \| `2xl` (64) · `loading` · `block` ·
+`disabled`. Slots: `[icon-leading]`, contenido (label), `[icon-trailing]`.
+
+El botón **no** lleva separación automática entre icono y texto: usa un [`migo-spacer`](#spacer)
+entre ambos. Así el botón solo-icono queda limpio (sin hueco sobrante). Solo `md` (44px) cumple el
+target táctil ≥44px por sí solo; los tamaños menores son para acciones secundarias/compactas (ver
+mobile-first).
 
 ```html
 <button migo-button variant="primary" size="md" [loading]="saving()">Guardar</button>
 <a migo-button variant="ghost" href="...">Cancelar</a>
+<!-- icono + texto: separa con migo-spacer -->
+<button migo-button variant="secondary">
+  <migo-icon icon-leading name="mat:add" size="sm" /><migo-spacer />Agregar
+</button>
+<!-- icono solo: sin spacer, sin hueco -->
+<button migo-button variant="ghost" aria-label="Cerrar">
+  <migo-icon icon-leading name="mat:close" size="sm" />
+</button>
+```
+
+## Spacer
+
+`migo-spacer` — separador **horizontal** sin nada visible: solo añade hueco (caja `inline-block`
+vacía con ancho del tema). Úsalo donde necesites separar dos elementos en línea — típicamente entre
+el icono y el texto de un botón. `size`: `sm` (4px) \| `md` (8px, default) \| `lg` (12px) ·
+`hideOnMobile` (booleano): si se activa, desaparece en móvil y reaparece en `sm+` — pensado para
+botones que en móvil ocultan su texto y dejan solo el icono (el spacer se va con el texto).
+
+```html
+<!-- entre icono y texto -->
+<migo-icon icon-leading name="mat:edit" size="sm" /><migo-spacer />Editar
+
+<!-- el texto se oculta en móvil → el spacer también -->
+<migo-icon icon-leading name="mat:add" size="sm" />
+<migo-spacer hideOnMobile /><span class="hidden sm:inline">Añadir</span>
 ```
 
 ## Card

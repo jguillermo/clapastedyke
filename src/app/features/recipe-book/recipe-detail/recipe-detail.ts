@@ -8,6 +8,7 @@ import { CardHeader } from '@components/card/card-header';
 import { CardTitle } from '@components/card/card-title';
 import { CardSubtitle } from '@components/card/card-subtitle';
 import { Icon } from '@components/icon/icon';
+import { Spacer } from '@components/spacer/spacer';
 import { MIGO_DIALOG_DATA, MigoDialogRef } from '@components/dialog/dialog.service';
 import { PreviewRecipeCost } from '@core/recipe-book/application/use-cases/preview-recipe-cost.use-case';
 
@@ -49,7 +50,7 @@ interface LineView {
 @Component({
   selector: 'app-recipe-detail',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Button, Card, CardHeader, CardTitle, CardSubtitle, CardBody, CardFooter, Icon],
+  imports: [Button, Card, CardHeader, CardTitle, CardSubtitle, CardBody, CardFooter, Icon, Spacer],
   // `contents`: el card `fill` es hijo flex directo del diálogo y llena la pantalla en móvil.
   host: { class: 'contents' },
   template: `
@@ -106,7 +107,7 @@ interface LineView {
         <button migo-button variant="ghost" type="button" (click)="close()">Cerrar</button>
         <button migo-button type="button" (click)="edit()">
           <migo-icon icon-leading name="mat:edit" size="sm" />
-          Editar
+          <migo-spacer />Editar
         </button>
       </migo-card-footer>
     </migo-card>

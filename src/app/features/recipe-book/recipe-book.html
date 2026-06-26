@@ -44,11 +44,11 @@
               <div class="flex flex-wrap items-center gap-3">
                 <button migo-button variant="secondary" type="button" (click)="addRecipe(category.id)">
                   <migo-icon icon-leading name="mat:add" size="sm" />
-                  Agregar receta
+                  <migo-spacer />Agregar receta
                 </button>
                 <button migo-button variant="ghost" type="button" (click)="editCategoryById(category.id)">
                   <migo-icon icon-leading name="mat:edit" size="sm" />
-                  Editar categoría
+                  <migo-spacer />Editar categoría
                 </button>
               </div>
             </section>
@@ -66,7 +66,7 @@
             <p class="m-0 text-muted">Crea una nueva categoría para organizar tus recetas.</p>
             <button migo-button variant="secondary" type="button" (click)="createCategory()">
               <migo-icon icon-leading name="mat:add" size="sm" />
-              Crear categoría
+              <migo-spacer />Crear categoría
             </button>
           </section>
         </ng-template>

@@ -7,6 +7,7 @@ import { CardFooter } from '@components/card/card-footer';
 import { CardHeader } from '@components/card/card-header';
 import { CardTitle } from '@components/card/card-title';
 import { Icon } from '@components/icon/icon';
+import { Spacer } from '@components/spacer/spacer';
 import { FormField } from '@components/form-field/form-field';
 import { InputField } from '@components/input/input';
 import { Select, type SelectOption } from '@components/select/select';
@@ -51,6 +52,7 @@ type PropertyGroup = FormGroup<{
     CardBody,
     CardFooter,
     Icon,
+    Spacer,
     FormField,
     InputField,
     Select,
