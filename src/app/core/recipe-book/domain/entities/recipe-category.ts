@@ -69,6 +69,21 @@ export class RecipeCategory {
         return this.properties.find((p) => p.id === id);
     }
 
+    /**
+     * Devuelve esta categoría con el esquema de propiedades de la categoría `canonical`
+     * (la fuente de verdad del código), conservando la visibilidad (`selectable`) elegida
+     * para las propiedades que coinciden por `id`. Repara registros persistidos con un
+     * esquema obsoleto (p. ej. una propiedad "Peso" que ya no existe). Conserva
+     * `name`/`order`/`system` de esta instancia.
+     */
+    reconcileSchema(canonical: RecipeCategory): RecipeCategory {
+        const properties = canonical.properties.map((cp) => {
+            const prior = this.property(cp.id);
+            return prior ? cp.withSelectable(prior.selectable) : cp;
+        });
+        return RecipeCategory.create(this.id, this.name, this.order, [...properties], this.system);
+    }
+
     /** La propiedad de peso que usa el costeo del pastel, si la hay. */
     weightProperty(): RecipeProperty | undefined {
         return this.properties.find((p) => p.role === 'scaling-weight');

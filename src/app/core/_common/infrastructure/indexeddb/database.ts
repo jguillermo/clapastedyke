@@ -5,7 +5,7 @@
  */
 
 export const DB_NAME = 'clapastedyke';
-export const DB_VERSION = 4;
+export const DB_VERSION = 5;
 
 const STORES = [
     'ingredients',
@@ -30,6 +30,8 @@ const STORES = [
     'cake_compositions',
     'ingredient_price_history',
     'progress',
+    // Marcador de seeds aplicados (para ejecutar la siembra una sola vez). Ver SeedState.
+    'seed_state',
 ] as const;
 
 export type StoreName = (typeof STORES)[number];

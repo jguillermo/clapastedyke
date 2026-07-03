@@ -26,6 +26,9 @@ import {
     IngredientPriceHistoryRepository,
     PriceHistoryEntry,
 } from '../domain/repositories/ingredient-price-history.repository';
+import { SeedDataSource } from '../infrastructure/seed-data-source';
+import { SeedState } from '../infrastructure/seed-state';
+import { RecipeBookSeedDocument } from '../infrastructure/recipe-book-seed-document';
 
 /** Shared in-memory store backing the repository fakes. */
 class Store<T extends { id: EntityId }> {
@@ -167,16 +170,45 @@ export const recipeBookRepositoryProviders: Provider[] = [
     { provide: ConversionOptionRepository, useClass: InMemoryConversionOptionRepository },
 ];
 
+/** SeedDataSource double: returns a (mutable) document, or `null` for "no seed file". */
+export class FakeSeedDataSource extends SeedDataSource {
+    constructor(public doc: RecipeBookSeedDocument | null = null) {
+        super();
+    }
+    load = async () => this.doc;
+}
+
+/** In-memory SeedState double: remembers the applied version per key. */
+export class FakeSeedState extends SeedState {
+    private readonly versions = new Map<string, number>();
+    appliedVersion = async (key: string) => this.versions.get(key) ?? null;
+    markApplied = async (key: string, version: number) => {
+        this.versions.set(key, version);
+    };
+}
+
 export interface RecipeBookFakes {
     bus: RecordingEventBus;
+    /** The SeedDataSource double; mutate `.doc` to change the seed between runs. */
+    seedSource: FakeSeedDataSource;
     providers: Provider[];
 }
 
-/** Builds fresh in-memory fakes and the matching Angular providers. */
-export function makeRecipeBookFakes(): RecipeBookFakes {
+/**
+ * Builds fresh in-memory fakes and the matching Angular providers. `seedDoc` backs the
+ * {@link SeedDataSource} (defaults to `null` → the seed loads no content, only reconciles
+ * the system categories).
+ */
+export function makeRecipeBookFakes(seedDoc: RecipeBookSeedDocument | null = null): RecipeBookFakes {
     const bus = new RecordingEventBus();
-    const providers: Provider[] = [...recipeBookRepositoryProviders, { provide: EventBus, useValue: bus }];
-    return { bus, providers };
+    const seedSource = new FakeSeedDataSource(seedDoc);
+    const providers: Provider[] = [
+        ...recipeBookRepositoryProviders,
+        { provide: EventBus, useValue: bus },
+        { provide: SeedDataSource, useValue: seedSource },
+        { provide: SeedState, useClass: FakeSeedState },
+    ];
+    return { bus, seedSource, providers };
 }
 
 /** Test helper: a purchase-price request literal for SaveIngredient. */

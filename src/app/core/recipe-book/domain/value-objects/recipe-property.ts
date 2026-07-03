@@ -9,8 +9,9 @@ export type PropertyType = 'text' | 'number' | 'weight' | 'flavor' | 'options';
 
 /**
  * Rol técnico de una propiedad.
- * - `scaling-weight`: el peso que usa el costeo del pastel (tipo `weight`). Lo usan
- *   Rellenos/Coberturas; Queques ya no tiene peso.
+ * - `scaling-weight`: el peso que usa el costeo del pastel (tipo `weight`). Es una
+ *   capacidad del dominio que **ninguna categoría de sistema usa** (su esquema canónico
+ *   es Sabor/Porciones/Molde, sin peso); queda disponible para esquemas que la requieran.
  */
 export type PropertyRole = 'scaling-weight';
 
@@ -88,6 +89,20 @@ export class RecipeProperty {
             role,
             group: group?.trim() || undefined,
         });
+    }
+
+    /** Devuelve una copia con otra visibilidad (`selectable`), sin tocar el resto del esquema. */
+    withSelectable(selectable: boolean): RecipeProperty {
+        return RecipeProperty.create(
+            this.id,
+            this.name,
+            this.type,
+            this.required,
+            this.locked,
+            this.role,
+            this.group,
+            selectable,
+        );
     }
 
     equals(other: RecipeProperty): boolean {

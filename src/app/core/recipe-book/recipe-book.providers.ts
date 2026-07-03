@@ -17,6 +17,9 @@ import { IndexedDbFlavorRepository } from './infrastructure/indexeddb-flavor.rep
 import { IndexedDbConversionOptionRepository } from './infrastructure/indexeddb-conversion-option.repository';
 import { IngredientPriceRecorder } from './infrastructure/ingredient-price-recorder.subscriber';
 import { RecipeBookSeed } from './infrastructure/recipe-book-seed';
+import { SeedDataSource, HttpSeedDataSource } from './infrastructure/seed-data-source';
+import { SeedState } from './infrastructure/seed-state';
+import { IndexedDbSeedState } from './infrastructure/indexeddb-seed-state';
 
 /**
  * Binds each recipe-book aggregate repository to its IndexedDB implementation,
@@ -33,6 +36,8 @@ export function provideRecipeBook(): EnvironmentProviders {
         { provide: IngredientPriceHistoryRepository, useClass: IndexedDbIngredientPriceHistoryRepository },
         { provide: FlavorRepository, useClass: IndexedDbFlavorRepository },
         { provide: ConversionOptionRepository, useClass: IndexedDbConversionOptionRepository },
+        { provide: SeedDataSource, useClass: HttpSeedDataSource },
+        { provide: SeedState, useClass: IndexedDbSeedState },
         provideAppInitializer(() => inject(RecipeBookSeed).run()),
         provideAppInitializer(() => inject(IngredientPriceRecorder).register()),
     ]);
