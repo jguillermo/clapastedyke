@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deployment.outputs.page_url || steps.deployment-retry.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
 
@@ -44,6 +44,19 @@ jobs:
         with:
           path: dist/misaevol/browser
 
+      # GitHub Pages falla de forma intermitente en el backend ("Deployment failed, try
+      # again later"), sin causa en este workflow — ver actions/deploy-pages#406 y #418.
+      # Reintentamos el propio step para no depender de un re-run manual.
       - name: Publicar en GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+        continue-on-error: true
+
+      - name: Reintentar publicación en GitHub Pages (fallo intermitente del backend)
+        id: deployment-retry
+        if: steps.deployment.outcome == 'failure'
+        uses: actions/deploy-pages@v4
+
+      - name: Verificar publicación en GitHub Pages
+        if: steps.deployment.outcome == 'failure' && steps.deployment-retry.outcome == 'failure'
+        run: exit 1
