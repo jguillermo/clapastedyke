@@ -2,11 +2,14 @@ import { Provider } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { EventBus } from '../../../_common/event-bus';
 import { InMemoryEventBus } from '../../../_common/in-memory-event-bus';
-import { aPurchase, recipeBookRepositoryProviders } from '../../../recipe-book/testing/recipe-book-test-doubles';
+import {
+    aPurchase,
+    makeWeightCategory,
+    recipeBookRepositoryProviders,
+} from '../../../recipe-book/testing/recipe-book-test-doubles';
+import { RecipeCategoryRepository } from '../../../recipe-book/domain/repositories/recipe-category.repository';
 import { SaveIngredient } from '../../../recipe-book/application/use-cases/save-ingredient.use-case';
-import { SaveSpongeRecipe } from '../../../recipe-book/application/use-cases/save-sponge-recipe.use-case';
-import { SaveFillingRecipe } from '../../../recipe-book/application/use-cases/save-filling-recipe.use-case';
-import { SaveCoveringRecipe } from '../../../recipe-book/application/use-cases/save-covering-recipe.use-case';
+import { SaveRecipe } from '../../../recipe-book/application/use-cases/save-recipe.use-case';
 import { SavePackagingRule } from '../../../recipe-book/application/use-cases/save-packaging-rule.use-case';
 import { ComposeCake } from '../../../recipe-book/application/use-cases/compose-cake.use-case';
 import { GetProgress } from '../../application/use-cases/get-progress.use-case';
@@ -22,24 +25,31 @@ async function composeACake(): Promise<void> {
     const manjar = (await ing.execute({ name: 'Manjar', baseUnit: 'g', usage: 'recipe', purchasePrice: aPurchase('g') })).id;
     const cream = (await ing.execute({ name: 'Chantilly', baseUnit: 'g', usage: 'recipe', purchasePrice: aPurchase('g') })).id;
 
+    const CAT = 'cat-q';
+    const PESO = `${CAT}-peso`;
+    await TestBed.inject(RecipeCategoryRepository).save(makeWeightCategory(CAT, 'Queques'));
+    const recipe = TestBed.inject(SaveRecipe);
     const spongeId = (
-        await TestBed.inject(SaveSpongeRecipe).execute({
+        await recipe.execute({
+            categoryId: CAT,
             name: 'Vainilla',
-            referenceYield: { weightGrams: 1000 },
+            values: [{ propertyId: PESO, value: 1000 }],
             lines: [{ ingredientId: flour, quantity: 250 }],
         })
     ).id;
     const fillingId = (
-        await TestBed.inject(SaveFillingRecipe).execute({
+        await recipe.execute({
+            categoryId: CAT,
             name: 'Manjar blanco',
-            referenceWeightGrams: 1000,
+            values: [{ propertyId: PESO, value: 1000 }],
             lines: [{ ingredientId: manjar, quantity: 300 }],
         })
     ).id;
     const coveringId = (
-        await TestBed.inject(SaveCoveringRecipe).execute({
+        await recipe.execute({
+            categoryId: CAT,
             name: 'Cobertura',
-            referenceWeightGrams: 1000,
+            values: [{ propertyId: PESO, value: 1000 }],
             lines: [{ ingredientId: cream, quantity: 200 }],
         })
     ).id;

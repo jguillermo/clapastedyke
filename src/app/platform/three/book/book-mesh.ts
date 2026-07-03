@@ -34,6 +34,8 @@ const PAGE_GAP = 0.012; // separación de la hoja sobre el taco (evita z-fightin
 /** Piezas del libro que el motor necesita para mostrar/animar. */
 export interface BookMesh {
   readonly root: Group;
+  /** Armazón del libro abierto (tapa + lomo + bloques). Se oculta en modo single. */
+  readonly frame: Group;
   readonly leftPage: Mesh;
   readonly rightPage: Mesh;
   readonly leftMaterial: MeshStandardMaterial;
@@ -54,6 +56,11 @@ function matte(color: number): MeshStandardMaterial {
 export function buildBookMesh(reducedMotion: boolean): BookMesh {
   const root = new Group();
 
+  // Armazón del libro abierto (tapa + lomo + bloques): un grupo que se oculta en
+  // modo single para dejar solo la hoja a pantalla completa.
+  const frame = new Group();
+  root.add(frame);
+
   // ---- Tapas + lomo (un bloque por debajo de las páginas) ----
   const coverW = PAGE_W * 2 + COVER_OVERHANG * 2;
   const coverH = PAGE_H + COVER_OVERHANG * 2;
@@ -61,12 +68,12 @@ export function buildBookMesh(reducedMotion: boolean): BookMesh {
   cover.position.set(0, 0, -COVER_THICK / 2 - 0.02);
   cover.castShadow = true;
   cover.receiveShadow = true;
-  root.add(cover);
+  frame.add(cover);
 
   // Canto del lomo (resalte central).
   const spine = new Mesh(new BoxGeometry(0.06, coverH, COVER_THICK + 0.02), matte(COLOR.coverEdge));
   spine.position.set(0, 0, -COVER_THICK / 2 - 0.02);
-  root.add(spine);
+  frame.add(spine);
 
   // ---- Taco de páginas (da grosor a cada lado) ----
   const block = (signX: number): Mesh => {
@@ -75,7 +82,7 @@ export function buildBookMesh(reducedMotion: boolean): BookMesh {
     b.receiveShadow = true;
     return b;
   };
-  root.add(block(-1), block(1));
+  frame.add(block(-1), block(1));
 
   // ---- Páginas estáticas visibles (spread actual) ----
   const leftMaterial = pageMaterial();
@@ -107,6 +114,7 @@ export function buildBookMesh(reducedMotion: boolean): BookMesh {
 
   return {
     root,
+    frame,
     leftPage,
     rightPage,
     leftMaterial,

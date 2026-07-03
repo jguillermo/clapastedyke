@@ -45,6 +45,16 @@ export class PageTurn {
     }
   }
 
+  /**
+   * Cancela el volteo en curso sin animar el resto: resuelve su promesa y anula
+   * el tween. Lo usa el motor al cambiar de modo a mitad de animación o al
+   * destruirse, para que el `await` de `drain()` se desbloquee sin colgarse.
+   */
+  cancel(): void {
+    this.tween?.resolve();
+    this.tween = null;
+  }
+
   /** Anima `progress` de `from` a `to`. Resuelve al terminar. */
   start(from: number, to: number, duration = 0.9): Promise<void> {
     this.tween?.resolve();

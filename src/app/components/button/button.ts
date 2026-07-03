@@ -1,11 +1,11 @@
 import { booleanAttribute, ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
-export type ButtonSize = 'sm' | 'md' | 'lg';
+export type ButtonSize = '2xs' | 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl';
 
 /** Estilo base (sin display: lo decide `block`). Solo utilidades del tema Migo. */
 const BASE =
-  'items-center justify-center gap-2 rounded-full border border-transparent font-body ' +
+  'items-center justify-center rounded-full border border-transparent font-body ' +
   'font-semibold leading-none no-underline cursor-pointer select-none transition duration-base ' +
   'ease-out active:translate-y-px focus-visible:outline-none focus-visible:shadow-focus ' +
   'disabled:opacity-55 disabled:cursor-not-allowed motion-reduce:transition-none';
@@ -18,9 +18,13 @@ const VARIANTS: Record<ButtonVariant, string> = {
 };
 
 const SIZES: Record<ButtonSize, string> = {
-  sm: 'min-h-9 px-4 text-caption',
-  md: 'min-h-11 px-5 text-sm',
-  lg: 'min-h-13 px-6 text-base',
+  '2xs': 'min-h-7 px-2.5 text-caption', // 28px
+  xs: 'min-h-8 px-3 text-caption', // 32px
+  sm: 'min-h-9 px-4 text-caption', // 36px
+  md: 'min-h-11 px-5 text-sm', // 44px — único tamaño que cumple el target táctil ≥44px por sí solo
+  lg: 'min-h-13 px-6 text-base', // 52px
+  xl: 'min-h-14 px-7 text-lead', // 56px
+  '2xl': 'min-h-16 px-8 text-h3', // 64px
 };
 
 /**
@@ -36,7 +40,7 @@ const SIZES: Record<ButtonSize, string> = {
   template: `
     @if (loading()) {
       <span
-        class="size-4 rounded-full border-2 border-current border-r-transparent animate-spin"
+        class="size-4 me-2 rounded-full border-2 border-current border-r-transparent animate-spin"
         aria-hidden="true"
       ></span>
     }

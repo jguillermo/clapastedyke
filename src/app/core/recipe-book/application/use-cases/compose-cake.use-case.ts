@@ -4,13 +4,13 @@ import { EntityId } from '../../../_common/entity-id';
 import { Quantity } from '../../../_common/quantity';
 import { EventBus } from '../../../_common/event-bus';
 import { CakeComposition } from '../../domain/entities/cake-composition';
+import { Recipe } from '../../domain/entities/recipe';
 import { CakeCompositionRepository } from '../../domain/repositories/cake-composition.repository';
-import { SpongeRecipeRepository } from '../../domain/repositories/sponge-recipe.repository';
-import { FillingRecipeRepository } from '../../domain/repositories/filling-recipe.repository';
-import { CoveringRecipeRepository } from '../../domain/repositories/covering-recipe.repository';
+import { RecipeRepository } from '../../domain/repositories/recipe.repository';
+import { RecipeCategoryRepository } from '../../domain/repositories/recipe-category.repository';
 import { IngredientRepository } from '../../domain/repositories/ingredient.repository';
 import { PackagingRuleRepository } from '../../domain/repositories/packaging-rule.repository';
-import { CakeScalingService, ScaledIngredient } from '../../domain/services/cake-scaling.service';
+import { CakeScalingService, ScalableRecipe, ScaledIngredient } from '../../domain/services/cake-scaling.service';
 import { RecipeBookEvents } from '../../domain/events/recipe-book-events';
 
 export interface ComposeCakeRequest {
@@ -31,15 +31,14 @@ export interface ComposeCakeResult {
  * Composes a cake: resolves the suggested packaging via the rule that covers
  * the target weight, computes the scaled ingredient view with the scaling
  * service, persists the composition and emits CakeComposed (the only event
- * that moves the goal). The "needs at least one line" / scaling rules live in
- * the domain — this use case only orchestrates.
+ * that moves the goal). The recipes are generic `Recipe`s; el peso de escalado
+ * sale de la propiedad de peso de su categoría.
  */
 @Injectable({ providedIn: 'root' })
 export class ComposeCake extends UseCase<ComposeCakeRequest, ComposeCakeResult> {
     private readonly compositions = inject(CakeCompositionRepository);
-    private readonly sponges = inject(SpongeRecipeRepository);
-    private readonly fillings = inject(FillingRecipeRepository);
-    private readonly coverings = inject(CoveringRecipeRepository);
+    private readonly recipes = inject(RecipeRepository);
+    private readonly categories = inject(RecipeCategoryRepository);
     private readonly ingredients = inject(IngredientRepository);
     private readonly rules = inject(PackagingRuleRepository);
     private readonly scaling = inject(CakeScalingService);
@@ -48,9 +47,9 @@ export class ComposeCake extends UseCase<ComposeCakeRequest, ComposeCakeResult> 
     async execute(request: ComposeCakeRequest): Promise<ComposeCakeResult> {
         const targetWeight = Quantity.of(request.targetWeightGrams, 'g');
 
-        const sponge = await this.sponges.byId(new EntityId(request.spongeId));
-        const filling = await this.fillings.byId(new EntityId(request.fillingId));
-        const covering = await this.coverings.byId(new EntityId(request.coveringId));
+        const sponge = await this.recipes.byId(new EntityId(request.spongeId));
+        const filling = await this.recipes.byId(new EntityId(request.fillingId));
+        const covering = await this.recipes.byId(new EntityId(request.coveringId));
         if (!sponge || !filling || !covering) {
             throw new Error('Sponge, filling and covering must all be selected and exist');
         }
@@ -80,9 +79,21 @@ export class ComposeCake extends UseCase<ComposeCakeRequest, ComposeCakeResult> 
         });
 
         await this.compositions.save(composition);
-        const scaled = this.scaling.scale({ composition, sponge, filling, covering });
+        const scalable = await Promise.all([sponge, filling, covering].map((r) => this.toScalable(r)));
+        const scaled = this.scaling.scale({ composition, recipes: scalable });
         await this.bus.publish([RecipeBookEvents.cakeComposed(id.value)]);
 
         return { composition, scaled };
+    }
+
+    /** Resuelve el peso de escalado de una receta desde la propiedad de peso de su categoría. */
+    private async toScalable(recipe: Recipe): Promise<ScalableRecipe> {
+        const category = await this.categories.byId(recipe.categoryId);
+        const weightProperty = category?.weightProperty();
+        const weight = weightProperty ? recipe.weightFor(weightProperty.id) : undefined;
+        if (!weight) {
+            throw new Error(`Recipe "${recipe.name}" has no scaling weight`);
+        }
+        return { lines: recipe.lines, weight };
     }
 }

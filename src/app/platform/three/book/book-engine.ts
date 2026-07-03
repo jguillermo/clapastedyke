@@ -29,8 +29,23 @@ export interface BookSpread {
 
 export type SpreadChangeHandler = (spread: BookSpread) => void;
 
+/** Modo de presentación: spread (dos páginas, escritorio) o single (una, móvil). */
+export type BookMode = 'spread' | 'single';
+
 const FOV = 32;
-const MARGIN = 0.18; // aire alrededor del libro al encuadrar
+const MARGIN = 0.18; // aire alrededor del libro al encuadrar (spread)
+const SINGLE_MARGIN = 0.04; // en single la hoja llena casi todo el ancho (al borde)
+/** Por debajo de este aspect (alto/estrecho) o ancho se pasa a una sola página. */
+const SINGLE_ASPECT = 1.0;
+const SINGLE_WIDTH = 700;
+
+/**
+ * Duración (segundos) del volteo de hoja. Sube/baja estos valores para ajustar la
+ * velocidad de la animación: `TURN_DURATION` es el volteo normal y
+ * `TURN_DURATION_FAST` el de cuando se encadenan varias hojas seguidas (más rápido).
+ */
+const TURN_DURATION = 0.5;
+const TURN_DURATION_FAST = 0.24;
 
 /**
  * Motor 3D del LIBRO DE RECETAS (pantalla completa, su propio canvas). Render
@@ -48,15 +63,22 @@ export class BookEngine {
   private readonly turn: PageTurn;
 
   private faces: PageContent[] = [];
+  /** Última cara con contenido real (antes del relleno a par). */
+  private lastContentFace = 0;
   private readonly textures = new Map<number, Texture>();
   private blankTexture: Texture | null = null;
 
-  /** Hojas volteadas hacia la izquierda (0..totalLeaves). */
+  /** Hojas volteadas hacia la izquierda (0..totalLeaves). Fuente de verdad en modo spread. */
   private leafIndex = 0;
+  /** Cara activa (0..lastContentFace). Fuente de verdad en modo single. */
+  private faceIndex = 0;
+  private mode: BookMode = 'spread';
   private spreadHandler: SpreadChangeHandler | null = null;
+  /** Id del rAF en curso; `0` = en reposo (no se dibuja salvo bajo demanda). */
   private frameId = 0;
   private disposed = false;
   private aspect = 1;
+  private widthPx = 1;
 
   /** Cola de volteos pendientes (+1 adelante, -1 atrás) y bandera de drenado. */
   private readonly queue: (1 | -1)[] = [];
@@ -68,6 +90,7 @@ export class BookEngine {
   ) {
     const { clientWidth: w, clientHeight: h } = canvas;
     this.aspect = h > 0 ? w / h : 1;
+    this.widthPx = w;
 
     this.renderer = new WebGLRenderer({ canvas, antialias: true });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -97,14 +120,17 @@ export class BookEngine {
     this.camera = new PerspectiveCamera(FOV, this.aspect, 0.1, 50);
     this.turn = new PageTurn((p) => this.book.leafCurl.setProgress(p), reducedMotion);
 
+    this.mode = this.computeMode();
+    this.book.root.position.x = this.mode === 'single' ? -PAGE_W / 2 : 0;
     this.frameCamera();
-    this.loop();
+    this.requestRender();
   }
 
-  /** Carga (o recarga) las páginas y muestra el primer spread. */
+  /** Carga (o recarga) las páginas y muestra el primer spread/página. */
   setPages(pages: PageContent[]): void {
     // Padding a número par de caras: cada hoja necesita frontal + trasera.
     const faces = [...pages];
+    this.lastContentFace = Math.max(0, faces.length - 1);
     if (faces.length % 2 !== 0) {
       faces.push({ kind: 'blank' });
     }
@@ -112,10 +138,18 @@ export class BookEngine {
     this.queue.length = 0;
     this.faces = faces;
     this.leafIndex = 0;
+    this.faceIndex = 0;
+    this.mode = this.computeMode();
+    this.book.root.position.x = this.mode === 'single' ? -PAGE_W / 2 : 0;
+    // En single solo queda la hoja centrada: ocultamos el armazón y la página izquierda.
+    this.book.frame.visible = this.mode !== 'single';
+    this.book.leftPage.visible = this.mode !== 'single';
     this.book.leaf.visible = false;
     this.book.leafCurl.setProgress(0);
-    this.renderSpread();
+    this.frameCamera();
+    this.renderCurrent();
     this.emitSpread();
+    this.requestRender();
   }
 
   /** Registra el observador de cambios de spread (para HUD / aria-live). */
@@ -123,9 +157,19 @@ export class BookEngine {
     this.spreadHandler = handler;
   }
 
-  /** Estado actual del spread. */
+  /** Estado actual del spread/página (lo consume el HUD). */
   get spread(): BookSpread {
     const total = this.totalLeaves;
+    if (this.mode === 'single') {
+      return {
+        leafIndex: this.leafFromFace(this.faceIndex),
+        totalLeaves: total,
+        canPrev: this.faceIndex > 0,
+        canNext: this.faceIndex < this.lastContentFace,
+        left: null,
+        right: this.faceAt(this.faceIndex),
+      };
+    }
     return {
       leafIndex: this.leafIndex,
       totalLeaves: total,
@@ -134,6 +178,11 @@ export class BookEngine {
       left: this.faceAt(2 * this.leafIndex - 1),
       right: this.faceAt(2 * this.leafIndex),
     };
+  }
+
+  /** Cara activa actual (ancla de lectura, válida en ambos modos). */
+  get currentFaceIndex(): number {
+    return this.mode === 'single' ? this.faceIndex : 2 * this.leafIndex;
   }
 
   /**
@@ -161,10 +210,15 @@ export class BookEngine {
   /** Procesa la cola de volteos en serie; acelera si quedan más pendientes. */
   private async drain(): Promise<void> {
     this.draining = true;
+    this.ensureLoop(); // dibuja bajo demanda mientras dure el drenado
     while (this.queue.length > 0) {
       const dir = this.queue.shift() as 1 | -1;
       const fast = this.queue.length > 0; // si vienen más, esta hoja va rápido
-      await (dir === 1 ? this.turnForward(fast) : this.turnBackward(fast));
+      if (this.mode === 'single') {
+        await (dir === 1 ? this.turnForwardSingle(fast) : this.turnBackwardSingle(fast));
+      } else {
+        await (dir === 1 ? this.turnForward(fast) : this.turnBackward(fast));
+      }
     }
     this.draining = false;
   }
@@ -182,13 +236,17 @@ export class BookEngine {
     this.setMap(this.book.rightMaterial, this.textureAt(2 * k + 2));
     this.book.leaf.visible = true;
 
-    await this.turn.start(0, 1, fast ? 0.42 : 0.95);
+    await this.turn.start(0, 1, fast ? TURN_DURATION_FAST : TURN_DURATION);
+    if (this.disposed || this.mode !== 'spread') {
+      return; // un cambio de modo/destrucción canceló el volteo: no toques el cursor
+    }
 
     // La hoja aterriza a la izquierda mostrando su cara trasera.
     this.setMap(this.book.leftMaterial, this.textureAt(2 * k + 1));
     this.book.leaf.visible = false;
     this.leafIndex = k + 1;
     this.emitSpread();
+    this.requestRender();
   }
 
   /** Voltea una hoja hacia atrás (izquierda → derecha). */
@@ -204,16 +262,68 @@ export class BookEngine {
     this.setMap(this.book.leftMaterial, this.textureAt(2 * k - 3));
     this.book.leaf.visible = true;
 
-    await this.turn.start(1, 0, fast ? 0.42 : 0.95);
+    await this.turn.start(1, 0, fast ? TURN_DURATION_FAST : TURN_DURATION);
+    if (this.disposed || this.mode !== 'spread') {
+      return;
+    }
 
     // La hoja aterriza a la derecha mostrando su cara frontal.
     this.setMap(this.book.rightMaterial, this.textureAt(2 * k - 2));
     this.book.leaf.visible = false;
     this.leafIndex = k - 1;
     this.emitSpread();
+    this.requestRender();
   }
 
-  /** Salta sin animación a una hoja (índice de navegación). */
+  /** Voltea UNA página hacia adelante (modo single): la cara actual barre a la izquierda. */
+  private async turnForwardSingle(fast: boolean): Promise<void> {
+    if (this.faceIndex >= this.lastContentFace) {
+      return;
+    }
+    const f = this.faceIndex;
+    // El destino (f+1) queda centrado, oculto bajo la hoja en progreso 0.
+    this.setMap(this.book.rightMaterial, this.textureAt(f + 1));
+    // La hoja lleva la cara que dejamos (misma cara en ambas caras del papel).
+    this.book.leafCurl.setFront(this.textureAt(f));
+    this.book.leafCurl.setBack(this.textureAt(f));
+    this.book.leaf.visible = true;
+
+    await this.turn.start(0, 1, fast ? TURN_DURATION_FAST : TURN_DURATION);
+    if (this.disposed || this.mode !== 'single') {
+      return;
+    }
+
+    this.book.leaf.visible = false;
+    this.faceIndex = f + 1;
+    this.emitSpread();
+    this.requestRender();
+  }
+
+  /** Voltea UNA página hacia atrás (modo single): la cara anterior barre desde la izquierda. */
+  private async turnBackwardSingle(fast: boolean): Promise<void> {
+    if (this.faceIndex <= 0) {
+      return;
+    }
+    const f = this.faceIndex;
+    // La hoja que vuelve lleva el destino (f-1); la actual (f) queda debajo.
+    this.book.leafCurl.setFront(this.textureAt(f - 1));
+    this.book.leafCurl.setBack(this.textureAt(f - 1));
+    this.setMap(this.book.rightMaterial, this.textureAt(f));
+    this.book.leaf.visible = true;
+
+    await this.turn.start(1, 0, fast ? TURN_DURATION_FAST : TURN_DURATION);
+    if (this.disposed || this.mode !== 'single') {
+      return;
+    }
+
+    this.setMap(this.book.rightMaterial, this.textureAt(f - 1));
+    this.book.leaf.visible = false;
+    this.faceIndex = f - 1;
+    this.emitSpread();
+    this.requestRender();
+  }
+
+  /** Salta sin animación a una hoja (modo spread). */
   goToLeaf(index: number): void {
     this.queue.length = 0; // un salto cancela los volteos encolados
     const clamped = Math.max(0, Math.min(index, this.totalLeaves));
@@ -224,23 +334,66 @@ export class BookEngine {
     this.leafIndex = clamped;
     this.renderSpread();
     this.emitSpread();
+    this.requestRender();
   }
 
-  /** Ajusta el render y reencuadra al nuevo tamaño. */
+  /** Salta sin animación a una cara concreta (respeta el modo actual). */
+  jumpToFace(face: number): void {
+    if (this.turn.animating) {
+      return;
+    }
+    if (this.mode === 'single') {
+      this.queue.length = 0;
+      const clamped = Math.max(0, Math.min(face, this.lastContentFace));
+      if (clamped === this.faceIndex) {
+        return;
+      }
+      this.book.leaf.visible = false;
+      this.faceIndex = clamped;
+      this.renderCurrent();
+      this.emitSpread();
+      this.requestRender();
+    } else {
+      this.goToLeaf(this.leafFromFace(face));
+    }
+  }
+
+  /** Salta a la primera página. */
+  home(): void {
+    this.mode === 'single' ? this.jumpToFace(0) : this.goToLeaf(0);
+  }
+
+  /** Salta a la última página con contenido. */
+  end(): void {
+    this.mode === 'single' ? this.jumpToFace(this.lastContentFace) : this.goToLeaf(this.totalLeaves);
+  }
+
+  /** Ajusta el render y reencuadra (cambiando de modo si cruza el breakpoint). */
   resize(width: number, height: number): void {
     if (this.disposed || width === 0 || height === 0) {
       return;
     }
     this.aspect = width / height;
+    this.widthPx = width;
     this.renderer.setSize(width, height, false);
     this.camera.aspect = this.aspect;
-    this.frameCamera();
+    const next = this.computeMode();
+    if (next !== this.mode) {
+      this.applyMode(next);
+    } else {
+      this.frameCamera();
+    }
+    this.requestRender();
   }
 
   /** Libera recursos de WebGL. */
   dispose(): void {
     this.disposed = true;
-    cancelAnimationFrame(this.frameId);
+    if (this.frameId) {
+      cancelAnimationFrame(this.frameId);
+      this.frameId = 0;
+    }
+    this.turn.cancel(); // desbloquea cualquier `drain()` en curso
     this.clearTextures();
     this.blankTexture?.dispose();
     this.book.dispose();
@@ -253,8 +406,59 @@ export class BookEngine {
     return this.faces.length / 2;
   }
 
+  /** Modo según el viewport: una página en estrecho/retrato, spread en ancho. */
+  private computeMode(): BookMode {
+    return this.aspect < SINGLE_ASPECT || this.widthPx < SINGLE_WIDTH ? 'single' : 'spread';
+  }
+
+  /** Hoja (modo spread) que contiene una cara dada. */
+  private leafFromFace(face: number): number {
+    const leaf = face % 2 === 0 ? face / 2 : (face + 1) / 2;
+    return Math.max(0, Math.min(leaf, this.totalLeaves));
+  }
+
+  /**
+   * Cambia de modo conservando la posición de lectura: remapea el cursor,
+   * desplaza el libro para centrar la página (single) o el lomo (spread),
+   * y re-renderiza el estado asentado. Cancela cola y volteo en curso.
+   */
+  private applyMode(next: BookMode): void {
+    if (next === this.mode) {
+      return;
+    }
+    this.queue.length = 0;
+    if (this.turn.animating) {
+      this.turn.cancel();
+    }
+    if (next === 'single') {
+      this.faceIndex = Math.max(0, Math.min(2 * this.leafIndex, this.lastContentFace));
+      this.book.root.position.x = -PAGE_W / 2;
+    } else {
+      this.leafIndex = this.leafFromFace(this.faceIndex);
+      this.book.root.position.x = 0;
+    }
+    this.mode = next;
+    this.book.frame.visible = next !== 'single';
+    this.book.leftPage.visible = next !== 'single';
+    this.book.leaf.visible = false;
+    this.book.leafCurl.setProgress(0);
+    this.renderCurrent();
+    this.frameCamera();
+    this.emitSpread();
+    this.requestRender();
+  }
+
   private faceAt(index: number): PageContent | null {
     return index >= 0 && index < this.faces.length ? this.faces[index] : null;
+  }
+
+  /** Pinta el estado asentado actual según el modo. */
+  private renderCurrent(): void {
+    if (this.mode === 'single') {
+      this.setMap(this.book.rightMaterial, this.textureAt(this.faceIndex));
+    } else {
+      this.renderSpread();
+    }
   }
 
   /** Aplica al spread actual las texturas de las caras izquierda/derecha. */
@@ -298,33 +502,52 @@ export class BookEngine {
     this.book.rightMaterial.map = null;
   }
 
-  /** Encuadra la cámara para que el spread (o una página en retrato) quepa. */
+  /** Encuadra la cámara según el modo. En single el libro se desplaza para
+   * centrar la página en world x=0; en spread se ve el lomo centrado. */
   private frameCamera(): void {
-    const portrait = this.aspect < 0.85;
-    // En retrato (móvil) enfocamos una página (la derecha, la "activa"); en
-    // apaisado, el spread completo.
-    const halfW = (portrait ? PAGE_W / 2 : PAGE_W) + MARGIN;
-    const halfH = PAGE_H / 2 + MARGIN;
-    const targetX = portrait ? PAGE_W / 2 : 0;
+    const single = this.mode === 'single';
+    const margin = single ? SINGLE_MARGIN : MARGIN;
+    const halfW = (single ? PAGE_W / 2 : PAGE_W) + margin;
+    const halfH = PAGE_H / 2 + margin;
+    const targetX = 0;
 
     const vFov = (FOV * Math.PI) / 180;
     const distH = halfH / Math.tan(vFov / 2);
     const hFov = 2 * Math.atan(Math.tan(vFov / 2) * this.aspect);
     const distW = halfW / Math.tan(hFov / 2);
-    const distance = Math.max(distH, distW) * 1.06;
+    const distance = Math.max(distH, distW) * (single ? 1.01 : 1.06);
 
     this.camera.position.set(targetX, 0.18, distance);
     this.camera.lookAt(targetX, 0, 0);
     this.camera.updateProjectionMatrix();
   }
 
+  /** Dibuja un único cuadro (render bajo demanda; escena estática en reposo). */
+  private requestRender(): void {
+    if (this.disposed) {
+      return;
+    }
+    this.renderer.render(this.scene, this.camera);
+  }
+
+  /** Arranca el loop solo mientras se drenan volteos y no corre ya (idempotente). */
+  private ensureLoop(): void {
+    if (this.disposed || this.frameId || !this.draining) {
+      return;
+    }
+    this.clock.getDelta(); // descarta el delta acumulado en reposo
+    this.frameId = requestAnimationFrame(this.loop);
+  }
+
   private readonly loop = (): void => {
     if (this.disposed) {
+      this.frameId = 0;
       return;
     }
     const dt = this.clock.getDelta();
     this.turn.update(dt);
     this.renderer.render(this.scene, this.camera);
-    this.frameId = requestAnimationFrame(this.loop);
+    // Seguimos mientras se drenen volteos o haya uno activo; si no, paramos.
+    this.frameId = this.draining || this.turn.animating ? requestAnimationFrame(this.loop) : 0;
   };
 }

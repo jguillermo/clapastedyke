@@ -113,12 +113,13 @@ usuario no puede hacer pinch-zoom ni doble-tap-zoom y el formulario no se mueve.
 > e2e, se **deshabilita esa regla puntual** (`meta-viewport`), no el bloqueo de zoom. **El resto de
 > WCAG AA sigue siendo obligatorio**: contraste, foco visible, ARIA y navegación por teclado.
 
-## Tablas / hoja de cálculo (`migo-grid`)
+## Tablas / hoja de cálculo (`migo-table`)
 
-Una hoja de cálculo de columnas fijas no cabe en móvil. Se resuelve con **scroll horizontal**, no
-apilando: el contenedor es `overflow-x-auto`, la cabecera y las filas comparten una pista
-`min-w-max` y cada columna conserva un `min-w-*` del tema para no aplastarse. El usuario desliza
-lateralmente; la navegación por teclado y los roles ARIA no cambian.
+`migo-table` es un `<table>` con columnas flexibles (`w-full`) que se ajustan al ancho del móvil; las
+columnas fijas/`%` que sumen de más activan **scroll horizontal** (`overflow-x-auto`), no apilado.
+Vertical **nunca scrollea** (crece y scrollea el contenedor exterior). El input `bleed` lleva la
+tabla **borde a borde** rompiendo el padding del padre en móvil. La navegación por teclado y los
+roles ARIA no cambian. Ver [components-conventions.md](components-conventions.md) → "Table".
 
 ## Verificación (obligatoria por componente/feature)
 

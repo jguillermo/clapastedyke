@@ -16,6 +16,7 @@ import { Icon } from '@components/icon/icon';
 import { IconName } from '@components/icon/icon.registry';
 import { InputField } from '@components/input/input';
 import { Select, SelectOption } from '@components/select/select';
+import { Spacer } from '@components/spacer/spacer';
 import { ConfirmDialog } from './confirm-dialog/confirm-dialog';
 
 /**
@@ -40,6 +41,7 @@ import { ConfirmDialog } from './confirm-dialog/confirm-dialog';
     Icon,
     InputField,
     Select,
+    Spacer,
   ],
   templateUrl: './ui-showcase.html',
 })

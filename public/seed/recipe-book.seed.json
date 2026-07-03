@@ -1,0 +1,309 @@
+{
+  "enabled": true,
+  "version": 1,
+  "flavors": [
+    { "id": "flv-vainilla", "label": "Vainilla" },
+    { "id": "flv-chocolate", "label": "Chocolate" },
+    { "id": "flv-naranja", "label": "Naranja" },
+    { "id": "flv-limon", "label": "Limón" },
+    { "id": "flv-fresa", "label": "Fresa" },
+    { "id": "flv-manjar", "label": "Manjar" }
+  ],
+  "conversionOptions": [
+    { "id": "co-portions-10", "group": "portions", "label": "10", "factor": 10 },
+    { "id": "co-portions-20", "group": "portions", "label": "20", "factor": 20 },
+    { "id": "co-portions-40", "group": "portions", "label": "40", "factor": 40 },
+    { "id": "co-mold-small", "group": "mold", "label": "Molde pequeño", "factor": 0.5 },
+    { "id": "co-mold-medium", "group": "mold", "label": "Molde mediano", "factor": 1 },
+    { "id": "co-mold-large", "group": "mold", "label": "Molde grande", "factor": 2 }
+  ],
+  "ingredients": [
+    { "id": "ing-harina", "name": "Harina sin preparar", "baseUnit": "g", "usage": "recipe", "purchasePrice": { "amount": 4.5, "per": { "value": 1000, "unit": "g" }, "currency": "PEN" } },
+    { "id": "ing-azucar-blanca", "name": "Azúcar blanca", "baseUnit": "g", "usage": "recipe", "purchasePrice": { "amount": 4.2, "per": { "value": 1000, "unit": "g" }, "currency": "PEN" } },
+    { "id": "ing-azucar-rubia", "name": "Azúcar rubia", "baseUnit": "g", "usage": "recipe", "purchasePrice": { "amount": 4.0, "per": { "value": 1000, "unit": "g" }, "currency": "PEN" } },
+    { "id": "ing-azucar-impalpable", "name": "Azúcar impalpable", "baseUnit": "g", "usage": "recipe", "purchasePrice": { "amount": 5.5, "per": { "value": 500, "unit": "g" }, "currency": "PEN" } },
+    { "id": "ing-huevos", "name": "Huevos", "baseUnit": "u", "usage": "recipe", "purchasePrice": { "amount": 0.5, "per": { "value": 1, "unit": "u" }, "currency": "PEN" } },
+    { "id": "ing-mantequilla", "name": "Mantequilla", "baseUnit": "g", "usage": "recipe", "purchasePrice": { "amount": 12.0, "per": { "value": 200, "unit": "g" }, "currency": "PEN" } },
+    { "id": "ing-aceite", "name": "Aceite vegetal", "baseUnit": "g", "usage": "recipe", "purchasePrice": { "amount": 9.0, "per": { "value": 1000, "unit": "g" }, "currency": "PEN" } },
+    { "id": "ing-leche-fresca", "name": "Leche fresca", "baseUnit": "g", "usage": "recipe", "purchasePrice": { "amount": 5.5, "per": { "value": 1000, "unit": "g" }, "currency": "PEN" } },
+    { "id": "ing-leche-evaporada", "name": "Leche evaporada", "baseUnit": "g", "usage": "recipe", "purchasePrice": { "amount": 3.8, "per": { "value": 400, "unit": "g" }, "currency": "PEN" } },
+    { "id": "ing-manjar", "name": "Manjar blanco", "baseUnit": "g", "usage": "recipe", "purchasePrice": { "amount": 12.0, "per": { "value": 1000, "unit": "g" }, "currency": "PEN" } },
+    { "id": "ing-cocoa", "name": "Cocoa en polvo", "baseUnit": "g", "usage": "recipe", "purchasePrice": { "amount": 6.0, "per": { "value": 150, "unit": "g" }, "currency": "PEN" } },
+    { "id": "ing-chocolate-cobertura", "name": "Chocolate de cobertura", "baseUnit": "g", "usage": "recipe", "purchasePrice": { "amount": 18.0, "per": { "value": 500, "unit": "g" }, "currency": "PEN" } },
+    { "id": "ing-crema-leche", "name": "Crema de leche", "baseUnit": "g", "usage": "recipe", "purchasePrice": { "amount": 4.5, "per": { "value": 300, "unit": "g" }, "currency": "PEN" } },
+    { "id": "ing-queso-crema", "name": "Queso crema", "baseUnit": "g", "usage": "recipe", "purchasePrice": { "amount": 9.0, "per": { "value": 180, "unit": "g" }, "currency": "PEN" } },
+    { "id": "ing-polvo-hornear", "name": "Polvo de hornear", "baseUnit": "g", "usage": "recipe", "purchasePrice": { "amount": 3.0, "per": { "value": 100, "unit": "g" }, "currency": "PEN" } },
+    { "id": "ing-esencia-vainilla", "name": "Esencia de vainilla", "baseUnit": "g", "usage": "recipe", "purchasePrice": { "amount": 6.0, "per": { "value": 100, "unit": "g" }, "currency": "PEN" } },
+    { "id": "ing-maicena", "name": "Maicena", "baseUnit": "g", "usage": "recipe", "purchasePrice": { "amount": 3.0, "per": { "value": 180, "unit": "g" }, "currency": "PEN" } },
+    { "id": "ing-fresas", "name": "Fresas", "baseUnit": "g", "usage": "recipe", "purchasePrice": { "amount": 8.0, "per": { "value": 500, "unit": "g" }, "currency": "PEN" } },
+    { "id": "ing-durazno", "name": "Durazno en conserva", "baseUnit": "g", "usage": "recipe", "purchasePrice": { "amount": 8.5, "per": { "value": 820, "unit": "g" }, "currency": "PEN" } },
+    { "id": "ing-naranja", "name": "Naranjas", "baseUnit": "u", "usage": "recipe", "purchasePrice": { "amount": 1.0, "per": { "value": 1, "unit": "u" }, "currency": "PEN" } },
+    { "id": "ing-limon", "name": "Limones", "baseUnit": "u", "usage": "recipe", "purchasePrice": { "amount": 0.3, "per": { "value": 1, "unit": "u" }, "currency": "PEN" } },
+    { "id": "ing-sal", "name": "Sal", "baseUnit": "g", "usage": "recipe", "purchasePrice": { "amount": 1.5, "per": { "value": 1000, "unit": "g" }, "currency": "PEN" } }
+  ],
+  "categories": [],
+  "recipes": [
+    {
+      "id": "rec-bizcocho-vainilla",
+      "categoryId": "sys-queques",
+      "name": "Bizcocho de Vainilla",
+      "values": [
+        { "propertyId": "prop-sabor-queques", "type": "flavor", "value": "Vainilla" },
+        { "propertyId": "prop-molde-queques", "type": "options", "value": "Molde mediano" }
+      ],
+      "lines": [
+        { "ingredientId": "ing-harina", "quantity": 500 },
+        { "ingredientId": "ing-azucar-blanca", "quantity": 400 },
+        { "ingredientId": "ing-huevos", "quantity": 8 },
+        { "ingredientId": "ing-mantequilla", "quantity": 200 },
+        { "ingredientId": "ing-leche-fresca", "quantity": 200 },
+        { "ingredientId": "ing-polvo-hornear", "quantity": 15 },
+        { "ingredientId": "ing-esencia-vainilla", "quantity": 10 }
+      ]
+    },
+    {
+      "id": "rec-keke-chocolate",
+      "categoryId": "sys-queques",
+      "name": "Keke de Chocolate",
+      "values": [
+        { "propertyId": "prop-sabor-queques", "type": "flavor", "value": "Chocolate" },
+        { "propertyId": "prop-molde-queques", "type": "options", "value": "Molde mediano" }
+      ],
+      "lines": [
+        { "ingredientId": "ing-harina", "quantity": 450 },
+        { "ingredientId": "ing-azucar-blanca", "quantity": 400 },
+        { "ingredientId": "ing-cocoa", "quantity": 100 },
+        { "ingredientId": "ing-huevos", "quantity": 6 },
+        { "ingredientId": "ing-aceite", "quantity": 200 },
+        { "ingredientId": "ing-leche-fresca", "quantity": 240 },
+        { "ingredientId": "ing-polvo-hornear", "quantity": 15 }
+      ]
+    },
+    {
+      "id": "rec-bizcocho-naranja",
+      "categoryId": "sys-queques",
+      "name": "Bizcocho de Naranja",
+      "values": [
+        { "propertyId": "prop-sabor-queques", "type": "flavor", "value": "Naranja" },
+        { "propertyId": "prop-molde-queques", "type": "options", "value": "Molde mediano" }
+      ],
+      "lines": [
+        { "ingredientId": "ing-harina", "quantity": 500 },
+        { "ingredientId": "ing-azucar-blanca", "quantity": 350 },
+        { "ingredientId": "ing-huevos", "quantity": 6 },
+        { "ingredientId": "ing-aceite", "quantity": 180 },
+        { "ingredientId": "ing-naranja", "quantity": 3 },
+        { "ingredientId": "ing-polvo-hornear", "quantity": 15 }
+      ]
+    },
+    {
+      "id": "rec-keke-limon",
+      "categoryId": "sys-queques",
+      "name": "Keke de Limón",
+      "values": [
+        { "propertyId": "prop-sabor-queques", "type": "flavor", "value": "Limón" },
+        { "propertyId": "prop-molde-queques", "type": "options", "value": "Molde mediano" }
+      ],
+      "lines": [
+        { "ingredientId": "ing-harina", "quantity": 480 },
+        { "ingredientId": "ing-azucar-blanca", "quantity": 360 },
+        { "ingredientId": "ing-huevos", "quantity": 5 },
+        { "ingredientId": "ing-mantequilla", "quantity": 180 },
+        { "ingredientId": "ing-limon", "quantity": 4 },
+        { "ingredientId": "ing-leche-fresca", "quantity": 120 },
+        { "ingredientId": "ing-polvo-hornear", "quantity": 12 }
+      ]
+    },
+    {
+      "id": "rec-torta-humeda-chocolate",
+      "categoryId": "sys-queques",
+      "name": "Torta Húmeda de Chocolate",
+      "values": [
+        { "propertyId": "prop-sabor-queques", "type": "flavor", "value": "Chocolate" },
+        { "propertyId": "prop-molde-queques", "type": "options", "value": "Molde grande" }
+      ],
+      "lines": [
+        { "ingredientId": "ing-harina", "quantity": 400 },
+        { "ingredientId": "ing-azucar-rubia", "quantity": 450 },
+        { "ingredientId": "ing-cocoa", "quantity": 120 },
+        { "ingredientId": "ing-huevos", "quantity": 6 },
+        { "ingredientId": "ing-aceite", "quantity": 220 },
+        { "ingredientId": "ing-leche-fresca", "quantity": 250 },
+        { "ingredientId": "ing-polvo-hornear", "quantity": 15 }
+      ]
+    },
+    {
+      "id": "rec-vainilla-clasica",
+      "categoryId": "sys-queques",
+      "name": "Vainilla Clásica",
+      "values": [
+        { "propertyId": "prop-sabor-queques", "type": "flavor", "value": "Vainilla" },
+        { "propertyId": "prop-molde-queques", "type": "options", "value": "Molde pequeño" }
+      ],
+      "lines": [
+        { "ingredientId": "ing-harina", "quantity": 300 },
+        { "ingredientId": "ing-azucar-blanca", "quantity": 250 },
+        { "ingredientId": "ing-huevos", "quantity": 4 },
+        { "ingredientId": "ing-mantequilla", "quantity": 150 },
+        { "ingredientId": "ing-leche-fresca", "quantity": 120 },
+        { "ingredientId": "ing-polvo-hornear", "quantity": 10 },
+        { "ingredientId": "ing-esencia-vainilla", "quantity": 8 }
+      ]
+    },
+    {
+      "id": "rec-relleno-manjar",
+      "categoryId": "sys-rellenos",
+      "name": "Manjar Blanco",
+      "values": [
+        { "propertyId": "prop-sabor-rellenos", "type": "flavor", "value": "Manjar" }
+      ],
+      "lines": [
+        { "ingredientId": "ing-manjar", "quantity": 500 }
+      ]
+    },
+    {
+      "id": "rec-crema-pastelera",
+      "categoryId": "sys-rellenos",
+      "name": "Crema Pastelera",
+      "values": [
+        { "propertyId": "prop-sabor-rellenos", "type": "flavor", "value": "Vainilla" }
+      ],
+      "lines": [
+        { "ingredientId": "ing-leche-fresca", "quantity": 500 },
+        { "ingredientId": "ing-azucar-blanca", "quantity": 120 },
+        { "ingredientId": "ing-huevos", "quantity": 3 },
+        { "ingredientId": "ing-maicena", "quantity": 50 },
+        { "ingredientId": "ing-esencia-vainilla", "quantity": 5 }
+      ]
+    },
+    {
+      "id": "rec-chantilly-relleno",
+      "categoryId": "sys-rellenos",
+      "name": "Crema Chantilly",
+      "values": [
+        { "propertyId": "prop-sabor-rellenos", "type": "flavor", "value": "Vainilla" }
+      ],
+      "lines": [
+        { "ingredientId": "ing-crema-leche", "quantity": 500 },
+        { "ingredientId": "ing-azucar-impalpable", "quantity": 80 },
+        { "ingredientId": "ing-esencia-vainilla", "quantity": 5 }
+      ]
+    },
+    {
+      "id": "rec-fresas-crema",
+      "categoryId": "sys-rellenos",
+      "name": "Fresas con Crema",
+      "values": [
+        { "propertyId": "prop-sabor-rellenos", "type": "flavor", "value": "Fresa" }
+      ],
+      "lines": [
+        { "ingredientId": "ing-crema-leche", "quantity": 400 },
+        { "ingredientId": "ing-fresas", "quantity": 300 },
+        { "ingredientId": "ing-azucar-impalpable", "quantity": 60 }
+      ]
+    },
+    {
+      "id": "rec-ganache-relleno",
+      "categoryId": "sys-rellenos",
+      "name": "Ganache de Chocolate",
+      "values": [
+        { "propertyId": "prop-sabor-rellenos", "type": "flavor", "value": "Chocolate" }
+      ],
+      "lines": [
+        { "ingredientId": "ing-chocolate-cobertura", "quantity": 300 },
+        { "ingredientId": "ing-crema-leche", "quantity": 300 }
+      ]
+    },
+    {
+      "id": "rec-durazno-crema",
+      "categoryId": "sys-rellenos",
+      "name": "Durazno con Crema",
+      "values": [
+        { "propertyId": "prop-sabor-rellenos", "type": "flavor", "value": "Vainilla" }
+      ],
+      "lines": [
+        { "ingredientId": "ing-crema-leche", "quantity": 400 },
+        { "ingredientId": "ing-durazno", "quantity": 400 },
+        { "ingredientId": "ing-azucar-impalpable", "quantity": 60 }
+      ]
+    },
+    {
+      "id": "rec-buttercream-vainilla",
+      "categoryId": "sys-coberturas",
+      "name": "Buttercream de Vainilla",
+      "values": [
+        { "propertyId": "prop-sabor-coberturas", "type": "flavor", "value": "Vainilla" }
+      ],
+      "lines": [
+        { "ingredientId": "ing-mantequilla", "quantity": 250 },
+        { "ingredientId": "ing-azucar-impalpable", "quantity": 400 },
+        { "ingredientId": "ing-leche-fresca", "quantity": 40 },
+        { "ingredientId": "ing-esencia-vainilla", "quantity": 8 }
+      ]
+    },
+    {
+      "id": "rec-ganache-cobertura",
+      "categoryId": "sys-coberturas",
+      "name": "Ganache de Chocolate",
+      "values": [
+        { "propertyId": "prop-sabor-coberturas", "type": "flavor", "value": "Chocolate" }
+      ],
+      "lines": [
+        { "ingredientId": "ing-chocolate-cobertura", "quantity": 400 },
+        { "ingredientId": "ing-crema-leche", "quantity": 250 }
+      ]
+    },
+    {
+      "id": "rec-chantilly-cobertura",
+      "categoryId": "sys-coberturas",
+      "name": "Crema Chantilly",
+      "values": [
+        { "propertyId": "prop-sabor-coberturas", "type": "flavor", "value": "Vainilla" }
+      ],
+      "lines": [
+        { "ingredientId": "ing-crema-leche", "quantity": 500 },
+        { "ingredientId": "ing-azucar-impalpable", "quantity": 80 }
+      ]
+    },
+    {
+      "id": "rec-glaseado-queso",
+      "categoryId": "sys-coberturas",
+      "name": "Glaseado de Queso Crema",
+      "values": [
+        { "propertyId": "prop-sabor-coberturas", "type": "flavor", "value": "Vainilla" }
+      ],
+      "lines": [
+        { "ingredientId": "ing-queso-crema", "quantity": 360 },
+        { "ingredientId": "ing-mantequilla", "quantity": 120 },
+        { "ingredientId": "ing-azucar-impalpable", "quantity": 300 },
+        { "ingredientId": "ing-esencia-vainilla", "quantity": 5 }
+      ]
+    },
+    {
+      "id": "rec-fudge-chocolate",
+      "categoryId": "sys-coberturas",
+      "name": "Fudge de Chocolate",
+      "values": [
+        { "propertyId": "prop-sabor-coberturas", "type": "flavor", "value": "Chocolate" }
+      ],
+      "lines": [
+        { "ingredientId": "ing-chocolate-cobertura", "quantity": 300 },
+        { "ingredientId": "ing-mantequilla", "quantity": 100 },
+        { "ingredientId": "ing-leche-evaporada", "quantity": 200 },
+        { "ingredientId": "ing-azucar-impalpable", "quantity": 200 }
+      ]
+    },
+    {
+      "id": "rec-bano-manjar",
+      "categoryId": "sys-coberturas",
+      "name": "Baño de Manjar",
+      "values": [
+        { "propertyId": "prop-sabor-coberturas", "type": "flavor", "value": "Manjar" }
+      ],
+      "lines": [
+        { "ingredientId": "ing-manjar", "quantity": 400 },
+        { "ingredientId": "ing-mantequilla", "quantity": 80 }
+      ]
+    }
+  ]
+}

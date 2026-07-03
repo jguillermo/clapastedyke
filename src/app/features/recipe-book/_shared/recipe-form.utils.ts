@@ -1,4 +1,5 @@
 import { MeasureInput } from '@core/recipe-book/domain/value-objects/measure-input';
+import type { PropertyType } from '@core/recipe-book/domain/value-objects/recipe-property';
 
 /** Une defaults + usados, deduplicando sin distinguir mayúsculas (gana el primero). */
 export function union(defaults: readonly string[], used?: readonly string[]): string[] {
@@ -30,4 +31,16 @@ export function validateServings(value: string): string | null {
 
 export function validateLabel(value: string): string | null {
   return value.trim() ? null : 'Escribe un valor.';
+}
+
+export function validateNumber(value: string): string | null {
+  return Number.isFinite(Number(value)) && value.trim() !== '' ? null : 'Escribe un número.';
+}
+
+/** Validación de un valor según el tipo de propiedad (para el SelectTag dinámico). */
+export function validateForType(type: PropertyType): (value: string) => string | null {
+  if (type === 'weight') return validateMass;
+  if (type === 'number') return validateNumber;
+  // text / flavor / options: el valor es un label libre.
+  return validateLabel;
 }

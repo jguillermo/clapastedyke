@@ -35,14 +35,16 @@ targets táctiles ≥ 44px (`min-h-11`). Detalle en
 |---|---|---|:---:|:---:|
 | [Icon](#icon) | `migo-icon` | Presentacional | — | ✅ |
 | [Button](#button) | `button[migo-button]`, `a[migo-button]` | Presentacional | — | ✅ |
+| [Spacer](#spacer) | `migo-spacer` | Presentacional (separador horizontal) | — | ✅ |
 | [Card](#card) (+ partes) | `migo-card` (+ `-header/-title/-subtitle/-body/-footer`) | Presentacional | — | ✅ |
 | [FormField](#formfield) | `migo-form-field` | Layout de campo | — | ✅ |
 | [Input](#input) | `migo-input` | Control de texto | ✅ | ✅ |
 | [UnitInput](#unitinput) | `migo-unit-input` | Control numérico con unidad dentro | ✅ | ✅ |
 | [Autocomplete](#autocomplete) | `migo-autocomplete` | Texto con completado fantasma | ✅ | ✅ |
+| [Combobox](#combobox) | `migo-combobox` | Texto: fantasma (1) + desplegable (2+) | ✅ | ✅ |
 | [Checkbox](#checkbox) | `migo-checkbox` | Control booleano | ✅ | ✅ |
 | [Select](#select) | `migo-select` | Control (CDK Overlay+Listbox) | ✅ | ✅ |
-| [Grid](#grid) | `migo-grid` | Hoja de cálculo (celdas + teclado) | — | ✅ |
+| [Table](#table) | `migo-table` | Hoja de cálculo (`<table>` + teclado) | — | ✅ |
 | [SelectTag](#selecttag) | `migo-select-tag` | Etiquetas tipo Select2 (chips + autocompletar) | — | ✅ |
 | [Dialog](#dialog) | `MigoDialog` (servicio) | Servicio (CDK Dialog) | — | ✅ |
 | [Swiper](#swiper) | `migo-swiper` (+ `migoSwiperSlide`) | Carrusel con pestañas (Swiper Element) | — | ✅ |
@@ -73,12 +75,43 @@ en plantillas — todo icono va por `migo-icon`. Las clases de animación (`opac
 
 ## Button
 
-`variant`: `primary` \| `secondary` \| `ghost` \| `danger` · `size`: `sm` \| `md` \| `lg` ·
-`loading` · `block` · `disabled`. Slots: `[icon-leading]`, contenido (label), `[icon-trailing]`.
+`variant`: `primary` \| `secondary` \| `ghost` \| `danger` · `size`: `2xs` (28) \| `xs` (32) \|
+`sm` (36) \| `md` (44, default) \| `lg` (52) \| `xl` (56) \| `2xl` (64) · `loading` · `block` ·
+`disabled`. Slots: `[icon-leading]`, contenido (label), `[icon-trailing]`.
+
+El botón **no** lleva separación automática entre icono y texto: usa un [`migo-spacer`](#spacer)
+entre ambos. Así el botón solo-icono queda limpio (sin hueco sobrante). Solo `md` (44px) cumple el
+target táctil ≥44px por sí solo; los tamaños menores son para acciones secundarias/compactas (ver
+mobile-first).
 
 ```html
 <button migo-button variant="primary" size="md" [loading]="saving()">Guardar</button>
 <a migo-button variant="ghost" href="...">Cancelar</a>
+<!-- icono + texto: separa con migo-spacer -->
+<button migo-button variant="secondary">
+  <migo-icon icon-leading name="mat:add" size="sm" /><migo-spacer />Agregar
+</button>
+<!-- icono solo: sin spacer, sin hueco -->
+<button migo-button variant="ghost" aria-label="Cerrar">
+  <migo-icon icon-leading name="mat:close" size="sm" />
+</button>
+```
+
+## Spacer
+
+`migo-spacer` — separador **horizontal** sin nada visible: solo añade hueco (caja `inline-block`
+vacía con ancho del tema). Úsalo donde necesites separar dos elementos en línea — típicamente entre
+el icono y el texto de un botón. `size`: `sm` (4px) \| `md` (8px, default) \| `lg` (12px) ·
+`hideOnMobile` (booleano): si se activa, desaparece en móvil y reaparece en `sm+` — pensado para
+botones que en móvil ocultan su texto y dejan solo el icono (el spacer se va con el texto).
+
+```html
+<!-- entre icono y texto -->
+<migo-icon icon-leading name="mat:edit" size="sm" /><migo-spacer />Editar
+
+<!-- el texto se oculta en móvil → el spacer también -->
+<migo-icon icon-leading name="mat:add" size="sm" />
+<migo-spacer hideOnMobile /><span class="hidden sm:inline">Añadir</span>
 ```
 
 ## Card
@@ -157,6 +190,27 @@ sugerencia que coincide aparece tenue dentro del campo; se acepta con Tab / → 
 <migo-autocomplete formControlName="name" [suggestions]="ingredientNames()" placeholder="Harina" />
 ```
 
+## Combobox
+
+`migo-combobox` — texto con **dos modos** según las coincidencias de lo tecleado:
+
+- **1 coincidencia que empieza por** lo escrito → **fantasma en línea** (sufijo tenue; se acepta con
+  Tab / → / Enter), con el scroll sincronizado al input para que **no se desalinee** con nombres largos.
+- **2+ coincidencias**, o **1 que solo contiene** lo escrito → **desplegable** debajo (CDK Overlay +
+  `role="listbox"`) para elegir con ratón o teclado (↑/↓, Enter, Tab, Esc).
+
+La coincidencia del desplegable es **por contenido** (substring); el fantasma solo completa **por
+prefijo**. `ControlValueAccessor` (valor `string`); se integra con `<migo-form-field>`. Inputs iguales
+a Autocomplete: `suggestions` (string[]) · `placeholder` · `ariaLabel` · `invalid` · `disabled` ·
+`seamless` · `paper`. Output `selected` (string): se emite al **terminar** la selección (Tab / Enter o
+clic en el desplegable, **no** al completar en línea con →), para que el consumidor avance al siguiente
+campo (p. ej. la grilla de insumos enfoca la columna de cantidad). Es el control de nombre que usa la
+grilla de insumos (`seamless`).
+
+```html
+<migo-combobox seamless formControlName="name" [suggestions]="ingredientNames()" ariaLabel="Ingrediente" />
+```
+
 ## Checkbox
 
 `migo-checkbox` — control booleano, `ControlValueAccessor`. `indeterminate` · `invalid` ·
@@ -200,30 +254,62 @@ protected readonly data = inject<ConfirmDialogData>(MIGO_DIALOG_DATA);
 
 Ejemplo vivo de todos los componentes: ruta **`/ui`** (`features/ui-showcase/`).
 
-## Grid
+## Table
 
-`migo-grid` — shell de **hoja de cálculo**: cabecera por columna, celdas pegadas, navegación por
-teclado (↑/↓/Enter cambian de fila; ←/→ saltan de celda en el borde del cursor) y botón de eliminar
-fila. Presentacional y agnóstico del editor: el consumidor proyecta una `<ng-template>` que pinta el
-control de cada celda (típicamente `migo-autocomplete`/`migo-unit-input` `seamless`). Datos y lógica
-(fila vacía, validación) los aporta el feature. Inputs: `columns` (`{label, width?}[]`) · `rows` ·
-`protectLastRow` · `removable` (default `true`; `false` oculta la columna de acciones) · `ariaLabel`.
-Output: `removeRow` (índice).
+`migo-table` — shell de **hoja de cálculo** sobre un `<table>` real (`role="grid"`): cabecera por
+columna, celdas pegadas y navegación por teclado (↑/↓/Enter cambian de fila; ←/→ saltan de celda en
+el borde del cursor; **Tab nativo** fila-mayor). Presentacional y agnóstico del editor: el consumidor
+proyecta una `<ng-template>` que pinta el control de cada celda (típicamente
+`migo-combobox`/`migo-unit-input` `seamless`). Datos y lógica (fila vacía, validación) los aporta el
+feature.
 
-**Mobile-first**: en pantallas estrechas la grilla **scrollea en horizontal** (no se aplasta) — las
-columnas conservan ancho (`min-w-32` las flexibles, `shrink-0` las de ancho fijo).
+**Eliminar fila**: la tabla **no** trae columna de acciones. Si el feature necesita borrar, añade su
+propia columna con un botón y llama a `migo-table.remove(rowIndex)` (vía referencia de plantilla
+`#table`), que dispara la salida `removeRow`. Así el feature decide cuándo/dónde mostrar el botón.
+
+**Tamaño de columna** (`size`): los anchos se expresan **en la escala del tema** (no valores
+arbitrarios ni `[style]`): `table-auto` da `'fit'` y la pista compartida nativamente; px/`%`/flexible
+se mapean a utilidades del tema vía mapas de literales.
+
+| `size` | Comportamiento | Utilidad |
+|---|---|---|
+| `number` (px) | ancho fijo | `w-*` (p.ej. `96`→`w-24`) |
+| `'40%'` | porcentaje | fracción (`w-2/5`) |
+| `'fit'` | ajustado al contenido (sin partirse) | `w-px whitespace-nowrap` |
+| *(omitido)* | flexible (absorbe lo que sobra) | `auto` (sin width) |
+
+Inputs: `columns` (`{ name, size?, align?, max? }[]`) · `rows` · `ariaLabel` · `bleed` (en móvil
+rompe el padding del padre y va borde a borde) · `maxWidth` (`'reading'|'page'`). Output: `removeRow`
+(índice). Métodos públicos: `focusCell(r, c)` · `remove(index)` (dispara `removeRow`).
+
+**Mobile-first**: vertical **nunca scrollea** (crece; scrollea el contenedor exterior). Las columnas
+flexibles (`auto`) absorben el ancho sobrante; si las fijas/% suman de más, hay **scroll horizontal**
+de fallback. `bleed` lleva la tabla a los bordes en móvil. Los inputs de celda llevan `min-w-0`
+(variante `[&_input]:`) para que `table-auto` respete los anchos fijos.
 
 ```html
-<migo-grid [columns]="columns" [rows]="lineControls()" (removeRow)="removeLine($event)">
+<migo-table
+  #table
+  [columns]="[{ name: 'Insumo' }, { name: 'Cantidad', size: 'fit', align: 'center' }, { name: '', size: 'fit' }]"
+  [rows]="lineControls()"
+  bleed
+  (removeRow)="removeLine($event)"
+>
   <ng-template let-line let-r="rowIndex" let-c="colIndex">
     <div [formGroup]="line">
       @switch (c) {
-        @case (0) { <migo-autocomplete seamless formControlName="name" [suggestions]="names()" /> }
+        @case (0) { <migo-combobox seamless formControlName="name" [suggestions]="names()" /> }
         @case (1) { <migo-unit-input seamless formControlName="quantity" [unit]="unit(r)" /> }
+        @case (2) {
+          <!-- botón de eliminar: lo pinta el feature y dispara removeRow vía la API de la tabla -->
+          <button migo-button variant="ghost" size="sm" aria-label="Quitar fila" (click)="table.remove(r)">
+            <migo-icon icon-leading name="mat:close" size="sm" />
+          </button>
+        }
       }
     </div>
   </ng-template>
-</migo-grid>
+</migo-table>
 ```
 
 ## SelectTag
@@ -284,7 +370,7 @@ Pendiente (ningún componente de abajo existe todavía). Orden sugerido por uso 
 ### Prioridad baja (datos / formularios avanzados)
 - [ ] **Table** (`migo-table`, CDK Table) — orden, selección.
 - [ ] **Pagination** (`migo-paginator`).
-- [ ] **Tag input / Autocomplete** (CDK Overlay + Listbox).
+- [x] **Combobox / Autocomplete** (CDK Overlay + Listbox) — ✅ hecho: `migo-combobox` (fantasma 1 + desplegable 2+).
 - [ ] **Date picker** (CDK Overlay + calendario).
 - [ ] **Slider** (`migo-slider`).
 - [x] **Icon** (`migo-icon`) — ✅ hecho: registro SVG tipado de Material (`icon/icon.registry.ts`),

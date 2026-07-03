@@ -1,15 +1,17 @@
 import { TestBed } from '@angular/core/testing';
-import { aPurchase, makeRecipeBookFakes, RecordingEventBus } from '../../recipe-book-test-doubles';
+import { aPurchase, makeRecipeBookFakes, makeWeightCategory, RecordingEventBus } from '../../recipe-book-test-doubles';
 import { EventBus } from '../../../../_common/event-bus';
+import { RecipeCategoryRepository } from '../../../domain/repositories/recipe-category.repository';
 import { SaveIngredient } from '../../../application/use-cases/save-ingredient.use-case';
-import { SaveSpongeRecipe } from '../../../application/use-cases/save-sponge-recipe.use-case';
-import { SaveFillingRecipe } from '../../../application/use-cases/save-filling-recipe.use-case';
-import { SaveCoveringRecipe } from '../../../application/use-cases/save-covering-recipe.use-case';
+import { SaveRecipe } from '../../../application/use-cases/save-recipe.use-case';
 import { SavePackagingRule } from '../../../application/use-cases/save-packaging-rule.use-case';
 import { ComposeCake } from '../../../application/use-cases/compose-cake.use-case';
 import { GenerateShoppingList } from '../../../application/use-cases/generate-shopping-list.use-case';
 
-/** Drives the whole Cap 0 flow and returns the list for a 1 kg cake (§9). */
+const CAT = 'cat-q';
+const PESO = `${CAT}-peso`;
+
+/** Drives the whole Cap 0 flow and returns the list for a 1 kg cake. */
 async function runCap0Flow(): Promise<{ compositionId: string }> {
     const ing = TestBed.inject(SaveIngredient);
     const flour = (await ing.execute({ name: 'Harina', baseUnit: 'g', usage: 'recipe', purchasePrice: aPurchase('g') })).id;
@@ -17,10 +19,13 @@ async function runCap0Flow(): Promise<{ compositionId: string }> {
     const manjar = (await ing.execute({ name: 'Manjar blanco', baseUnit: 'g', usage: 'recipe', purchasePrice: aPurchase('g') })).id;
     const cream = (await ing.execute({ name: 'Chantilly', baseUnit: 'g', usage: 'recipe', purchasePrice: aPurchase('g') })).id;
 
+    await TestBed.inject(RecipeCategoryRepository).save(makeWeightCategory(CAT, 'Queques'));
+    const recipe = TestBed.inject(SaveRecipe);
     const spongeId = (
-        await TestBed.inject(SaveSpongeRecipe).execute({
+        await recipe.execute({
+            categoryId: CAT,
             name: 'Queque de vainilla',
-            referenceYield: { weightGrams: 1000, servings: 8 },
+            values: [{ propertyId: PESO, value: 1000 }],
             lines: [
                 { ingredientId: flour, quantity: 250 },
                 { ingredientId: eggs, quantity: 4 },
@@ -28,16 +33,18 @@ async function runCap0Flow(): Promise<{ compositionId: string }> {
         })
     ).id;
     const fillingId = (
-        await TestBed.inject(SaveFillingRecipe).execute({
+        await recipe.execute({
+            categoryId: CAT,
             name: 'Manjar blanco',
-            referenceWeightGrams: 1000,
+            values: [{ propertyId: PESO, value: 1000 }],
             lines: [{ ingredientId: manjar, quantity: 300 }],
         })
     ).id;
     const coveringId = (
-        await TestBed.inject(SaveCoveringRecipe).execute({
+        await recipe.execute({
+            categoryId: CAT,
             name: 'Chantilly',
-            referenceWeightGrams: 1000,
+            values: [{ propertyId: PESO, value: 1000 }],
             lines: [{ ingredientId: cream, quantity: 200 }],
         })
     ).id;

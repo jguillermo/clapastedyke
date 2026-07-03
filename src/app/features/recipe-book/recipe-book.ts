@@ -13,27 +13,26 @@ import { CardBody } from '@components/card/card-body';
 import { CardHeader } from '@components/card/card-header';
 import { CardTitle } from '@components/card/card-title';
 import { Icon } from '@components/icon/icon';
+import { Spacer } from '@components/spacer/spacer';
 import { MigoSwiper } from '@components/swiper/swiper';
 import { MigoSwiperSlide } from '@components/swiper/swiper-slide';
 import { MigoDialog, MigoDialogRef, MIGO_DIALOG_DATA } from '@components/dialog/dialog.service';
 import { ListRecipeBook, type RecipeBookCatalog } from '@core/recipe-book/application/use-cases/list-recipe-book.use-case';
-import type { SpongeRecipe } from '@core/recipe-book/domain/entities/sponge-recipe';
-import type { FillingRecipe } from '@core/recipe-book/domain/entities/filling-recipe';
-import type { CoveringRecipe } from '@core/recipe-book/domain/entities/covering-recipe';
+import type { Recipe } from '@core/recipe-book/domain/entities/recipe';
+import type { RecipeCategory } from '@core/recipe-book/domain/entities/recipe-category';
 import type { Ingredient } from '@core/recipe-book/domain/entities/ingredient';
 import type { IngredientLine } from '@core/recipe-book/domain/value-objects/ingredient-line';
-import { SpongeForm, type SpongeFormData, type SpongeRecipePrefill } from './sponge-form/sponge-form';
-import { LayerForm, type LayerFormData, type LayerKind, type LayerRecipePrefill } from './layer-form/layer-form';
+import { RecipeForm, type RecipeFormData, type RecipeFormPrefill } from './recipe-form/recipe-form';
+import { CategoryEditor, type CategoryEditorData } from './category-editor/category-editor';
 import {
   RecipeDetail,
   type RecipeDetailData,
-  type RecipeDetailKind,
   type RecipeDetailLine,
   type RecipeDetailResult,
 } from './recipe-detail/recipe-detail';
 import type { IngredientOption, InitialLine } from './_shared/ingredient-grid/ingredient-grid';
 import { IngredientList } from './ingredient-list/ingredient-list';
-import { formatQuantity, formatWeight, layerChips, spongeChips } from './_shared/recipe-format';
+import { formatQuantity, formatWeight, recipeChips } from './_shared/recipe-format';
 
 interface RecipeView {
   id: string;
@@ -42,221 +41,263 @@ interface RecipeView {
   chips: string[];
 }
 
-/** Pestaña/sección del libro que el hub puede abrir directamente. */
-export type RecipeBookTab = 'sponges' | 'fillings' | 'coverings' | 'ingredients';
+interface CategoryView {
+  id: string;
+  name: string;
+  recipes: RecipeView[];
+}
 
-/** Datos opcionales al abrir el hub: en qué pestaña entrar y si arrancar "agregar". */
+/** Datos opcionales al abrir el hub: en qué categoría entrar y si arrancar "agregar". */
 export interface RecipeBookData {
-  tab?: RecipeBookTab;
+  categoryId?: string;
   add?: boolean;
 }
 
-/** Orden de las pestañas en el swiper. */
-const TAB_INDEX: Record<RecipeBookTab, number> = {
-  sponges: 0,
-  fillings: 1,
-  coverings: 2,
-  ingredients: 3,
-};
+/**
+ * Resultado al cerrar el hub: a dónde debe saltar el libro 3D para reflejar lo
+ * último que se tocó (la receta recién guardada, su categoría, o los insumos).
+ */
+export interface RecipeBookResult {
+  categoryId?: string;
+  recipeName?: string;
+  ingredients?: boolean;
+}
 
 /**
- * Hub "Mi libro de recetas": contenido de un MigoDialog que abre el mundo 3D al
- * tocar el atril de recetas. Lee el catálogo con `ListRecipeBook` y deja crear,
- * **ver** (ficha de lectura) y **editar** queques ({@link SpongeForm}), rellenos
- * y coberturas ({@link LayerForm}), además de gestionar los **insumos** como una
- * lista editable en línea ({@link IngredientList}). Inyecta solo use cases.
+ * Hub "Mi libro de recetas": contenido de un MigoDialog. Lee el catálogo con
+ * `ListRecipeBook` y deja crear/editar **categorías** y, dentro de cada una,
+ * crear, **ver** y **editar** recetas con un formulario dinámico según el esquema
+ * de la categoría. Los **insumos** se gestionan aparte. Inyecta solo use cases.
  */
 @Component({
   selector: 'app-recipe-book',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Button, Card, CardHeader, CardTitle, CardBody, Icon, MigoSwiper, MigoSwiperSlide, IngredientList],
+  imports: [Button, Card, CardHeader, CardTitle, CardBody, Icon, Spacer, IngredientList, MigoSwiper, MigoSwiperSlide],
+  // `contents`: el card `fill` es hijo flex directo del diálogo y llena la pantalla en móvil.
+  host: { class: 'contents' },
   templateUrl: './recipe-book.html',
 })
 export class RecipeBook implements AfterViewInit {
   private readonly listRecipeBook = inject(ListRecipeBook);
   private readonly dialog = inject(MigoDialog);
-  protected readonly ref = inject<MigoDialogRef>(MigoDialogRef);
-  /** Pestaña/intención con la que se abrió (p. ej. desde un botón del libro 3D). */
+  protected readonly ref = inject<MigoDialogRef<RecipeBookResult>>(MigoDialogRef);
   private readonly data = inject<RecipeBookData | null>(MIGO_DIALOG_DATA, { optional: true });
 
+  /** Foco a devolver al libro 3D: última receta/categoría/insumos que se tocó. */
+  private focusRecipeId: string | null = null;
+  private focusCategoryId: string | null = this.data?.categoryId ?? null;
+  private focusIngredients = false;
+
   private readonly swiper = viewChild(MigoSwiper);
-  private readonly ingredientList = viewChild(IngredientList);
 
   private readonly catalog = signal<RecipeBookCatalog | null>(null);
 
   protected readonly loaded = computed(() => this.catalog() !== null);
-  protected readonly sponges = computed<RecipeView[]>(() =>
-    (this.catalog()?.sponges ?? []).map((s) => ({
-      id: s.id.value,
-      name: s.name,
-      lineCount: s.lines.length,
-      chips: spongeChips(s),
-    })),
-  );
-  protected readonly fillings = computed<RecipeView[]>(() =>
-    (this.catalog()?.fillings ?? []).map((f) => layerView(f)),
-  );
-  protected readonly coverings = computed<RecipeView[]>(() =>
-    (this.catalog()?.coverings ?? []).map((c) => layerView(c)),
-  );
-  /** Insumos del catálogo (entidades) para la lista editable de la pestaña Insumos. */
   protected readonly ingredientEntities = computed(() => this.catalog()?.ingredients ?? []);
 
-  /** Insumos indexados por id, para resolver las líneas de una receta al verla/editarla. */
+  private readonly categoriesById = computed(
+    () => new Map((this.catalog()?.categories ?? []).map((c) => [c.id.value, c])),
+  );
+  private readonly recipesById = computed(
+    () => new Map((this.catalog()?.recipes ?? []).map((r) => [r.id.value, r])),
+  );
   private readonly ingredientsById = computed(
     () => new Map<string, Ingredient>((this.catalog()?.ingredients ?? []).map((i) => [i.id.value, i])),
   );
 
+  /** Categorías (ordenadas) con sus recetas alfabéticas, listas para pintar. */
+  protected readonly categoryViews = computed<CategoryView[]>(() => {
+    const catalog = this.catalog();
+    if (!catalog) {
+      return [];
+    }
+    return catalog.categories.map((category) => ({
+      id: category.id.value,
+      name: category.name,
+      recipes: this.recipesOf(category)
+        .map((recipe) => this.toView(recipe, category))
+        .sort((a, b) => a.name.localeCompare(b.name, 'es')),
+    }));
+  });
+
   private readonly ready = this.reload();
 
   ngAfterViewInit(): void {
-    const tab = this.data?.tab;
-    if (!tab) {
+    const categoryId = this.data?.categoryId;
+    if (!categoryId) {
       return;
     }
-    // Abre en la pestaña que corresponde a la página del libro desde donde se llamó.
-    setTimeout(() => this.swiper()?.slideTo(TAB_INDEX[tab]));
-    if (this.data?.add) {
-      void this.ready.then(() => this.startAdd(tab));
+    void this.ready.then(() => {
+      // Abre la pestaña de la categoría desde la que se llamó (página del libro).
+      const index = this.categoryViews().findIndex((c) => c.id === categoryId);
+      if (index >= 0) {
+        setTimeout(() => this.swiper()?.slideTo(index));
+      }
+      if (this.data?.add) {
+        const category = this.categoriesById().get(categoryId);
+        if (category) {
+          this.createRecipe(category);
+        }
+      }
+    });
+  }
+
+  // --- Pestañas ---
+
+  /** Última pestaña "real" (categoría o Insumos) para volver tras la acción "Crear categoría". */
+  private lastRealTab = 0;
+
+  /** Cambia la pestaña visible (categorías + Insumos). El foco sigue a la pestaña. */
+  protected onTabChange(index: number): void {
+    const categories = this.categoryViews();
+    const insumosTab = categories.length;
+    this.lastRealTab = index;
+    this.focusRecipeId = null;
+    if (index === insumosTab) {
+      this.focusIngredients = true;
+      this.focusCategoryId = null;
+    } else if (index >= 0 && index < categories.length) {
+      this.focusIngredients = false;
+      this.focusCategoryId = categories[index].id;
     }
   }
 
-  /** Arranca "agregar" en la sección pedida: forms para recetas, foco al renglón para insumos. */
-  private startAdd(tab: RecipeBookTab): void {
-    switch (tab) {
-      case 'sponges':
-        this.createSponge();
-        break;
-      case 'fillings':
-        this.createFilling();
-        break;
-      case 'coverings':
-        this.createCovering();
-        break;
-      case 'ingredients':
-        setTimeout(() => this.ingredientList()?.focusNew());
-        break;
-    }
-  }
+  // --- Categorías ---
 
-  // --- Crear ---
-
-  protected createSponge(): void {
-    const dialogRef = this.dialog.open<{ id: string }, SpongeFormData, SpongeForm>(SpongeForm, {
-      data: { ingredients: this.recipeIngredients(), valuesByType: valuesByType(this.catalog()?.sponges ?? []) },
-      ariaLabel: 'Nuevo queque',
+  protected editCategoryById(id: string): void {
+    const category = this.categoriesById().get(id);
+    if (!category) return;
+    const ref = this.dialog.open<{ id: string }, CategoryEditorData, CategoryEditor>(CategoryEditor, {
+      data: { category, ...this.categoryEditorCatalog() },
+      ariaLabel: 'Editar categoría',
       width: '640px',
     });
-    this.reloadOnSave(dialogRef);
+    this.onCategorySaved(ref);
   }
 
-  protected createFilling(): void {
-    this.openLayerForm('filling', this.catalog()?.fillings ?? []);
+  /** Catálogos (sabores + opciones de conversión) en forma plana para el editor de categoría. */
+  private categoryEditorCatalog(): Omit<CategoryEditorData, 'category'> {
+    const catalog = this.catalog();
+    return {
+      flavors: (catalog?.flavors ?? []).map((f) => ({ id: f.id.value, label: f.label })),
+      conversionOptions: (catalog?.conversionOptions ?? []).map((o) => ({
+        id: o.id.value,
+        group: o.group,
+        label: o.label,
+        factor: o.factor,
+      })),
+    };
   }
 
-  protected createCovering(): void {
-    this.openLayerForm('covering', this.catalog()?.coverings ?? []);
+  // --- Recetas ---
+
+  protected addRecipe(categoryId: string): void {
+    const category = this.categoriesById().get(categoryId);
+    if (category) this.createRecipe(category);
   }
 
-  // --- Ver (ficha de lectura) → Editar ---
-
-  protected openSponge(id: string): void {
-    const sponge = (this.catalog()?.sponges ?? []).find((s) => s.id.value === id);
-    if (!sponge) return;
-    const ref = this.openDetail('sponge', sponge.name, spongeChips(sponge), sponge.lines);
+  protected openRecipe(recipeId: string): void {
+    const recipe = this.recipesById().get(recipeId);
+    const category = recipe ? this.categoriesById().get(recipe.categoryId.value) : undefined;
+    if (!recipe || !category) return;
+    const ref = this.openDetail(recipe, category);
     ref.closed.subscribe((result) => {
-      if (result?.action === 'edit') this.editSponge(sponge);
-    });
-  }
-
-  protected openFilling(id: string): void {
-    const filling = (this.catalog()?.fillings ?? []).find((f) => f.id.value === id);
-    if (!filling) return;
-    const ref = this.openDetail('filling', filling.name, layerChips(filling), filling.lines);
-    ref.closed.subscribe((result) => {
-      if (result?.action === 'edit') this.editLayer('filling', filling);
-    });
-  }
-
-  protected openCovering(id: string): void {
-    const covering = (this.catalog()?.coverings ?? []).find((c) => c.id.value === id);
-    if (!covering) return;
-    const ref = this.openDetail('covering', covering.name, layerChips(covering), covering.lines);
-    ref.closed.subscribe((result) => {
-      if (result?.action === 'edit') this.editLayer('covering', covering);
+      if (result?.action === 'edit') this.editRecipe(recipe, category);
     });
   }
 
   protected close(): void {
-    this.ref.close();
+    this.ref.close(this.buildResult());
   }
 
-  // --- Editar ---
+  protected onIngredientsChanged(): void {
+    this.focusIngredients = true;
+    this.focusCategoryId = null;
+    this.focusRecipeId = null;
+    void this.reload();
+  }
 
-  private editSponge(sponge: SpongeRecipe): void {
-    const prefill: SpongeRecipePrefill = {
-      name: sponge.name,
-      flavor: sponge.flavor,
-      weightLabel: formatWeight(sponge.referenceYield.weight.value),
-      servings: sponge.referenceYield.servings ? String(sponge.referenceYield.servings) : undefined,
-      size: sponge.referenceYield.size,
-      lines: this.prefillLines(sponge.lines),
-    };
-    const dialogRef = this.dialog.open<{ id: string }, SpongeFormData, SpongeForm>(SpongeForm, {
+  /** Foco a devolver al libro: insumos > receta recién tocada > categoría visible. */
+  private buildResult(): RecipeBookResult {
+    if (this.focusIngredients) {
+      return { ingredients: true };
+    }
+    const recipe = this.focusRecipeId ? this.recipesById().get(this.focusRecipeId) : null;
+    if (recipe) {
+      return { categoryId: recipe.categoryId.value, recipeName: recipe.name };
+    }
+    return this.focusCategoryId ? { categoryId: this.focusCategoryId } : {};
+  }
+
+  private onCategorySaved(dialogRef: {
+    closed: { subscribe(fn: (result: { id: string } | undefined) => void): unknown };
+  }): void {
+    dialogRef.closed.subscribe((result) => {
+      if (result) {
+        this.focusCategoryId = result.id;
+        this.focusRecipeId = null;
+        this.focusIngredients = false;
+        void this.reload();
+      }
+    });
+  }
+
+  private onRecipeSaved(dialogRef: {
+    closed: { subscribe(fn: (result: { id: string } | undefined) => void): unknown };
+  }): void {
+    dialogRef.closed.subscribe((result) => {
+      if (result) {
+        this.focusRecipeId = result.id;
+        this.focusIngredients = false;
+        void this.reload();
+      }
+    });
+  }
+
+  // --- Helpers de diálogos ---
+
+  private createRecipe(category: RecipeCategory): void {
+    const ref = this.dialog.open<{ id: string }, RecipeFormData, RecipeForm>(RecipeForm, {
       data: {
+        category,
         ingredients: this.recipeIngredients(),
-        valuesByType: valuesByType(this.catalog()?.sponges ?? []),
+        valuesByProp: this.valuesByProp(category),
+      },
+      ariaLabel: `Nueva receta en ${category.name}`,
+      width: '640px',
+    });
+    this.onRecipeSaved(ref);
+  }
+
+  private editRecipe(recipe: Recipe, category: RecipeCategory): void {
+    const prefill: RecipeFormPrefill = {
+      name: recipe.name,
+      values: this.rawValues(recipe),
+      lines: this.prefillLines(recipe.lines),
+    };
+    const ref = this.dialog.open<{ id: string }, RecipeFormData, RecipeForm>(RecipeForm, {
+      data: {
+        category,
+        ingredients: this.recipeIngredients(),
+        valuesByProp: this.valuesByProp(category),
         recipe: prefill,
       },
-      ariaLabel: 'Editar queque',
+      ariaLabel: `Editar ${recipe.name}`,
       width: '640px',
     });
-    this.reloadOnSave(dialogRef);
-  }
-
-  private editLayer(kind: LayerKind, layer: FillingRecipe | CoveringRecipe): void {
-    const existing = kind === 'filling' ? (this.catalog()?.fillings ?? []) : (this.catalog()?.coverings ?? []);
-    const prefill: LayerRecipePrefill = {
-      name: layer.name,
-      weightLabel: formatWeight(layer.referenceWeight.value),
-      lines: this.prefillLines(layer.lines),
-    };
-    this.openLayerForm(kind, existing, prefill);
-  }
-
-  // --- Helpers ---
-
-  private openLayerForm(
-    kind: LayerKind,
-    existing: readonly (FillingRecipe | CoveringRecipe)[],
-    recipe?: LayerRecipePrefill,
-  ): void {
-    const dialogRef = this.dialog.open<{ id: string }, LayerFormData, LayerForm>(LayerForm, {
-      data: { kind, ingredients: this.recipeIngredients(), usedWeights: usedWeights(existing), recipe },
-      ariaLabel: recipe
-        ? kind === 'filling'
-          ? 'Editar relleno'
-          : 'Editar cobertura'
-        : kind === 'filling'
-          ? 'Nuevo relleno'
-          : 'Nueva cobertura',
-      width: '640px',
-    });
-    this.reloadOnSave(dialogRef);
+    this.onRecipeSaved(ref);
   }
 
   private openDetail(
-    kind: RecipeDetailKind,
-    name: string,
-    chips: string[],
-    lines: readonly IngredientLine[],
+    recipe: Recipe,
+    category: RecipeCategory,
   ): MigoDialogRef<RecipeDetailResult, RecipeDetail> {
     const byId = this.ingredientsById();
     const data: RecipeDetailData = {
-      kind,
-      name,
-      chips,
-      lines: lines.map((line): RecipeDetailLine => {
+      subtitle: category.name,
+      name: recipe.name,
+      chips: recipeChips(recipe, category),
+      lines: recipe.lines.map((line): RecipeDetailLine => {
         const ingredient = byId.get(line.ingredientId.value);
         return {
           name: ingredient?.name ?? '—',
@@ -273,12 +314,69 @@ export class RecipeBook implements AfterViewInit {
     };
     return this.dialog.open<RecipeDetailResult, RecipeDetailData, RecipeDetail>(RecipeDetail, {
       data,
-      ariaLabel: name,
+      ariaLabel: recipe.name,
       width: '640px',
     });
   }
 
-  /** Líneas de una receta proyectadas para precargar la grilla del formulario al editar. */
+  // --- Proyecciones ---
+
+  private recipesOf(category: RecipeCategory): Recipe[] {
+    return (this.catalog()?.recipes ?? []).filter((r) => r.categoryId.value === category.id.value);
+  }
+
+  private toView(recipe: Recipe, category: RecipeCategory): RecipeView {
+    return {
+      id: recipe.id.value,
+      name: recipe.name,
+      lineCount: recipe.lines.length,
+      chips: recipeChips(recipe, category),
+    };
+  }
+
+  /** Valores (texto visible) por id de propiedad para precargar el formulario. */
+  private rawValues(recipe: Recipe): Record<string, string> {
+    const values: Record<string, string> = {};
+    for (const value of recipe.values) {
+      values[value.propertyId] = value.type === 'weight' ? formatWeight(value.asWeight().value) : String(value.value);
+    }
+    return values;
+  }
+
+  /**
+   * Opciones/sugerencias por propiedad para el formulario. Para propiedades de
+   * catálogo (`flavor` → sabores; `options` → opciones de conversión del grupo) se
+   * siembran los labels del catálogo (esto restaura los sabores/tamaños/moldes
+   * predefinidos al crear una receta); se añaden además los valores ya usados.
+   */
+  private valuesByProp(category: RecipeCategory): Record<string, string[]> {
+    const result: Record<string, string[]> = {};
+    const recipes = this.recipesOf(category);
+    const catalog = this.catalog();
+    for (const property of category.properties) {
+      const set = new Set<string>();
+      if (property.type === 'flavor') {
+        for (const flavor of catalog?.flavors ?? []) {
+          set.add(flavor.label);
+        }
+      } else if (property.type === 'options' && property.group) {
+        for (const option of catalog?.conversionOptions ?? []) {
+          if (option.group === property.group) {
+            set.add(option.label);
+          }
+        }
+      }
+      for (const recipe of recipes) {
+        const value = recipe.valueOf(property.id);
+        if (value) {
+          set.add(value.type === 'weight' ? formatWeight(value.asWeight().value) : String(value.value));
+        }
+      }
+      result[property.id] = [...set];
+    }
+    return result;
+  }
+
   private prefillLines(lines: readonly IngredientLine[]): InitialLine[] {
     const byId = this.ingredientsById();
     const result: InitialLine[] = [];
@@ -291,17 +389,8 @@ export class RecipeBook implements AfterViewInit {
     return result;
   }
 
-  /** Insumos del catálogo usables en una receta (con su precio), para autocompletar. */
   private recipeIngredients(): IngredientOption[] {
     return (this.catalog()?.ingredients ?? []).filter((i) => i.usage === 'recipe').map(toIngredientOption);
-  }
-
-  private reloadOnSave(dialogRef: { closed: { subscribe(fn: (result: { id: string } | undefined) => void): unknown } }): void {
-    dialogRef.closed.subscribe((result) => {
-      if (result) {
-        void this.reload();
-      }
-    });
   }
 
   protected async reload(): Promise<void> {
@@ -319,42 +408,5 @@ function toIngredientOption(ingredient: Ingredient): IngredientOption {
       per: { value: ingredient.purchasePrice.per.value, unit: ingredient.purchasePrice.per.unit },
       currency: ingredient.purchasePrice.currency,
     },
-  };
-}
-
-/** Vista de listado de una capa (relleno/cobertura). */
-function layerView(layer: FillingRecipe | CoveringRecipe): RecipeView {
-  return {
-    id: layer.id.value,
-    name: layer.name,
-    lineCount: layer.lines.length,
-    chips: layerChips(layer),
-  };
-}
-
-/** Pesos de referencia ya usados por las capas, para sugerirlos en el SelectTag. */
-function usedWeights(layers: readonly (FillingRecipe | CoveringRecipe)[]): string[] {
-  return [...new Set(layers.map((l) => formatWeight(l.referenceWeight.value)))];
-}
-
-/** Valores ya usados por tipo, para alimentar las sugerencias del campo único. */
-function valuesByType(sponges: readonly SpongeRecipe[]): Record<string, string[]> {
-  const buckets: Record<string, Set<string>> = {
-    sabor: new Set(),
-    peso: new Set(),
-    porciones: new Set(),
-    'tamaño': new Set(),
-  };
-  for (const s of sponges) {
-    if (s.flavor) buckets['sabor'].add(s.flavor);
-    buckets['peso'].add(formatWeight(s.referenceYield.weight.value));
-    if (s.referenceYield.size) buckets['tamaño'].add(s.referenceYield.size);
-    if (s.referenceYield.servings) buckets['porciones'].add(String(s.referenceYield.servings));
-  }
-  return {
-    sabor: [...buckets['sabor']],
-    peso: [...buckets['peso']],
-    porciones: [...buckets['porciones']],
-    'tamaño': [...buckets['tamaño']],
   };
 }

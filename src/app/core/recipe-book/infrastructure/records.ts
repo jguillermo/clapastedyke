@@ -1,5 +1,7 @@
 import { BaseUnit } from '../../_common/quantity';
+import { ConversionGroup } from '../domain/entities/conversion-option';
 import { IngredientUsage } from '../domain/value-objects/ingredient-usage';
+import { PropertyRole, PropertyType } from '../domain/value-objects/recipe-property';
 
 /**
  * Flat storage documents (primitives only) persisted in IndexedDB. They are
@@ -31,22 +33,50 @@ export interface IngredientRecord {
     purchasePrice: PurchasePriceRecord;
 }
 
-export interface SpongeRecipeRecord {
+export interface RecipePropertyRecord {
     id: string;
     name: string;
-    flavor?: string;
-    referenceYield: { weight: QuantityRecord; servings?: number; size?: string };
-    lines: IngredientLineRecord[];
+    type: PropertyType;
+    required: boolean;
+    locked: boolean;
+    role?: PropertyRole;
+    group?: string; // solo propiedades `options`: grupo del catálogo de conversión
+    selectable?: boolean; // se muestra al seleccionar la receta (default true para records viejos)
 }
 
-export interface FillingRecipeRecord {
+export interface FlavorRecord {
+    id: string;
+    label: string;
+}
+
+export interface ConversionOptionRecord {
+    id: string;
+    group: ConversionGroup;
+    label: string;
+    factor: number;
+}
+
+export interface RecipeCategoryRecord {
     id: string;
     name: string;
-    referenceWeight: QuantityRecord;
-    lines: IngredientLineRecord[];
+    order: number;
+    system: boolean;
+    properties: RecipePropertyRecord[];
 }
 
-export type CoveringRecipeRecord = FillingRecipeRecord;
+export interface RecipePropertyValueRecord {
+    propertyId: string;
+    type: PropertyType;
+    value: string | number | QuantityRecord;
+}
+
+export interface RecipeRecord {
+    id: string;
+    categoryId: string;
+    name: string;
+    values: RecipePropertyValueRecord[];
+    lines: IngredientLineRecord[];
+}
 
 export interface PackagingRuleRecord {
     id: string;

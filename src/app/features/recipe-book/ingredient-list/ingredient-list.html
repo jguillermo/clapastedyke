@@ -1,13 +1,13 @@
-<div class="flex flex-col gap-3 rounded-lg bg-surface-warm p-3">
+<div class="flex flex-col gap-3 rounded-lg bg-surface-warm px-4 py-3">
   <p class="m-0 text-caption text-muted">
     Tus insumos: escribe el nombre, cuánto compras y a qué precio. El último renglón en blanco es
     para añadir uno nuevo.
   </p>
 
-  <migo-grid
+  <migo-table
     [columns]="columns"
     [rows]="lineControls()"
-    [removable]="false"
+    bleed
     ariaLabel="Insumos del libro"
   >
     <ng-template let-line let-r="rowIndex" let-c="colIndex">
@@ -55,7 +55,7 @@
         }
       </div>
     </ng-template>
-  </migo-grid>
+  </migo-table>
 
   @if (errorMessage()) {
     <p class="m-0 text-caption font-medium text-error" role="alert">{{ errorMessage() }}</p>
