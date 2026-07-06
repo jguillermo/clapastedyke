@@ -1,53 +1,56 @@
 import { Quantity, type BaseUnit } from '../../../_common/quantity';
 
 /**
- * What a measure field represents:
- * - `mass`: a weight typed in kilos or grams (`1 kg`, `400`, `1,5 k`). Base unit `g`.
- * - `count`: a countable amount, always base unit `u` (e.g. 5 huevos).
- * - `any`: an ingredient-line amount whose nature is decided by what the user
- *   types — a `u` token (`6 u`) means count, otherwise it is mass. Used when the
- *   ingredient is created on the fly and its base unit is inferred from the
- *   quantity.
+ * Qué representa un campo de medida:
+ * - `mass`: un peso tecleado en kilos o gramos (`1 kg`, `400`, `1,5 k`). Unidad base `g`.
+ * - `count`: una cantidad contable, siempre unidad base `u` (p. ej. 5 huevos).
+ * - `any`: una cantidad de línea de insumo cuya naturaleza decide lo que el
+ *   usuario teclea — un token `u` (`6 u`) significa conteo, en caso contrario es
+ *   masa. Se usa cuando el insumo se crea al vuelo y su unidad base se
+ *   infiere de la cantidad.
  */
 export type MeasureKind = 'mass' | 'count' | 'any';
 
-/** The unit resolved for display (the "ghost" hint shown inside the field). */
+/** La unidad resuelta para mostrar (la pista "fantasma" dentro del campo). */
 export type ResolvedUnit = 'kg' | 'g' | 'u';
 
 /**
- * Below this magnitude a bare mass number (no explicit unit) is read as
- * **kilos**; at or above it, as **grams**. So `1` → 1 kg and `400` → 400 g.
- * A recipe-book interpretation rule — kept here, not in the shared kernel.
+ * Por debajo de esta magnitud un número de masa pelado (sin unidad explícita) se
+ * lee como **kilos**; a partir de ella, como **gramos**. Así `1` → 1 kg y
+ * `400` → 400 g. Es una regla de interpretación del recetario — vive aquí, no en
+ * el kernel compartido.
  */
 export const KG_MAGNITUDE_THRESHOLD = 10;
 
 /**
- * Interprets the free text a user types in a measure field into a domain
- * {@link Quantity}, and exposes the unit it resolved to so the view can show it
- * (the ghost placeholder) — the view never decides the unit nor converts.
+ * Interpreta el texto libre que el usuario teclea en un campo de medida hacia un
+ * {@link Quantity} de dominio, y expone la unidad a la que resolvió para que la
+ * vista la muestre (el placeholder fantasma) — la vista nunca decide la unidad
+ * ni convierte.
  *
- * Rules (value semantics, no side effects — hence a value object with a `parse`
- * factory, like `Quantity.of`):
- * - **Explicit unit wins**: a trailing token starting with `k` (`k`, `kg`,
- *   `kilo`…) means kilos; `g` (`g`, `gr`, `gramos`…) grams; `u` (`u`, `und`…)
- *   units (only meaningful for `count`/`any`).
- * - **No token → magnitude**: `value < KG_MAGNITUDE_THRESHOLD` → kg, else g.
- * - Always normalised to the domain base unit: grams (`g`) for mass, `u` for
- *   count. Read {@link quantity} for the value to send to a use case and
- *   {@link baseUnit} for the unit to persist a newly-created ingredient with.
- * - Accepts comma or dot as decimal separator (`1,5` ≡ `1.5`). Invalid (empty,
- *   non-numeric, ≤ 0, or a unit token that doesn't fit the kind) → {@link
- *   isValid} is `false`, while {@link unit} still holds the unit the field is
- *   currently considering (for the live hint).
+ * Reglas (semántica de valor, sin efectos secundarios — de ahí un value object
+ * con una factory `parse`, como `Quantity.of`):
+ * - **La unidad explícita manda**: un token final que empiece por `k` (`k`, `kg`,
+ *   `kilo`…) significa kilos; `g` (`g`, `gr`, `gramos`…) gramos; `u` (`u`, `und`…)
+ *   unidades (solo tiene sentido para `count`/`any`).
+ * - **Sin token → magnitud**: `value < KG_MAGNITUDE_THRESHOLD` → kg, si no g.
+ * - Siempre normalizado a la unidad base del dominio: gramos (`g`) para masa, `u`
+ *   para conteo. Lee {@link quantity} para el valor a enviar a un use case y
+ *   {@link baseUnit} para la unidad con la que persistir un insumo
+ *   recién creado.
+ * - Acepta coma o punto como separador decimal (`1,5` ≡ `1.5`). Inválido (vacío,
+ *   no numérico, ≤ 0, o un token de unidad que no encaja con el kind) → {@link
+ *   isValid} es `false`, mientras {@link unit} sigue con la unidad que el campo
+ *   está considerando en ese momento (para la pista viva).
  */
 export class MeasureInput {
     private constructor(
         readonly raw: string,
-        /** Normalised quantity in base unit (`g`/`u`), or `null` when invalid. */
+        /** Cantidad normalizada en unidad base (`g`/`u`), o `null` si es inválida. */
         readonly quantity: Quantity | null,
-        /** Unit resolved for display; defined even when the input is invalid. */
+        /** Unidad resuelta para mostrar; definida incluso cuando el input es inválido. */
         readonly unit: ResolvedUnit,
-        /** Domain base unit to persist with (`g` for any mass, `u` for counts). */
+        /** Unidad base del dominio con la que persistir (`g` para cualquier masa, `u` para conteos). */
         readonly baseUnit: BaseUnit,
     ) {}
 
@@ -81,7 +84,7 @@ export class MeasureInput {
             unit = amount < KG_MAGNITUDE_THRESHOLD ? 'kg' : 'g';
             baseUnit = 'g';
         } else {
-            unit = 'kg'; // provisional hint before a number is typed
+            unit = 'kg'; // pista provisional antes de teclear un número
             baseUnit = 'g';
         }
 
@@ -112,7 +115,7 @@ export class MeasureInput {
     }
 }
 
-/** Parses a bare amount (no unit), accepting comma or dot decimals. */
+/** Parsea un monto pelado (sin unidad), aceptando decimales con coma o punto. */
 function parseAmount(text: string): number | null {
     if (!/^\d*[.,]?\d+$/.test(text)) {
         return null;
@@ -122,9 +125,9 @@ function parseAmount(text: string): number | null {
 }
 
 /**
- * Splits a measure input into its numeric amount and a normalised unit token:
- * `'k'` (kilos), `'g'` (grams), `'u'` (units), `null` (no token) or `'unknown'`
- * (a token that is none of the above → invalid).
+ * Divide un input de medida en su monto numérico y un token de unidad normalizado:
+ * `'k'` (kilos), `'g'` (gramos), `'u'` (unidades), `null` (sin token) o `'unknown'`
+ * (un token que no es ninguno de los anteriores → inválido).
  */
 function splitAmountAndToken(text: string): {
     amount: number | null;

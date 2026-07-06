@@ -6,6 +6,10 @@ import { RecipeCategoryRepository } from '../domain/repositories/recipe-category
 import { RecipeCategoryMapper } from './recipe-category.mapper';
 import { RecipeCategoryRecord } from './records';
 
+/**
+ * Implementación IndexedDB de `RecipeCategoryRepository` sobre `IndexedDbStore` (store
+ * `recipe_categories`); traduce con `RecipeCategoryMapper`. Se enlaza en `recipe-book.providers.ts`.
+ */
 @Injectable()
 export class IndexedDbRecipeCategoryRepository extends RecipeCategoryRepository {
     private readonly store = new IndexedDbStore<RecipeCategoryRecord>('recipe_categories');

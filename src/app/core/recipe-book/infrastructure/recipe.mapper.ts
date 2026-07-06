@@ -18,6 +18,11 @@ const valueToDomain = (r: RecipePropertyValueRecord): RecipePropertyValue =>
         r.type === 'weight' ? quantityToDomain(r.value as QuantityRecord) : (r.value as string | number),
     );
 
+/**
+ * ACL de persistencia: traduce `Recipe` ⇄ `RecipeRecord` (primitivos de IndexedDB).
+ * Usado por `IndexedDbRecipeRepository`. Mapea los VOs `RecipePropertyValue` (el valor de tipo
+ * `weight` como `QuantityRecord`) y las `SupplyLine` (vía `value-record.mappers`).
+ */
 export const RecipeMapper = {
     toRecord(recipe: Recipe): RecipeRecord {
         return {

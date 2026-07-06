@@ -17,6 +17,11 @@ const propertyToRecord = (p: RecipeProperty): RecipePropertyRecord => ({
 const propertyToDomain = (r: RecipePropertyRecord): RecipeProperty =>
     RecipeProperty.create(r.id, r.name, r.type, r.required, r.locked ?? false, r.role, r.group, r.selectable ?? false);
 
+/**
+ * ACL de persistencia: traduce `RecipeCategory` ⇄ `RecipeCategoryRecord` (primitivos de IndexedDB).
+ * Usado por `IndexedDbRecipeCategoryRepository`. Mapea el VO `RecipeProperty` de cada propiedad
+ * (aplicando defaults a records legacy: `locked`, `selectable`, `order`, `system`).
+ */
 export const RecipeCategoryMapper = {
     toRecord(category: RecipeCategory): RecipeCategoryRecord {
         return {

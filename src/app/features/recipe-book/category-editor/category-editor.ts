@@ -13,7 +13,7 @@ import { InputField } from '@components/input/input';
 import { Checkbox } from '@components/checkbox/checkbox';
 import { MIGO_DIALOG_DATA, MigoDialogRef } from '@components/dialog/dialog.service';
 import type { PropertyType } from '@core/recipe-book/domain/value-objects/recipe-property';
-import type { ConversionGroup } from '@core/recipe-book/domain/entities/conversion-option';
+import type { CapacityGroup } from '@core/recipe-book/domain/entities/recipe-capacity';
 import type { RecipeCategory } from '@core/recipe-book/domain/entities/recipe-category';
 import {
   SaveRecipeCategory,
@@ -21,14 +21,14 @@ import {
 } from '@core/recipe-book/application/use-cases/save-recipe-category.use-case';
 import { SaveFlavor } from '@core/recipe-book/application/use-cases/save-flavor.use-case';
 import { DeleteFlavor } from '@core/recipe-book/application/use-cases/delete-flavor.use-case';
-import { SaveConversionOption } from '@core/recipe-book/application/use-cases/save-conversion-option.use-case';
-import { DeleteConversionOption } from '@core/recipe-book/application/use-cases/delete-conversion-option.use-case';
+import { SaveRecipeCapacity } from '@core/recipe-book/application/use-cases/save-recipe-capacity.use-case';
+import { DeleteRecipeCapacity } from '@core/recipe-book/application/use-cases/delete-recipe-capacity.use-case';
 import { messageOf } from '../_shared/recipe-form.utils';
 
 /** Entrada de catálogo (sabor u opción de conversión) editada dentro de una propiedad. */
 export interface CatalogItemSeed {
   id: string;
-  group: ConversionGroup;
+  group: CapacityGroup;
   label: string;
   factor: number;
 }
@@ -37,7 +37,7 @@ export interface CatalogItemSeed {
 export interface CategoryEditorData {
   category: RecipeCategory;
   flavors?: { id: string; label: string }[];
-  conversionOptions?: CatalogItemSeed[];
+  recipeCapacities?: CatalogItemSeed[];
 }
 
 type CatalogItemGroup = FormGroup<{
@@ -88,8 +88,8 @@ export class CategoryEditor {
   private readonly saveCategory = inject(SaveRecipeCategory);
   private readonly saveFlavor = inject(SaveFlavor);
   private readonly deleteFlavor = inject(DeleteFlavor);
-  private readonly saveOption = inject(SaveConversionOption);
-  private readonly deleteOption = inject(DeleteConversionOption);
+  private readonly saveOption = inject(SaveRecipeCapacity);
+  private readonly deleteOption = inject(DeleteRecipeCapacity);
   protected readonly ref = inject<MigoDialogRef<{ id: string }>>(MigoDialogRef);
   private readonly data = inject<CategoryEditorData>(MIGO_DIALOG_DATA);
 
@@ -97,7 +97,7 @@ export class CategoryEditor {
   protected readonly title = `Editar ${this.category.name}`;
 
   private readonly seedFlavors = this.data.flavors ?? [];
-  private readonly seedOptions = this.data.conversionOptions ?? [];
+  private readonly seedOptions = this.data.recipeCapacities ?? [];
   /** Ids de catálogo presentes al abrir, para detectar los borrados al guardar. */
   private readonly originalFlavorIds = new Set(this.seedFlavors.map((f) => f.id));
   private readonly originalOptionIds = new Set(this.seedOptions.map((o) => o.id));
@@ -193,7 +193,7 @@ export class CategoryEditor {
       name: p.name,
       type: p.type,
       required: p.required,
-      group: p.type === 'options' ? (p.group as ConversionGroup) : undefined,
+      group: p.type === 'options' ? (p.group as CapacityGroup) : undefined,
       selectable: p.selectable,
     }));
 
@@ -231,7 +231,7 @@ export class CategoryEditor {
           keptFlavorIds.add(id);
         }
       } else if (row.type === 'options') {
-        const group = row.group as ConversionGroup;
+        const group = row.group as CapacityGroup;
         // Porciones es numérico: el número ES el label y el factor a la vez.
         const numeric = group === 'portions';
         for (const item of row.items) {

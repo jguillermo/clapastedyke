@@ -1,9 +1,9 @@
 import { TestBed } from '@angular/core/testing';
 import { MIGO_DIALOG_DATA, MigoDialogRef } from '@components/dialog/dialog.service';
 import { makeConvertibleCategory, makeRecipeBookFakes } from '@core/recipe-book/testing/recipe-book-test-doubles';
-import { ConversionOption } from '@core/recipe-book/domain/entities/conversion-option';
+import { RecipeCapacity } from '@core/recipe-book/domain/entities/recipe-capacity';
 import { Flavor } from '@core/recipe-book/domain/entities/flavor';
-import { ConversionOptionRepository } from '@core/recipe-book/domain/repositories/conversion-option.repository';
+import { RecipeCapacityRepository } from '@core/recipe-book/domain/repositories/recipe-capacity.repository';
 import { FlavorRepository } from '@core/recipe-book/domain/repositories/flavor.repository';
 import { RecipeCategoryRepository } from '@core/recipe-book/domain/repositories/recipe-category.repository';
 import { EntityId } from '@core/_common/entity-id';
@@ -25,7 +25,7 @@ describe('CategoryEditor (catalogs + visibility)', () => {
     const data: CategoryEditorData = {
       category,
       flavors: [{ id: 'flv-vainilla', label: 'Vainilla' }],
-      conversionOptions: [{ id: 'co-p-double', group: 'portions', label: 'Doble', factor: 2 }],
+      recipeCapacities: [{ id: 'co-p-double', group: 'portions', label: 'Doble', factor: 2 }],
     };
     TestBed.configureTestingModule({
       imports: [CategoryEditor],
@@ -38,8 +38,8 @@ describe('CategoryEditor (catalogs + visibility)', () => {
     // Los catálogos que ve el editor existen en sus repositorios (como en el hub real).
     await TestBed.inject(RecipeCategoryRepository).save(category);
     await TestBed.inject(FlavorRepository).save(Flavor.create(new EntityId('flv-vainilla'), 'Vainilla'));
-    await TestBed.inject(ConversionOptionRepository).save(
-      ConversionOption.create(new EntityId('co-p-double'), 'portions', 'Doble', 2),
+    await TestBed.inject(RecipeCapacityRepository).save(
+      RecipeCapacity.create(new EntityId('co-p-double'), 'portions', 'Doble', 2),
     );
   });
 
@@ -63,7 +63,7 @@ describe('CategoryEditor (catalogs + visibility)', () => {
     expect(flavors.map((f) => f.label)).toEqual(expect.arrayContaining(['Vainilla', 'Chocolate']));
 
     // El catálogo de porciones sigue intacto.
-    expect(await TestBed.inject(ConversionOptionRepository).byGroup('portions')).toHaveLength(1);
+    expect(await TestBed.inject(RecipeCapacityRepository).byGroup('portions')).toHaveLength(1);
 
     expect(closeSpy).toHaveBeenCalled();
   });

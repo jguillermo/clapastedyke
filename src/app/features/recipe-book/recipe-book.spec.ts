@@ -6,12 +6,11 @@ import { makeRecipeBookFakes, makeWeightCategory } from '@core/recipe-book/testi
 import { RecipeBook } from './recipe-book';
 
 const emptyCatalog: RecipeBookCatalog = {
-  ingredients: [],
+  supplies: [],
   categories: [],
   recipes: [],
-  packagingRules: [],
   flavors: [],
-  conversionOptions: [],
+  recipeCapacities: [],
 };
 
 class ListRecipeBookStub {
@@ -46,7 +45,7 @@ describe('RecipeBook (hub)', () => {
     ) as HTMLButtonElement;
   }
 
-  it('shows the ingredients section and no "create category" action', async () => {
+  it('shows the supplies section and no "create category" action', async () => {
     const { fixture } = setup();
     await fixture.whenStable();
     fixture.detectChanges();

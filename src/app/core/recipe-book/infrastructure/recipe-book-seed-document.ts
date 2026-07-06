@@ -1,6 +1,6 @@
 import { BaseUnit } from '../../_common/quantity';
-import { ConversionGroup } from '../domain/entities/conversion-option';
-import { IngredientUsage } from '../domain/value-objects/ingredient-usage';
+import { CapacityGroup } from '../domain/entities/recipe-capacity';
+import { SupplyUsage } from '../domain/value-objects/supply-usage';
 import { PropertyType } from '../domain/value-objects/recipe-property';
 
 /**
@@ -21,8 +21,8 @@ export interface RecipeBookSeedDocument {
      */
     version?: number;
     flavors?: SeedFlavor[];
-    conversionOptions?: SeedConversionOption[];
-    ingredients?: SeedIngredient[];
+    recipeCapacities?: SeedRecipeCapacity[];
+    supplies?: SeedSupply[];
     /** Categorías creadas por el usuario (no de sistema). Opcional. */
     categories?: SeedCategory[];
     recipes?: SeedRecipe[];
@@ -33,9 +33,9 @@ export interface SeedFlavor {
     label: string;
 }
 
-export interface SeedConversionOption {
+export interface SeedRecipeCapacity {
     id: string;
-    group: ConversionGroup;
+    group: CapacityGroup;
     label: string;
     factor: number;
 }
@@ -46,11 +46,11 @@ export interface SeedPurchasePrice {
     currency?: string;
 }
 
-export interface SeedIngredient {
+export interface SeedSupply {
     id: string;
     name: string;
     baseUnit: BaseUnit;
-    usage: IngredientUsage;
+    usage: SupplyUsage;
     purchasePrice: SeedPurchasePrice;
 }
 
@@ -79,8 +79,8 @@ export interface SeedRecipeValue {
 }
 
 export interface SeedRecipeLine {
-    ingredientId: string;
-    /** Cantidad en la unidad base del ingrediente (g o u). */
+    supplyId: string;
+    /** Cantidad en la unidad base del insumo (g o u). */
     quantity: number;
 }
 

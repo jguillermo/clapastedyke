@@ -17,7 +17,7 @@
         <migo-input formControlName="name" placeholder="Nombre de la receta" />
       </migo-form-field>
 
-      <app-ingredient-grid [ingredients]="ingredientOptions" [initialLines]="initialLines" />
+      <app-supply-grid [supplies]="supplyOptions" [initialLines]="initialLines" />
 
       @if (errorMessage()) {
         <p class="m-0 text-caption font-medium text-error" role="alert">{{ errorMessage() }}</p>

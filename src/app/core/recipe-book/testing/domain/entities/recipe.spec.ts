@@ -1,10 +1,10 @@
 import { EntityId } from '../../../../_common/entity-id';
 import { Quantity } from '../../../../_common/quantity';
 import { Recipe } from '../../../domain/entities/recipe';
-import { IngredientLine } from '../../../domain/value-objects/ingredient-line';
+import { SupplyLine } from '../../../domain/value-objects/supply-line';
 import { RecipePropertyValue } from '../../../domain/value-objects/recipe-property-value';
 
-const line = IngredientLine.of(new EntityId('IN-1'), Quantity.of(250, 'g'));
+const line = SupplyLine.of(new EntityId('IN-1'), Quantity.of(250, 'g'));
 const make = (name: string, values = [RecipePropertyValue.of('peso', 'weight', Quantity.of(1000, 'g'))], lines = [line]) =>
   Recipe.create(new EntityId('RE-1'), new EntityId('cat-1'), name, values, lines);
 

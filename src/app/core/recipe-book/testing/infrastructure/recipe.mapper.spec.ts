@@ -1,7 +1,7 @@
 import { EntityId } from '../../../_common/entity-id';
 import { Quantity } from '../../../_common/quantity';
 import { Recipe } from '../../domain/entities/recipe';
-import { IngredientLine } from '../../domain/value-objects/ingredient-line';
+import { SupplyLine } from '../../domain/value-objects/supply-line';
 import { RecipePropertyValue } from '../../domain/value-objects/recipe-property-value';
 import { RecipeMapper } from '../../infrastructure/recipe.mapper';
 
@@ -16,7 +16,7 @@ describe('RecipeMapper', () => {
         RecipePropertyValue.of('sabor', 'text', 'Vainilla'),
         RecipePropertyValue.of('porciones', 'number', 8),
       ],
-      [IngredientLine.of(new EntityId('IN-1'), Quantity.of(250, 'g'))],
+      [SupplyLine.of(new EntityId('IN-1'), Quantity.of(250, 'g'))],
     );
 
     const back = RecipeMapper.toDomain(RecipeMapper.toRecord(recipe));

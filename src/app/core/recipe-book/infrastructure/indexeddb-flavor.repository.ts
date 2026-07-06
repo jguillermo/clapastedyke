@@ -6,6 +6,10 @@ import { FlavorRepository } from '../domain/repositories/flavor.repository';
 import { FlavorMapper } from './flavor.mapper';
 import { FlavorRecord } from './records';
 
+/**
+ * Implementación IndexedDB de `FlavorRepository` sobre `IndexedDbStore` (store `flavors`);
+ * traduce con `FlavorMapper`. Se enlaza en `recipe-book.providers.ts`.
+ */
 @Injectable()
 export class IndexedDbFlavorRepository extends FlavorRepository {
     private readonly store = new IndexedDbStore<FlavorRecord>('flavors');

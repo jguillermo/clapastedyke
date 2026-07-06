@@ -1,6 +1,6 @@
 import { EntityId } from '../../../_common/entity-id';
 import { Quantity } from '../../../_common/quantity';
-import { IngredientLine } from '../value-objects/ingredient-line';
+import { SupplyLine } from '../value-objects/supply-line';
 import { RecipePropertyValue } from '../value-objects/recipe-property-value';
 
 interface RecipeData {
@@ -8,13 +8,13 @@ interface RecipeData {
     categoryId: EntityId;
     name: string;
     values: RecipePropertyValue[];
-    lines: IngredientLine[];
+    lines: SupplyLine[];
 }
 
 /**
  * Una RECETA. Pertenece a una categoría (por id) y toma valores para las
  * propiedades del esquema de esa categoría. Siempre tiene título y al menos una
- * línea de ingrediente. La validación de "propiedades obligatorias/tipos" la
+ * línea de insumo. La validación de "propiedades obligatorias/tipos" la
  * hace la categoría (la orquesta el use case, que carga ambas). Aggregate root;
  * las líneas se modifican solo a través de la raíz.
  */
@@ -23,7 +23,7 @@ export class Recipe {
     readonly categoryId: EntityId; // Nivel 2: categoría a la que pertenece (id de otra raíz del contexto)
     readonly name: string; // Nivel 1: título de la receta
     readonly values: readonly RecipePropertyValue[]; // Nivel 1: valores de las propiedades del esquema
-    readonly lines: readonly IngredientLine[]; // Nivel 3: líneas de ingrediente; solo se modifican vía la raíz
+    readonly lines: readonly SupplyLine[]; // Nivel 3: líneas de insumo; solo se modifican vía la raíz
 
     private constructor(data: RecipeData) {
         this.id = data.id;
@@ -38,13 +38,13 @@ export class Recipe {
         categoryId: EntityId,
         name: string,
         values: RecipePropertyValue[],
-        lines: IngredientLine[],
+        lines: SupplyLine[],
     ): Recipe {
         if (!name.trim()) {
             throw new Error('Recipe name is required');
         }
         if (lines.length === 0) {
-            throw new Error('Recipe needs at least one ingredient line');
+            throw new Error('Recipe needs at least one supply line');
         }
         const ids = new Set(values.map((v) => v.propertyId));
         if (ids.size !== values.length) {
@@ -53,7 +53,7 @@ export class Recipe {
         return new Recipe({ id, categoryId, name: name.trim(), values: [...values], lines: [...lines] });
     }
 
-    addLine(line: IngredientLine): Recipe {
+    addLine(line: SupplyLine): Recipe {
         return this.with({ lines: [...this.lines, line] });
     }
 

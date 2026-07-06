@@ -25,8 +25,8 @@ describe('PreviewRecipeCost', () => {
         const result = await preview.execute({
             lines: [
                 { purchasePrice: { amount: 5, per: { value: 1000, unit: 'g' } }, quantity: { value: 200, unit: 'g' } }, // 1.00
-                { purchasePrice: null, quantity: { value: 100, unit: 'g' } }, // no price
-                { purchasePrice: { amount: 5, per: { value: 1000, unit: 'g' } } }, // no quantity yet
+                { purchasePrice: null, quantity: { value: 100, unit: 'g' } }, // sin precio
+                { purchasePrice: { amount: 5, per: { value: 1000, unit: 'g' } } }, // aún sin cantidad
             ],
         });
 

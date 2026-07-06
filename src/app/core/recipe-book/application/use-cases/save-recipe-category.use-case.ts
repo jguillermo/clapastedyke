@@ -7,6 +7,7 @@ import { RecipeProperty, PropertyRole, PropertyType } from '../../domain/value-o
 import { RecipeCategoryRepository } from '../../domain/repositories/recipe-category.repository';
 import { RecipeBookEvents } from '../../domain/events/recipe-book-events';
 
+/** Una propiedad del esquema de una categoría dentro de {@link SaveRecipeCategoryRequest}. */
 export interface RecipePropertyInput {
     id?: string;
     name: string;
@@ -18,6 +19,7 @@ export interface RecipePropertyInput {
     selectable?: boolean;
 }
 
+/** Entrada de {@link SaveRecipeCategory}: nombre y esquema de propiedades (con id para editar, sin id para crear). */
 export interface SaveRecipeCategoryRequest {
     id?: string; // presente → editar; ausente → crear
     name: string;
@@ -25,10 +27,13 @@ export interface SaveRecipeCategoryRequest {
 }
 
 /**
- * Crea o edita una categoría y su esquema de propiedades. Al crear, la añade al
- * final (`order = max + 1`). Al editar una categoría de sistema, conserva las
- * propiedades bloqueadas (lo garantiza `RecipeCategory.redefine`). La regla vive
- * en el dominio; el use case orquesta.
+ * Crea o edita una categoría y su esquema de propiedades. La invocan las pantallas de gestión de
+ * categorías del recetario. Al crear, la añade al final (`order = max + 1`). Al editar una categoría
+ * de sistema, conserva las propiedades bloqueadas (lo garantiza `RecipeCategory.redefine`). La regla
+ * vive en el dominio; el use case orquesta.
+ *
+ * Orquesta RecipeCategoryRepository (upsert, comprobación de nombre y cálculo del `order`) y arma los
+ * VO RecipeProperty. Publica `RecipeCategorySaved` vía EventBus.
  */
 @Injectable({ providedIn: 'root' })
 export class SaveRecipeCategory extends UseCase<SaveRecipeCategoryRequest, { id: string }> {

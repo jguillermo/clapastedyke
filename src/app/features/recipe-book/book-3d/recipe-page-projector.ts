@@ -1,13 +1,13 @@
 import type { RecipeBookCatalog } from '@core/recipe-book/application/use-cases/list-recipe-book.use-case';
-import type { Ingredient } from '@core/recipe-book/domain/entities/ingredient';
+import type { Supply } from '@core/recipe-book/domain/entities/supply';
 import type { Recipe } from '@core/recipe-book/domain/entities/recipe';
 import type { RecipeCategory } from '@core/recipe-book/domain/entities/recipe-category';
-import type { IngredientLine } from '@core/recipe-book/domain/value-objects/ingredient-line';
+import type { SupplyLine } from '@core/recipe-book/domain/value-objects/supply-line';
 import type { PageContent } from '@platform/three/book/page-content';
 import { formatMoney, formatQuantity, recipeChips } from '../_shared/recipe-format';
 
 /** Sección opaca de Insumos (la lee el HUD; nunca aparece en el índice). */
-export const INGREDIENTS_SECTION = 'ingredients';
+export const INGREDIENTS_SECTION = 'supplies';
 
 /**
  * Proyecta el catálogo del libro de recetas a las páginas del libro 3D
@@ -21,11 +21,11 @@ export const INGREDIENTS_SECTION = 'ingredients';
 export function toPages(catalog: RecipeBookCatalog): PageContent[] {
   const pages: PageContent[] = [{ kind: 'cover', title: 'Mi libro de recetas', subtitle: 'Recetario' }];
 
-  const ingredientName = nameResolver(catalog.ingredients);
+  const supplyName = nameResolver(catalog.supplies);
   const COLUMNS = ['Insumo', 'Cantidad'];
-  const rowsOf = (lines: readonly IngredientLine[]) =>
+  const rowsOf = (lines: readonly SupplyLine[]) =>
     lines.map((l) => ({
-      cells: [ingredientName(l.ingredientId.value), formatQuantity(l.quantity.value, l.quantity.unit)],
+      cells: [supplyName(l.supplyId.value), formatQuantity(l.quantity.value, l.quantity.unit)],
     }));
 
   for (const category of catalog.categories) {
@@ -47,12 +47,12 @@ export function toPages(catalog: RecipeBookCatalog): PageContent[] {
     }
   }
 
-  pages.push(...ingredientListPages(catalog.ingredients));
+  pages.push(...supplyListPages(catalog.supplies));
   return pages;
 }
 
-function nameResolver(ingredients: readonly Ingredient[]): (id: string) => string {
-  const byId = new Map(ingredients.map((i) => [i.id.value, i] as const));
+function nameResolver(supplies: readonly Supply[]): (id: string) => string {
+  const byId = new Map(supplies.map((i) => [i.id.value, i] as const));
   return (id) => byId.get(id)?.name ?? '—';
 }
 
@@ -111,11 +111,11 @@ function recipePages(
  * Una o más páginas de lista de insumos. Tres columnas bien separadas
  * (Insumo · Cantidad · Precio) para que se lea como una tabla, no apretado.
  */
-function ingredientListPages(ingredients: readonly Ingredient[]): PageContent[] {
+function supplyListPages(supplies: readonly Supply[]): PageContent[] {
   const pages: PageContent[] = [
     { kind: 'section', subtitle: 'Sección', title: 'Insumos', section: INGREDIENTS_SECTION },
   ];
-  if (ingredients.length === 0) {
+  if (supplies.length === 0) {
     pages.push({
       kind: 'recipe',
       section: INGREDIENTS_SECTION,
@@ -124,7 +124,7 @@ function ingredientListPages(ingredients: readonly Ingredient[]): PageContent[] 
     });
     return pages;
   }
-  const sorted = [...ingredients].sort((a, b) => a.name.localeCompare(b.name, 'es'));
+  const sorted = [...supplies].sort((a, b) => a.name.localeCompare(b.name, 'es'));
   const rows = sorted.map((i) => ({
     cells: [
       i.name,
@@ -132,7 +132,7 @@ function ingredientListPages(ingredients: readonly Ingredient[]): PageContent[] 
       formatMoney(i.purchasePrice.amount),
     ],
   }));
-  const total = `${ingredients.length} insumos`;
+  const total = `${supplies.length} insumos`;
   const groups = chunkRows(rows, ROWS_FIRST, ROWS_CONT);
   groups.forEach((group, i) => {
     const last = i === groups.length - 1;

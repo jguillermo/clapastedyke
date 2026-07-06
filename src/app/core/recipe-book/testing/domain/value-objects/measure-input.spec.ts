@@ -20,7 +20,7 @@ describe('MeasureInput', () => {
         });
 
         it('honours the token even when magnitude would say otherwise', () => {
-            // 1 with grams token → 1 g (not 1 kg); 400 with kilo token → 400 000 g
+            // 1 con token de gramos → 1 g (no 1 kg); 400 con token de kilos → 400 000 g
             expect(MeasureInput.parse('1 g', 'mass').quantity?.value).toBe(1);
             expect(MeasureInput.parse('400 k', 'mass').quantity?.value).toBe(400000);
         });
@@ -98,7 +98,7 @@ describe('MeasureInput', () => {
 
     it('is equal by normalised value and unit', () => {
         expect(MeasureInput.parse('1 kg', 'mass').equals(MeasureInput.parse('1000 g', 'mass'))).toBe(false);
-        // same display unit + same grams → equal
+        // misma unidad de visualización + mismos gramos → iguales
         expect(MeasureInput.parse('1kg', 'mass').equals(MeasureInput.parse('1 kilo', 'mass'))).toBe(true);
     });
 });

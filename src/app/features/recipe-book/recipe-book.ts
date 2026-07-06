@@ -20,8 +20,8 @@ import { MigoDialog, MigoDialogRef, MIGO_DIALOG_DATA } from '@components/dialog/
 import { ListRecipeBook, type RecipeBookCatalog } from '@core/recipe-book/application/use-cases/list-recipe-book.use-case';
 import type { Recipe } from '@core/recipe-book/domain/entities/recipe';
 import type { RecipeCategory } from '@core/recipe-book/domain/entities/recipe-category';
-import type { Ingredient } from '@core/recipe-book/domain/entities/ingredient';
-import type { IngredientLine } from '@core/recipe-book/domain/value-objects/ingredient-line';
+import type { Supply } from '@core/recipe-book/domain/entities/supply';
+import type { SupplyLine } from '@core/recipe-book/domain/value-objects/supply-line';
 import { RecipeForm, type RecipeFormData, type RecipeFormPrefill } from './recipe-form/recipe-form';
 import { CategoryEditor, type CategoryEditorData } from './category-editor/category-editor';
 import {
@@ -30,8 +30,8 @@ import {
   type RecipeDetailLine,
   type RecipeDetailResult,
 } from './recipe-detail/recipe-detail';
-import type { IngredientOption, InitialLine } from './_shared/ingredient-grid/ingredient-grid';
-import { IngredientList } from './ingredient-list/ingredient-list';
+import type { SupplyOption, InitialLine } from './_shared/supply-grid/supply-grid';
+import { SupplyList } from './supply-list/supply-list';
 import { formatQuantity, formatWeight, recipeChips } from './_shared/recipe-format';
 
 interface RecipeView {
@@ -60,7 +60,7 @@ export interface RecipeBookData {
 export interface RecipeBookResult {
   categoryId?: string;
   recipeName?: string;
-  ingredients?: boolean;
+  supplies?: boolean;
 }
 
 /**
@@ -72,7 +72,7 @@ export interface RecipeBookResult {
 @Component({
   selector: 'app-recipe-book',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Button, Card, CardHeader, CardTitle, CardBody, Icon, Spacer, IngredientList, MigoSwiper, MigoSwiperSlide],
+  imports: [Button, Card, CardHeader, CardTitle, CardBody, Icon, Spacer, SupplyList, MigoSwiper, MigoSwiperSlide],
   // `contents`: el card `fill` es hijo flex directo del diálogo y llena la pantalla en móvil.
   host: { class: 'contents' },
   templateUrl: './recipe-book.html',
@@ -86,14 +86,14 @@ export class RecipeBook implements AfterViewInit {
   /** Foco a devolver al libro 3D: última receta/categoría/insumos que se tocó. */
   private focusRecipeId: string | null = null;
   private focusCategoryId: string | null = this.data?.categoryId ?? null;
-  private focusIngredients = false;
+  private focusSupplies = false;
 
   private readonly swiper = viewChild(MigoSwiper);
 
   private readonly catalog = signal<RecipeBookCatalog | null>(null);
 
   protected readonly loaded = computed(() => this.catalog() !== null);
-  protected readonly ingredientEntities = computed(() => this.catalog()?.ingredients ?? []);
+  protected readonly supplyEntities = computed(() => this.catalog()?.supplies ?? []);
 
   private readonly categoriesById = computed(
     () => new Map((this.catalog()?.categories ?? []).map((c) => [c.id.value, c])),
@@ -101,8 +101,8 @@ export class RecipeBook implements AfterViewInit {
   private readonly recipesById = computed(
     () => new Map((this.catalog()?.recipes ?? []).map((r) => [r.id.value, r])),
   );
-  private readonly ingredientsById = computed(
-    () => new Map<string, Ingredient>((this.catalog()?.ingredients ?? []).map((i) => [i.id.value, i])),
+  private readonly suppliesById = computed(
+    () => new Map<string, Supply>((this.catalog()?.supplies ?? []).map((s) => [s.id.value, s])),
   );
 
   /** Categorías (ordenadas) con sus recetas alfabéticas, listas para pintar. */
@@ -154,10 +154,10 @@ export class RecipeBook implements AfterViewInit {
     this.lastRealTab = index;
     this.focusRecipeId = null;
     if (index === insumosTab) {
-      this.focusIngredients = true;
+      this.focusSupplies = true;
       this.focusCategoryId = null;
     } else if (index >= 0 && index < categories.length) {
-      this.focusIngredients = false;
+      this.focusSupplies = false;
       this.focusCategoryId = categories[index].id;
     }
   }
@@ -175,16 +175,16 @@ export class RecipeBook implements AfterViewInit {
     this.onCategorySaved(ref);
   }
 
-  /** Catálogos (sabores + opciones de conversión) en forma plana para el editor de categoría. */
+  /** Catálogos (sabores + capacidades de receta) en forma plana para el editor de categoría. */
   private categoryEditorCatalog(): Omit<CategoryEditorData, 'category'> {
     const catalog = this.catalog();
     return {
       flavors: (catalog?.flavors ?? []).map((f) => ({ id: f.id.value, label: f.label })),
-      conversionOptions: (catalog?.conversionOptions ?? []).map((o) => ({
-        id: o.id.value,
-        group: o.group,
-        label: o.label,
-        factor: o.factor,
+      recipeCapacities: (catalog?.recipeCapacities ?? []).map((c) => ({
+        id: c.id.value,
+        group: c.group,
+        label: c.label,
+        factor: c.factor,
       })),
     };
   }
@@ -210,8 +210,8 @@ export class RecipeBook implements AfterViewInit {
     this.ref.close(this.buildResult());
   }
 
-  protected onIngredientsChanged(): void {
-    this.focusIngredients = true;
+  protected onSuppliesChanged(): void {
+    this.focusSupplies = true;
     this.focusCategoryId = null;
     this.focusRecipeId = null;
     void this.reload();
@@ -219,8 +219,8 @@ export class RecipeBook implements AfterViewInit {
 
   /** Foco a devolver al libro: insumos > receta recién tocada > categoría visible. */
   private buildResult(): RecipeBookResult {
-    if (this.focusIngredients) {
-      return { ingredients: true };
+    if (this.focusSupplies) {
+      return { supplies: true };
     }
     const recipe = this.focusRecipeId ? this.recipesById().get(this.focusRecipeId) : null;
     if (recipe) {
@@ -236,7 +236,7 @@ export class RecipeBook implements AfterViewInit {
       if (result) {
         this.focusCategoryId = result.id;
         this.focusRecipeId = null;
-        this.focusIngredients = false;
+        this.focusSupplies = false;
         void this.reload();
       }
     });
@@ -248,7 +248,7 @@ export class RecipeBook implements AfterViewInit {
     dialogRef.closed.subscribe((result) => {
       if (result) {
         this.focusRecipeId = result.id;
-        this.focusIngredients = false;
+        this.focusSupplies = false;
         void this.reload();
       }
     });
@@ -260,7 +260,7 @@ export class RecipeBook implements AfterViewInit {
     const ref = this.dialog.open<{ id: string }, RecipeFormData, RecipeForm>(RecipeForm, {
       data: {
         category,
-        ingredients: this.recipeIngredients(),
+        supplies: this.recipeSupplies(),
         valuesByProp: this.valuesByProp(category),
       },
       ariaLabel: `Nueva receta en ${category.name}`,
@@ -278,7 +278,7 @@ export class RecipeBook implements AfterViewInit {
     const ref = this.dialog.open<{ id: string }, RecipeFormData, RecipeForm>(RecipeForm, {
       data: {
         category,
-        ingredients: this.recipeIngredients(),
+        supplies: this.recipeSupplies(),
         valuesByProp: this.valuesByProp(category),
         recipe: prefill,
       },
@@ -292,20 +292,20 @@ export class RecipeBook implements AfterViewInit {
     recipe: Recipe,
     category: RecipeCategory,
   ): MigoDialogRef<RecipeDetailResult, RecipeDetail> {
-    const byId = this.ingredientsById();
+    const byId = this.suppliesById();
     const data: RecipeDetailData = {
       subtitle: category.name,
       name: recipe.name,
       chips: recipeChips(recipe, category),
       lines: recipe.lines.map((line): RecipeDetailLine => {
-        const ingredient = byId.get(line.ingredientId.value);
+        const supply = byId.get(line.supplyId.value);
         return {
-          name: ingredient?.name ?? '—',
+          name: supply?.name ?? '—',
           quantityLabel: formatQuantity(line.quantity.value, line.quantity.unit),
-          purchasePrice: ingredient
+          purchasePrice: supply
             ? {
-                amount: ingredient.purchasePrice.amount,
-                per: { value: ingredient.purchasePrice.per.value, unit: ingredient.purchasePrice.per.unit },
+                amount: supply.purchasePrice.amount,
+                per: { value: supply.purchasePrice.per.value, unit: supply.purchasePrice.per.unit },
               }
             : null,
           quantity: { value: line.quantity.value, unit: line.quantity.unit },
@@ -345,7 +345,7 @@ export class RecipeBook implements AfterViewInit {
 
   /**
    * Opciones/sugerencias por propiedad para el formulario. Para propiedades de
-   * catálogo (`flavor` → sabores; `options` → opciones de conversión del grupo) se
+   * catálogo (`flavor` → sabores; `options` → capacidades de receta del grupo) se
    * siembran los labels del catálogo (esto restaura los sabores/tamaños/moldes
    * predefinidos al crear una receta); se añaden además los valores ya usados.
    */
@@ -360,9 +360,9 @@ export class RecipeBook implements AfterViewInit {
           set.add(flavor.label);
         }
       } else if (property.type === 'options' && property.group) {
-        for (const option of catalog?.conversionOptions ?? []) {
-          if (option.group === property.group) {
-            set.add(option.label);
+        for (const capacity of catalog?.recipeCapacities ?? []) {
+          if (capacity.group === property.group) {
+            set.add(capacity.label);
           }
         }
       }
@@ -377,20 +377,20 @@ export class RecipeBook implements AfterViewInit {
     return result;
   }
 
-  private prefillLines(lines: readonly IngredientLine[]): InitialLine[] {
-    const byId = this.ingredientsById();
+  private prefillLines(lines: readonly SupplyLine[]): InitialLine[] {
+    const byId = this.suppliesById();
     const result: InitialLine[] = [];
     for (const line of lines) {
-      const ingredient = byId.get(line.ingredientId.value);
-      if (ingredient) {
-        result.push({ name: ingredient.name, quantity: line.quantity.value, baseUnit: line.quantity.unit });
+      const supply = byId.get(line.supplyId.value);
+      if (supply) {
+        result.push({ name: supply.name, quantity: line.quantity.value, baseUnit: line.quantity.unit });
       }
     }
     return result;
   }
 
-  private recipeIngredients(): IngredientOption[] {
-    return (this.catalog()?.ingredients ?? []).filter((i) => i.usage === 'recipe').map(toIngredientOption);
+  private recipeSupplies(): SupplyOption[] {
+    return (this.catalog()?.supplies ?? []).filter((s) => s.usage === 'recipe').map(toSupplyOption);
   }
 
   protected async reload(): Promise<void> {
@@ -398,15 +398,15 @@ export class RecipeBook implements AfterViewInit {
   }
 }
 
-/** Proyecta un Ingredient del catálogo a una opción con precio para el formulario. */
-function toIngredientOption(ingredient: Ingredient): IngredientOption {
+/** Proyecta un Supply del catálogo a una opción con precio para el formulario. */
+function toSupplyOption(supply: Supply): SupplyOption {
   return {
-    name: ingredient.name,
-    baseUnit: ingredient.baseUnit,
+    name: supply.name,
+    baseUnit: supply.baseUnit,
     purchase: {
-      amount: ingredient.purchasePrice.amount,
-      per: { value: ingredient.purchasePrice.per.value, unit: ingredient.purchasePrice.per.unit },
-      currency: ingredient.purchasePrice.currency,
+      amount: supply.purchasePrice.amount,
+      per: { value: supply.purchasePrice.per.value, unit: supply.purchasePrice.per.unit },
+      currency: supply.purchasePrice.currency,
     },
   };
 }

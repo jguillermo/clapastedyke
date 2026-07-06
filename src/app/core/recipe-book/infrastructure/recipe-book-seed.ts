@@ -2,24 +2,24 @@ import { inject, Injectable } from '@angular/core';
 import { EntityId } from '../../_common/entity-id';
 import { Quantity } from '../../_common/quantity';
 import { buildSystemCategories, RecipeCategory } from '../domain/entities/recipe-category';
-import { ConversionOption } from '../domain/entities/conversion-option';
+import { RecipeCapacity } from '../domain/entities/recipe-capacity';
 import { Flavor } from '../domain/entities/flavor';
-import { Ingredient } from '../domain/entities/ingredient';
+import { Supply } from '../domain/entities/supply';
 import { Recipe } from '../domain/entities/recipe';
 import { PurchasePrice } from '../domain/value-objects/purchase-price';
 import { RecipeProperty } from '../domain/value-objects/recipe-property';
 import { RecipePropertyValue } from '../domain/value-objects/recipe-property-value';
-import { IngredientLine } from '../domain/value-objects/ingredient-line';
+import { SupplyLine } from '../domain/value-objects/supply-line';
 import { RecipeCategoryRepository } from '../domain/repositories/recipe-category.repository';
-import { ConversionOptionRepository } from '../domain/repositories/conversion-option.repository';
+import { RecipeCapacityRepository } from '../domain/repositories/recipe-capacity.repository';
 import { FlavorRepository } from '../domain/repositories/flavor.repository';
-import { IngredientRepository } from '../domain/repositories/ingredient.repository';
+import { SupplyRepository } from '../domain/repositories/supply.repository';
 import { RecipeRepository } from '../domain/repositories/recipe.repository';
 import { SeedDataSource } from './seed-data-source';
 import { SeedState } from './seed-state';
 import {
     SeedCategory,
-    SeedIngredient,
+    SeedSupply,
     SeedRecipe,
     SeedRecipeValue,
 } from './recipe-book-seed-document';
@@ -35,12 +35,12 @@ const SEED_KEY = 'recipe-book';
  *    **reconcilian en cada arranque** contra el esquema canónico (`buildSystemCategories()`):
  *    faltantes se crean, esquemas obsoletos se reparan, conservando la visibilidad (`selectable`)
  *    elegida por el usuario. Las categorías de usuario no se tocan.
- * 2. **Contenido (JSON).** Sabores, opciones de conversión, ingredientes, categorías custom y
- *    recetas se cargan desde `public/seed/recipe-book.seed.json` (vía {@link SeedDataSource}) y se
- *    guardan en los **repositorios IndexedDB** (el flujo normal). Se aplica **una sola vez**: un
- *    marcador persistido ({@link SeedState}) registra la versión sembrada; si ya se aplicó, no se
- *    vuelve a ejecutar, de modo que el usuario puede editar o **borrar** libremente los datos sin
- *    que el seed los vuelva a insertar. Subir `version` en el JSON lo re-aplica a propósito.
+ * 2. **Contenido (JSON).** Sabores, capacidades de receta, insumos, categorías custom y recetas se
+ *    cargan desde `public/seed/recipe-book.seed.json` (vía {@link SeedDataSource}) y se guardan en
+ *    los **repositorios IndexedDB** (el flujo normal). Se aplica **una sola vez**: un marcador
+ *    persistido ({@link SeedState}) registra la versión sembrada; si ya se aplicó, no se vuelve a
+ *    ejecutar, de modo que el usuario puede editar o **borrar** libremente los datos sin que el seed
+ *    los vuelva a insertar. Subir `version` en el JSON lo re-aplica a propósito.
  *
  * Desactivación: `"enabled": false` en el JSON (o fichero ausente) → se omite el contenido; la
  * estructura de sistema se sigue reconciliando. Nunca rompe el arranque: los fallos se registran
@@ -50,8 +50,8 @@ const SEED_KEY = 'recipe-book';
 export class RecipeBookSeed {
     private readonly categories = inject(RecipeCategoryRepository);
     private readonly flavors = inject(FlavorRepository);
-    private readonly options = inject(ConversionOptionRepository);
-    private readonly ingredients = inject(IngredientRepository);
+    private readonly capacities = inject(RecipeCapacityRepository);
+    private readonly supplies = inject(SupplyRepository);
     private readonly recipes = inject(RecipeRepository);
     private readonly source = inject(SeedDataSource);
     private readonly seedState = inject(SeedState);
@@ -76,22 +76,22 @@ export class RecipeBookSeed {
             return;
         }
 
-        // Orden: primero lo que las recetas referencian (sabores/opciones/categorías/ingredientes).
+        // Orden: primero lo que las recetas referencian (sabores/capacidades/categorías/insumos).
         for (const f of doc.flavors ?? []) {
             await this.createIfAbsent(f.id, this.flavors, () =>
                 Flavor.create(new EntityId(f.id), f.label),
             );
         }
-        for (const o of doc.conversionOptions ?? []) {
-            await this.createIfAbsent(o.id, this.options, () =>
-                ConversionOption.create(new EntityId(o.id), o.group, o.label, o.factor),
+        for (const c of doc.recipeCapacities ?? []) {
+            await this.createIfAbsent(c.id, this.capacities, () =>
+                RecipeCapacity.create(new EntityId(c.id), c.group, c.label, c.factor),
             );
         }
         for (const c of doc.categories ?? []) {
             await this.createIfAbsent(c.id, this.categories, () => this.buildCategory(c));
         }
-        for (const ing of doc.ingredients ?? []) {
-            await this.createIfAbsent(ing.id, this.ingredients, () => this.buildIngredient(ing));
+        for (const s of doc.supplies ?? []) {
+            await this.createIfAbsent(s.id, this.supplies, () => this.buildSupply(s));
         }
         for (const r of doc.recipes ?? []) {
             if (await this.recipes.byId(new EntityId(r.id))) {
@@ -140,23 +140,23 @@ export class RecipeBookSeed {
         return RecipeCategory.create(new EntityId(c.id), c.name, c.order, properties, false);
     }
 
-    private buildIngredient(ing: SeedIngredient): Ingredient {
-        const per = Quantity.of(ing.purchasePrice.per.value, ing.purchasePrice.per.unit);
-        const price = PurchasePrice.of(ing.purchasePrice.amount, per, ing.purchasePrice.currency);
-        return Ingredient.create(new EntityId(ing.id), ing.name, ing.baseUnit, ing.usage, price);
+    private buildSupply(s: SeedSupply): Supply {
+        const per = Quantity.of(s.purchasePrice.per.value, s.purchasePrice.per.unit);
+        const price = PurchasePrice.of(s.purchasePrice.amount, per, s.purchasePrice.currency);
+        return Supply.create(new EntityId(s.id), s.name, s.baseUnit, s.usage, price);
     }
 
-    /** Construye una receta, resolviendo la unidad de cada línea desde su ingrediente. Devuelve null si no puede. */
+    /** Construye una receta, resolviendo la unidad de cada línea desde su insumo. Devuelve null si no puede. */
     private async buildRecipe(r: SeedRecipe): Promise<Recipe | null> {
         try {
-            const lines: IngredientLine[] = [];
+            const lines: SupplyLine[] = [];
             for (const line of r.lines) {
-                const ingredient = await this.ingredients.byId(new EntityId(line.ingredientId));
-                if (!ingredient) {
-                    console.warn(`[recipe-book-seed] receta "${r.id}": ingrediente "${line.ingredientId}" no encontrado, se omite la línea`);
+                const supply = await this.supplies.byId(new EntityId(line.supplyId));
+                if (!supply) {
+                    console.warn(`[recipe-book-seed] receta "${r.id}": insumo "${line.supplyId}" no encontrado, se omite la línea`);
                     continue;
                 }
-                lines.push(IngredientLine.of(ingredient.id, Quantity.of(line.quantity, ingredient.baseUnit)));
+                lines.push(SupplyLine.of(supply.id, Quantity.of(line.quantity, supply.baseUnit)));
             }
             if (lines.length === 0) {
                 console.warn(`[recipe-book-seed] receta "${r.id}" sin líneas válidas, se omite`);

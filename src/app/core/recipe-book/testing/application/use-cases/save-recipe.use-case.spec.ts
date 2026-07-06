@@ -9,7 +9,7 @@ import {
 } from '../../recipe-book-test-doubles';
 import { RecipeCategoryRepository } from '../../../domain/repositories/recipe-category.repository';
 import { RecipeRepository } from '../../../domain/repositories/recipe.repository';
-import { SaveIngredient } from '../../../application/use-cases/save-ingredient.use-case';
+import { SaveSupply } from '../../../application/use-cases/save-supply.use-case';
 import { SaveRecipe } from '../../../application/use-cases/save-recipe.use-case';
 
 const CAT = 'cat-q';
@@ -23,7 +23,7 @@ describe('SaveRecipe', () => {
     TestBed.configureTestingModule({ providers: makeRecipeBookFakes().providers });
     bus = TestBed.inject(EventBus) as RecordingEventBus;
     await TestBed.inject(RecipeCategoryRepository).save(makeWeightCategory(CAT, 'Queques'));
-    flour = (await TestBed.inject(SaveIngredient).execute({ name: 'Harina', baseUnit: 'g', usage: 'recipe', purchasePrice: aPurchase('g') })).id;
+    flour = (await TestBed.inject(SaveSupply).execute({ name: 'Harina', baseUnit: 'g', usage: 'recipe', purchasePrice: aPurchase('g') })).id;
   });
 
   const save = (name: string, value = 1000) =>
@@ -31,7 +31,7 @@ describe('SaveRecipe', () => {
       categoryId: CAT,
       name,
       values: [{ propertyId: PESO, value }],
-      lines: [{ ingredientId: flour, quantity: 250 }],
+      lines: [{ supplyId: flour, quantity: 250 }],
     });
 
   it('saves a recipe and emits RecipeSaved', async () => {
@@ -55,7 +55,7 @@ describe('SaveRecipe', () => {
         categoryId: CAT,
         name: 'Sin peso',
         values: [],
-        lines: [{ ingredientId: flour, quantity: 250 }],
+        lines: [{ supplyId: flour, quantity: 250 }],
       }),
     ).rejects.toThrow();
   });
@@ -66,7 +66,7 @@ describe('SaveRecipe', () => {
         categoryId: CAT,
         name: 'Fantasma',
         values: [{ propertyId: PESO, value: 1000 }],
-        lines: [{ ingredientId: 'IN-nope', quantity: 100 }],
+        lines: [{ supplyId: 'IN-nope', quantity: 100 }],
       }),
     ).rejects.toThrow();
   });

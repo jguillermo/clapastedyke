@@ -420,7 +420,7 @@ export class RecipeBook3d implements AfterViewInit, OnDestroy {
  * o el divisor de su categoría, o la 1ª cara de Insumos. `-1` si no se resuelve.
  */
 function resolveFace(pages: PageContent[], focus: RecipeBookResult): number {
-  if (focus.ingredients) {
+  if (focus.supplies) {
     return pages.findIndex((p) => p.section === INGREDIENTS_SECTION && p.kind === 'recipe');
   }
   if (focus.recipeName && focus.categoryId) {

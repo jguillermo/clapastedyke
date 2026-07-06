@@ -2,7 +2,7 @@
  * Tipos de dato que puede tener una propiedad de categoría.
  * - `text` / `number` / `weight`: valores libres.
  * - `flavor`: selector respaldado por el catálogo de `Flavor` (guarda el label).
- * - `options`: selector respaldado por un grupo de `ConversionOption` (guarda el label);
+ * - `options`: selector respaldado por un grupo de `RecipeCapacity` (guarda el label);
  *   exige `group` (el grupo del catálogo del que tira el selector).
  */
 export type PropertyType = 'text' | 'number' | 'weight' | 'flavor' | 'options';
@@ -32,7 +32,7 @@ interface RecipePropertyData {
  * `selectable` (se muestra al SELECCIONAR la receta). Identidad por valor. `id` es
  * estable (no cambia al renombrar), así los valores guardados en las recetas no
  * quedan huérfanos. `locked` impide eliminarla o volverla opcional. `group` solo
- * aplica al tipo `options`: el grupo de `ConversionOption` que la puebla.
+ * aplica al tipo `options`: el grupo de `RecipeCapacity` que la puebla.
  */
 export class RecipeProperty {
     readonly id: string;
@@ -77,7 +77,7 @@ export class RecipeProperty {
         }
         // Un selector de catálogo necesita saber de qué grupo de opciones tira.
         if (type === 'options' && !group?.trim()) {
-            throw new Error('An options property must declare its conversion group');
+            throw new Error('An options property must declare its capacity group');
         }
         return new RecipeProperty({
             id,

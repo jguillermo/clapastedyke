@@ -1,25 +1,26 @@
 import { Quantity } from '../../../_common/quantity';
 
 /**
- * Purchase price of an ingredient — a *conceptual whole* value object (identity
- * by value, immutable). Models **how Ariana buys it**: the presentation she
- * buys (`per`, e.g. 1000 g or 30 u), what that purchase costs (`amount`), and
- * in which **currency** (`currency`, ISO 4217). It is a buying cost, never a
- * selling price.
+ * Precio de compra de un insumo — un value object *todo conceptual*
+ * (identidad por valor, inmutable). Modela **cómo lo compra Ariana**: la
+ * presentación que compra (`per`, p. ej. 1000 g o 30 u), cuánto cuesta esa
+ * compra (`amount`) y en qué **moneda** (`currency`, ISO 4217). Es un costo de
+ * compra, nunca un precio de venta. Lo guarda cada Supply y se apoya en
+ * Quantity para la presentación.
  *
- * Behaviour is side-effect-free and returns values:
- * - {@link perBaseUnit} — cost per base unit (the "price per gram/unit"), a
- *   live reference calculation.
- * - {@link costFor} — rule of three: what a given quantity of this ingredient
- *   costs.
+ * El comportamiento es sin efectos secundarios y devuelve valores:
+ * - {@link perBaseUnit} — costo por unidad base (el "precio por gramo/unidad"),
+ *   un cálculo de referencia vivo.
+ * - {@link costFor} — regla de tres: cuánto cuesta una cantidad dada de este
+ *   insumo.
  */
 export class PurchasePrice {
     private constructor(
-        /** Amount paid for the whole purchase presentation (in `currency`). */
+        /** Monto pagado por la presentación de compra completa (en `currency`). */
         readonly amount: number,   // Nivel 1: costo pagado por la presentación completa
-        /** The presentation bought, in the ingredient's base unit (g | u). */
+        /** La presentación comprada, en la unidad base del insumo (g | u). */
         readonly per: Quantity,    // Nivel 1: presentación comprada normalizada a la unidad base
-        /** ISO 4217 currency code (e.g. 'PEN' for Peruvian sol). */
+        /** Código de moneda ISO 4217 (p. ej. 'PEN' para el sol peruano). */
         readonly currency: string, // Nivel 1: moneda del monto (identifica la unidad monetaria)
     ) {}
 
@@ -30,12 +31,12 @@ export class PurchasePrice {
         return new PurchasePrice(amount, per, currency);
     }
 
-    /** Cost of one base unit (e.g. soles per gram). Live reference calc. */
+    /** Costo de una unidad base (p. ej. soles por gramo). Cálculo de referencia vivo. */
     perBaseUnit(): number {
         return this.amount / this.per.value;
     }
 
-    /** Rule of three: cost of `quantity` of this ingredient (same unit as `per`). */
+    /** Regla de tres: costo de `quantity` de este insumo (misma unidad que `per`). */
     costFor(quantity: Quantity): number {
         if (quantity.unit !== this.per.unit) {
             throw new Error(
@@ -54,7 +55,7 @@ export class PurchasePrice {
     }
 }
 
-/** Maps ISO 4217 code to display symbol; falls back to the code itself. */
+/** Mapea el código ISO 4217 a su símbolo visible; si no lo conoce, usa el propio código. */
 export function symbolFor(currency: string): string {
     return currency === 'PEN' ? 'S/' : currency;
 }

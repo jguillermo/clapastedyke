@@ -4,8 +4,8 @@ import { Quantity } from '../../../_common/quantity';
 import { makeRecipeBookFakes, makeWeightCategory } from '../recipe-book-test-doubles';
 import { RecipeCategoryRepository } from '../../domain/repositories/recipe-category.repository';
 import { FlavorRepository } from '../../domain/repositories/flavor.repository';
-import { ConversionOptionRepository } from '../../domain/repositories/conversion-option.repository';
-import { IngredientRepository } from '../../domain/repositories/ingredient.repository';
+import { RecipeCapacityRepository } from '../../domain/repositories/recipe-capacity.repository';
+import { SupplyRepository } from '../../domain/repositories/supply.repository';
 import { RecipeRepository } from '../../domain/repositories/recipe.repository';
 import { RecipeCategory, SYSTEM_CATEGORY_IDS } from '../../domain/entities/recipe-category';
 import { Flavor } from '../../domain/entities/flavor';
@@ -105,8 +105,8 @@ describe('RecipeBookSeed · contenido desde JSON', () => {
   const sampleDoc = (): RecipeBookSeedDocument => ({
     enabled: true,
     flavors: [{ id: 'flv-vainilla', label: 'Vainilla' }],
-    conversionOptions: [{ id: 'co-mold-medium', group: 'mold', label: 'Molde mediano', factor: 1 }],
-    ingredients: [
+    recipeCapacities: [{ id: 'co-mold-medium', group: 'mold', label: 'Molde mediano', factor: 1 }],
+    supplies: [
       { id: 'ing-harina', name: 'Harina', baseUnit: 'g', usage: 'recipe', purchasePrice: { amount: 4.5, per: { value: 1000, unit: 'g' }, currency: 'PEN' } },
       { id: 'ing-huevos', name: 'Huevos', baseUnit: 'u', usage: 'recipe', purchasePrice: { amount: 0.5, per: { value: 1, unit: 'u' }, currency: 'PEN' } },
     ],
@@ -120,8 +120,8 @@ describe('RecipeBookSeed · contenido desde JSON', () => {
           { propertyId: 'prop-molde-queques', type: 'options', value: 'Molde mediano' },
         ],
         lines: [
-          { ingredientId: 'ing-harina', quantity: 500 },
-          { ingredientId: 'ing-huevos', quantity: 8 },
+          { supplyId: 'ing-harina', quantity: 500 },
+          { supplyId: 'ing-huevos', quantity: 8 },
         ],
       },
     ],
@@ -135,8 +135,8 @@ describe('RecipeBookSeed · contenido desde JSON', () => {
     await TestBed.inject(RecipeBookSeed).run();
 
     expect((await TestBed.inject(FlavorRepository).all()).map((f) => f.label)).toEqual(['Vainilla']);
-    expect((await TestBed.inject(ConversionOptionRepository).all()).map((o) => o.label)).toEqual(['Molde mediano']);
-    const ingredients = await TestBed.inject(IngredientRepository).all();
+    expect((await TestBed.inject(RecipeCapacityRepository).all()).map((o) => o.label)).toEqual(['Molde mediano']);
+    const ingredients = await TestBed.inject(SupplyRepository).all();
     expect(ingredients.map((i) => i.name).sort()).toEqual(['Harina', 'Huevos']);
 
     const recipes = await TestBed.inject(RecipeRepository).all();
@@ -145,7 +145,7 @@ describe('RecipeBookSeed · contenido desde JSON', () => {
     expect(recipe.name).toBe('Bizcocho de Vainilla');
     expect(recipe.categoryId.value).toBe(SYSTEM_CATEGORY_IDS.queques);
     // La línea de huevos toma la unidad base del ingrediente ('u'), no gramos.
-    const huevos = recipe.lines.find((l) => l.ingredientId.value === 'ing-huevos');
+    const huevos = recipe.lines.find((l) => l.supplyId.value === 'ing-huevos');
     expect(huevos?.quantity.equals(Quantity.of(8, 'u'))).toBe(true);
     expect(recipe.valueOf('prop-sabor-queques')?.value).toBe('Vainilla');
   });
@@ -157,7 +157,7 @@ describe('RecipeBookSeed · contenido desde JSON', () => {
     await seed.run();
 
     expect(await TestBed.inject(FlavorRepository).all()).toHaveLength(1);
-    expect(await TestBed.inject(IngredientRepository).all()).toHaveLength(2);
+    expect(await TestBed.inject(SupplyRepository).all()).toHaveLength(2);
     expect(await TestBed.inject(RecipeRepository).all()).toHaveLength(1);
   });
 
@@ -198,7 +198,7 @@ describe('RecipeBookSeed · contenido desde JSON', () => {
           id: 'rec-orphan',
           categoryId: SYSTEM_CATEGORY_IDS.queques,
           name: 'Huérfana',
-          lines: [{ ingredientId: 'ing-inexistente', quantity: 100 }],
+          lines: [{ supplyId: 'ing-inexistente', quantity: 100 }],
         },
       ],
     };
@@ -212,7 +212,7 @@ describe('RecipeBookSeed · contenido desde JSON', () => {
     configure(sampleDoc());
     await TestBed.inject(RecipeBookSeed).run();
 
-    const harina = await TestBed.inject(IngredientRepository).byId(new EntityId('ing-harina'));
+    const harina = await TestBed.inject(SupplyRepository).byId(new EntityId('ing-harina'));
     expect(harina?.purchasePrice.equals(PurchasePrice.of(4.5, Quantity.of(1000, 'g'), 'PEN'))).toBe(true);
   });
 

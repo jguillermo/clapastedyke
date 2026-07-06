@@ -16,13 +16,13 @@ import { MIGO_DIALOG_DATA, MigoDialogRef } from '@components/dialog/dialog.servi
 import { MeasureInput } from '@core/recipe-book/domain/value-objects/measure-input';
 import type { RecipeCategory } from '@core/recipe-book/domain/entities/recipe-category';
 import { SaveRecipe } from '@core/recipe-book/application/use-cases/save-recipe.use-case';
-import { SaveIngredient } from '@core/recipe-book/application/use-cases/save-ingredient.use-case';
+import { SaveSupply } from '@core/recipe-book/application/use-cases/save-supply.use-case';
 import { SaveFlavor } from '@core/recipe-book/application/use-cases/save-flavor.use-case';
-import { SaveConversionOption } from '@core/recipe-book/application/use-cases/save-conversion-option.use-case';
-import { IngredientGrid, type IngredientOption, type InitialLine } from '../_shared/ingredient-grid/ingredient-grid';
+import { SaveRecipeCapacity } from '@core/recipe-book/application/use-cases/save-recipe-capacity.use-case';
+import { SupplyGrid, type SupplyOption, type InitialLine } from '../_shared/supply-grid/supply-grid';
 import { messageOf, union, validateForType, validateServings } from '../_shared/recipe-form.utils';
 
-export type { IngredientOption };
+export type { SupplyOption };
 
 /** Receta existente proyectada para precargar el formulario al editar. */
 export interface RecipeFormPrefill {
@@ -35,7 +35,7 @@ export interface RecipeFormPrefill {
 /** Datos del diálogo: la categoría (esquema), insumos, sugerencias y receta a editar. */
 export interface RecipeFormData {
   category: RecipeCategory;
-  ingredients: IngredientOption[];
+  supplies: SupplyOption[];
   /** Sugerencias por id de propiedad (valores ya usados por otras recetas). */
   valuesByProp: Record<string, string[]>;
   recipe?: RecipeFormPrefill;
@@ -63,7 +63,7 @@ export interface RecipeFormData {
     FormField,
     InputField,
     SelectTag,
-    IngredientGrid,
+    SupplyGrid,
   ],
   // `contents`: el host no genera caja, así el `migo-card fill` es el hijo flex directo del
   // contenedor del diálogo y llena la pantalla en móvil (solo el body scrollea, sin scroll de página).
@@ -73,14 +73,14 @@ export interface RecipeFormData {
 export class RecipeForm {
   private readonly fb = inject(FormBuilder);
   private readonly saveRecipe = inject(SaveRecipe);
-  private readonly saveIngredient = inject(SaveIngredient);
+  private readonly saveSupply = inject(SaveSupply);
   private readonly saveFlavor = inject(SaveFlavor);
-  private readonly saveConversionOption = inject(SaveConversionOption);
+  private readonly saveRecipeCapacity = inject(SaveRecipeCapacity);
   protected readonly ref = inject<MigoDialogRef<{ id: string }>>(MigoDialogRef);
   private readonly data = inject<RecipeFormData>(MIGO_DIALOG_DATA);
 
   protected readonly category = this.data.category;
-  protected readonly ingredientOptions = this.data.ingredients;
+  protected readonly supplyOptions = this.data.supplies;
   private readonly prefill = this.data.recipe ?? null;
   protected readonly editing = this.prefill !== null;
   protected readonly title = this.editing ? 'Editar receta' : 'Nueva receta';
@@ -100,7 +100,7 @@ export class RecipeForm {
   protected readonly submitted = signal(false);
   protected readonly errorMessage = signal('');
 
-  private readonly grid = viewChild(IngredientGrid);
+  private readonly grid = viewChild(SupplyGrid);
   private readonly valueTick = toSignal(this.form.valueChanges, { initialValue: null });
   private readonly interaction = signal(0);
 
@@ -159,15 +159,15 @@ export class RecipeForm {
 
     this.saving.set(true);
     try {
-      const lines: { ingredientId: string; quantity: number }[] = [];
+      const lines: { supplyId: string; quantity: number }[] = [];
       for (const item of parsed) {
-        const { id } = await this.saveIngredient.execute({
+        const { id } = await this.saveSupply.execute({
           name: item.name,
           baseUnit: item.baseUnit,
           usage: 'recipe',
           purchasePrice: item.purchase,
         });
-        lines.push({ ingredientId: id, quantity: item.quantity });
+        lines.push({ supplyId: id, quantity: item.quantity });
       }
       await this.ensureCatalog();
       const result = await this.saveRecipe.execute({
@@ -211,7 +211,7 @@ export class RecipeForm {
       } else if (property.type === 'options' && property.group === 'portions') {
         const n = Number(raw);
         if (Number.isInteger(n) && n > 0) {
-          await this.saveConversionOption.execute({ group: 'portions', label: raw, factor: n });
+          await this.saveRecipeCapacity.execute({ group: 'portions', label: raw, factor: n });
         }
       }
     }
