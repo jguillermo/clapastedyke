@@ -46,34 +46,63 @@ const MUTED = '#9a886f'; // cacao apagado (subtítulos, pie)
 const FONT_SERIF = 'Georgia, "Times New Roman", serif';
 const FONT_SANS = 'system-ui, -apple-system, "Segoe UI", sans-serif';
 
-/** Renderiza una cara de página a textura. */
-export function renderPageTexture(content: PageContent): CanvasTexture {
+// Geometría de la tabla scrollable de una receta (llena la hoja: del 30% al 90% del alto).
+const ROW_H = 64;
+const REGION_TOP = Math.round(H * 0.3);
+const REGION_BOTTOM = Math.round(H * 0.9);
+
+/** Zonas verticales de la tabla scrollable (compartidas por el pintado y el clamp de scroll). */
+function scrollGeom(): { headerRuleY: number; clipTop: number; visibleH: number } {
+  const headerRuleY = REGION_TOP + 30;
+  const clipTop = headerRuleY + 6;
+  return { headerRuleY, clipTop, visibleH: REGION_BOTTOM - clipTop };
+}
+
+/**
+ * Máximo desplazamiento vertical (px) de la tabla de una receta scrollable: 0 si todo cabe. La
+ * plataforma lo usa para acotar el scroll de la página.
+ */
+export function recipeScrollMax(content: PageContent): number {
+  if (!content.scrollable || !content.rows?.length) {
+    return 0;
+  }
+  return Math.max(0, content.rows.length * ROW_H - scrollGeom().visibleH);
+}
+
+/** Renderiza una cara de página a una nueva textura (con un scroll vertical opcional). */
+export function renderPageTexture(content: PageContent, scroll = 0): CanvasTexture {
   const canvas = document.createElement('canvas');
   canvas.width = W;
   canvas.height = H;
-  const ctx = canvas.getContext('2d');
-  if (ctx) {
-    paintPaper(ctx);
-    switch (content.kind) {
-      case 'cover':
-        paintCover(ctx, content);
-        break;
-      case 'section':
-        paintSection(ctx, content);
-        break;
-      case 'index':
-      case 'recipe':
-        paintRecipe(ctx, content);
-        break;
-      case 'blank':
-        break;
-    }
-  }
+  paintInto(canvas, content, scroll);
   const texture = new CanvasTexture(canvas);
   texture.colorSpace = SRGBColorSpace;
   texture.anisotropy = 4;
   texture.needsUpdate = true;
   return texture;
+}
+
+/** (Re)dibuja el contenido de una cara sobre un canvas existente (para repintar al scrollear). */
+export function paintInto(canvas: HTMLCanvasElement, content: PageContent, scroll = 0): void {
+  const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    return;
+  }
+  paintPaper(ctx);
+  switch (content.kind) {
+    case 'cover':
+      paintCover(ctx, content);
+      break;
+    case 'section':
+      paintSection(ctx, content);
+      break;
+    case 'index':
+    case 'recipe':
+      paintRecipe(ctx, content, scroll);
+      break;
+    case 'blank':
+      break;
+  }
 }
 
 /** Fondo de papel con un leve degradado hacia el lomo. */
@@ -120,42 +149,41 @@ function paintSection(ctx: CanvasRenderingContext2D, content: PageContent): void
 }
 
 /** Página de receta / índice: título, chips, tabla rayada y pie. */
-function paintRecipe(ctx: CanvasRenderingContext2D, content: PageContent): void {
+function paintRecipe(ctx: CanvasRenderingContext2D, content: PageContent, scroll = 0): void {
   const marginL = W * 0.12;
   const marginR = W * 0.08;
   const right = W - marginR;
   let y = H * 0.14;
 
-  // Título.
+  // Título (fijo).
   ctx.fillStyle = COLOR.heading;
   ctx.font = `bold 64px ${FONT_SERIF}`;
   y = wrapText(ctx, content.title ?? '', marginL, y, right - marginL, 72, 'left');
 
-  // Subtítulo (baseline bien por debajo del título para no solaparse).
-  if (content.subtitle) {
-    y += 60;
-    ctx.fillStyle = MUTED;
-    ctx.font = `italic 38px ${FONT_SERIF}`;
-    y = wrapText(ctx, content.subtitle, marginL, y, right - marginL, 48, 'left');
+  if (content.scrollable && content.columns?.length) {
+    // Receta: la tabla llena la hoja (región fija) y scrollea; cabecera fija, filas desplazables.
+    paintScrollTable(ctx, content.columns, content.rows ?? [], marginL, right, scroll);
+  } else {
+    // Insumos / otros: flujo clásico (subtítulo, chips, filete y tabla top-aligned, paginada).
+    if (content.subtitle) {
+      y += 60;
+      ctx.fillStyle = MUTED;
+      ctx.font = `italic 38px ${FONT_SERIF}`;
+      y = wrapText(ctx, content.subtitle, marginL, y, right - marginL, 48, 'left');
+    }
+    if (content.chips?.length) {
+      y += 56;
+      y = paintChips(ctx, content.chips, marginL, y, right);
+    }
+    y += 36;
+    rule(ctx, marginL, y, right - marginL, COLOR.accent, 4);
+    y += 48;
+    if (content.columns?.length) {
+      paintTable(ctx, content.columns, content.rows ?? [], marginL, y, right);
+    }
   }
 
-  // Chips.
-  if (content.chips?.length) {
-    y += 56;
-    y = paintChips(ctx, content.chips, marginL, y, right);
-  }
-
-  // Filete de separación.
-  y += 36;
-  rule(ctx, marginL, y, right - marginL, COLOR.accent, 4);
-  y += 48;
-
-  // Tabla.
-  if (content.columns?.length) {
-    y = paintTable(ctx, content.columns, content.rows ?? [], marginL, y, right);
-  }
-
-  // Pie.
+  // Pie (fijo).
   if (content.footer) {
     ctx.fillStyle = MUTED;
     ctx.font = `italic 34px ${FONT_SERIF}`;
@@ -164,10 +192,130 @@ function paintRecipe(ctx: CanvasRenderingContext2D, content: PageContent): void 
     ctx.textAlign = 'left';
   }
 
-  // Chip de editar (lápiz) sobre el papel, esquina superior derecha.
+  // Chip de editar (lápiz) sobre el papel, esquina superior derecha (fijo).
   if (content.editable) {
     paintEditChip(ctx);
   }
+}
+
+/**
+ * Tabla de receta que **llena la hoja** (región fija `REGION_TOP`..`REGION_BOTTOM`): cabecera fija
+ * arriba, filas desplazables por `scroll` (recortadas a la región) y filete tipo cuaderno que
+ * rellena el alto aunque haya pocos insumos. Chevrons ▲/▼ indican que hay más.
+ */
+function paintScrollTable(
+  ctx: CanvasRenderingContext2D,
+  columns: string[],
+  rows: { cells: string[] }[],
+  x: number,
+  right: number,
+  scroll: number,
+): void {
+  const { headerRuleY, clipTop, visibleH } = scrollGeom();
+
+  // Filete de acento sobre la cabecera + cabecera (fijos).
+  rule(ctx, x, REGION_TOP - 24, right - x, COLOR.accent, 4);
+  paintTableHeader(ctx, columns, x, REGION_TOP + 8, right);
+  rule(ctx, x, headerRuleY, right - x, COLOR.ruled, 2);
+
+  const contentH = rows.length * ROW_H;
+  const max = Math.max(0, contentH - visibleH);
+  const clamped = Math.min(Math.max(scroll, 0), max);
+  const fillToY = clipTop + Math.max(contentH, visibleH);
+
+  // Filas desplazables, recortadas a la región visible.
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, clipTop, W, visibleH);
+  ctx.clip();
+  ctx.translate(0, -clamped);
+  paintTableRows(ctx, columns, rows, x, clipTop, right, fillToY);
+  ctx.restore();
+
+  // Indicadores (fijos): hay más arriba / abajo.
+  if (clamped > 0.5) {
+    drawChevron(ctx, W / 2, clipTop + 26, 'up');
+  }
+  if (clamped < max - 0.5) {
+    drawChevron(ctx, W / 2, REGION_BOTTOM - 26, 'down');
+  }
+}
+
+/** Cabecera de la tabla (INSUMO … CANTIDAD), alineada como `paintTable`. */
+function paintTableHeader(
+  ctx: CanvasRenderingContext2D,
+  columns: string[],
+  x: number,
+  y: number,
+  right: number,
+): void {
+  const anchors = columnAnchors(columns.length, x, right);
+  ctx.fillStyle = MUTED;
+  ctx.font = `bold 30px ${FONT_SANS}`;
+  ctx.fillText(columns[0]?.toUpperCase() ?? '', x, y);
+  ctx.textAlign = 'right';
+  for (let c = 1; c < columns.length; c++) {
+    ctx.fillText(columns[c].toUpperCase(), anchors[c], y);
+  }
+  ctx.textAlign = 'left';
+}
+
+/**
+ * Filas en "slots" de alto `ROW_H`: las primeras llevan texto; el resto quedan como renglones
+ * rayados vacíos hasta `fillToY` (relleno de cuaderno) para que la hoja se vea llena.
+ */
+function paintTableRows(
+  ctx: CanvasRenderingContext2D,
+  columns: string[],
+  rows: { cells: string[] }[],
+  x: number,
+  top: number,
+  right: number,
+  fillToY: number,
+): void {
+  const w = right - x;
+  const anchors = columnAnchors(columns.length, x, right);
+  const nameMax = columns.length > 2 ? anchors[1] - x - w * 0.2 : right - x - 24;
+  const slots = Math.max(rows.length, Math.ceil((fillToY - top) / ROW_H));
+
+  for (let i = 0; i < slots; i++) {
+    const slotTop = top + i * ROW_H;
+    const baseline = slotTop + ROW_H * 0.62;
+    const row = rows[i];
+    if (row) {
+      ctx.fillStyle = COLOR.body;
+      ctx.font = `40px ${FONT_SERIF}`;
+      ctx.fillText(ellipsize(ctx, row.cells[0] ?? '', nameMax), x, baseline);
+      ctx.textAlign = 'right';
+      for (let c = 1; c < columns.length; c++) {
+        const last = c === columns.length - 1;
+        const cell = row.cells[c] ?? '';
+        const price = last ? /^S\/\s*(.+)$/.exec(cell) : null;
+        if (price) {
+          drawPrice(ctx, price[1], anchors[c], baseline);
+        } else {
+          ctx.fillStyle = last ? COLOR.heading : COLOR.body;
+          ctx.font = `${last ? 'bold ' : ''}40px ${FONT_SERIF}`;
+          ctx.fillText(cell, anchors[c], baseline);
+        }
+      }
+      ctx.textAlign = 'left';
+    }
+    rule(ctx, x, slotTop + ROW_H, right - x, COLOR.ruled, 1);
+  }
+}
+
+/** Chevron (triángulo) que indica que hay más contenido hacia arriba/abajo. */
+function drawChevron(ctx: CanvasRenderingContext2D, cx: number, cy: number, dir: 'up' | 'down'): void {
+  const s = 16;
+  const dy = dir === 'up' ? -1 : 1;
+  ctx.fillStyle = MUTED;
+  ctx.beginPath();
+  ctx.moveTo(cx - s, cy - (s / 2) * dy);
+  ctx.lineTo(cx + s, cy - (s / 2) * dy);
+  ctx.lineTo(cx, cy + (s / 2) * dy);
+  ctx.closePath();
+  ctx.fill();
 }
 
 // Icono "editar" de Material Design (viewBox 24×24). Copiado como dato de ruta para que la

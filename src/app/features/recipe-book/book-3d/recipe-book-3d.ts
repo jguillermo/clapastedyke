@@ -67,6 +67,7 @@ interface BookFocus {
         class="block h-full w-full touch-none"
         aria-hidden="true"
         (pointerdown)="onSwipeStart($event)"
+        (pointermove)="onSwipeMove($event)"
         (pointerup)="onSwipeEnd($event)"
         (pointercancel)="onSwipeCancel()"
       ></canvas>
@@ -339,22 +340,56 @@ export class RecipeBook3d implements AfterViewInit, OnDestroy {
     this.engine?.prev();
   }
 
-  // --- Navegación sobre la hoja: deslizar (touch/ratón) o clic (ratón) ---
+  // --- Navegación/scroll sobre la hoja: deslizar (touch/ratón) o clic (ratón) ---
   private swipeStart: { x: number; y: number } | null = null;
+  private lastPointer: { x: number; y: number } | null = null;
+  /** Gesto en curso, decidido en el primer movimiento significativo. */
+  private gesture: 'idle' | 'turn' | 'scroll' = 'idle';
+  private didScroll = false;
   /** Distancia mínima horizontal (px) para contar como deslizamiento, no toque/clic. */
   private static readonly SWIPE_THRESHOLD = 40;
+  /** Movimiento mínimo (px) para bloquear el gesto en horizontal (turn) o vertical (scroll). */
+  private static readonly LOCK_THRESHOLD = 8;
 
   protected onSwipeStart(event: PointerEvent): void {
     this.swipeStart = { x: event.clientX, y: event.clientY };
-    // Captura el puntero para recibir el `up` aunque el dedo/cursor salga del canvas.
+    this.lastPointer = { x: event.clientX, y: event.clientY };
+    this.gesture = 'idle';
+    this.didScroll = false;
+    // Captura el puntero para recibir el `up`/`move` aunque el dedo/cursor salga del canvas.
     (event.target as Element).setPointerCapture?.(event.pointerId);
+  }
+
+  protected onSwipeMove(event: PointerEvent): void {
+    const start = this.swipeStart;
+    const last = this.lastPointer;
+    if (!start || !last) {
+      return;
+    }
+    const dx = event.clientX - start.x;
+    const dy = event.clientY - start.y;
+    if (this.gesture === 'idle' && Math.hypot(dx, dy) >= RecipeBook3d.LOCK_THRESHOLD) {
+      this.gesture = Math.abs(dy) > Math.abs(dx) ? 'scroll' : 'turn';
+    }
+    if (this.gesture === 'scroll') {
+      // Scroll natural: arrastrar hacia arriba revela lo de más abajo.
+      const delta = last.y - event.clientY;
+      if (this.engine?.scrollPageAt(event.clientX, event.clientY, delta)) {
+        this.didScroll = true;
+      }
+    }
+    this.lastPointer = { x: event.clientX, y: event.clientY };
   }
 
   protected onSwipeEnd(event: PointerEvent): void {
     const start = this.swipeStart;
+    const scrolled = this.gesture === 'scroll' || this.didScroll;
     this.swipeStart = null;
-    if (!start) {
-      return;
+    this.lastPointer = null;
+    this.gesture = 'idle';
+    this.didScroll = false;
+    if (!start || scrolled) {
+      return; // un scroll no pasa página ni abre el editor
     }
     const dx = event.clientX - start.x;
     const dy = event.clientY - start.y;
@@ -387,6 +422,9 @@ export class RecipeBook3d implements AfterViewInit, OnDestroy {
 
   protected onSwipeCancel(): void {
     this.swipeStart = null;
+    this.lastPointer = null;
+    this.gesture = 'idle';
+    this.didScroll = false;
   }
 
   protected jump(faceIndex: number): void {

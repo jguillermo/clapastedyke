@@ -74,9 +74,9 @@ function chunkRows<T>(items: readonly T[], first: number, rest: number): T[][] {
 }
 
 /**
- * Una receta como una o varias caras: la primera con título + tabla; si los
- * insumos no caben, **continúan** en las siguientes (marcadas `continued`,
- * fuera del índice). El pie muestra «Continúa…» salvo en la última (total).
+ * Una receta es SIEMPRE una sola cara: todos los insumos van en la misma hoja. Si no caben, la
+ * hoja scrollea en vertical (lo resuelve el render de la página, no la paginación). A diferencia
+ * de Insumos, una receta nunca se parte en páginas de continuación.
  */
 function recipePages(
   recipe: Recipe,
@@ -85,25 +85,9 @@ function recipePages(
   columns: string[],
 ): PageContent[] {
   const total = `${recipe.lines.length} insumos`;
-  const groups = chunkRows(rows, ROWS_FIRST, ROWS_CONT);
-  if (groups.length <= 1) {
-    return [{ kind: 'recipe', section: category.id.value, title: recipe.name, columns, rows, footer: total, editable: true }];
-  }
-  return groups.map((group, i) => {
-    const last = i === groups.length - 1;
-    return i === 0
-      ? { kind: 'recipe', section: category.id.value, title: recipe.name, columns, rows: group, footer: 'Continúa…', editable: true }
-      : {
-          kind: 'recipe',
-          section: category.id.value,
-          title: recipe.name,
-          subtitle: 'continuación',
-          columns,
-          rows: group,
-          continued: true,
-          footer: last ? total : 'Continúa…',
-        };
-  });
+  return [
+    { kind: 'recipe', section: category.id.value, title: recipe.name, columns, rows, footer: total, editable: true, scrollable: true },
+  ];
 }
 
 /**

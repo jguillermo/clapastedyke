@@ -47,4 +47,10 @@ export interface PageContent {
    * "editar" — eso lo decide el feature al recibir el clic de la cara.
    */
   readonly editable?: boolean;
+  /**
+   * `true` si la tabla de la página **llena la hoja** y, si el contenido no cabe, **scrollea en
+   * vertical dentro de la misma cara** (con indicadores ▲/▼) en vez de partirse en páginas de
+   * continuación. Título/cabecera/pie quedan fijos; solo las filas se desplazan.
+   */
+  readonly scrollable?: boolean;
 }

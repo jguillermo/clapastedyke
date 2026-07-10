@@ -16,7 +16,7 @@ import {
 } from 'three';
 import { buildBookMesh, BookMesh, PAGE_H, PAGE_W } from './book-mesh';
 import { PageContent } from './page-content';
-import { EDIT_CHIP_UV, renderPageTexture } from './page-texture';
+import { EDIT_CHIP_UV, paintInto, recipeScrollMax, renderPageTexture } from './page-texture';
 import { PageTurn } from './page-turn';
 
 /** Spread visible: contenido de la cara izquierda y derecha (null = sin cara). */
@@ -70,6 +70,8 @@ export class BookEngine {
   /** Última cara con contenido real (antes del relleno a par). */
   private lastContentFace = 0;
   private readonly textures = new Map<number, Texture>();
+  /** Desplazamiento vertical (px) por cara para las recetas scrollables. */
+  private readonly scrollByFace = new Map<number, number>();
   private blankTexture: Texture | null = null;
 
   /** Hojas volteadas hacia la izquierda (0..totalLeaves). Fuente de verdad en modo spread. */
@@ -199,6 +201,57 @@ export class BookEngine {
    * Devuelve `null` si el toque no fue sobre un chip editable (el llamador pasa página entonces).
    */
   pickPageAction(clientX: number, clientY: number): 'left' | 'right' | null {
+    const hit = this.raycastPage(clientX, clientY);
+    if (!hit) {
+      return null;
+    }
+    const { x, y } = hit.uv;
+    const inChip =
+      x >= EDIT_CHIP_UV.x0 && x <= EDIT_CHIP_UV.x1 && y >= EDIT_CHIP_UV.y0 && y <= EDIT_CHIP_UV.y1;
+    if (!inChip) {
+      return null;
+    }
+    return this.faceAt(hit.faceIndex)?.editable ? hit.side : null;
+  }
+
+  /**
+   * Desplaza en vertical el contenido de la página bajo el punto (si es una receta scrollable con
+   * contenido de sobra). Repinta esa cara y redibuja. Devuelve `true` si hubo scroll (el llamador
+   * consume el gesto en vez de pasar página). `deltaPx` > 0 baja el contenido.
+   */
+  scrollPageAt(clientX: number, clientY: number, deltaPx: number): boolean {
+    const hit = this.raycastPage(clientX, clientY);
+    if (!hit) {
+      return false;
+    }
+    const content = this.faceAt(hit.faceIndex);
+    if (!content) {
+      return false;
+    }
+    const max = recipeScrollMax(content);
+    if (max <= 0) {
+      return false;
+    }
+    const prev = this.scrollByFace.get(hit.faceIndex) ?? 0;
+    const next = Math.min(Math.max(prev + deltaPx, 0), max);
+    if (next === prev) {
+      return false;
+    }
+    this.scrollByFace.set(hit.faceIndex, next);
+    const tex = this.textures.get(hit.faceIndex);
+    if (tex) {
+      paintInto(tex.image as HTMLCanvasElement, content, next);
+      tex.needsUpdate = true;
+      this.renderer.render(this.scene, this.camera);
+    }
+    return true;
+  }
+
+  /** Raycast a las páginas asentadas visibles: lado, índice de cara y uv del impacto. */
+  private raycastPage(
+    clientX: number,
+    clientY: number,
+  ): { side: 'left' | 'right'; faceIndex: number; uv: Vector2 } | null {
     const rect = this.renderer.domElement.getBoundingClientRect();
     if (rect.width === 0 || rect.height === 0) {
       return null;
@@ -215,12 +268,6 @@ export class BookEngine {
     if (!hit?.uv) {
       return null;
     }
-    const { x, y } = hit.uv;
-    const inChip =
-      x >= EDIT_CHIP_UV.x0 && x <= EDIT_CHIP_UV.x1 && y >= EDIT_CHIP_UV.y0 && y <= EDIT_CHIP_UV.y1;
-    if (!inChip) {
-      return null;
-    }
     const side: 'left' | 'right' = hit.object === this.book.leftPage ? 'left' : 'right';
     const faceIndex =
       side === 'left'
@@ -228,7 +275,7 @@ export class BookEngine {
         : this.mode === 'single'
           ? this.faceIndex
           : 2 * this.leafIndex;
-    return this.faces[faceIndex]?.editable ? side : null;
+    return { side, faceIndex, uv: hit.uv };
   }
 
   /**
@@ -522,7 +569,7 @@ export class BookEngine {
     }
     let tex = this.textures.get(index);
     if (!tex) {
-      tex = renderPageTexture(content);
+      tex = renderPageTexture(content, this.scrollByFace.get(index) ?? 0);
       this.textures.set(index, tex);
     }
     return tex;
@@ -544,6 +591,7 @@ export class BookEngine {
   private clearTextures(): void {
     this.textures.forEach((t) => t.dispose());
     this.textures.clear();
+    this.scrollByFace.clear();
     this.book.leftMaterial.map = null;
     this.book.rightMaterial.map = null;
   }
