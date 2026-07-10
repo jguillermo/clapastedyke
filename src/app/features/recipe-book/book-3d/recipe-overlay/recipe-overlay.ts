@@ -40,28 +40,28 @@ interface LineView {
     '(pointerup)': 'onUp($event)',
   },
   template: `
-    <!-- Título FIJO (único bloque fijo: nombre + editar + su subrayado). -->
-    <header class="mx-6 flex items-start justify-between gap-3 border-b-2 border-brand pt-6 pb-3">
-      <h2 class="m-0 font-display text-heading text-h3">{{ recipe().name }}</h2>
+    <!-- Título FIJO (único bloque fijo: nombre + editar + su subrayado). Serif grande tipo recetario. -->
+    <header class="mx-6 flex items-start justify-between gap-4 border-b-2 border-brand pt-8 pb-4">
+      <h2 class="m-0 font-display font-bold text-heading text-h2 sm:text-h1">{{ recipe().name }}</h2>
       <button migo-button variant="ghost" size="sm" type="button" aria-label="Editar receta" (click)="edit.emit()">
-        <migo-icon icon-leading name="mat:edit" size="sm" />
+        <migo-icon icon-leading name="mat:edit" size="md" />
       </button>
     </header>
 
     <!-- Cuerpo SCROLLEABLE (scroll nativo): cabecera de columnas, filas y pie scrollean todos. -->
-    <div class="flex-1 overflow-y-auto overscroll-contain touch-pan-y px-6 py-3">
-      <div class="flex items-baseline justify-between gap-3 pb-1 text-caption font-semibold text-muted">
-        <span>INSUMO</span><span>CANTIDADes</span>
+    <div class="flex-1 overflow-y-auto overscroll-contain touch-pan-y px-6 py-4">
+      <div class="flex items-baseline justify-between gap-3 pb-2 text-sm font-semibold uppercase tracking-wide text-muted">
+        <span>Insumo</span><span>Cantidad</span>
       </div>
       <ul class="m-0 p-0 list-none">
         @for (line of lines(); track $index) {
-          <li class="flex items-baseline justify-between gap-4 border-b border-border-subtle py-2">
-            <span class="font-body text-body">{{ line.name }}</span>
-            <span class="font-body font-semibold text-heading tabular-nums whitespace-nowrap">{{ line.quantity }}</span>
+          <li class="flex items-baseline justify-between gap-4 border-b border-border-line py-3">
+            <span class="font-display text-heading text-lead">{{ line.name }}</span>
+            <span class="font-display font-bold text-heading text-lead tabular-nums whitespace-nowrap">{{ line.quantity }}</span>
           </li>
         }
       </ul>
-      <p class="mt-3 mb-0 text-right text-caption italic text-muted">{{ lines().length }} insumos</p>
+      <p class="mt-3 mb-0 text-right text-sm italic text-muted">{{ lines().length }} insumos</p>
       <!-- Aquí irán, a futuro, secciones de preparación e imágenes (contenido rico). -->
     </div>
   `,
