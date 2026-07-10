@@ -1,4 +1,4 @@
-import { CanvasTexture, SRGBColorSpace } from 'three';
+import { CanvasTexture, LinearFilter, SRGBColorSpace } from 'three';
 import { PageContent } from './page-content';
 
 /**
@@ -77,7 +77,10 @@ export function renderPageTexture(content: PageContent, scroll = 0): CanvasTextu
   paintInto(canvas, content, scroll);
   const texture = new CanvasTexture(canvas);
   texture.colorSpace = SRGBColorSpace;
-  texture.anisotropy = 4;
+  // Sin mipmaps: al scrollear se repinta y re-sube la textura cada frame; regenerar la cadena de
+  // mipmaps en cada `needsUpdate` es el costo real. Bilineal basta (el libro se ve casi de frente).
+  texture.generateMipmaps = false;
+  texture.minFilter = LinearFilter;
   texture.needsUpdate = true;
   return texture;
 }

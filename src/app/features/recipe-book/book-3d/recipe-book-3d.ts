@@ -67,9 +67,7 @@ interface BookFocus {
         class="block h-full w-full touch-none"
         aria-hidden="true"
         (pointerdown)="onSwipeStart($event)"
-        (pointermove)="onSwipeMove($event)"
-        (pointerup)="onSwipeEnd($event)"
-        (pointercancel)="onSwipeCancel()"
+        (wheel)="onWheel($event)"
       ></canvas>
 
       <!-- Cerrar / volver a la cocina -->
@@ -327,6 +325,12 @@ export class RecipeBook3d implements AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    window.removeEventListener('pointermove', this.moveHandler);
+    window.removeEventListener('pointerup', this.upHandler);
+    window.removeEventListener('pointercancel', this.cancelHandler);
+    if (this.scrollRaf) {
+      cancelAnimationFrame(this.scrollRaf);
+    }
     this.engine?.dispose();
   }
 
@@ -340,24 +344,36 @@ export class RecipeBook3d implements AfterViewInit, OnDestroy {
     this.engine?.prev();
   }
 
-  // --- Navegación/scroll sobre la hoja: deslizar (touch/ratón) o clic (ratón) ---
+  // --- Detector de intención del gesto sobre la hoja (scroll vertical vs pasar página) ---
   private swipeStart: { x: number; y: number } | null = null;
   private lastPointer: { x: number; y: number } | null = null;
-  /** Gesto en curso, decidido en el primer movimiento significativo. */
-  private gesture: 'idle' | 'turn' | 'scroll' = 'idle';
-  private didScroll = false;
-  /** Distancia mínima horizontal (px) para contar como deslizamiento, no toque/clic. */
+  /** Eje bloqueado del arrastre actual: fijo desde el primer movimiento hasta soltar. */
+  private axis: 'none' | 'v' | 'h' = 'none';
+  /** Cara scrollable fijada al presionar (objetivo del scroll; null si la página no scrollea). */
+  private scrollTarget: number | null = null;
+  private scrollAccum = 0;
+  private scrollRaf = 0;
+  /** Distancia horizontal mínima (px) para pasar página. */
   private static readonly SWIPE_THRESHOLD = 40;
-  /** Movimiento mínimo (px) para bloquear el gesto en horizontal (turn) o vertical (scroll). */
-  private static readonly LOCK_THRESHOLD = 8;
+  /** Movimiento mínimo (px) para decidir el eje del gesto (vertical/horizontal). */
+  private static readonly LOCK_THRESHOLD = 10;
+
+  // Handlers en `window` durante el arrastre: garantizan que cada `pointermove` llegue (en la web
+  // el binding en el canvas + captura no es fiable, p. ej. en la emulación táctil de Chrome).
+  private readonly moveHandler = (e: PointerEvent): void => this.onSwipeMove(e);
+  private readonly upHandler = (e: PointerEvent): void => this.onSwipeEnd(e);
+  private readonly cancelHandler = (): void => this.onSwipeCancel();
 
   protected onSwipeStart(event: PointerEvent): void {
+    event.preventDefault(); // evita que el navegador robe el gesto (selección/pan nativo)
     this.swipeStart = { x: event.clientX, y: event.clientY };
     this.lastPointer = { x: event.clientX, y: event.clientY };
-    this.gesture = 'idle';
-    this.didScroll = false;
-    // Captura el puntero para recibir el `up`/`move` aunque el dedo/cursor salga del canvas.
-    (event.target as Element).setPointerCapture?.(event.pointerId);
+    this.axis = 'none';
+    // Fija de una vez la cara a scrollear (si la hay); no se vuelve a raycastear en cada move.
+    this.scrollTarget = this.engine?.scrollTargetAt(event.clientX, event.clientY) ?? null;
+    window.addEventListener('pointermove', this.moveHandler, { passive: false });
+    window.addEventListener('pointerup', this.upHandler);
+    window.addEventListener('pointercancel', this.cancelHandler);
   }
 
   protected onSwipeMove(event: PointerEvent): void {
@@ -366,43 +382,56 @@ export class RecipeBook3d implements AfterViewInit, OnDestroy {
     if (!start || !last) {
       return;
     }
+    event.preventDefault(); // mantiene el flujo de `pointermove` (no pan nativo → no pointercancel)
     const dx = event.clientX - start.x;
     const dy = event.clientY - start.y;
-    if (this.gesture === 'idle' && Math.hypot(dx, dy) >= RecipeBook3d.LOCK_THRESHOLD) {
-      this.gesture = Math.abs(dy) > Math.abs(dx) ? 'scroll' : 'turn';
+    // Decide el eje UNA sola vez y no lo cambia el resto del arrastre (bloqueo pegajoso).
+    if (this.axis === 'none' && Math.hypot(dx, dy) >= RecipeBook3d.LOCK_THRESHOLD) {
+      this.axis = Math.abs(dy) > Math.abs(dx) ? 'v' : 'h';
     }
-    if (this.gesture === 'scroll') {
-      // Scroll natural: arrastrar hacia arriba revela lo de más abajo.
-      const delta = last.y - event.clientY;
-      if (this.engine?.scrollPageAt(event.clientX, event.clientY, delta)) {
-        this.didScroll = true;
-      }
+    if (this.axis === 'v' && this.scrollTarget !== null) {
+      // Scroll natural (arrastrar hacia arriba revela lo de abajo), acumulado y aplicado por frame.
+      this.scrollAccum += last.y - event.clientY;
+      this.scheduleScroll();
     }
     this.lastPointer = { x: event.clientX, y: event.clientY };
   }
 
+  /** Aplica el scroll acumulado una vez por frame (evita repintar la textura en cada move). */
+  private scheduleScroll(): void {
+    if (this.scrollRaf) {
+      return;
+    }
+    this.scrollRaf = requestAnimationFrame(() => {
+      this.scrollRaf = 0;
+      const delta = this.scrollAccum;
+      this.scrollAccum = 0;
+      if (this.scrollTarget !== null && delta !== 0) {
+        this.engine?.scrollFaceBy(this.scrollTarget, delta);
+      }
+    });
+  }
+
   protected onSwipeEnd(event: PointerEvent): void {
     const start = this.swipeStart;
-    const scrolled = this.gesture === 'scroll' || this.didScroll;
-    this.swipeStart = null;
-    this.lastPointer = null;
-    this.gesture = 'idle';
-    this.didScroll = false;
-    if (!start || scrolled) {
-      return; // un scroll no pasa página ni abre el editor
+    const axis = this.axis;
+    this.resetGesture();
+    // Vertical (scroll) nunca pasa página; sin punto de inicio, nada.
+    if (!start || axis === 'v') {
+      return;
     }
     const dx = event.clientX - start.x;
     const dy = event.clientY - start.y;
-    const horizontalSwipe =
-      Math.abs(dx) >= RecipeBook3d.SWIPE_THRESHOLD && Math.abs(dx) > Math.abs(dy);
 
-    if (horizontalSwipe) {
-      // Deslizamiento (touch o arrastre de ratón): izquierda → siguiente, derecha → anterior.
-      dx < 0 ? this.next() : this.prev();
+    // Horizontal (convención de libro): arrastrar a la IZQUIERDA → siguiente, a la DERECHA → anterior.
+    if (axis === 'h') {
+      if (Math.abs(dx) >= RecipeBook3d.SWIPE_THRESHOLD) {
+        dx < 0 ? this.next() : this.prev();
+      }
       return;
     }
 
-    // Toque/clic sin deslizar: ¿cayó sobre el chip de editar de una página? → abre el editor.
+    // Sin eje (toque/clic sin arrastrar): ¿chip de editar? → abre el editor.
     const side = this.engine?.pickPageAction(event.clientX, event.clientY) ?? null;
     if (side) {
       const recipe = side === 'left' ? this.leftRecipe() : this.rightRecipe();
@@ -412,19 +441,44 @@ export class RecipeBook3d implements AfterViewInit, OnDestroy {
       return;
     }
 
-    // Si no fue el chip: con RATÓN, un clic pasa página según la mitad pulsada
-    // (derecha → siguiente, izquierda → anterior). En touch un toque no hace nada.
-    if (event.pointerType === 'mouse') {
+    // Con RATÓN, un clic (sin arrastre) pasa página según la mitad pulsada.
+    if (event.pointerType === 'mouse' && Math.hypot(dx, dy) < RecipeBook3d.LOCK_THRESHOLD) {
       const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
       event.clientX > rect.left + rect.width / 2 ? this.next() : this.prev();
     }
   }
 
   protected onSwipeCancel(): void {
+    this.resetGesture();
+  }
+
+  /** Rueda / trackpad: scroll vertical de la página bajo el cursor (escritorio). */
+  protected onWheel(event: WheelEvent): void {
+    const target = this.engine?.scrollTargetAt(event.clientX, event.clientY) ?? null;
+    if (target === null) {
+      return;
+    }
+    event.preventDefault();
+    this.engine?.scrollFaceBy(target, event.deltaY);
+  }
+
+  /** Limpia el estado del gesto, quita los listeners de `window` y vuelca el scroll pendiente. */
+  private resetGesture(): void {
+    window.removeEventListener('pointermove', this.moveHandler);
+    window.removeEventListener('pointerup', this.upHandler);
+    window.removeEventListener('pointercancel', this.cancelHandler);
+    if (this.scrollRaf) {
+      cancelAnimationFrame(this.scrollRaf);
+      this.scrollRaf = 0;
+    }
+    if (this.scrollTarget !== null && this.scrollAccum !== 0) {
+      this.engine?.scrollFaceBy(this.scrollTarget, this.scrollAccum);
+    }
+    this.scrollAccum = 0;
     this.swipeStart = null;
     this.lastPointer = null;
-    this.gesture = 'idle';
-    this.didScroll = false;
+    this.axis = 'none';
+    this.scrollTarget = null;
   }
 
   protected jump(faceIndex: number): void {

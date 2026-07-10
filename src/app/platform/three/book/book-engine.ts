@@ -215,36 +215,42 @@ export class BookEngine {
   }
 
   /**
-   * Desplaza en vertical el contenido de la página bajo el punto (si es una receta scrollable con
-   * contenido de sobra). Repinta esa cara y redibuja. Devuelve `true` si hubo scroll (el llamador
-   * consume el gesto en vez de pasar página). `deltaPx` > 0 baja el contenido.
+   * Índice de cara bajo el punto SI es una receta scrollable con contenido de sobra; si no, `null`.
+   * El feature lo llama al empezar el arrastre para fijar el objetivo del scroll (no re-raycast por
+   * cada movimiento).
    */
-  scrollPageAt(clientX: number, clientY: number, deltaPx: number): boolean {
+  scrollTargetAt(clientX: number, clientY: number): number | null {
     const hit = this.raycastPage(clientX, clientY);
     if (!hit) {
-      return false;
+      return null;
     }
     const content = this.faceAt(hit.faceIndex);
+    return content && recipeScrollMax(content) > 0 ? hit.faceIndex : null;
+  }
+
+  /**
+   * Desplaza en vertical el contenido de una cara (fijada por {@link scrollTargetAt}). Acota a
+   * `[0, recipeScrollMax]`, repinta el canvas de esa cara y redibuja. `deltaPx` > 0 revela lo de
+   * más abajo (scroll hacia abajo).
+   */
+  scrollFaceBy(faceIndex: number, deltaPx: number): void {
+    const content = this.faceAt(faceIndex);
     if (!content) {
-      return false;
+      return;
     }
     const max = recipeScrollMax(content);
-    if (max <= 0) {
-      return false;
-    }
-    const prev = this.scrollByFace.get(hit.faceIndex) ?? 0;
+    const prev = this.scrollByFace.get(faceIndex) ?? 0;
     const next = Math.min(Math.max(prev + deltaPx, 0), max);
     if (next === prev) {
-      return false;
+      return;
     }
-    this.scrollByFace.set(hit.faceIndex, next);
-    const tex = this.textures.get(hit.faceIndex);
+    this.scrollByFace.set(faceIndex, next);
+    const tex = this.textures.get(faceIndex);
     if (tex) {
       paintInto(tex.image as HTMLCanvasElement, content, next);
       tex.needsUpdate = true;
       this.renderer.render(this.scene, this.camera);
     }
-    return true;
   }
 
   /** Raycast a las páginas asentadas visibles: lado, índice de cara y uv del impacto. */
