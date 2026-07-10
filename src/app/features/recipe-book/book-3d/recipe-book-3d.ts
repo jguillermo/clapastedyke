@@ -22,7 +22,15 @@ import type { PageContent } from '@platform/three/book/page-content';
 import { RecipeForm, type RecipeFormData, type RecipeFormResult } from '../recipe-form/recipe-form';
 import { SuppliesDialog, type SuppliesDialogData } from '../supplies-dialog/supplies-dialog';
 import type { InitialLine } from '../_shared/supply-grid/supply-grid';
+import { RecipeOverlay, type OverlayRect } from './recipe-overlay/recipe-overlay';
 import { INGREDIENTS_SECTION, toPages } from './recipe-page-projector';
+
+/** Un overlay de receta a pintar: qué receta, en qué lado del libro y su caja en pantalla. */
+interface RecipeOverlayView {
+  side: 'left' | 'right';
+  recipe: Recipe;
+  rect: OverlayRect;
+}
 
 /** Una entrada del índice (salto rápido a una página). */
 interface IndexEntry {
@@ -54,7 +62,7 @@ interface BookFocus {
 @Component({
   selector: 'app-recipe-book-3d',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Button, Icon, Spacer],
+  imports: [Button, Icon, Spacer, RecipeOverlay],
   host: {
     class: 'fixed inset-0 z-40 block bg-surface-page',
     '(window:resize)': 'onResize()',
@@ -67,8 +75,19 @@ interface BookFocus {
         class="block h-full w-full touch-none"
         aria-hidden="true"
         (pointerdown)="onSwipeStart($event)"
-        (wheel)="onWheel($event)"
+        (pointerup)="onSwipeEnd($event)"
       ></canvas>
+
+      <!-- Contenido de cada receta visible: overlay DOM sobre la hoja (scroll nativo, título fijo). -->
+      @for (ov of overlays(); track ov.side) {
+        <app-recipe-overlay
+          [recipe]="ov.recipe"
+          [supplies]="supplyEntities()"
+          [rect]="ov.rect"
+          (edit)="openEditForm(ov.recipe)"
+          (swipe)="onOverlaySwipe($event)"
+        />
+      }
 
       <!-- Cerrar / volver a la cocina -->
       <button
@@ -294,6 +313,11 @@ export class RecipeBook3d implements AfterViewInit, OnDestroy {
   private readonly suppliesById = computed(
     () => new Map<string, Supply>((this.catalog()?.supplies ?? []).map((s) => [s.id.value, s])),
   );
+  /** Insumos del catálogo (los pasa el overlay para resolver nombres). */
+  protected readonly supplyEntities = computed<readonly Supply[]>(() => this.catalog()?.supplies ?? []);
+
+  /** Overlays DOM a pintar sobre las hojas de receta visibles (vacío durante el volteo). */
+  protected readonly overlays = signal<RecipeOverlayView[]>([]);
 
   private readonly _indexEntries = signal<IndexEntry[]>([]);
   protected readonly indexEntries = this._indexEntries.asReadonly();
@@ -325,163 +349,80 @@ export class RecipeBook3d implements AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
-    window.removeEventListener('pointermove', this.moveHandler);
-    window.removeEventListener('pointerup', this.upHandler);
-    window.removeEventListener('pointercancel', this.cancelHandler);
-    if (this.scrollRaf) {
-      cancelAnimationFrame(this.scrollRaf);
-    }
     this.engine?.dispose();
   }
 
   // No bloquea: el motor encola los volteos y acelera el que esté en curso, así
-  // pulsar rápido pasa varias hojas seguidas (como un libro real).
+  // pulsar rápido pasa varias hojas seguidas (como un libro real). Al voltear se ocultan los
+  // overlays (para ver la hoja 3D animarse); se repueblan al asentar el spread (`onSpread`).
   protected next(): void {
+    this.overlays.set([]);
     this.engine?.next();
   }
 
   protected prev(): void {
+    this.overlays.set([]);
     this.engine?.prev();
   }
 
-  // --- Detector de intención del gesto sobre la hoja (scroll vertical vs pasar página) ---
+  // --- Gesto en el CANVAS (páginas sin overlay: portada, secciones, Insumos): pasar página ---
   private swipeStart: { x: number; y: number } | null = null;
-  private lastPointer: { x: number; y: number } | null = null;
-  /** Eje bloqueado del arrastre actual: fijo desde el primer movimiento hasta soltar. */
-  private axis: 'none' | 'v' | 'h' = 'none';
-  /** Cara scrollable fijada al presionar (objetivo del scroll; null si la página no scrollea). */
-  private scrollTarget: number | null = null;
-  private scrollAccum = 0;
-  private scrollRaf = 0;
-  /** Distancia horizontal mínima (px) para pasar página. */
+  /** Distancia horizontal mínima (px) para contar como deslizamiento, no clic. */
   private static readonly SWIPE_THRESHOLD = 40;
-  /** Movimiento mínimo (px) para decidir el eje del gesto (vertical/horizontal). */
-  private static readonly LOCK_THRESHOLD = 10;
-
-  // Handlers en `window` durante el arrastre: garantizan que cada `pointermove` llegue (en la web
-  // el binding en el canvas + captura no es fiable, p. ej. en la emulación táctil de Chrome).
-  private readonly moveHandler = (e: PointerEvent): void => this.onSwipeMove(e);
-  private readonly upHandler = (e: PointerEvent): void => this.onSwipeEnd(e);
-  private readonly cancelHandler = (): void => this.onSwipeCancel();
 
   protected onSwipeStart(event: PointerEvent): void {
-    event.preventDefault(); // evita que el navegador robe el gesto (selección/pan nativo)
     this.swipeStart = { x: event.clientX, y: event.clientY };
-    this.lastPointer = { x: event.clientX, y: event.clientY };
-    this.axis = 'none';
-    // Fija de una vez la cara a scrollear (si la hay); no se vuelve a raycastear en cada move.
-    this.scrollTarget = this.engine?.scrollTargetAt(event.clientX, event.clientY) ?? null;
-    window.addEventListener('pointermove', this.moveHandler, { passive: false });
-    window.addEventListener('pointerup', this.upHandler);
-    window.addEventListener('pointercancel', this.cancelHandler);
-  }
-
-  protected onSwipeMove(event: PointerEvent): void {
-    const start = this.swipeStart;
-    const last = this.lastPointer;
-    if (!start || !last) {
-      return;
-    }
-    event.preventDefault(); // mantiene el flujo de `pointermove` (no pan nativo → no pointercancel)
-    const dx = event.clientX - start.x;
-    const dy = event.clientY - start.y;
-    // Decide el eje UNA sola vez y no lo cambia el resto del arrastre (bloqueo pegajoso).
-    if (this.axis === 'none' && Math.hypot(dx, dy) >= RecipeBook3d.LOCK_THRESHOLD) {
-      this.axis = Math.abs(dy) > Math.abs(dx) ? 'v' : 'h';
-    }
-    if (this.axis === 'v' && this.scrollTarget !== null) {
-      // Scroll natural (arrastrar hacia arriba revela lo de abajo), acumulado y aplicado por frame.
-      this.scrollAccum += last.y - event.clientY;
-      this.scheduleScroll();
-    }
-    this.lastPointer = { x: event.clientX, y: event.clientY };
-  }
-
-  /** Aplica el scroll acumulado una vez por frame (evita repintar la textura en cada move). */
-  private scheduleScroll(): void {
-    if (this.scrollRaf) {
-      return;
-    }
-    this.scrollRaf = requestAnimationFrame(() => {
-      this.scrollRaf = 0;
-      const delta = this.scrollAccum;
-      this.scrollAccum = 0;
-      if (this.scrollTarget !== null && delta !== 0) {
-        this.engine?.scrollFaceBy(this.scrollTarget, delta);
-      }
-    });
+    (event.target as Element).setPointerCapture?.(event.pointerId);
   }
 
   protected onSwipeEnd(event: PointerEvent): void {
     const start = this.swipeStart;
-    const axis = this.axis;
-    this.resetGesture();
-    // Vertical (scroll) nunca pasa página; sin punto de inicio, nada.
-    if (!start || axis === 'v') {
+    this.swipeStart = null;
+    if (!start) {
       return;
     }
     const dx = event.clientX - start.x;
     const dy = event.clientY - start.y;
-
-    // Horizontal (convención de libro): arrastrar a la IZQUIERDA → siguiente, a la DERECHA → anterior.
-    if (axis === 'h') {
-      if (Math.abs(dx) >= RecipeBook3d.SWIPE_THRESHOLD) {
-        dx < 0 ? this.next() : this.prev();
-      }
+    // Deslizamiento horizontal: izquierda → siguiente, derecha → anterior.
+    if (Math.abs(dx) >= RecipeBook3d.SWIPE_THRESHOLD && Math.abs(dx) > Math.abs(dy)) {
+      dx < 0 ? this.next() : this.prev();
       return;
     }
-
-    // Sin eje (toque/clic sin arrastrar): ¿chip de editar? → abre el editor.
-    const side = this.engine?.pickPageAction(event.clientX, event.clientY) ?? null;
-    if (side) {
-      const recipe = side === 'left' ? this.leftRecipe() : this.rightRecipe();
-      if (recipe) {
-        this.openEditForm(recipe);
-      }
-      return;
-    }
-
-    // Con RATÓN, un clic (sin arrastre) pasa página según la mitad pulsada.
-    if (event.pointerType === 'mouse' && Math.hypot(dx, dy) < RecipeBook3d.LOCK_THRESHOLD) {
+    // Clic de ratón sin arrastrar: pasa página según la mitad pulsada.
+    if (event.pointerType === 'mouse' && Math.hypot(dx, dy) < RecipeBook3d.SWIPE_THRESHOLD) {
       const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
       event.clientX > rect.left + rect.width / 2 ? this.next() : this.prev();
     }
   }
 
-  protected onSwipeCancel(): void {
-    this.resetGesture();
+  /** Deslizamiento horizontal detectado dentro de un overlay de receta → pasar página. */
+  protected onOverlaySwipe(dir: 'next' | 'prev'): void {
+    dir === 'next' ? this.next() : this.prev();
   }
 
-  /** Rueda / trackpad: scroll vertical de la página bajo el cursor (escritorio). */
-  protected onWheel(event: WheelEvent): void {
-    const target = this.engine?.scrollTargetAt(event.clientX, event.clientY) ?? null;
-    if (target === null) {
+  /** Recalcula los overlays de receta visibles (receta + su caja en pantalla). En reposo. */
+  private refreshOverlays(): void {
+    const engine = this.engine;
+    if (!engine) {
+      this.overlays.set([]);
       return;
     }
-    event.preventDefault();
-    this.engine?.scrollFaceBy(target, event.deltaY);
-  }
-
-  /** Limpia el estado del gesto, quita los listeners de `window` y vuelca el scroll pendiente. */
-  private resetGesture(): void {
-    window.removeEventListener('pointermove', this.moveHandler);
-    window.removeEventListener('pointerup', this.upHandler);
-    window.removeEventListener('pointercancel', this.cancelHandler);
-    if (this.scrollRaf) {
-      cancelAnimationFrame(this.scrollRaf);
-      this.scrollRaf = 0;
+    const views: RecipeOverlayView[] = [];
+    for (const side of ['left', 'right'] as const) {
+      const recipe = side === 'left' ? this.leftRecipe() : this.rightRecipe();
+      if (!recipe) {
+        continue;
+      }
+      const rect = engine.getPageRect(side);
+      if (rect) {
+        views.push({ side, recipe, rect });
+      }
     }
-    if (this.scrollTarget !== null && this.scrollAccum !== 0) {
-      this.engine?.scrollFaceBy(this.scrollTarget, this.scrollAccum);
-    }
-    this.scrollAccum = 0;
-    this.swipeStart = null;
-    this.lastPointer = null;
-    this.axis = 'none';
-    this.scrollTarget = null;
+    this.overlays.set(views);
   }
 
   protected jump(faceIndex: number): void {
+    this.overlays.set([]);
     this.engine?.jumpToFace(faceIndex);
     this.indexOpen.set(false);
   }
@@ -585,6 +526,7 @@ export class RecipeBook3d implements AfterViewInit, OnDestroy {
     const canvas = this.canvasRef()?.nativeElement;
     if (canvas) {
       this.engine?.resize(canvas.clientWidth, canvas.clientHeight);
+      this.refreshOverlays(); // la caja de la hoja cambió → recolocar los overlays
     }
   }
 
@@ -605,10 +547,12 @@ export class RecipeBook3d implements AfterViewInit, OnDestroy {
         break;
       case 'Home':
         event.preventDefault();
+        this.overlays.set([]);
         this.engine?.home();
         break;
       case 'End':
         event.preventDefault();
+        this.overlays.set([]);
         this.engine?.end();
         break;
       case 'Escape':
@@ -647,6 +591,7 @@ export class RecipeBook3d implements AfterViewInit, OnDestroy {
   private onSpread(spread: BookSpread): void {
     this.spread.set(spread);
     this.announce.set(describe(spread));
+    this.refreshOverlays(); // spread asentado → (re)colocar los overlays de receta
   }
 }
 

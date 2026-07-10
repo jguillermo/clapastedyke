@@ -2,7 +2,6 @@ import type { RecipeBookCatalog } from '@core/recipe-book/application/use-cases/
 import type { Supply } from '@core/recipe-book/domain/entities/supply';
 import type { Recipe } from '@core/recipe-book/domain/entities/recipe';
 import type { RecipeCategory } from '@core/recipe-book/domain/entities/recipe-category';
-import type { SupplyLine } from '@core/recipe-book/domain/value-objects/supply-line';
 import type { PageContent } from '@platform/three/book/page-content';
 import { formatMoney, formatQuantity } from '../_shared/recipe-format';
 
@@ -21,13 +20,6 @@ export const INGREDIENTS_SECTION = 'supplies';
 export function toPages(catalog: RecipeBookCatalog): PageContent[] {
   const pages: PageContent[] = [{ kind: 'cover', title: 'Mi libro de recetas..4', subtitle: 'Recetario' }];
 
-  const supplyName = nameResolver(catalog.supplies);
-  const COLUMNS = ['Insumo', 'Cantidad'];
-  const rowsOf = (lines: readonly SupplyLine[]) =>
-    lines.map((l) => ({
-      cells: [supplyName(l.supplyId.value), formatQuantity(l.quantity.value, l.quantity.unit)],
-    }));
-
   for (const category of catalog.categories) {
     pages.push({ kind: 'section', subtitle: 'Categoría', title: category.name, section: category.id.value });
     const recipes = catalog.recipes
@@ -43,17 +35,12 @@ export function toPages(catalog: RecipeBookCatalog): PageContent[] {
       continue;
     }
     for (const recipe of recipes) {
-      pages.push(...recipePages(recipe, category, rowsOf(recipe.lines), COLUMNS));
+      pages.push(...recipePages(recipe, category));
     }
   }
 
   pages.push(...supplyListPages(catalog.supplies));
   return pages;
-}
-
-function nameResolver(supplies: readonly Supply[]): (id: string) => string {
-  const byId = new Map(supplies.map((i) => [i.id.value, i] as const));
-  return (id) => byId.get(id)?.name ?? '—';
 }
 
 /**
@@ -74,20 +61,14 @@ function chunkRows<T>(items: readonly T[], first: number, rest: number): T[][] {
 }
 
 /**
- * Una receta es SIEMPRE una sola cara: todos los insumos van en la misma hoja. Si no caben, la
- * hoja scrollea en vertical (lo resuelve el render de la página, no la paginación). A diferencia
- * de Insumos, una receta nunca se parte en páginas de continuación.
+ * Una receta es SIEMPRE una sola cara y en la textura 3D lleva **solo el título** (paper + nombre):
+ * el contenido (ingredientes, preparación, imágenes) lo pinta un overlay DOM sobre la hoja, con
+ * scroll nativo. Nunca se parte en páginas de continuación.
  */
-function recipePages(
-  recipe: Recipe,
-  category: RecipeCategory,
-  rows: { cells: string[] }[],
-  columns: string[],
-): PageContent[] {
-  const total = `${recipe.lines.length} insumos`;
-  return [
-    { kind: 'recipe', section: category.id.value, title: recipe.name, columns, rows, footer: total, editable: true, scrollable: true },
-  ];
+function recipePages(recipe: Recipe, category: RecipeCategory): PageContent[] {
+  // `overlay: true` → la textura pinta solo papel; el título y los ingredientes los dibuja el
+  // overlay DOM transparente sobre la hoja (para ver el fondo real del libro 3D detrás).
+  return [{ kind: 'recipe', section: category.id.value, title: recipe.name, overlay: true }];
 }
 
 /**

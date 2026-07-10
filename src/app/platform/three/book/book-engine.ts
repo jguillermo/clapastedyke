@@ -7,16 +7,15 @@ import {
   MeshStandardMaterial,
   PCFSoftShadowMap,
   PerspectiveCamera,
-  Raycaster,
   Scene,
   SRGBColorSpace,
   Texture,
-  Vector2,
+  Vector3,
   WebGLRenderer,
 } from 'three';
 import { buildBookMesh, BookMesh, PAGE_H, PAGE_W } from './book-mesh';
 import { PageContent } from './page-content';
-import { EDIT_CHIP_UV, paintInto, recipeScrollMax, renderPageTexture } from './page-texture';
+import { renderPageTexture } from './page-texture';
 import { PageTurn } from './page-turn';
 
 /** Spread visible: contenido de la cara izquierda y derecha (null = sin cara). */
@@ -70,8 +69,6 @@ export class BookEngine {
   /** Última cara con contenido real (antes del relleno a par). */
   private lastContentFace = 0;
   private readonly textures = new Map<number, Texture>();
-  /** Desplazamiento vertical (px) por cara para las recetas scrollables. */
-  private readonly scrollByFace = new Map<number, number>();
   private blankTexture: Texture | null = null;
 
   /** Hojas volteadas hacia la izquierda (0..totalLeaves). Fuente de verdad en modo spread. */
@@ -79,7 +76,6 @@ export class BookEngine {
   /** Cara activa (0..lastContentFace). Fuente de verdad en modo single. */
   private faceIndex = 0;
   private mode: BookMode = 'spread';
-  private readonly raycaster = new Raycaster();
   private spreadHandler: SpreadChangeHandler | null = null;
   /** Id del rAF en curso; `0` = en reposo (no se dibuja salvo bajo demanda). */
   private frameId = 0;
@@ -108,7 +104,8 @@ export class BookEngine {
     this.renderer.toneMapping = ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.05;
 
-    this.scene.background = new Color(0xefe3cf); // crema un poco más cálida que la cocina
+    // Ambiente cálido alrededor del libro (crema un poco más cálida que la cocina).
+    this.scene.background = new Color(0xefe3cf);
 
     const hemi = new HemisphereLight(0xfff3df, 0xe8d9c4, 1.15);
     this.scene.add(hemi);
@@ -195,93 +192,43 @@ export class BookEngine {
   }
 
   /**
-   * Hit-test genérico de la acción de página: proyecta el punto de pantalla con la cámara y, si cae
-   * sobre el chip (rect {@link EDIT_CHIP_UV}) de una cara marcada `editable`, devuelve el lado. La
-   * plataforma no sabe qué significa la acción; el feature decide (abrir editor de esa cara).
-   * Devuelve `null` si el toque no fue sobre un chip editable (el llamador pasa página entonces).
+   * Rectángulo en pantalla (px de viewport) de la cara asentada visible, proyectando sus 4 esquinas
+   * con la cámara. El feature lo usa para colocar el overlay DOM justo sobre la hoja. En `single`
+   * solo existe la derecha → `getPageRect('left')` devuelve `null`.
    */
-  pickPageAction(clientX: number, clientY: number): 'left' | 'right' | null {
-    const hit = this.raycastPage(clientX, clientY);
-    if (!hit) {
+  getPageRect(side: 'left' | 'right'): { x: number; y: number; width: number; height: number } | null {
+    if (this.mode === 'single' && side === 'left') {
       return null;
     }
-    const { x, y } = hit.uv;
-    const inChip =
-      x >= EDIT_CHIP_UV.x0 && x <= EDIT_CHIP_UV.x1 && y >= EDIT_CHIP_UV.y0 && y <= EDIT_CHIP_UV.y1;
-    if (!inChip) {
-      return null;
-    }
-    return this.faceAt(hit.faceIndex)?.editable ? hit.side : null;
-  }
-
-  /**
-   * Índice de cara bajo el punto SI es una receta scrollable con contenido de sobra; si no, `null`.
-   * El feature lo llama al empezar el arrastre para fijar el objetivo del scroll (no re-raycast por
-   * cada movimiento).
-   */
-  scrollTargetAt(clientX: number, clientY: number): number | null {
-    const hit = this.raycastPage(clientX, clientY);
-    if (!hit) {
-      return null;
-    }
-    const content = this.faceAt(hit.faceIndex);
-    return content && recipeScrollMax(content) > 0 ? hit.faceIndex : null;
-  }
-
-  /**
-   * Desplaza en vertical el contenido de una cara (fijada por {@link scrollTargetAt}). Acota a
-   * `[0, recipeScrollMax]`, repinta el canvas de esa cara y redibuja. `deltaPx` > 0 revela lo de
-   * más abajo (scroll hacia abajo).
-   */
-  scrollFaceBy(faceIndex: number, deltaPx: number): void {
-    const content = this.faceAt(faceIndex);
-    if (!content) {
-      return;
-    }
-    const max = recipeScrollMax(content);
-    const prev = this.scrollByFace.get(faceIndex) ?? 0;
-    const next = Math.min(Math.max(prev + deltaPx, 0), max);
-    if (next === prev) {
-      return;
-    }
-    this.scrollByFace.set(faceIndex, next);
-    const tex = this.textures.get(faceIndex);
-    if (tex) {
-      paintInto(tex.image as HTMLCanvasElement, content, next);
-      tex.needsUpdate = true;
-      this.renderer.render(this.scene, this.camera);
-    }
-  }
-
-  /** Raycast a las páginas asentadas visibles: lado, índice de cara y uv del impacto. */
-  private raycastPage(
-    clientX: number,
-    clientY: number,
-  ): { side: 'left' | 'right'; faceIndex: number; uv: Vector2 } | null {
     const rect = this.renderer.domElement.getBoundingClientRect();
     if (rect.width === 0 || rect.height === 0) {
       return null;
     }
-    const ndc = new Vector2(
-      ((clientX - rect.left) / rect.width) * 2 - 1,
-      -(((clientY - rect.top) / rect.height) * 2 - 1),
-    );
-    this.raycaster.setFromCamera(ndc, this.camera);
-    // Solo las páginas asentadas visibles (en single la izquierda está oculta).
-    const meshes =
-      this.mode === 'single' ? [this.book.rightPage] : [this.book.leftPage, this.book.rightPage];
-    const hit = this.raycaster.intersectObjects(meshes, false)[0];
-    if (!hit?.uv) {
-      return null;
+    const mesh = side === 'left' ? this.book.leftPage : this.book.rightPage;
+    this.camera.updateMatrixWorld();
+    mesh.updateWorldMatrix(true, false);
+    // Esquinas del plano en coords locales (la geometría se trasladó: derecha x∈[0,PAGE_W], izq [-PAGE_W,0]).
+    const [x0, x1] = side === 'left' ? [-PAGE_W, 0] : [0, PAGE_W];
+    const hy = PAGE_H / 2;
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const [lx, ly] of [
+      [x0, -hy],
+      [x1, -hy],
+      [x0, hy],
+      [x1, hy],
+    ] as const) {
+      const p = new Vector3(lx, ly, 0).applyMatrix4(mesh.matrixWorld).project(this.camera);
+      const sx = rect.left + ((p.x + 1) / 2) * rect.width;
+      const sy = rect.top + ((1 - p.y) / 2) * rect.height;
+      minX = Math.min(minX, sx);
+      maxX = Math.max(maxX, sx);
+      minY = Math.min(minY, sy);
+      maxY = Math.max(maxY, sy);
     }
-    const side: 'left' | 'right' = hit.object === this.book.leftPage ? 'left' : 'right';
-    const faceIndex =
-      side === 'left'
-        ? 2 * this.leafIndex - 1
-        : this.mode === 'single'
-          ? this.faceIndex
-          : 2 * this.leafIndex;
-    return { side, faceIndex, uv: hit.uv };
+    return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
   }
 
   /**
@@ -575,7 +522,7 @@ export class BookEngine {
     }
     let tex = this.textures.get(index);
     if (!tex) {
-      tex = renderPageTexture(content, this.scrollByFace.get(index) ?? 0);
+      tex = renderPageTexture(content);
       this.textures.set(index, tex);
     }
     return tex;
@@ -597,7 +544,6 @@ export class BookEngine {
   private clearTextures(): void {
     this.textures.forEach((t) => t.dispose());
     this.textures.clear();
-    this.scrollByFace.clear();
     this.book.leftMaterial.map = null;
     this.book.rightMaterial.map = null;
   }

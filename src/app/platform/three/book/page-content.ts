@@ -42,15 +42,8 @@ export interface PageContent {
    */
   readonly continued?: boolean;
   /**
-   * `true` si la página ofrece una acción de **editar**: la plataforma dibuja un chip genérico
-   * (lápiz) sobre el papel y lo hace clicable (hit-test por raycast); NO interpreta qué significa
-   * "editar" — eso lo decide el feature al recibir el clic de la cara.
+   * `true` si el contenido de esta cara lo dibuja un **overlay DOM** sobre la hoja (no la textura):
+   * la plataforma pinta solo el papel en blanco y el título/contenido van en el overlay transparente.
    */
-  readonly editable?: boolean;
-  /**
-   * `true` si la tabla de la página **llena la hoja** y, si el contenido no cabe, **scrollea en
-   * vertical dentro de la misma cara** (con indicadores ▲/▼) en vez de partirse en páginas de
-   * continuación. Título/cabecera/pie quedan fijos; solo las filas se desplazan.
-   */
-  readonly scrollable?: boolean;
+  readonly overlay?: boolean;
 }
