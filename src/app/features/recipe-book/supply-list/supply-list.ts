@@ -2,7 +2,6 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
-  DestroyRef,
   ElementRef,
   inject,
   input,
@@ -11,7 +10,7 @@ import {
   signal,
 } from '@angular/core';
 import { FormArray, FormBuilder, FormGroup, ReactiveFormsModule, type FormControl } from '@angular/forms';
-import { toSignal, takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { Table, type TableColumn } from '@components/table/table';
 import { Autocomplete } from '@components/autocomplete/autocomplete';
 import { UnitInput, type UnitToken } from '@components/unit-input/unit-input';
@@ -44,11 +43,11 @@ interface RowPurchase {
 
 /**
  * Lista editable de insumos como una **hoja del libro**: cada renglón es un
- * insumo (nombre → empaque → precio) que se edita en línea y se guarda solo. Los
- * insumos existentes se editan/renombran/reprecian por id ({@link UpdateSupply});
- * el renglón vacío del final crea uno nuevo al escribirlo ({@link SaveSupply}).
- * Reusa la grilla y los controles del design system con el skin `paper` para
- * fundirse con la página y no parecer un formulario.
+ * insumo (nombre → empaque → precio) que se edita en línea y se guarda solo. El
+ * renglón vacío para **agregar** va **arriba** (primera fila); debajo, los insumos
+ * existentes ordenados alfabéticamente se editan/renombran/reprecian por id
+ * ({@link UpdateSupply}); el renglón vacío crea uno nuevo al escribirlo
+ * ({@link SaveSupply}). Reusa la grilla y los controles del design system.
  */
 @Component({
   selector: 'app-supply-list',
@@ -59,7 +58,6 @@ interface RowPurchase {
 })
 export class SupplyList implements OnInit {
   private readonly fb = inject(FormBuilder);
-  private readonly destroyRef = inject(DestroyRef);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly saveSupply = inject(SaveSupply);
   private readonly updateSupply = inject(UpdateSupply);
@@ -88,18 +86,14 @@ export class SupplyList implements OnInit {
 
   ngOnInit(): void {
     const seeds = this.supplies();
-    if (seeds.length > 0) {
-      // Orden alfabético al cargar (no en vivo, para que las filas no salten al editar).
-      const sorted = [...seeds].sort((a, b) => a.name.localeCompare(b.name, 'es'));
-      this.lines.clear();
-      for (const supply of sorted) {
-        this.lines.push(this.seededLine(supply));
-      }
-      this.lines.push(this.newLine());
+    // El renglón para agregar va arriba (primera fila); debajo, los existentes en orden alfabético
+    // (no en vivo, para que las filas no salten al editar).
+    this.lines.clear();
+    this.lines.push(this.newLine());
+    for (const supply of [...seeds].sort((a, b) => a.name.localeCompare(b.name, 'es'))) {
+      this.lines.push(this.seededLine(supply));
     }
 
-    // Mantiene siempre un renglón vacío al final para "seguir escribiendo".
-    this.lines.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.ensureTrailingRow());
   }
 
   protected readonly lineControls = computed(() => {
@@ -136,11 +130,24 @@ export class SupplyList implements OnInit {
     }, 2500);
   }
 
-  /** Lleva el foco al renglón vacío del final (para "Agregar insumo"). */
+  /**
+   * Enter en el renglón de agregar (arriba): lo guarda y deja el cursor en el renglón vacío nuevo
+   * (arriba), para seguir añadiendo. Evita que la tabla mueva el foco a la fila de abajo.
+   */
+  protected onAddRowEnter(event: Event, index: number): void {
+    const line = this.lines.at(index);
+    if (!line || line.controls.id.value !== null) {
+      return; // solo la fila de agregar (sin id); las existentes usan la navegación de la tabla
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    void this.trySaveRow(index).then(() => setTimeout(() => this.focusNew()));
+  }
+
+  /** Lleva el foco al renglón vacío de arriba (para "Agregar insumo"). */
   focusNew(): void {
-    const cells = this.host.nativeElement.querySelectorAll<HTMLElement>('[role="gridcell"][data-col="0"]');
-    const last = cells[cells.length - 1];
-    last?.querySelector<HTMLInputElement>('input')?.focus();
+    const first = this.host.nativeElement.querySelector<HTMLElement>('[role="gridcell"][data-col="0"]');
+    first?.querySelector<HTMLInputElement>('input')?.focus();
   }
 
   // --- Edición de unidad ---
@@ -188,7 +195,8 @@ export class SupplyList implements OnInit {
         this.snapshot(line);
         this.errorMessage.set('');
         this.markRecentlyAdded(newId);
-        this.ensureTrailingRow();
+        // Deja un renglón vacío arriba para seguir agregando (el recién creado baja una fila).
+        this.lines.insert(0, this.newLine());
         this.changed.emit();
       } catch (error) {
         this.errorMessage.set(messageOf(error));
@@ -250,14 +258,6 @@ export class SupplyList implements OnInit {
   private snapshot(line: LineGroup): void {
     const id = line.controls.id.value;
     if (id) this.savedSnapshots.set(id, this.snapshotKey(line));
-  }
-
-  private ensureTrailingRow(): void {
-    const last = this.lines.at(this.lines.length - 1);
-    const filled = !!last && (last.controls.name.value.trim() || last.controls.packaging.value.trim());
-    if (filled) {
-      this.lines.push(this.newLine());
-    }
   }
 
   private newLine(): LineGroup {

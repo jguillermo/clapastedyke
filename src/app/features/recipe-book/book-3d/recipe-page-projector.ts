@@ -19,7 +19,7 @@ export const INGREDIENTS_SECTION = 'supplies';
  * el HUD sepa a qué categoría agregar/editar.
  */
 export function toPages(catalog: RecipeBookCatalog): PageContent[] {
-  const pages: PageContent[] = [{ kind: 'cover', title: 'Mi libro de recetas', subtitle: 'Recetario' }];
+  const pages: PageContent[] = [{ kind: 'cover', title: 'Mi libro de recetas..4', subtitle: 'Recetario' }];
 
   const supplyName = nameResolver(catalog.supplies);
   const COLUMNS = ['Insumo', 'Cantidad'];
@@ -87,12 +87,12 @@ function recipePages(
   const total = `${recipe.lines.length} insumos`;
   const groups = chunkRows(rows, ROWS_FIRST, ROWS_CONT);
   if (groups.length <= 1) {
-    return [{ kind: 'recipe', section: category.id.value, title: recipe.name, columns, rows, footer: total }];
+    return [{ kind: 'recipe', section: category.id.value, title: recipe.name, columns, rows, footer: total, editable: true }];
   }
   return groups.map((group, i) => {
     const last = i === groups.length - 1;
     return i === 0
-      ? { kind: 'recipe', section: category.id.value, title: recipe.name, columns, rows: group, footer: 'Continúa…' }
+      ? { kind: 'recipe', section: category.id.value, title: recipe.name, columns, rows: group, footer: 'Continúa…', editable: true }
       : {
           kind: 'recipe',
           section: category.id.value,

@@ -119,9 +119,12 @@ export class SupplyGrid implements OnInit {
     if (seeds.length === 0) {
       return;
     }
-    this.lines.clear();
+    // Sembrar sin emitir: si cada push emitiera, `ensureTrailingRow` insertaría una fila vacía
+    // entre cada ingrediente. Solo el push final del renglón vacío emite una vez (refresca costos
+    // y la vista, y no añade nada porque la última fila ya está vacía).
+    this.lines.clear({ emitEvent: false });
     for (const seed of seeds) {
-      this.lines.push(this.seededLine(seed));
+      this.lines.push(this.seededLine(seed), { emitEvent: false });
     }
     this.lines.push(this.newLine());
   }

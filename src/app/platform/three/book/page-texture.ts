@@ -14,6 +14,22 @@ import { PageContent } from './page-content';
 const W = 1024;
 const H = 1536;
 
+// Chip de "editar" (lápiz) en la esquina superior derecha del papel. Geometría en px de canvas.
+const EDIT_CHIP = { w: 76, h: 60, right: 40, top: 40 } as const;
+const EDIT_CHIP_X0 = W - EDIT_CHIP.right - EDIT_CHIP.w;
+const EDIT_CHIP_Y0 = EDIT_CHIP.top;
+
+/**
+ * Rect del chip de editar en espacio **UV** (0..1), ya con el eje Y invertido de `CanvasTexture`
+ * (`uv.y = 1 - canvasY/H`). Lo comparte el engine para el hit-test del clic sin duplicar geometría.
+ */
+export const EDIT_CHIP_UV = {
+  x0: EDIT_CHIP_X0 / W,
+  x1: (EDIT_CHIP_X0 + EDIT_CHIP.w) / W,
+  y0: 1 - (EDIT_CHIP_Y0 + EDIT_CHIP.h) / H,
+  y1: 1 - EDIT_CHIP_Y0 / H,
+} as const;
+
 // Paleta Migo (hex).
 const COLOR = {
   paper: '#fffbf4', // nata-tibia
@@ -147,6 +163,41 @@ function paintRecipe(ctx: CanvasRenderingContext2D, content: PageContent): void 
     ctx.fillText(content.footer, right, H * 0.93);
     ctx.textAlign = 'left';
   }
+
+  // Chip de editar (lápiz) sobre el papel, esquina superior derecha.
+  if (content.editable) {
+    paintEditChip(ctx);
+  }
+}
+
+// Icono "editar" de Material Design (viewBox 24×24). Copiado como dato de ruta para que la
+// plataforma sea autónoma (no importa del layer `components/`, prohibido por capas).
+const EDIT_ICON_PATH =
+  'M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z';
+
+/** Dibuja el chip de editar: botón ghost (fondo = papel, solo borde) con el icono de Material. */
+function paintEditChip(ctx: CanvasRenderingContext2D): void {
+  const { w, h } = EDIT_CHIP;
+  const x = EDIT_CHIP_X0;
+  const y = EDIT_CHIP_Y0;
+
+  // Ghost: fondo igual al papel (se funde con la hoja), solo el borde define el botón.
+  roundRect(ctx, x, y, w, h, h / 2);
+  ctx.fillStyle = COLOR.paper;
+  ctx.fill();
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = COLOR.accent;
+  ctx.stroke();
+
+  // Icono Material (24×24) escalado y centrado en la píldora.
+  const iconSize = 36;
+  const scale = iconSize / 24;
+  ctx.save();
+  ctx.translate(x + (w - iconSize) / 2, y + (h - iconSize) / 2);
+  ctx.scale(scale, scale);
+  ctx.fillStyle = COLOR.heading;
+  ctx.fill(new Path2D(EDIT_ICON_PATH));
+  ctx.restore();
 }
 
 /** Dibuja chips tipo etiqueta, devolviendo la `y` siguiente. */

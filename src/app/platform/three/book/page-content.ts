@@ -41,4 +41,10 @@ export interface PageContent {
    * El feature la marca para no duplicarla en el índice; la plataforma no la usa.
    */
   readonly continued?: boolean;
+  /**
+   * `true` si la página ofrece una acción de **editar**: la plataforma dibuja un chip genérico
+   * (lápiz) sobre el papel y lo hace clicable (hit-test por raycast); NO interpreta qué significa
+   * "editar" — eso lo decide el feature al recibir el clic de la cara.
+   */
+  readonly editable?: boolean;
 }

@@ -13,11 +13,15 @@ import {
 import { Button } from '@components/button/button';
 import { Icon } from '@components/icon/icon';
 import { Spacer } from '@components/spacer/spacer';
-import { MigoDialog, MigoDialogRef } from '@components/dialog/dialog.service';
-import { ListRecipeBook } from '@core/recipe-book/application/use-cases/list-recipe-book.use-case';
+import { MigoDialog } from '@components/dialog/dialog.service';
+import { ListRecipeBook, type RecipeBookCatalog } from '@core/recipe-book/application/use-cases/list-recipe-book.use-case';
+import type { Recipe } from '@core/recipe-book/domain/entities/recipe';
+import type { Supply } from '@core/recipe-book/domain/entities/supply';
 import { BookEngine, type BookSpread } from '@platform/three/book/book-engine';
 import type { PageContent } from '@platform/three/book/page-content';
-import { RecipeBook, type RecipeBookData, type RecipeBookResult } from '../recipe-book';
+import { RecipeForm, type RecipeFormData, type RecipeFormResult } from '../recipe-form/recipe-form';
+import { SuppliesDialog, type SuppliesDialogData } from '../supplies-dialog/supplies-dialog';
+import type { InitialLine } from '../_shared/supply-grid/supply-grid';
 import { INGREDIENTS_SECTION, toPages } from './recipe-page-projector';
 
 /** Una entrada del índice (salto rápido a una página). */
@@ -27,15 +31,25 @@ interface IndexEntry {
   readonly section: boolean;
 }
 
+/** Foco a devolver al libro tras cerrar un formulario/diálogo. */
+interface BookFocus {
+  categoryId?: string;
+  recipeName?: string;
+  supplies?: boolean;
+}
+
 /**
  * Experiencia de LECTURA a pantalla completa: el libro de recetas renderizado en
  * 3D ({@link BookEngine}) con páginas que se pasan con curvatura realista. Inyecta
  * solo el use case `ListRecipeBook` y proyecta el catálogo a páginas agnósticas.
  *
- * El botón «Abrir libro» abre el hub DOM {@link RecipeBook} (lectura del catálogo
- * y gestión de insumos); al cerrarlo se recarga el libro. Sin WebGL, este
- * componente abre directamente ese hub como ruta accesible. Navegación por
- * teclado y región `aria-live` para lectores.
+ * **Editar** vive *dentro del libro*: cada página de receta pinta un chip de lápiz (en la textura)
+ * y un toque/clic sobre él (hit-test por `BookEngine.pickPageAction`) abre el formulario único
+ * {@link RecipeForm} de esa receta — uno por página (2 en spread). La tecla **E** edita la receta
+ * de la página actual (accesibilidad, ya que el chip 3D no es focusable). Botones flotantes:
+ * **＋ Nuevo «Categoría»** (primary) en páginas de categoría y **Insumos** ({@link SuppliesDialog})
+ * en la sección de Insumos. Sin WebGL cae a una lista DOM accesible con las mismas acciones.
+ * Navegación por teclado y región `aria-live` para lectores.
  */
 @Component({
   selector: 'app-recipe-book-3d',
@@ -73,7 +87,7 @@ interface IndexEntry {
       <header
         class="absolute right-4 top-4 rounded-full border border-border-subtle bg-surface-card px-4 py-2 shadow-md"
       >
-        <span class="font-display text-heading text-sm">Mi libro de recetas</span>
+        <span class="font-display text-heading text-sm">Mi libro de recetas..2</span>
       </header>
 
       <!-- Anuncio para lectores de pantalla (el texto 3D no es accesible) -->
@@ -81,77 +95,74 @@ interface IndexEntry {
         {{ announce() }}
       </p>
 
-      <!-- Controles inferiores -->
+      <!-- Barra de navegación inferior. Móvil: pegada al footer, ancho completo. sm+: píldora centrada. -->
       <nav
-        class="absolute bottom-5 left-1/2 flex w-full max-w-md -translate-x-1/2 flex-col items-center gap-3 px-4"
+        class="absolute inset-x-0 bottom-0 z-30 flex items-center justify-center gap-2 border-t border-border-subtle bg-surface-card px-4 py-3 shadow-lg
+               sm:inset-x-auto sm:left-1/2 sm:bottom-5 sm:w-auto sm:-translate-x-1/2 sm:gap-3 sm:rounded-full sm:border sm:px-3"
         aria-label="Páginas del libro"
       >
-        <div class="flex w-full items-center justify-center gap-3">
-          <button
-            migo-button
-            variant="secondary"
-            size="md"
-            class="flex-1 justify-center shadow-md"
-            [disabled]="!canPrev()"
-            (click)="prev()"
-            aria-label="Página anterior"
-          >
-            <migo-icon icon-leading name="mat:chevron_right" size="md" class="rotate-180" />
-          </button>
+        <button
+          migo-button
+          variant="secondary"
+          size="md"
+          class="shadow-md"
+          [disabled]="!canPrev()"
+          (click)="prev()"
+          aria-label="Página anterior"
+        >
+          <migo-icon icon-leading name="mat:chevron_right" size="md" class="rotate-180" />
+        </button>
 
-          <button
-            migo-button
-            variant="secondary"
-            size="md"
-            class="min-w-0 flex-auto justify-center shadow-md"
-            aria-label="Índice"
-            (click)="toggleIndex()"
-          >
-            <migo-icon icon-leading name="mat:layers" size="sm" />
-            <migo-spacer />Índice
-          </button>
+        <button
+          migo-button
+          variant="secondary"
+          size="md"
+          class="shadow-md"
+          aria-label="Índice"
+          (click)="toggleIndex()"
+        >
+          <migo-icon icon-leading name="mat:layers" size="sm" />
+          <migo-spacer hideOnMobile /><span class="hidden sm:inline">Índice</span>
+        </button>
 
-          <button
-            migo-button
-            variant="secondary"
-            size="md"
-            class="flex-1 justify-center shadow-md"
-            [disabled]="!canNext()"
-            (click)="next()"
-            aria-label="Página siguiente"
-          >
-            <migo-icon icon-leading name="mat:chevron_right" size="md" />
-          </button>
-        </div>
-
-        <div class="flex w-full items-center justify-center gap-3">
-          @if (currentSection(); as sec) {
-            <button
-              migo-button
-              variant="primary"
-              size="md"
-              class="shadow-md"
-              aria-label="Abrir"
-              (click)="openHere(sec)"
-            >
-              <migo-icon icon-leading name="mat:layers" size="sm" />
-              <migo-spacer hideOnMobile /><span class="hidden sm:inline">Abrir</span>
-            </button>
-          } @else {
-            <button
-              migo-button
-              variant="primary"
-              size="md"
-              class="shadow-md"
-              aria-label="Abrir libro"
-              (click)="manage()"
-            >
-              <migo-icon icon-leading name="mat:layers" size="sm" />
-              <migo-spacer hideOnMobile /><span class="hidden sm:inline">Abrir libro</span>
-            </button>
-          }
-        </div>
+        <button
+          migo-button
+          variant="secondary"
+          size="md"
+          class="shadow-md"
+          [disabled]="!canNext()"
+          (click)="next()"
+          aria-label="Página siguiente"
+        >
+          <migo-icon icon-leading name="mat:chevron_right" size="md" />
+        </button>
       </nav>
+
+      <!-- Nuevo/Insumos (primary): SIEMPRE flotante (no altera la barra). En móvil, a la altura del
+           footer, al costado de sus botones (bottom-3); en sm+ flota más arriba (bottom-24). -->
+      @if (currentSection(); as categoryId) {
+        <button
+          migo-button
+          variant="primary"
+          size="md"
+          class="absolute bottom-3 right-4 z-30 shadow-lg sm:bottom-24"
+          [attr.aria-label]="'Nuevo ' + categoryName()"
+          (click)="openNewForm(categoryId)"
+        >
+          <migo-icon icon-leading name="mat:add" size="md" />
+        </button>
+      } @else if (onSupplies()) {
+        <button
+          migo-button
+          variant="primary"
+          size="md"
+          class="absolute bottom-3 right-4 z-30 shadow-lg sm:bottom-24"
+          aria-label="Gestionar insumos"
+          (click)="openSupplies()"
+        >
+          <migo-icon icon-leading name="mat:layers" size="md" />
+        </button>
+      }
 
       <!-- Índice: panel lateral izquierdo (full-bleed en móvil, columna fija en sm+) -->
       @if (indexOpen()) {
@@ -182,6 +193,45 @@ interface IndexEntry {
           </div>
         </nav>
       }
+    } @else {
+      <!-- Fallback accesible sin WebGL: lista DOM con las mismas acciones. -->
+      <div class="absolute inset-0 flex flex-col overflow-y-auto p-4 gap-4">
+        <div class="flex items-center justify-between gap-3">
+          <span class="font-display text-heading text-lead">Mi libro de recetas</span>
+          <button migo-button variant="secondary" size="md" (click)="close()">
+            <migo-icon icon-leading name="mat:arrow_back" size="sm" />
+            <migo-spacer />Volver
+          </button>
+        </div>
+
+        @for (category of catalog()?.categories ?? []; track category.id.value) {
+          <section class="flex flex-col gap-2">
+            <div class="flex items-center justify-between gap-3">
+              <h2 class="m-0 font-display text-heading text-base">{{ category.name }}</h2>
+              <button migo-button variant="secondary" size="sm" (click)="openNewForm(category.id.value)">
+                <migo-icon icon-leading name="mat:add" size="sm" />
+                <migo-spacer />Nuevo
+              </button>
+            </div>
+            @for (recipe of recipesOf(category.id.value); track recipe.id.value) {
+              <button
+                type="button"
+                class="min-h-11 w-full rounded-lg bg-surface-sunken px-4 py-2 text-left font-body text-body hover:bg-surface-card focus-visible:shadow-focus focus-visible:outline-none"
+                (click)="openEditForm(recipe)"
+              >
+                {{ recipe.name }}
+              </button>
+            } @empty {
+              <p class="m-0 text-muted text-sm">Aún no hay recetas aquí.</p>
+            }
+          </section>
+        }
+
+        <button migo-button variant="primary" size="md" class="self-start" (click)="openSupplies()">
+          <migo-icon icon-leading name="mat:layers" size="sm" />
+          <migo-spacer />Insumos
+        </button>
+      </div>
     }
   `,
 })
@@ -197,13 +247,15 @@ export class RecipeBook3d implements AfterViewInit, OnDestroy {
   protected readonly indexOpen = signal(false);
   protected readonly announce = signal('');
 
+  protected readonly catalog = signal<RecipeBookCatalog | null>(null);
+
   private readonly spread = signal<BookSpread | null>(null);
   protected readonly canPrev = computed(() => this.spread()?.canPrev ?? false);
   protected readonly canNext = computed(() => this.spread()?.canNext ?? false);
 
   /**
-   * Id de la CATEGORÍA de la página actual (para editar/agregar receta ahí). Es
-   * `null` en la portada y en la sección de Insumos (entonces se ofrece "Gestionar").
+   * Id de la CATEGORÍA de la página actual (para agregar receta ahí). Es `null` en
+   * la portada y en la sección de Insumos.
    */
   protected readonly currentSection = computed<string | null>(() => {
     const s = this.spread();
@@ -211,18 +263,51 @@ export class RecipeBook3d implements AfterViewInit, OnDestroy {
     return section && section !== INGREDIENTS_SECTION ? section : null;
   });
 
+  /** `true` si la página actual es la sección de Insumos. */
+  protected readonly onSupplies = computed<boolean>(() => {
+    const s = this.spread();
+    return (s?.right?.section ?? s?.left?.section) === INGREDIENTS_SECTION;
+  });
+
+  /** Nombre de la categoría de la página actual (para el botón «Nuevo …»). */
+  protected readonly categoryName = computed<string>(() => {
+    const id = this.currentSection();
+    return this.catalog()?.categories.find((c) => c.id.value === id)?.name ?? '';
+  });
+
+  /** Receta mostrada en la página izquierda del spread (o `null`). */
+  protected readonly leftRecipe = computed<Recipe | null>(() => this.recipeOfPage(this.spread()?.left));
+  /** Receta mostrada en la página derecha del spread / la única en single (o `null`). */
+  protected readonly rightRecipe = computed<Recipe | null>(() => this.recipeOfPage(this.spread()?.right));
+
+  /** La receta de la página actual: derecha con prioridad, luego izquierda (para el atajo de teclado). */
+  protected readonly currentRecipe = computed<Recipe | null>(() => this.rightRecipe() ?? this.leftRecipe());
+
+  /** Resuelve la receta del catálogo que corresponde a una cara de página (por categoría + título). */
+  private recipeOfPage(page: PageContent | null | undefined): Recipe | null {
+    const catalog = this.catalog();
+    if (!catalog || !page || page.kind !== 'recipe' || !page.section || page.section === INGREDIENTS_SECTION || !page.title) {
+      return null;
+    }
+    return catalog.recipes.find((r) => r.categoryId.value === page.section && r.name === page.title) ?? null;
+  }
+
+  private readonly suppliesById = computed(
+    () => new Map<string, Supply>((this.catalog()?.supplies ?? []).map((s) => [s.id.value, s])),
+  );
 
   private readonly _indexEntries = signal<IndexEntry[]>([]);
   protected readonly indexEntries = this._indexEntries.asReadonly();
 
   private engine: BookEngine | null = null;
-  private dialogRef: MigoDialogRef<RecipeBookResult, RecipeBook> | null = null;
+  /** `true` mientras un formulario/diálogo está abierto (bloquea el teclado del libro). */
+  private dialogOpen = false;
   private readonly reducedMotion =
     window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 
   ngAfterViewInit(): void {
     if (!this.webglSupported()) {
-      this.openManage(true);
+      void this.load(); // pobla el catálogo para el fallback DOM
       return;
     }
     const canvas = this.canvasRef()?.nativeElement;
@@ -236,7 +321,7 @@ export class RecipeBook3d implements AfterViewInit, OnDestroy {
     } catch {
       this.engine = null;
       this.webglSupported.set(false);
-      this.openManage(true);
+      void this.load();
     }
   }
 
@@ -282,7 +367,17 @@ export class RecipeBook3d implements AfterViewInit, OnDestroy {
       return;
     }
 
-    // Sin deslizamiento: con RATÓN, un clic pasa página según la mitad pulsada
+    // Toque/clic sin deslizar: ¿cayó sobre el chip de editar de una página? → abre el editor.
+    const side = this.engine?.pickPageAction(event.clientX, event.clientY) ?? null;
+    if (side) {
+      const recipe = side === 'left' ? this.leftRecipe() : this.rightRecipe();
+      if (recipe) {
+        this.openEditForm(recipe);
+      }
+      return;
+    }
+
+    // Si no fue el chip: con RATÓN, un clic pasa página según la mitad pulsada
     // (derecha → siguiente, izquierda → anterior). En touch un toque no hace nada.
     if (event.pointerType === 'mouse') {
       const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
@@ -303,17 +398,95 @@ export class RecipeBook3d implements AfterViewInit, OnDestroy {
     this.indexOpen.update((v) => !v);
   }
 
-  protected manage(): void {
-    this.openManage(false);
-  }
-
-  /** Abre el hub en la categoría de la página actual. */
-  protected openHere(categoryId: string): void {
-    this.openManage(false, { categoryId });
-  }
-
   protected close(): void {
     this.closed.emit();
+  }
+
+  // --- Recetas ---
+
+  /** Recetas de una categoría (para el fallback DOM). */
+  protected recipesOf(categoryId: string): Recipe[] {
+    return (this.catalog()?.recipes ?? [])
+      .filter((r) => r.categoryId.value === categoryId)
+      .sort((a, b) => a.name.localeCompare(b.name, 'es'));
+  }
+
+  /** Abre el formulario de crear una receta en la categoría dada. */
+  protected openNewForm(categoryId: string): void {
+    const catalog = this.catalog();
+    const category = catalog?.categories.find((c) => c.id.value === categoryId);
+    if (!catalog || !category) {
+      return;
+    }
+    this.openForm({ category: { id: category.id.value, name: category.name }, supplies: catalog.supplies });
+  }
+
+  /** Edita la receta de la página actual (el botón está deshabilitado si no hay ninguna). */
+  protected editCurrent(): void {
+    const recipe = this.currentRecipe();
+    if (recipe) {
+      this.openEditForm(recipe);
+    }
+  }
+
+  /** Abre el formulario de editar la receta dada. */
+  protected openEditForm(recipe: Recipe): void {
+    const catalog = this.catalog();
+    const category = catalog?.categories.find((c) => c.id.value === recipe.categoryId.value);
+    if (!catalog || !category) {
+      return;
+    }
+    this.openForm({
+      category: { id: category.id.value, name: category.name },
+      supplies: catalog.supplies,
+      recipe: { id: recipe.id.value, name: recipe.name, lines: this.prefillLines(recipe) },
+    });
+  }
+
+  private openForm(data: RecipeFormData): void {
+    if (this.dialogOpen) {
+      return;
+    }
+    this.dialogOpen = true;
+    const ref = this.dialog.open<RecipeFormResult, RecipeFormData, RecipeForm>(RecipeForm, {
+      ariaLabel: data.recipe ? 'Editar receta' : 'Nueva receta',
+      width: '640px',
+      data,
+    });
+    ref.closed.subscribe((result) => {
+      this.dialogOpen = false;
+      if (result) {
+        void this.load({ categoryId: result.categoryId, recipeName: result.name });
+      }
+    });
+  }
+
+  /** Abre el diálogo de gestión de Insumos. */
+  protected openSupplies(): void {
+    const catalog = this.catalog();
+    if (!catalog || this.dialogOpen) {
+      return;
+    }
+    this.dialogOpen = true;
+    const ref = this.dialog.open<boolean, SuppliesDialogData, SuppliesDialog>(SuppliesDialog, {
+      ariaLabel: 'Insumos',
+      width: '640px',
+      data: { supplies: catalog.supplies },
+    });
+    ref.closed.subscribe((changed) => {
+      this.dialogOpen = false;
+      if (changed) {
+        void this.load({ supplies: true });
+      }
+    });
+  }
+
+  private prefillLines(recipe: Recipe): InitialLine[] {
+    const byId = this.suppliesById();
+    return recipe.lines.map((line) => {
+      const supply = byId.get(line.supplyId.value);
+      return { name: supply?.name ?? '—', quantity: line.quantity.value, baseUnit: line.quantity.unit };
+    });
   }
 
   protected onResize(): void {
@@ -324,8 +497,8 @@ export class RecipeBook3d implements AfterViewInit, OnDestroy {
   }
 
   protected onKeydown(event: KeyboardEvent): void {
-    if (this.dialogRef) {
-      return; // el hub DOM gestiona su propio teclado
+    if (this.dialogOpen) {
+      return; // el diálogo abierto gestiona su propio teclado
     }
     switch (event.key) {
       case 'ArrowRight':
@@ -353,16 +526,24 @@ export class RecipeBook3d implements AfterViewInit, OnDestroy {
           this.close();
         }
         break;
+      case 'e':
+      case 'E':
+        // Atajo de accesibilidad: editar la receta de la página actual (el chip 3D no es focusable).
+        if (this.currentRecipe()) {
+          event.preventDefault();
+          this.editCurrent();
+        }
+        break;
     }
   }
 
-  private async load(focus?: RecipeBookResult): Promise<void> {
+  private async load(focus?: BookFocus): Promise<void> {
     const catalog = await this.listRecipeBook.execute();
+    this.catalog.set(catalog);
     const pages = toPages(catalog);
     this._indexEntries.set(buildIndex(pages));
-    // Tras cerrar el hub salta a lo último que se tocó (receta/categoría/insumos);
-    // si no hay foco, conserva la cara actual (no volver al inicio). El ancla por
-    // cara funciona en ambos modos (spread y single).
+    // Tras cerrar un formulario/diálogo salta a lo último que se tocó (receta/categoría/insumos);
+    // si no hay foco, conserva la cara actual (no volver al inicio).
     const target = focus ? resolveFace(pages, focus) : -1;
     const face = target >= 0 ? target : this.engine?.currentFaceIndex ?? 0;
     this.engine?.setPages(pages);
@@ -375,36 +556,23 @@ export class RecipeBook3d implements AfterViewInit, OnDestroy {
     this.spread.set(spread);
     this.announce.set(describe(spread));
   }
-
-  /** Abre el hub DOM (CRUD). Si `asFallback`, al cerrarlo se sale de la experiencia. */
-  private openManage(asFallback: boolean, data?: RecipeBookData): void {
-    if (this.dialogRef) {
-      return;
-    }
-    // Modal responsivo normal: tarjeta centrada en desktop, pantalla completa en móvil.
-    this.dialogRef = this.dialog.open<RecipeBookResult, RecipeBookData, RecipeBook>(RecipeBook, {
-      ariaLabel: 'Mi libro de recetas',
-      width: '560px',
-      data,
-    });
-    this.dialogRef.closed.subscribe((result) => {
-      this.dialogRef = null;
-      if (asFallback) {
-        this.closed.emit();
-      } else {
-        void this.load(result ?? undefined); // reflejar y saltar a lo tocado
-      }
-    });
-  }
 }
 
 /**
- * Cara a la que saltar tras cerrar el hub: la receta recién guardada (su 1ª cara),
- * o el divisor de su categoría, o la 1ª cara de Insumos. `-1` si no se resuelve.
+ * Cara a la que saltar tras cerrar un formulario: la receta recién guardada (su 1ª
+ * cara), o el divisor de su categoría, o la 1ª cara de Insumos. `-1` si no se resuelve.
  */
-function resolveFace(pages: PageContent[], focus: RecipeBookResult): number {
+function resolveFace(pages: PageContent[], focus: BookFocus): number {
   if (focus.supplies) {
     return pages.findIndex((p) => p.section === INGREDIENTS_SECTION && p.kind === 'recipe');
+  }
+  if (focus.recipeName && focus.categoryId) {
+    const i = pages.findIndex(
+      (p) => p.kind === 'recipe' && !p.continued && p.section === focus.categoryId && p.title === focus.recipeName,
+    );
+    if (i >= 0) {
+      return i;
+    }
   }
   if (focus.categoryId) {
     return pages.findIndex((p) => p.kind === 'section' && p.section === focus.categoryId);

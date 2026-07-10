@@ -1,6 +1,6 @@
 <div class="flex flex-col gap-3 rounded-lg bg-surface-warm px-4 py-3">
   <p class="m-0 text-caption text-muted">
-    Tus insumos: escribe el nombre, cuánto compras y a qué precio. El último renglón en blanco es
+    Tus insumos: escribe el nombre, cuánto compras y a qué precio. El primer renglón en blanco es
     para añadir uno nuevo.
   </p>
 
@@ -11,7 +11,7 @@
     ariaLabel="Insumos del libro"
   >
     <ng-template let-line let-r="rowIndex" let-c="colIndex">
-      <div [formGroup]="line">
+      <div [formGroup]="line" (keydown.enter)="onAddRowEnter($event, r)">
         @switch (c) {
           @case (0) {
             <div class="flex items-center gap-1">

@@ -7,14 +7,16 @@ import {
   MeshStandardMaterial,
   PCFSoftShadowMap,
   PerspectiveCamera,
+  Raycaster,
   Scene,
   SRGBColorSpace,
   Texture,
+  Vector2,
   WebGLRenderer,
 } from 'three';
 import { buildBookMesh, BookMesh, PAGE_H, PAGE_W } from './book-mesh';
 import { PageContent } from './page-content';
-import { renderPageTexture } from './page-texture';
+import { EDIT_CHIP_UV, renderPageTexture } from './page-texture';
 import { PageTurn } from './page-turn';
 
 /** Spread visible: contenido de la cara izquierda y derecha (null = sin cara). */
@@ -25,6 +27,8 @@ export interface BookSpread {
   readonly canNext: boolean;
   readonly left: PageContent | null;
   readonly right: PageContent | null;
+  /** `true` en modo single (una página, móvil); `false` en spread (dos páginas, escritorio). */
+  readonly single: boolean;
 }
 
 export type SpreadChangeHandler = (spread: BookSpread) => void;
@@ -34,7 +38,7 @@ export type BookMode = 'spread' | 'single';
 
 const FOV = 32;
 const MARGIN = 0.18; // aire alrededor del libro al encuadrar (spread)
-const SINGLE_MARGIN = 0.04; // en single la hoja llena casi todo el ancho (al borde)
+const SINGLE_MARGIN = 0; // en single la hoja llena todo el ancho (borde a borde, lo más grande posible)
 /** Por debajo de este aspect (alto/estrecho) o ancho se pasa a una sola página. */
 const SINGLE_ASPECT = 1.0;
 const SINGLE_WIDTH = 700;
@@ -73,6 +77,7 @@ export class BookEngine {
   /** Cara activa (0..lastContentFace). Fuente de verdad en modo single. */
   private faceIndex = 0;
   private mode: BookMode = 'spread';
+  private readonly raycaster = new Raycaster();
   private spreadHandler: SpreadChangeHandler | null = null;
   /** Id del rAF en curso; `0` = en reposo (no se dibuja salvo bajo demanda). */
   private frameId = 0;
@@ -168,6 +173,7 @@ export class BookEngine {
         canNext: this.faceIndex < this.lastContentFace,
         left: null,
         right: this.faceAt(this.faceIndex),
+        single: true,
       };
     }
     return {
@@ -177,12 +183,52 @@ export class BookEngine {
       canNext: this.leafIndex < total,
       left: this.faceAt(2 * this.leafIndex - 1),
       right: this.faceAt(2 * this.leafIndex),
+      single: false,
     };
   }
 
   /** Cara activa actual (ancla de lectura, válida en ambos modos). */
   get currentFaceIndex(): number {
     return this.mode === 'single' ? this.faceIndex : 2 * this.leafIndex;
+  }
+
+  /**
+   * Hit-test genérico de la acción de página: proyecta el punto de pantalla con la cámara y, si cae
+   * sobre el chip (rect {@link EDIT_CHIP_UV}) de una cara marcada `editable`, devuelve el lado. La
+   * plataforma no sabe qué significa la acción; el feature decide (abrir editor de esa cara).
+   * Devuelve `null` si el toque no fue sobre un chip editable (el llamador pasa página entonces).
+   */
+  pickPageAction(clientX: number, clientY: number): 'left' | 'right' | null {
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) {
+      return null;
+    }
+    const ndc = new Vector2(
+      ((clientX - rect.left) / rect.width) * 2 - 1,
+      -(((clientY - rect.top) / rect.height) * 2 - 1),
+    );
+    this.raycaster.setFromCamera(ndc, this.camera);
+    // Solo las páginas asentadas visibles (en single la izquierda está oculta).
+    const meshes =
+      this.mode === 'single' ? [this.book.rightPage] : [this.book.leftPage, this.book.rightPage];
+    const hit = this.raycaster.intersectObjects(meshes, false)[0];
+    if (!hit?.uv) {
+      return null;
+    }
+    const { x, y } = hit.uv;
+    const inChip =
+      x >= EDIT_CHIP_UV.x0 && x <= EDIT_CHIP_UV.x1 && y >= EDIT_CHIP_UV.y0 && y <= EDIT_CHIP_UV.y1;
+    if (!inChip) {
+      return null;
+    }
+    const side: 'left' | 'right' = hit.object === this.book.leftPage ? 'left' : 'right';
+    const faceIndex =
+      side === 'left'
+        ? 2 * this.leafIndex - 1
+        : this.mode === 'single'
+          ? this.faceIndex
+          : 2 * this.leafIndex;
+    return this.faces[faceIndex]?.editable ? side : null;
   }
 
   /**
@@ -515,7 +561,7 @@ export class BookEngine {
     const distH = halfH / Math.tan(vFov / 2);
     const hFov = 2 * Math.atan(Math.tan(vFov / 2) * this.aspect);
     const distW = halfW / Math.tan(hFov / 2);
-    const distance = Math.max(distH, distW) * (single ? 1.01 : 1.06);
+    const distance = Math.max(distH, distW) * (single ? 1.0 : 1.06);
 
     this.camera.position.set(targetX, 0.18, distance);
     this.camera.lookAt(targetX, 0, 0);
