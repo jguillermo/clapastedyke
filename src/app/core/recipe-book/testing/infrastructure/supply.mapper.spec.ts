@@ -2,7 +2,7 @@ import { EntityId } from '../../../_common/entity-id';
 import { Quantity } from '../../../_common/quantity';
 import { Supply } from '../../domain/entities/supply';
 import { PurchasePrice } from '../../domain/value-objects/purchase-price';
-import { SupplyMapper } from '../../infrastructure/supply.mapper';
+import { SupplyMapper } from '../../infrastructure/supply/supply.mapper';
 
 describe('SupplyMapper', () => {
     it('round-trips an ingredient (with usage and purchase price) through its record', () => {

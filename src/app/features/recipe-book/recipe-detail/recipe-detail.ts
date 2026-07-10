@@ -8,7 +8,6 @@ import { CardHeader } from '@components/card/card-header';
 import { CardTitle } from '@components/card/card-title';
 import { CardSubtitle } from '@components/card/card-subtitle';
 import { Icon } from '@components/icon/icon';
-import { Spacer } from '@components/spacer/spacer';
 import { MIGO_DIALOG_DATA, MigoDialogRef } from '@components/dialog/dialog.service';
 import { PreviewRecipeCost } from '@core/recipe-book/application/use-cases/preview-recipe-cost.use-case';
 
@@ -25,13 +24,7 @@ export interface RecipeDetailData {
   /** Subtítulo de la ficha (el nombre de la categoría). */
   subtitle: string;
   name: string;
-  chips: string[];
   lines: RecipeDetailLine[];
-}
-
-/** El usuario pidió editar esta receta desde la ficha de lectura. */
-export interface RecipeDetailResult {
-  action: 'edit';
 }
 
 interface LineView {
@@ -42,15 +35,14 @@ interface LineView {
 
 /**
  * Ficha de lectura ("página de recetario") de un queque, relleno o cobertura:
- * cabecera con nombre + características, tabla de ingredientes con cantidad y
- * costo, y el total de materiales. Solo lectura; el costo lo calcula el negocio
- * ({@link PreviewRecipeCost}, la vista no calcula). El botón Editar cierra el
- * diálogo devolviendo `{ action: 'edit' }` para que el hub abra el formulario.
+ * cabecera con nombre + subtítulo, tabla de ingredientes con cantidad y costo, y
+ * el total de materiales. Solo lectura; el costo lo calcula el negocio
+ * ({@link PreviewRecipeCost}, la vista no calcula).
  */
 @Component({
   selector: 'app-recipe-detail',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Button, Card, CardHeader, CardTitle, CardSubtitle, CardBody, CardFooter, Icon, Spacer],
+  imports: [Button, Card, CardHeader, CardTitle, CardSubtitle, CardBody, CardFooter, Icon],
   // `contents`: el card `fill` es hijo flex directo del diálogo y llena la pantalla en móvil.
   host: { class: 'contents' },
   template: `
@@ -65,16 +57,6 @@ interface LineView {
       </migo-card-header>
 
       <migo-card-body>
-        @if (data.chips.length) {
-          <div class="flex flex-wrap items-center gap-1.5 mb-4">
-            @for (chip of data.chips; track chip) {
-              <span class="inline-flex items-center min-h-6 px-2.5 rounded-full bg-surface-card border border-border-subtle text-caption text-body">
-                {{ chip }}
-              </span>
-            }
-          </div>
-        }
-
         <div class="overflow-x-auto">
           <table class="w-full min-w-max border-collapse">
             <thead>
@@ -105,16 +87,12 @@ interface LineView {
 
       <migo-card-footer>
         <button migo-button variant="ghost" type="button" (click)="close()">Cerrar</button>
-        <button migo-button type="button" (click)="edit()">
-          <migo-icon icon-leading name="mat:edit" size="sm" />
-          <migo-spacer />Editar
-        </button>
       </migo-card-footer>
     </migo-card>
   `,
 })
 export class RecipeDetail {
-  protected readonly ref = inject<MigoDialogRef<RecipeDetailResult>>(MigoDialogRef);
+  protected readonly ref = inject<MigoDialogRef<void>>(MigoDialogRef);
   protected readonly data = inject<RecipeDetailData>(MIGO_DIALOG_DATA);
   private readonly previewCost = inject(PreviewRecipeCost);
 
@@ -136,10 +114,6 @@ export class RecipeDetail {
 
   protected close(): void {
     this.ref.close();
-  }
-
-  protected edit(): void {
-    this.ref.close({ action: 'edit' });
   }
 
   private async computeCosts(): Promise<void> {

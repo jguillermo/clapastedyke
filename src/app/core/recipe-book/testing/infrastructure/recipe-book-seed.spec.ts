@@ -1,109 +1,74 @@
 import { TestBed } from '@angular/core/testing';
 import { EntityId } from '../../../_common/entity-id';
 import { Quantity } from '../../../_common/quantity';
-import { makeRecipeBookFakes, makeWeightCategory } from '../recipe-book-test-doubles';
+import { makeRecipeBookFakes, makeCategory } from '../recipe-book-test-doubles';
 import { RecipeCategoryRepository } from '../../domain/repositories/recipe-category.repository';
-import { FlavorRepository } from '../../domain/repositories/flavor.repository';
+import { RecipeFlavorRepository } from '../../domain/repositories/recipe-flavor.repository';
 import { RecipeCapacityRepository } from '../../domain/repositories/recipe-capacity.repository';
 import { SupplyRepository } from '../../domain/repositories/supply.repository';
 import { RecipeRepository } from '../../domain/repositories/recipe.repository';
-import { RecipeCategory, SYSTEM_CATEGORY_IDS } from '../../domain/entities/recipe-category';
-import { Flavor } from '../../domain/entities/flavor';
+import { RecipeFlavor } from '../../domain/entities/recipe-flavor';
 import { PurchasePrice } from '../../domain/value-objects/purchase-price';
-import { RecipeProperty } from '../../domain/value-objects/recipe-property';
-import { RecipeBookSeed } from '../../infrastructure/recipe-book-seed';
-import { RecipeBookSeedDocument } from '../../infrastructure/recipe-book-seed-document';
+import { RecipeBookSeed } from '../../infrastructure/seed/recipe-book-seed';
+import { RecipeBookSeedDocument } from '../../infrastructure/seed/recipe-book-seed-document';
 
-describe('RecipeBookSeed', () => {
-  beforeEach(() => {
-    TestBed.configureTestingModule({ providers: makeRecipeBookFakes().providers });
+describe('RecipeBookSeed · categorías', () => {
+  const doc = (): RecipeBookSeedDocument => ({
+    enabled: true,
+    categories: [
+      { id: 'sys-queques', name: 'Queques' },
+      { id: 'sys-rellenos', name: 'Rellenos' },
+      { id: 'sys-coberturas', name: 'Coberturas' },
+    ],
   });
 
-  it('seeds the three system categories on an empty store', async () => {
+  const configure = (d: RecipeBookSeedDocument | null) =>
+    TestBed.configureTestingModule({ providers: makeRecipeBookFakes(d).providers });
+
+  it('seeds the categories from the document (id + name)', async () => {
+    configure(doc());
     await TestBed.inject(RecipeBookSeed).run();
     const categories = await TestBed.inject(RecipeCategoryRepository).all();
     expect(categories.map((c) => c.name).sort()).toEqual(['Coberturas', 'Queques', 'Rellenos']);
-    expect(categories.every((c) => c.system)).toBe(true);
-    // Todas cargan el mismo esquema (Sabor, Porciones, Molde). Ninguna tiene Peso.
-    for (const c of categories) {
-      expect(c.properties.map((p) => p.name)).toEqual(['Sabor', 'Porciones', 'Molde']);
-      expect(c.weightProperty()).toBeUndefined();
-    }
-    // Por defecto oculto, salvo Queques (visible).
-    const queques = categories.find((c) => c.name === 'Queques');
-    const rellenos = categories.find((c) => c.name === 'Rellenos');
-    expect(queques?.properties.every((p) => p.selectable)).toBe(true);
-    expect(rellenos?.properties.every((p) => !p.selectable)).toBe(true);
   });
 
   it('is idempotent: running again does not duplicate', async () => {
+    configure(doc());
     const seed = TestBed.inject(RecipeBookSeed);
     await seed.run();
     await seed.run();
     expect(await TestBed.inject(RecipeCategoryRepository).all()).toHaveLength(3);
   });
 
-  it('reconciles a stale system category: a persisted Rellenos with only Peso → canonical schema, no Peso', async () => {
+  it('create-if-absent: never overwrites a category the user already renamed (same id)', async () => {
+    configure(doc());
     const repo = TestBed.inject(RecipeCategoryRepository);
-    // BD obsoleta: Rellenos guardado por una versión anterior con una propiedad "Peso".
-    await repo.save(makeWeightCategory(SYSTEM_CATEGORY_IDS.rellenos, 'Rellenos', 1));
+    await repo.save(makeCategory('sys-queques', 'Mis Queques'));
 
     await TestBed.inject(RecipeBookSeed).run();
 
-    const rellenos = (await repo.all()).find((c) => c.id.value === SYSTEM_CATEGORY_IDS.rellenos);
-    expect(rellenos?.properties.map((p) => p.name)).toEqual(['Sabor', 'Porciones', 'Molde']);
-    expect(rellenos?.weightProperty()).toBeUndefined();
-    // No se duplica: siguen siendo las tres de sistema.
+    const queques = (await repo.all()).find((c) => c.id.value === 'sys-queques');
+    expect(queques?.name).toBe('Mis Queques'); // no lo pisa el seed
     expect(await repo.all()).toHaveLength(3);
   });
 
-  it('preserves the chosen visibility (selectable) when reconciling an existing system category', async () => {
-    const repo = TestBed.inject(RecipeCategoryRepository);
-    // Queques persistido con Sabor oculto (ids canónicos).
-    await repo.save(
-      RecipeCategory.create(
-        new EntityId(SYSTEM_CATEGORY_IDS.queques),
-        'Queques',
-        0,
-        [
-          RecipeProperty.create('prop-sabor-queques', 'Sabor', 'flavor', false, false, undefined, undefined, false),
-          RecipeProperty.create('prop-porciones-queques', 'Porciones', 'options', false, false, undefined, 'portions', true),
-          RecipeProperty.create('prop-molde-queques', 'Molde', 'options', false, false, undefined, 'mold', true),
-        ],
-        true,
-      ),
-    );
-
+  it('enabled:false seeds nothing', async () => {
+    configure({ ...doc(), enabled: false });
     await TestBed.inject(RecipeBookSeed).run();
-
-    const queques = (await repo.all()).find((c) => c.id.value === SYSTEM_CATEGORY_IDS.queques);
-    expect(queques?.property('prop-sabor-queques')?.selectable).toBe(false);
-    expect(queques?.property('prop-porciones-queques')?.selectable).toBe(true);
+    expect(await TestBed.inject(RecipeCategoryRepository).all()).toHaveLength(0);
   });
 
-  it('leaves user-created (non-system) categories untouched', async () => {
-    const repo = TestBed.inject(RecipeCategoryRepository);
-    const userCat = RecipeCategory.create(
-      new EntityId('user-cat-1'),
-      'Galletas',
-      9,
-      [RecipeProperty.create('user-prop-1', 'Forma', 'text', false, false, undefined, undefined, true)],
-      false,
-    );
-    await repo.save(userCat);
-
+  it('missing seed file (null document) does not crash and seeds nothing', async () => {
+    configure(null);
     await TestBed.inject(RecipeBookSeed).run();
-
-    const reloaded = (await repo.all()).find((c) => c.id.value === 'user-cat-1');
-    expect(reloaded?.name).toBe('Galletas');
-    expect(reloaded?.properties.map((p) => p.name)).toEqual(['Forma']);
-    expect(await repo.all()).toHaveLength(4); // 3 de sistema + 1 del usuario
+    expect(await TestBed.inject(RecipeCategoryRepository).all()).toHaveLength(0);
   });
 });
 
 describe('RecipeBookSeed · contenido desde JSON', () => {
   const sampleDoc = (): RecipeBookSeedDocument => ({
     enabled: true,
+    categories: [{ id: 'sys-queques', name: 'Queques' }],
     flavors: [{ id: 'flv-vainilla', label: 'Vainilla' }],
     recipeCapacities: [{ id: 'co-mold-medium', group: 'mold', label: 'Molde mediano', factor: 1 }],
     supplies: [
@@ -113,12 +78,8 @@ describe('RecipeBookSeed · contenido desde JSON', () => {
     recipes: [
       {
         id: 'rec-bizcocho-vainilla',
-        categoryId: SYSTEM_CATEGORY_IDS.queques,
+        categoryId: 'sys-queques',
         name: 'Bizcocho de Vainilla',
-        values: [
-          { propertyId: 'prop-sabor-queques', type: 'flavor', value: 'Vainilla' },
-          { propertyId: 'prop-molde-queques', type: 'options', value: 'Molde mediano' },
-        ],
         lines: [
           { supplyId: 'ing-harina', quantity: 500 },
           { supplyId: 'ing-huevos', quantity: 8 },
@@ -130,12 +91,13 @@ describe('RecipeBookSeed · contenido desde JSON', () => {
   const configure = (doc: RecipeBookSeedDocument | null) =>
     TestBed.configureTestingModule({ providers: makeRecipeBookFakes(doc).providers });
 
-  it('seeds flavors, conversion options, ingredients and recipes from the document', async () => {
+  it('seeds flavors, conversion options, categories, ingredients and recipes from the document', async () => {
     configure(sampleDoc());
     await TestBed.inject(RecipeBookSeed).run();
 
-    expect((await TestBed.inject(FlavorRepository).all()).map((f) => f.label)).toEqual(['Vainilla']);
+    expect((await TestBed.inject(RecipeFlavorRepository).all()).map((f) => f.label)).toEqual(['Vainilla']);
     expect((await TestBed.inject(RecipeCapacityRepository).all()).map((o) => o.label)).toEqual(['Molde mediano']);
+    expect((await TestBed.inject(RecipeCategoryRepository).all()).map((c) => c.name)).toEqual(['Queques']);
     const ingredients = await TestBed.inject(SupplyRepository).all();
     expect(ingredients.map((i) => i.name).sort()).toEqual(['Harina', 'Huevos']);
 
@@ -143,11 +105,10 @@ describe('RecipeBookSeed · contenido desde JSON', () => {
     expect(recipes).toHaveLength(1);
     const recipe = recipes[0];
     expect(recipe.name).toBe('Bizcocho de Vainilla');
-    expect(recipe.categoryId.value).toBe(SYSTEM_CATEGORY_IDS.queques);
+    expect(recipe.categoryId.value).toBe('sys-queques');
     // La línea de huevos toma la unidad base del ingrediente ('u'), no gramos.
     const huevos = recipe.lines.find((l) => l.supplyId.value === 'ing-huevos');
     expect(huevos?.quantity.equals(Quantity.of(8, 'u'))).toBe(true);
-    expect(recipe.valueOf('prop-sabor-queques')?.value).toBe('Vainilla');
   });
 
   it('is idempotent: running twice does not duplicate content', async () => {
@@ -156,7 +117,7 @@ describe('RecipeBookSeed · contenido desde JSON', () => {
     await seed.run();
     await seed.run();
 
-    expect(await TestBed.inject(FlavorRepository).all()).toHaveLength(1);
+    expect(await TestBed.inject(RecipeFlavorRepository).all()).toHaveLength(1);
     expect(await TestBed.inject(SupplyRepository).all()).toHaveLength(2);
     expect(await TestBed.inject(RecipeRepository).all()).toHaveLength(1);
   });
@@ -164,39 +125,40 @@ describe('RecipeBookSeed · contenido desde JSON', () => {
   it('never modifies an item the user already edited (create-if-absent by id)', async () => {
     configure(sampleDoc());
     // El usuario ya renombró el sabor con el mismo id que trae el seed.
-    await TestBed.inject(FlavorRepository).save(Flavor.create(new EntityId('flv-vainilla'), 'Vainilla Bourbon'));
+    await TestBed.inject(RecipeFlavorRepository).save(RecipeFlavor.create(new EntityId('flv-vainilla'), 'Vainilla Bourbon'));
 
     await TestBed.inject(RecipeBookSeed).run();
 
-    const flavors = await TestBed.inject(FlavorRepository).all();
+    const flavors = await TestBed.inject(RecipeFlavorRepository).all();
     expect(flavors).toHaveLength(1);
     expect(flavors[0].label).toBe('Vainilla Bourbon'); // no lo pisa el seed
   });
 
-  it('enabled:false seeds no content but still reconciles system categories', async () => {
+  it('enabled:false seeds no content', async () => {
     configure({ ...sampleDoc(), enabled: false });
     await TestBed.inject(RecipeBookSeed).run();
 
-    expect(await TestBed.inject(FlavorRepository).all()).toHaveLength(0);
+    expect(await TestBed.inject(RecipeFlavorRepository).all()).toHaveLength(0);
     expect(await TestBed.inject(RecipeRepository).all()).toHaveLength(0);
-    expect(await TestBed.inject(RecipeCategoryRepository).all()).toHaveLength(3); // sistema
+    expect(await TestBed.inject(RecipeCategoryRepository).all()).toHaveLength(0);
   });
 
-  it('missing seed file (null document) does not crash and still reconciles system categories', async () => {
+  it('missing seed file (null document) does not crash and seeds nothing', async () => {
     configure(null);
     await TestBed.inject(RecipeBookSeed).run();
 
-    expect(await TestBed.inject(FlavorRepository).all()).toHaveLength(0);
-    expect(await TestBed.inject(RecipeCategoryRepository).all()).toHaveLength(3);
+    expect(await TestBed.inject(RecipeFlavorRepository).all()).toHaveLength(0);
+    expect(await TestBed.inject(RecipeCategoryRepository).all()).toHaveLength(0);
   });
 
   it('skips a recipe whose ingredient does not exist (no valid lines)', async () => {
     const doc: RecipeBookSeedDocument = {
       enabled: true,
+      categories: [{ id: 'sys-queques', name: 'Queques' }],
       recipes: [
         {
           id: 'rec-orphan',
-          categoryId: SYSTEM_CATEGORY_IDS.queques,
+          categoryId: 'sys-queques',
           name: 'Huérfana',
           lines: [{ supplyId: 'ing-inexistente', quantity: 100 }],
         },
@@ -227,7 +189,7 @@ describe('RecipeBookSeed · contenido desde JSON', () => {
   it('runs only once: a deleted seeded item stays deleted on the next run', async () => {
     configure(sampleDoc());
     const seed = TestBed.inject(RecipeBookSeed);
-    const flavors = TestBed.inject(FlavorRepository);
+    const flavors = TestBed.inject(RecipeFlavorRepository);
 
     await seed.run();
     expect(await flavors.all()).toHaveLength(1);
@@ -244,7 +206,7 @@ describe('RecipeBookSeed · contenido desde JSON', () => {
   it('does not re-seed on the second run (marker guards it)', async () => {
     configure(sampleDoc());
     const seed = TestBed.inject(RecipeBookSeed);
-    const flavors = TestBed.inject(FlavorRepository);
+    const flavors = TestBed.inject(RecipeFlavorRepository);
 
     await seed.run();
     // El usuario renombra un sabor sembrado DESPUÉS del primer run.
@@ -269,7 +231,7 @@ describe('RecipeBookSeed · contenido desde JSON', () => {
     const fakes = makeRecipeBookFakes(sampleDoc());
     TestBed.configureTestingModule({ providers: fakes.providers });
     const seed = TestBed.inject(RecipeBookSeed);
-    const flavors = TestBed.inject(FlavorRepository);
+    const flavors = TestBed.inject(RecipeFlavorRepository);
 
     await seed.run(); // version 1 → siembra Vainilla, marca aplicado v1
     expect((await flavors.all()).map((f) => f.label)).toEqual(['Vainilla']);

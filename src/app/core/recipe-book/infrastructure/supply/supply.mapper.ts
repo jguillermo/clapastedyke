@@ -1,8 +1,8 @@
-import { EntityId } from '../../_common/entity-id';
-import { Supply } from '../domain/entities/supply';
-import { PurchasePrice } from '../domain/value-objects/purchase-price';
-import { SupplyRecord } from './records';
-import { quantityToDomain, quantityToRecord } from './value-record.mappers';
+import { EntityId } from '../../../_common/entity-id';
+import { Supply } from '../../domain/entities/supply';
+import { PurchasePrice } from '../../domain/value-objects/purchase-price';
+import { SupplyRecord } from '../records';
+import { quantityToDomain, quantityToRecord } from '../value-record.mappers';
 
 /**
  * ACL de persistencia: traduce `Supply` ⇄ `SupplyRecord` (primitivos de IndexedDB).

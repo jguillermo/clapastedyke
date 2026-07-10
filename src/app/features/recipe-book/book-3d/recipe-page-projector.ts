@@ -4,7 +4,7 @@ import type { Recipe } from '@core/recipe-book/domain/entities/recipe';
 import type { RecipeCategory } from '@core/recipe-book/domain/entities/recipe-category';
 import type { SupplyLine } from '@core/recipe-book/domain/value-objects/supply-line';
 import type { PageContent } from '@platform/three/book/page-content';
-import { formatMoney, formatQuantity, recipeChips } from '../_shared/recipe-format';
+import { formatMoney, formatQuantity } from '../_shared/recipe-format';
 
 /** Sección opaca de Insumos (la lee el HUD; nunca aparece en el índice). */
 export const INGREDIENTS_SECTION = 'supplies';
@@ -58,7 +58,7 @@ function nameResolver(supplies: readonly Supply[]): (id: string) => string {
 
 /**
  * Filas que caben en una cara: menos en la **primera** (comparte espacio con el
- * título y los chips) y más en las de **continuación** (solo título + tabla).
+ * título) y más en las de **continuación** (solo título + tabla).
  */
 const ROWS_FIRST = 10;
 const ROWS_CONT = 14;
@@ -74,8 +74,8 @@ function chunkRows<T>(items: readonly T[], first: number, rest: number): T[][] {
 }
 
 /**
- * Una receta como una o varias caras: la primera con título + chips + tabla; si
- * los insumos no caben, **continúan** en las siguientes (marcadas `continued`,
+ * Una receta como una o varias caras: la primera con título + tabla; si los
+ * insumos no caben, **continúan** en las siguientes (marcadas `continued`,
  * fuera del índice). El pie muestra «Continúa…» salvo en la última (total).
  */
 function recipePages(
@@ -84,16 +84,15 @@ function recipePages(
   rows: { cells: string[] }[],
   columns: string[],
 ): PageContent[] {
-  const chips = recipeChips(recipe, category);
   const total = `${recipe.lines.length} insumos`;
   const groups = chunkRows(rows, ROWS_FIRST, ROWS_CONT);
   if (groups.length <= 1) {
-    return [{ kind: 'recipe', section: category.id.value, title: recipe.name, chips, columns, rows, footer: total }];
+    return [{ kind: 'recipe', section: category.id.value, title: recipe.name, columns, rows, footer: total }];
   }
   return groups.map((group, i) => {
     const last = i === groups.length - 1;
     return i === 0
-      ? { kind: 'recipe', section: category.id.value, title: recipe.name, chips, columns, rows: group, footer: 'Continúa…' }
+      ? { kind: 'recipe', section: category.id.value, title: recipe.name, columns, rows: group, footer: 'Continúa…' }
       : {
           kind: 'recipe',
           section: category.id.value,

@@ -1,7 +1,6 @@
-import { BaseUnit } from '../../_common/quantity';
-import { CapacityGroup } from '../domain/entities/recipe-capacity';
-import { SupplyUsage } from '../domain/value-objects/supply-usage';
-import { PropertyType } from '../domain/value-objects/recipe-property';
+import { BaseUnit } from '../../../_common/quantity';
+import { CapacityGroup } from '../../domain/entities/recipe-capacity';
+import { SupplyUsage } from '../../domain/value-objects/supply-usage';
 
 /**
  * Forma del documento JSON del seed del libro de recetas (`public/seed/recipe-book.seed.json`).
@@ -9,8 +8,7 @@ import { PropertyType } from '../domain/value-objects/recipe-property';
  * Es un **contrato de infraestructura** (solo primitivos), NO un modelo de dominio: el
  * {@link RecipeBookSeed} lo traduce a agregados con las factories del dominio. Todos los items
  * llevan `id` estable para permitir la semántica *create-if-absent* (si el id ya existe, no se
- * toca). Las **categorías de sistema** (Queques/Rellenos/Coberturas) NO se declaran aquí: viven
- * en `buildSystemCategories()` y se reconcilian en cada arranque; el JSON solo aporta contenido.
+ * toca).
  */
 export interface RecipeBookSeedDocument {
     /** Interruptor del seed. `false` → no se siembra contenido (las categorías de sistema sí). */
@@ -20,15 +18,15 @@ export interface RecipeBookSeedDocument {
      * (los items nuevos se crean; los existentes no se tocan). Por defecto 1.
      */
     version?: number;
-    flavors?: SeedFlavor[];
+    flavors?: SeedRecipeFlavor[];
     recipeCapacities?: SeedRecipeCapacity[];
     supplies?: SeedSupply[];
-    /** Categorías creadas por el usuario (no de sistema). Opcional. */
+    /** Categorías del recetario. Opcional. */
     categories?: SeedCategory[];
     recipes?: SeedRecipe[];
 }
 
-export interface SeedFlavor {
+export interface SeedRecipeFlavor {
     id: string;
     label: string;
 }
@@ -54,28 +52,9 @@ export interface SeedSupply {
     purchasePrice: SeedPurchasePrice;
 }
 
-export interface SeedCategoryProperty {
-    id: string;
-    name: string;
-    type: PropertyType;
-    required: boolean;
-    locked?: boolean;
-    group?: string;
-    selectable?: boolean;
-}
-
 export interface SeedCategory {
     id: string;
     name: string;
-    order: number;
-    properties: SeedCategoryProperty[];
-}
-
-export interface SeedRecipeValue {
-    propertyId: string;
-    type: PropertyType;
-    /** Para flavor/options/text: label (string). Para number: number. Para weight: gramos (number). */
-    value: string | number;
 }
 
 export interface SeedRecipeLine {
@@ -88,6 +67,5 @@ export interface SeedRecipe {
     id: string;
     categoryId: string;
     name: string;
-    values?: SeedRecipeValue[];
     lines: SeedRecipeLine[];
 }

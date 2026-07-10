@@ -2,17 +2,17 @@ import { EnvironmentProviders, inject, makeEnvironmentProviders, provideAppIniti
 import { SupplyRepository } from './domain/repositories/supply.repository';
 import { RecipeRepository } from './domain/repositories/recipe.repository';
 import { RecipeCategoryRepository } from './domain/repositories/recipe-category.repository';
-import { FlavorRepository } from './domain/repositories/flavor.repository';
+import { RecipeFlavorRepository } from './domain/repositories/recipe-flavor.repository';
 import { RecipeCapacityRepository } from './domain/repositories/recipe-capacity.repository';
-import { IndexedDbSupplyRepository } from './infrastructure/indexeddb-supply.repository';
-import { IndexedDbRecipeRepository } from './infrastructure/indexeddb-recipe.repository';
-import { IndexedDbRecipeCategoryRepository } from './infrastructure/indexeddb-recipe-category.repository';
-import { IndexedDbFlavorRepository } from './infrastructure/indexeddb-flavor.repository';
-import { IndexedDbRecipeCapacityRepository } from './infrastructure/indexeddb-recipe-capacity.repository';
-import { RecipeBookSeed } from './infrastructure/recipe-book-seed';
-import { SeedDataSource, HttpSeedDataSource } from './infrastructure/seed-data-source';
-import { SeedState } from './infrastructure/seed-state';
-import { IndexedDbSeedState } from './infrastructure/indexeddb-seed-state';
+import { IndexedDbSupplyRepository } from './infrastructure/supply/indexeddb-supply.repository';
+import { IndexedDbRecipeRepository } from './infrastructure/recipe/indexeddb-recipe.repository';
+import { IndexedDbRecipeCategoryRepository } from './infrastructure/recipe-category/indexeddb-recipe-category.repository';
+import { IndexedDbRecipeFlavorRepository } from './infrastructure/recipe-flavor/indexeddb-recipe-flavor.repository';
+import { IndexedDbRecipeCapacityRepository } from './infrastructure/recipe-capacity/indexeddb-recipe-capacity.repository';
+import { RecipeBookSeed } from './infrastructure/seed/recipe-book-seed';
+import { SeedDataSource, HttpSeedDataSource } from './infrastructure/seed/seed-data-source';
+import { SeedState } from './infrastructure/seed/seed-state';
+import { IndexedDbSeedState } from './infrastructure/seed/indexeddb-seed-state';
 
 /**
  * DI del contexto recipe-book: enlaza cada puerto de repositorio (abstracto) con
@@ -25,7 +25,7 @@ export function provideRecipeBook(): EnvironmentProviders {
         { provide: SupplyRepository, useClass: IndexedDbSupplyRepository },
         { provide: RecipeRepository, useClass: IndexedDbRecipeRepository },
         { provide: RecipeCategoryRepository, useClass: IndexedDbRecipeCategoryRepository },
-        { provide: FlavorRepository, useClass: IndexedDbFlavorRepository },
+        { provide: RecipeFlavorRepository, useClass: IndexedDbRecipeFlavorRepository },
         { provide: RecipeCapacityRepository, useClass: IndexedDbRecipeCapacityRepository },
         { provide: SeedDataSource, useClass: HttpSeedDataSource },
         { provide: SeedState, useClass: IndexedDbSeedState },

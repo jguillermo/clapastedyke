@@ -1,10 +1,10 @@
 import { Injectable } from '@angular/core';
-import { EntityId } from '../../_common/entity-id';
-import { IndexedDbStore } from '../../_common/infrastructure/indexeddb/store';
-import { Supply } from '../domain/entities/supply';
-import { SupplyRepository } from '../domain/repositories/supply.repository';
+import { EntityId } from '../../../_common/entity-id';
+import { IndexedDbStore } from '../../../_common/infrastructure/indexeddb/store';
+import { Supply } from '../../domain/entities/supply';
+import { SupplyRepository } from '../../domain/repositories/supply.repository';
 import { SupplyMapper } from './supply.mapper';
-import { SupplyRecord } from './records';
+import { SupplyRecord } from '../records';
 
 /**
  * Implementación IndexedDB de `SupplyRepository` sobre `IndexedDbStore` (store `ingredients`, nombre

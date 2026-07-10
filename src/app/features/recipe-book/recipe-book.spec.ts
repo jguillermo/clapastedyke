@@ -1,8 +1,11 @@
 import { TestBed } from '@angular/core/testing';
 import { of } from 'rxjs';
+import { EntityId } from '@core/_common/entity-id';
+import { Quantity } from '@core/_common/quantity';
+import { SupplyLine } from '@core/recipe-book/domain/value-objects/supply-line';
 import { MigoDialog, MigoDialogRef } from '@components/dialog/dialog.service';
 import { ListRecipeBook, type RecipeBookCatalog } from '@core/recipe-book/application/use-cases/list-recipe-book.use-case';
-import { makeRecipeBookFakes, makeWeightCategory } from '@core/recipe-book/testing/recipe-book-test-doubles';
+import { makeRecipeBookFakes, makeCategory, makeRecipe } from '@core/recipe-book/testing/recipe-book-test-doubles';
 import { RecipeBook } from './recipe-book';
 
 const emptyCatalog: RecipeBookCatalog = {
@@ -45,29 +48,35 @@ describe('RecipeBook (hub)', () => {
     ) as HTMLButtonElement;
   }
 
-  it('shows the supplies section and no "create category" action', async () => {
+  const categoryWithRecipe = (): RecipeBookCatalog => ({
+    ...emptyCatalog,
+    categories: [makeCategory('cat-q', 'Queques')],
+    recipes: [makeRecipe('re-1', 'cat-q', 'Vainilla', [SupplyLine.of(new EntityId('ing-1'), Quantity.of(100, 'g'))])],
+  });
+
+  it('shows the supplies section and no create/edit actions', async () => {
     const { fixture } = setup();
     await fixture.whenStable();
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain('Insumos');
     expect(fixture.nativeElement.textContent).not.toContain('Crear categoría');
+    expect(fixture.nativeElement.textContent).not.toContain('Editar categoría');
+    expect(fixture.nativeElement.textContent).not.toContain('Agregar receta');
   });
 
-  it('opens the category editor when "Editar categoría" is clicked', async () => {
-    const category = makeWeightCategory('cat-q', 'Queques');
-    const { fixture, dialog } = setup({ ...emptyCatalog, categories: [category] });
-    await fixture.whenStable();
-    fixture.detectChanges();
-    findButton(fixture, 'Editar categoría').click();
-    expect(dialog.open).toHaveBeenCalledTimes(1);
-  });
-
-  it('renders a section per category with its "Agregar receta" action', async () => {
-    const category = makeWeightCategory('cat-q', 'Queques');
-    const { fixture } = setup({ ...emptyCatalog, categories: [category] });
+  it('renders a section per category with its recipes', async () => {
+    const { fixture } = setup(categoryWithRecipe());
     await fixture.whenStable();
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain('Queques');
-    expect(fixture.nativeElement.textContent).toContain('Agregar receta');
+    expect(fixture.nativeElement.textContent).toContain('Vainilla');
+  });
+
+  it('opens the read-only recipe detail when a recipe row is clicked', async () => {
+    const { fixture, dialog } = setup(categoryWithRecipe());
+    await fixture.whenStable();
+    fixture.detectChanges();
+    findButton(fixture, 'Vainilla').click();
+    expect(dialog.open).toHaveBeenCalledTimes(1);
   });
 });

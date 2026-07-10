@@ -32,10 +32,10 @@ interface IndexEntry {
  * 3D ({@link BookEngine}) con páginas que se pasan con curvatura realista. Inyecta
  * solo el use case `ListRecipeBook` y proyecta el catálogo a páginas agnósticas.
  *
- * Crear/editar **no** ocurre aquí: el botón «Gestionar» abre el hub DOM
- * {@link RecipeBook} (toda la lógica de CRUD ya vive ahí); al cerrarlo se recarga
- * el libro. Sin WebGL, este componente abre directamente ese hub como ruta
- * accesible. Navegación por teclado y región `aria-live` para lectores.
+ * El botón «Abrir libro» abre el hub DOM {@link RecipeBook} (lectura del catálogo
+ * y gestión de insumos); al cerrarlo se recarga el libro. Sin WebGL, este
+ * componente abre directamente ese hub como ruta accesible. Navegación por
+ * teclado y región `aria-live` para lectores.
  */
 @Component({
   selector: 'app-recipe-book-3d',
@@ -128,25 +128,14 @@ interface IndexEntry {
           @if (currentSection(); as sec) {
             <button
               migo-button
-              variant="secondary"
-              size="md"
-              class="shadow-md"
-              aria-label="Editar"
-              (click)="editHere(sec)"
-            >
-              <migo-icon icon-leading name="mat:edit" size="sm" />
-              <migo-spacer hideOnMobile /><span class="hidden sm:inline">Editar</span>
-            </button>
-            <button
-              migo-button
               variant="primary"
               size="md"
               class="shadow-md"
-              [attr.aria-label]="addLabel"
-              (click)="addHere(sec)"
+              aria-label="Abrir"
+              (click)="openHere(sec)"
             >
-              <migo-icon icon-leading name="mat:add" size="sm" />
-              <migo-spacer hideOnMobile /><span class="hidden sm:inline">{{ addLabel }}</span>
+              <migo-icon icon-leading name="mat:layers" size="sm" />
+              <migo-spacer hideOnMobile /><span class="hidden sm:inline">Abrir</span>
             </button>
           } @else {
             <button
@@ -154,11 +143,11 @@ interface IndexEntry {
               variant="primary"
               size="md"
               class="shadow-md"
-              aria-label="Gestionar"
+              aria-label="Abrir libro"
               (click)="manage()"
             >
-              <migo-icon icon-leading name="mat:edit" size="sm" />
-              <migo-spacer hideOnMobile /><span class="hidden sm:inline">Gestionar</span>
+              <migo-icon icon-leading name="mat:layers" size="sm" />
+              <migo-spacer hideOnMobile /><span class="hidden sm:inline">Abrir libro</span>
             </button>
           }
         </div>
@@ -222,7 +211,6 @@ export class RecipeBook3d implements AfterViewInit, OnDestroy {
     return section && section !== INGREDIENTS_SECTION ? section : null;
   });
 
-  protected readonly addLabel = 'Agregar receta';
 
   private readonly _indexEntries = signal<IndexEntry[]>([]);
   protected readonly indexEntries = this._indexEntries.asReadonly();
@@ -319,14 +307,9 @@ export class RecipeBook3d implements AfterViewInit, OnDestroy {
     this.openManage(false);
   }
 
-  /** Editar la categoría de la página actual (abre el hub en esa categoría). */
-  protected editHere(categoryId: string): void {
+  /** Abre el hub en la categoría de la página actual. */
+  protected openHere(categoryId: string): void {
     this.openManage(false, { categoryId });
-  }
-
-  /** Agregar receta en la categoría de la página actual (abre el hub listo para crear). */
-  protected addHere(categoryId: string): void {
-    this.openManage(false, { categoryId, add: true });
   }
 
   protected close(): void {
@@ -422,12 +405,6 @@ export class RecipeBook3d implements AfterViewInit, OnDestroy {
 function resolveFace(pages: PageContent[], focus: RecipeBookResult): number {
   if (focus.supplies) {
     return pages.findIndex((p) => p.section === INGREDIENTS_SECTION && p.kind === 'recipe');
-  }
-  if (focus.recipeName && focus.categoryId) {
-    const i = pages.findIndex(
-      (p) => p.kind === 'recipe' && !p.continued && p.section === focus.categoryId && p.title === focus.recipeName,
-    );
-    if (i >= 0) return i;
   }
   if (focus.categoryId) {
     return pages.findIndex((p) => p.kind === 'section' && p.section === focus.categoryId);

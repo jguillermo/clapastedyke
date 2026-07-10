@@ -1,6 +1,6 @@
-import { EntityId } from '../../_common/entity-id';
-import { RecipeCapacity } from '../domain/entities/recipe-capacity';
-import { RecipeCapacityRecord } from './records';
+import { EntityId } from '../../../_common/entity-id';
+import { RecipeCapacity } from '../../domain/entities/recipe-capacity';
+import { RecipeCapacityRecord } from '../records';
 
 /**
  * ACL de persistencia: traduce `RecipeCapacity` ⇄ `RecipeCapacityRecord` (primitivos de IndexedDB).

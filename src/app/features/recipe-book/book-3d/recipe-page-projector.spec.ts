@@ -2,7 +2,7 @@ import { EntityId } from '@core/_common/entity-id';
 import { Quantity } from '@core/_common/quantity';
 import type { RecipeBookCatalog } from '@core/recipe-book/application/use-cases/list-recipe-book.use-case';
 import { SupplyLine } from '@core/recipe-book/domain/value-objects/supply-line';
-import { makeSupply, makeRecipe, makeWeightCategory } from '@core/recipe-book/testing/recipe-book-test-doubles';
+import { makeSupply, makeRecipe, makeCategory } from '@core/recipe-book/testing/recipe-book-test-doubles';
 import { toPages } from './recipe-page-projector';
 
 function emptyCatalog(): RecipeBookCatalog {
@@ -21,8 +21,8 @@ describe('recipe-page-projector', () => {
 
   it('projects a recipe with its supply lines into a recipe page', () => {
     const harina = makeSupply('IN-1', 'Harina');
-    const category = makeWeightCategory('cat-q', 'Queques');
-    const recipe = makeRecipe('RE-1', 'cat-q', 'Vainilla clásica', 2500, [
+    const category = makeCategory('cat-q', 'Queques');
+    const recipe = makeRecipe('RE-1', 'cat-q', 'Vainilla clásica', [
       SupplyLine.of(new EntityId('IN-1'), Quantity.of(500, 'g')),
     ]);
     const catalog: RecipeBookCatalog = { ...emptyCatalog(), supplies: [harina], categories: [category], recipes: [recipe] };
@@ -31,14 +31,13 @@ describe('recipe-page-projector', () => {
 
     expect(sectionTitles(pages)).toEqual(['Queques', 'Insumos']);
     const recipePage = pages.find((p) => p.kind === 'recipe' && p.title === 'Vainilla clásica');
-    expect(recipePage?.chips).toContain('2.5 kg');
     expect(recipePage?.columns).toEqual(['Insumo', 'Cantidad']);
     expect(recipePage?.rows).toEqual([{ cells: ['Harina', '500 g'] }]);
     expect(recipePage?.footer).toBe('1 insumos');
   });
 
   it('an empty category shows a titled blank page', () => {
-    const category = makeWeightCategory('cat-g', 'Galletas');
+    const category = makeCategory('cat-g', 'Galletas');
     const catalog: RecipeBookCatalog = { ...emptyCatalog(), categories: [category] };
 
     const pages = toPages(catalog);
@@ -106,12 +105,11 @@ describe('recipe-page-projector', () => {
 
   it('paginates a recipe with many insumos onto continuation pages (out of the index)', () => {
     const supplies = Array.from({ length: 15 }, (_, n) => makeSupply(`IN-${n}`, `Insumo ${n}`));
-    const category = makeWeightCategory('cat-q', 'Queques');
+    const category = makeCategory('cat-q', 'Queques');
     const recipe = makeRecipe(
       'RE-1',
       'cat-q',
       'Receta grande',
-      2500,
       supplies.map((i) => SupplyLine.of(new EntityId(i.id.value), Quantity.of(100, 'g'))),
     );
     const catalog: RecipeBookCatalog = { ...emptyCatalog(), supplies, categories: [category], recipes: [recipe] };
@@ -119,11 +117,9 @@ describe('recipe-page-projector', () => {
     const recipePages = toPages(catalog).filter((p) => p.kind === 'recipe' && p.section === 'cat-q');
     expect(recipePages).toHaveLength(2);
     expect(recipePages[0].rows).toHaveLength(10);
-    expect(recipePages[0].chips).toContain('2.5 kg'); // chips solo en la primera
     expect(recipePages[0].footer).toBe('Continúa…');
     expect(recipePages[1].rows).toHaveLength(5);
     expect(recipePages[1].continued).toBe(true);
-    expect(recipePages[1].chips).toBeUndefined();
     expect(recipePages[1].footer).toBe('15 insumos');
   });
 });

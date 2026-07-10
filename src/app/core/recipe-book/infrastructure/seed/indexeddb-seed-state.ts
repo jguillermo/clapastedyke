@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { IndexedDbStore } from '../../_common/infrastructure/indexeddb/store';
+import { IndexedDbStore } from '../../../_common/infrastructure/indexeddb/store';
 import { SeedState } from './seed-state';
 
 /** Documento plano del marcador de seed en el store `seed_state`. */

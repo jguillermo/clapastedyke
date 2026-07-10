@@ -1,7 +1,6 @@
 import { BaseUnit } from '../../_common/quantity';
 import { CapacityGroup } from '../domain/entities/recipe-capacity';
 import { SupplyUsage } from '../domain/value-objects/supply-usage';
-import { PropertyRole, PropertyType } from '../domain/value-objects/recipe-property';
 
 /**
  * Documentos de almacenamiento planos (solo primitivos) persistidos en IndexedDB. Son contratos
@@ -35,18 +34,7 @@ export interface SupplyRecord {
     purchasePrice: PurchasePriceRecord;
 }
 
-export interface RecipePropertyRecord {
-    id: string;
-    name: string;
-    type: PropertyType;
-    required: boolean;
-    locked: boolean;
-    role?: PropertyRole;
-    group?: string; // solo propiedades `options`: grupo del catálogo de capacidades
-    selectable?: boolean; // se muestra al seleccionar la receta (default true para records viejos)
-}
-
-export interface FlavorRecord {
+export interface RecipeFlavorRecord {
     id: string;
     label: string;
 }
@@ -61,21 +49,11 @@ export interface RecipeCapacityRecord {
 export interface RecipeCategoryRecord {
     id: string;
     name: string;
-    order: number;
-    system: boolean;
-    properties: RecipePropertyRecord[];
-}
-
-export interface RecipePropertyValueRecord {
-    propertyId: string;
-    type: PropertyType;
-    value: string | number | QuantityRecord;
 }
 
 export interface RecipeRecord {
     id: string;
     categoryId: string;
     name: string;
-    values: RecipePropertyValueRecord[];
     lines: SupplyLineRecord[];
 }

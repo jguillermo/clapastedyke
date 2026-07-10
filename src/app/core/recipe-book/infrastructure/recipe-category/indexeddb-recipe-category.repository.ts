@@ -1,10 +1,10 @@
 import { Injectable } from '@angular/core';
-import { EntityId } from '../../_common/entity-id';
-import { IndexedDbStore } from '../../_common/infrastructure/indexeddb/store';
-import { RecipeCategory } from '../domain/entities/recipe-category';
-import { RecipeCategoryRepository } from '../domain/repositories/recipe-category.repository';
+import { EntityId } from '../../../_common/entity-id';
+import { IndexedDbStore } from '../../../_common/infrastructure/indexeddb/store';
+import { RecipeCategory } from '../../domain/entities/recipe-category';
+import { RecipeCategoryRepository } from '../../domain/repositories/recipe-category.repository';
 import { RecipeCategoryMapper } from './recipe-category.mapper';
-import { RecipeCategoryRecord } from './records';
+import { RecipeCategoryRecord } from '../records';
 
 /**
  * Implementación IndexedDB de `RecipeCategoryRepository` sobre `IndexedDbStore` (store

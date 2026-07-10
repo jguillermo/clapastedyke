@@ -1,28 +1,21 @@
 import { inject, Injectable } from '@angular/core';
-import { EntityId } from '../../_common/entity-id';
-import { Quantity } from '../../_common/quantity';
-import { buildSystemCategories, RecipeCategory } from '../domain/entities/recipe-category';
-import { RecipeCapacity } from '../domain/entities/recipe-capacity';
-import { Flavor } from '../domain/entities/flavor';
-import { Supply } from '../domain/entities/supply';
-import { Recipe } from '../domain/entities/recipe';
-import { PurchasePrice } from '../domain/value-objects/purchase-price';
-import { RecipeProperty } from '../domain/value-objects/recipe-property';
-import { RecipePropertyValue } from '../domain/value-objects/recipe-property-value';
-import { SupplyLine } from '../domain/value-objects/supply-line';
-import { RecipeCategoryRepository } from '../domain/repositories/recipe-category.repository';
-import { RecipeCapacityRepository } from '../domain/repositories/recipe-capacity.repository';
-import { FlavorRepository } from '../domain/repositories/flavor.repository';
-import { SupplyRepository } from '../domain/repositories/supply.repository';
-import { RecipeRepository } from '../domain/repositories/recipe.repository';
+import { EntityId } from '../../../_common/entity-id';
+import { Quantity } from '../../../_common/quantity';
+import { RecipeCategory } from '../../domain/entities/recipe-category';
+import { RecipeCapacity } from '../../domain/entities/recipe-capacity';
+import { RecipeFlavor } from '../../domain/entities/recipe-flavor';
+import { Supply } from '../../domain/entities/supply';
+import { Recipe } from '../../domain/entities/recipe';
+import { PurchasePrice } from '../../domain/value-objects/purchase-price';
+import { SupplyLine } from '../../domain/value-objects/supply-line';
+import { RecipeCategoryRepository } from '../../domain/repositories/recipe-category.repository';
+import { RecipeCapacityRepository } from '../../domain/repositories/recipe-capacity.repository';
+import { RecipeFlavorRepository } from '../../domain/repositories/recipe-flavor.repository';
+import { SupplyRepository } from '../../domain/repositories/supply.repository';
+import { RecipeRepository } from '../../domain/repositories/recipe.repository';
 import { SeedDataSource } from './seed-data-source';
 import { SeedState } from './seed-state';
-import {
-    SeedCategory,
-    SeedSupply,
-    SeedRecipe,
-    SeedRecipeValue,
-} from './recipe-book-seed-document';
+import { SeedCategory, SeedSupply, SeedRecipe } from './recipe-book-seed-document';
 
 /** Identifica este seed en el marcador persistido ({@link SeedState}). */
 const SEED_KEY = 'recipe-book';
@@ -30,26 +23,20 @@ const SEED_KEY = 'recipe-book';
 /**
  * Siembra el libro de recetas al arrancar.
  *
- * Dos responsabilidades separadas:
- * 1. **Estructura (código).** Las categorías de sistema (Queques, Rellenos, Coberturas) se
- *    **reconcilian en cada arranque** contra el esquema canónico (`buildSystemCategories()`):
- *    faltantes se crean, esquemas obsoletos se reparan, conservando la visibilidad (`selectable`)
- *    elegida por el usuario. Las categorías de usuario no se tocan.
- * 2. **Contenido (JSON).** Sabores, capacidades de receta, insumos, categorías custom y recetas se
- *    cargan desde `public/seed/recipe-book.seed.json` (vía {@link SeedDataSource}) y se guardan en
- *    los **repositorios IndexedDB** (el flujo normal). Se aplica **una sola vez**: un marcador
- *    persistido ({@link SeedState}) registra la versión sembrada; si ya se aplicó, no se vuelve a
- *    ejecutar, de modo que el usuario puede editar o **borrar** libremente los datos sin que el seed
- *    los vuelva a insertar. Subir `version` en el JSON lo re-aplica a propósito.
+ * Sabores, capacidades de receta, insumos, categorías y recetas se cargan desde
+ * `public/seed/recipe-book.seed.json` (vía {@link SeedDataSource}) y se guardan en los
+ * **repositorios IndexedDB** (el flujo normal). Se aplica **una sola vez**: un marcador persistido
+ * ({@link SeedState}) registra la versión sembrada; si ya se aplicó, no se vuelve a ejecutar, de
+ * modo que el usuario puede editar o **borrar** libremente los datos sin que el seed los vuelva a
+ * insertar. Subir `version` en el JSON lo re-aplica a propósito.
  *
- * Desactivación: `"enabled": false` en el JSON (o fichero ausente) → se omite el contenido; la
- * estructura de sistema se sigue reconciliando. Nunca rompe el arranque: los fallos se registran
- * y se continúa.
+ * Desactivación: `"enabled": false` en el JSON (o fichero ausente) → se omite. Nunca rompe el
+ * arranque: los fallos se registran y se continúa.
  */
 @Injectable({ providedIn: 'root' })
 export class RecipeBookSeed {
     private readonly categories = inject(RecipeCategoryRepository);
-    private readonly flavors = inject(FlavorRepository);
+    private readonly flavors = inject(RecipeFlavorRepository);
     private readonly capacities = inject(RecipeCapacityRepository);
     private readonly supplies = inject(SupplyRepository);
     private readonly recipes = inject(RecipeRepository);
@@ -62,8 +49,6 @@ export class RecipeBookSeed {
     }
 
     async run(): Promise<void> {
-        await this.seedSystemCategories();
-
         const doc = await this.source.load();
         if (!doc || doc.enabled === false) {
             return;
@@ -79,7 +64,7 @@ export class RecipeBookSeed {
         // Orden: primero lo que las recetas referencian (sabores/capacidades/categorías/insumos).
         for (const f of doc.flavors ?? []) {
             await this.createIfAbsent(f.id, this.flavors, () =>
-                Flavor.create(new EntityId(f.id), f.label),
+                RecipeFlavor.create(new EntityId(f.id), f.label),
             );
         }
         for (const c of doc.recipeCapacities ?? []) {
@@ -107,15 +92,6 @@ export class RecipeBookSeed {
         await this.seedState.markApplied(SEED_KEY, version);
     }
 
-    /** Crea las categorías de sistema que falten y reconcilia las existentes con el esquema canónico. */
-    private async seedSystemCategories(): Promise<void> {
-        const byId = new Map((await this.categories.all()).map((c) => [c.id.value, c]));
-        for (const canonical of buildSystemCategories()) {
-            const existing = byId.get(canonical.id.value);
-            await this.categories.save(existing ? existing.reconcileSchema(canonical) : canonical);
-        }
-    }
-
     /** Guarda el agregado que produce `build` solo si su id no existe ya (create-if-absent). */
     private async createIfAbsent<T>(
         id: string,
@@ -134,10 +110,7 @@ export class RecipeBookSeed {
     }
 
     private buildCategory(c: SeedCategory): RecipeCategory {
-        const properties = c.properties.map((p) =>
-            RecipeProperty.create(p.id, p.name, p.type, p.required, p.locked ?? false, undefined, p.group, p.selectable ?? false),
-        );
-        return RecipeCategory.create(new EntityId(c.id), c.name, c.order, properties, false);
+        return RecipeCategory.create(new EntityId(c.id), c.name);
     }
 
     private buildSupply(s: SeedSupply): Supply {
@@ -162,22 +135,10 @@ export class RecipeBookSeed {
                 console.warn(`[recipe-book-seed] receta "${r.id}" sin líneas válidas, se omite`);
                 return null;
             }
-            const values = (r.values ?? []).map(toRecipeValue);
-            return Recipe.create(new EntityId(r.id), new EntityId(r.categoryId), r.name, values, lines);
+            return Recipe.create(new EntityId(r.id), new EntityId(r.categoryId), r.name, lines);
         } catch (error) {
             console.warn(`[recipe-book-seed] no se pudo construir la receta "${r.id}":`, error);
             return null;
         }
     }
-}
-
-/** Traduce un valor del JSON a su VO, según el tipo de la propiedad. */
-function toRecipeValue(v: SeedRecipeValue): RecipePropertyValue {
-    if (v.type === 'weight') {
-        return RecipePropertyValue.of(v.propertyId, v.type, Quantity.of(Number(v.value), 'g'));
-    }
-    if (v.type === 'number') {
-        return RecipePropertyValue.of(v.propertyId, v.type, Number(v.value));
-    }
-    return RecipePropertyValue.of(v.propertyId, v.type, String(v.value));
 }

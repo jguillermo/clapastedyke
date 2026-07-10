@@ -1,10 +1,10 @@
 import { Injectable } from '@angular/core';
-import { EntityId } from '../../_common/entity-id';
-import { IndexedDbStore } from '../../_common/infrastructure/indexeddb/store';
-import { CapacityGroup, RecipeCapacity } from '../domain/entities/recipe-capacity';
-import { RecipeCapacityRepository } from '../domain/repositories/recipe-capacity.repository';
+import { EntityId } from '../../../_common/entity-id';
+import { IndexedDbStore } from '../../../_common/infrastructure/indexeddb/store';
+import { CapacityGroup, RecipeCapacity } from '../../domain/entities/recipe-capacity';
+import { RecipeCapacityRepository } from '../../domain/repositories/recipe-capacity.repository';
 import { RecipeCapacityMapper } from './recipe-capacity.mapper';
-import { RecipeCapacityRecord } from './records';
+import { RecipeCapacityRecord } from '../records';
 
 /**
  * Implementación IndexedDB de `RecipeCapacityRepository` sobre `IndexedDbStore` (store
