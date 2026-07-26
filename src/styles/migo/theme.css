@@ -169,3 +169,16 @@
 @utility duration-slow {
   transition-duration: var(--duration-slow);
 }
+
+/* Oculta la barra de scroll nativa (Firefox/estándar + WebKit) manteniendo el scroll funcional:
+   para paneles internos con scroll táctil (overlay de receta, listas largas) donde la barra del
+   navegador rompe el diseño. La afordancia de "hay más contenido" la da un indicador propio (ver
+   `hasMore`/flecha en `RecipeOverlay`), no la barra. No es namespace nativo de Tailwind. */
+@utility scrollbar-hidden {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
