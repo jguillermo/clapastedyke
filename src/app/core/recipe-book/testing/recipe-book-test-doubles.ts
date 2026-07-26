@@ -1,36 +1,36 @@
+/**
+ * Dobles de test compartidos del contexto `recipe-book`: repositorios in-memory de cada
+ * agregado, un event bus de grabación (`RecordingEventBus`), dobles del sembrado
+ * (`FakeSeedDataSource`/`FakeSeedState`) y builders de datos falsos (seeds) para armar
+ * escenarios rápidamente.
+ *
+ * Lo usan todos los specs del contexto: cada spec obtiene los providers de Angular vía
+ * `makeRecipeBookFakes().providers` y los inyecta en el TestBed, de modo que los casos de
+ * uso corren contra estas implementaciones en memoria en lugar de IndexedDB.
+ */
 import { Provider } from '@angular/core';
 import { EntityId } from '../../_common/entity-id';
 import { BaseUnit, Quantity } from '../../_common/quantity';
 import { DomainEvent } from '../../_common/domain-event';
 import { EventBus, EventHandler } from '../../_common/event-bus';
-import { Ingredient } from '../domain/entities/ingredient';
+import { Supply } from '../domain/entities/supply';
 import { Recipe } from '../domain/entities/recipe';
 import { RecipeCategory } from '../domain/entities/recipe-category';
-import { PackagingRule } from '../domain/entities/packaging-rule';
-import { CakeComposition } from '../domain/entities/cake-composition';
-import { Flavor } from '../domain/entities/flavor';
-import { ConversionGroup, ConversionOption } from '../domain/entities/conversion-option';
+import { RecipeFlavor } from '../domain/entities/recipe-flavor';
+import { CapacityGroup, RecipeCapacity } from '../domain/entities/recipe-capacity';
 import { PurchasePrice } from '../domain/value-objects/purchase-price';
-import { IngredientUsage } from '../domain/value-objects/ingredient-usage';
-import { IngredientLine } from '../domain/value-objects/ingredient-line';
-import { RecipeProperty } from '../domain/value-objects/recipe-property';
-import { RecipePropertyValue } from '../domain/value-objects/recipe-property-value';
-import { IngredientRepository } from '../domain/repositories/ingredient.repository';
+import { SupplyUsage } from '../domain/value-objects/supply-usage';
+import { SupplyLine } from '../domain/value-objects/supply-line';
+import { SupplyRepository } from '../domain/repositories/supply.repository';
 import { RecipeRepository } from '../domain/repositories/recipe.repository';
 import { RecipeCategoryRepository } from '../domain/repositories/recipe-category.repository';
-import { PackagingRuleRepository } from '../domain/repositories/packaging-rule.repository';
-import { CakeCompositionRepository } from '../domain/repositories/cake-composition.repository';
-import { FlavorRepository } from '../domain/repositories/flavor.repository';
-import { ConversionOptionRepository } from '../domain/repositories/conversion-option.repository';
-import {
-    IngredientPriceHistoryRepository,
-    PriceHistoryEntry,
-} from '../domain/repositories/ingredient-price-history.repository';
-import { SeedDataSource } from '../infrastructure/seed-data-source';
-import { SeedState } from '../infrastructure/seed-state';
-import { RecipeBookSeedDocument } from '../infrastructure/recipe-book-seed-document';
+import { RecipeFlavorRepository } from '../domain/repositories/recipe-flavor.repository';
+import { RecipeCapacityRepository } from '../domain/repositories/recipe-capacity.repository';
+import { SeedDataSource } from '../infrastructure/seed/seed-data-source';
+import { SeedState } from '../infrastructure/seed/seed-state';
+import { RecipeBookSeedDocument } from '../infrastructure/seed/recipe-book-seed-document';
 
-/** Shared in-memory store backing the repository fakes. */
+/** Almacén in-memory compartido que respalda los repositorios falsos. */
 class Store<T extends { id: EntityId }> {
     readonly items = new Map<string, T>();
     private seq = 0;
@@ -59,12 +59,12 @@ class Store<T extends { id: EntityId }> {
     }
 }
 
-class InMemoryIngredientRepository extends IngredientRepository {
-    private readonly store = new Store<Ingredient>('IN');
+class InMemorySupplyRepository extends SupplyRepository {
+    private readonly store = new Store<Supply>('SU');
     nextIdentity = () => this.store.next();
     byId = async (id: EntityId) => this.store.byId(id);
-    byName = async (name: string) => this.store.byName(name, (i) => i.name);
-    save = async (i: Ingredient) => this.store.save(i);
+    byName = async (name: string) => this.store.byName(name, (s) => s.name);
+    save = async (s: Supply) => this.store.save(s);
     all = async () => this.store.all();
 }
 
@@ -95,82 +95,53 @@ class InMemoryRecipeRepository extends RecipeRepository {
     all = async () => this.store.all();
 }
 
-class InMemoryPackagingRuleRepository extends PackagingRuleRepository {
-    private readonly store = new Store<PackagingRule>('RL');
+class InMemoryRecipeFlavorRepository extends RecipeFlavorRepository {
+    private readonly store = new Store<RecipeFlavor>('FL');
     nextIdentity = () => this.store.next();
     byId = async (id: EntityId) => this.store.byId(id);
-    save = async (r: PackagingRule) => this.store.save(r);
-    all = async () => this.store.all();
-}
-
-class InMemoryCakeCompositionRepository extends CakeCompositionRepository {
-    private readonly store = new Store<CakeComposition>('CK');
-    nextIdentity = () => this.store.next();
-    byId = async (id: EntityId) => this.store.byId(id);
-    save = async (c: CakeComposition) => this.store.save(c);
-    all = async () => this.store.all();
-}
-
-class InMemoryFlavorRepository extends FlavorRepository {
-    private readonly store = new Store<Flavor>('FL');
-    nextIdentity = () => this.store.next();
-    byId = async (id: EntityId) => this.store.byId(id);
-    save = async (f: Flavor) => this.store.save(f);
+    save = async (f: RecipeFlavor) => this.store.save(f);
     all = async () => this.store.all();
     delete = async (id: EntityId) => {
         this.store.items.delete(id.value);
     };
 }
 
-class InMemoryConversionOptionRepository extends ConversionOptionRepository {
-    private readonly store = new Store<ConversionOption>('CO');
+class InMemoryRecipeCapacityRepository extends RecipeCapacityRepository {
+    private readonly store = new Store<RecipeCapacity>('RC');
     nextIdentity = () => this.store.next();
     byId = async (id: EntityId) => this.store.byId(id);
-    byGroup = async (group: ConversionGroup) => this.store.all().filter((o) => o.group === group);
-    save = async (o: ConversionOption) => this.store.save(o);
+    byGroup = async (group: CapacityGroup) => this.store.all().filter((c) => c.group === group);
+    save = async (c: RecipeCapacity) => this.store.save(c);
     all = async () => this.store.all();
     delete = async (id: EntityId) => {
         this.store.items.delete(id.value);
     };
 }
 
-/** In-memory append-only price history. */
-export class InMemoryIngredientPriceHistoryRepository extends IngredientPriceHistoryRepository {
-    readonly entries: PriceHistoryEntry[] = [];
-    append = async (entry: PriceHistoryEntry) => {
-        this.entries.push(entry);
-    };
-    byIngredient = async (ingredientId: EntityId) =>
-        this.entries.filter((e) => e.ingredientId.equals(ingredientId));
-}
-
-/** EventBus double that records everything published for assertions. */
+/** Doble de EventBus que graba todo lo publicado para poder hacer aserciones. */
 export class RecordingEventBus extends EventBus {
     readonly published: DomainEvent[] = [];
     async publish(events: readonly DomainEvent[]): Promise<void> {
         this.published.push(...events);
     }
     subscribe(_eventName: string, _handler: EventHandler): void {
-        // no-op for tests
+        // no hace nada en los tests
     }
     names(): string[] {
         return this.published.map((e) => e.name);
     }
 }
 
-/** The aggregate repository bindings to in-memory doubles (no EventBus). */
+/** Bindings de los repositorios de agregados a los dobles in-memory (sin EventBus). */
 export const recipeBookRepositoryProviders: Provider[] = [
-    { provide: IngredientRepository, useClass: InMemoryIngredientRepository },
+    { provide: SupplyRepository, useClass: InMemorySupplyRepository },
     { provide: RecipeRepository, useClass: InMemoryRecipeRepository },
     { provide: RecipeCategoryRepository, useClass: InMemoryRecipeCategoryRepository },
-    { provide: PackagingRuleRepository, useClass: InMemoryPackagingRuleRepository },
-    { provide: CakeCompositionRepository, useClass: InMemoryCakeCompositionRepository },
-    { provide: IngredientPriceHistoryRepository, useClass: InMemoryIngredientPriceHistoryRepository },
-    { provide: FlavorRepository, useClass: InMemoryFlavorRepository },
-    { provide: ConversionOptionRepository, useClass: InMemoryConversionOptionRepository },
+    { provide: RecipeFlavorRepository, useClass: InMemoryRecipeFlavorRepository },
+    { provide: RecipeCapacityRepository, useClass: InMemoryRecipeCapacityRepository },
 ];
 
-/** SeedDataSource double: returns a (mutable) document, or `null` for "no seed file". */
+/** Doble de SeedDataSource: devuelve un documento (mutable), o `null` para "sin archivo de sembrado". */
 export class FakeSeedDataSource extends SeedDataSource {
     constructor(public doc: RecipeBookSeedDocument | null = null) {
         super();
@@ -178,7 +149,7 @@ export class FakeSeedDataSource extends SeedDataSource {
     load = async () => this.doc;
 }
 
-/** In-memory SeedState double: remembers the applied version per key. */
+/** Doble in-memory de SeedState: recuerda la versión aplicada por cada clave. */
 export class FakeSeedState extends SeedState {
     private readonly versions = new Map<string, number>();
     appliedVersion = async (key: string) => this.versions.get(key) ?? null;
@@ -189,15 +160,14 @@ export class FakeSeedState extends SeedState {
 
 export interface RecipeBookFakes {
     bus: RecordingEventBus;
-    /** The SeedDataSource double; mutate `.doc` to change the seed between runs. */
+    /** El doble de SeedDataSource; muta `.doc` para cambiar el sembrado entre corridas. */
     seedSource: FakeSeedDataSource;
     providers: Provider[];
 }
 
 /**
- * Builds fresh in-memory fakes and the matching Angular providers. `seedDoc` backs the
- * {@link SeedDataSource} (defaults to `null` → the seed loads no content, only reconciles
- * the system categories).
+ * Construye dobles in-memory nuevos y los providers de Angular correspondientes. `seedDoc`
+ * respalda el {@link SeedDataSource} (por defecto `null` → el sembrado no carga contenido).
  */
 export function makeRecipeBookFakes(seedDoc: RecipeBookSeedDocument | null = null): RecipeBookFakes {
     const bus = new RecordingEventBus();
@@ -211,66 +181,35 @@ export function makeRecipeBookFakes(seedDoc: RecipeBookSeedDocument | null = nul
     return { bus, seedSource, providers };
 }
 
-/** Test helper: a purchase-price request literal for SaveIngredient. */
+/** Helper de test: un literal de petición de precio de compra para SaveSupply. */
 export function aPurchase(unit: BaseUnit = 'g', amount = 5): { amount: number; per: { value: number; unit: BaseUnit } } {
     return { amount, per: { value: unit === 'u' ? 10 : 1000, unit } };
 }
 
-/** Test helper: una categoría con una propiedad de Peso (rol de escalado). */
-export function makeWeightCategory(id: string, name: string, order = 0, system = true): RecipeCategory {
-    return RecipeCategory.create(
-        new EntityId(id),
-        name,
-        order,
-        [RecipeProperty.create(`${id}-peso`, 'Peso', 'weight', true, true, 'scaling-weight')],
-        system,
-    );
+/** Test helper: una categoría de catálogo (id + nombre). */
+export function makeCategory(id: string, name: string): RecipeCategory {
+    return RecipeCategory.create(new EntityId(id), name);
 }
 
-/** Test helper: una receta con un valor de peso (en gramos) y sus líneas. */
+/** Test helper: una receta con sus líneas de insumo. */
 export function makeRecipe(
     id: string,
     categoryId: string,
     name: string,
-    weightGrams: number,
-    lines: IngredientLine[],
+    lines: SupplyLine[],
 ): Recipe {
-    return Recipe.create(
-        new EntityId(id),
-        new EntityId(categoryId),
-        name,
-        [RecipePropertyValue.of(`${categoryId}-peso`, 'weight', Quantity.of(weightGrams, 'g'))],
-        lines,
-    );
+    return Recipe.create(new EntityId(id), new EntityId(categoryId), name, lines);
 }
 
-/**
- * Test helper: una categoría tipo Queques convertible — Sabor (flavor), Porciones
- * (opciones del grupo `portions`) y Molde (opciones del grupo `mold`). Sin Peso.
- */
-export function makeConvertibleCategory(id: string): RecipeCategory {
-    return RecipeCategory.create(
-        new EntityId(id),
-        'Queques',
-        0,
-        [
-            RecipeProperty.create(`${id}-sabor`, 'Sabor', 'flavor', false, false, undefined, undefined, true),
-            RecipeProperty.create(`${id}-porciones`, 'Porciones', 'options', false, false, undefined, 'portions', true),
-            RecipeProperty.create(`${id}-molde`, 'Molde', 'options', false, false, undefined, 'mold', true),
-        ],
-        true,
-    );
-}
-
-/** Test helper: a priced ingredient (uses `restore` to avoid recording events). */
-export function makeIngredient(
+/** Helper de test: un insumo con precio (usa `restore` para no grabar eventos). */
+export function makeSupply(
     id: string,
     name: string,
-    options: { usage?: IngredientUsage; baseUnit?: BaseUnit; amount?: number; per?: Quantity } = {},
-): Ingredient {
+    options: { usage?: SupplyUsage; baseUnit?: BaseUnit; amount?: number; per?: Quantity } = {},
+): Supply {
     const baseUnit = options.baseUnit ?? 'g';
     const per = options.per ?? Quantity.of(1000, baseUnit);
-    return Ingredient.restore({
+    return Supply.restore({
         id: new EntityId(id),
         name,
         baseUnit,

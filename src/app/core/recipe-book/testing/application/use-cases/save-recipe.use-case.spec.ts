@@ -1,72 +1,63 @@
 import { TestBed } from '@angular/core/testing';
 import { EntityId } from '../../../../_common/entity-id';
-import { EventBus } from '../../../../_common/event-bus';
-import {
-  aPurchase,
-  makeRecipeBookFakes,
-  makeWeightCategory,
-  RecordingEventBus,
-} from '../../recipe-book-test-doubles';
-import { RecipeCategoryRepository } from '../../../domain/repositories/recipe-category.repository';
-import { RecipeRepository } from '../../../domain/repositories/recipe.repository';
-import { SaveIngredient } from '../../../application/use-cases/save-ingredient.use-case';
+import { makeRecipeBookFakes, makeSupply } from '../../recipe-book-test-doubles';
 import { SaveRecipe } from '../../../application/use-cases/save-recipe.use-case';
-
-const CAT = 'cat-q';
-const PESO = `${CAT}-peso`;
+import { RecipeRepository } from '../../../domain/repositories/recipe.repository';
+import { SupplyRepository } from '../../../domain/repositories/supply.repository';
+import { RecordingEventBus } from '../../recipe-book-test-doubles';
+import { EventBus } from '../../../../_common/event-bus';
 
 describe('SaveRecipe', () => {
-  let bus: RecordingEventBus;
-  let flour: string;
-
-  beforeEach(async () => {
+  beforeEach(() => {
     TestBed.configureTestingModule({ providers: makeRecipeBookFakes().providers });
-    bus = TestBed.inject(EventBus) as RecordingEventBus;
-    await TestBed.inject(RecipeCategoryRepository).save(makeWeightCategory(CAT, 'Queques'));
-    flour = (await TestBed.inject(SaveIngredient).execute({ name: 'Harina', baseUnit: 'g', usage: 'recipe', purchasePrice: aPurchase('g') })).id;
   });
 
-  const save = (name: string, value = 1000) =>
-    TestBed.inject(SaveRecipe).execute({
-      categoryId: CAT,
-      name,
-      values: [{ propertyId: PESO, value }],
-      lines: [{ ingredientId: flour, quantity: 250 }],
+  /** Seeds one supply and returns its id (recipes reference existing supplies). */
+  async function seedSupply(id = 'ing-harina'): Promise<string> {
+    await TestBed.inject(SupplyRepository).save(makeSupply(id, 'Harina'));
+    return id;
+  }
+
+  it('creates a recipe (no id) and publishes RecipeSaved', async () => {
+    const supplyId = await seedSupply();
+    const { id } = await TestBed.inject(SaveRecipe).execute({
+      categoryId: 'cat-q',
+      name: 'Vainilla',
+      lines: [{ supplyId, quantity: 500 }],
     });
 
-  it('saves a recipe and emits RecipeSaved', async () => {
-    const { id } = await save('Vainilla');
-    const recipe = await TestBed.inject(RecipeRepository).byId(new EntityId(id));
-    expect(recipe?.name).toBe('Vainilla');
-    expect(recipe?.weightFor(PESO)?.value).toBe(1000);
+    const saved = await TestBed.inject(RecipeRepository).byId(new EntityId(id));
+    expect(saved?.name).toBe('Vainilla');
+    expect(saved?.lines).toHaveLength(1);
+
+    const bus = TestBed.inject(EventBus) as RecordingEventBus;
     expect(bus.names()).toContain('RecipeSaved');
   });
 
-  it('upserts by (category, name): same name reuses the id', async () => {
-    const first = await save('Vainilla', 1000);
-    const second = await save('Vainilla', 2000);
-    expect(second.id).toBe(first.id);
-    expect((await TestBed.inject(RecipeRepository).all())).toHaveLength(1);
+  it('editing = saving again with the same id replaces in place (upsert, no duplicate)', async () => {
+    const supplyId = await seedSupply();
+    const save = TestBed.inject(SaveRecipe);
+    const { id } = await save.execute({ categoryId: 'cat-q', name: 'Vainilla', lines: [{ supplyId, quantity: 500 }] });
+
+    await save.execute({ id, categoryId: 'cat-q', name: 'Vainilla clásica', lines: [{ supplyId, quantity: 600 }] });
+
+    const recipes = await TestBed.inject(RecipeRepository).all();
+    expect(recipes).toHaveLength(1);
+    expect(recipes[0].name).toBe('Vainilla clásica');
   });
 
-  it('rejects when a required property is missing', async () => {
+  it('rejects a recipe without lines (domain rule)', async () => {
     await expect(
-      TestBed.inject(SaveRecipe).execute({
-        categoryId: CAT,
-        name: 'Sin peso',
-        values: [],
-        lines: [{ ingredientId: flour, quantity: 250 }],
-      }),
+      TestBed.inject(SaveRecipe).execute({ categoryId: 'cat-q', name: 'Vacía', lines: [] }),
     ).rejects.toThrow();
   });
 
-  it('rejects when a referenced ingredient does not exist', async () => {
+  it('throws when a line references a missing supply', async () => {
     await expect(
       TestBed.inject(SaveRecipe).execute({
-        categoryId: CAT,
+        categoryId: 'cat-q',
         name: 'Fantasma',
-        values: [{ propertyId: PESO, value: 1000 }],
-        lines: [{ ingredientId: 'IN-nope', quantity: 100 }],
+        lines: [{ supplyId: 'ing-inexistente', quantity: 100 }],
       }),
     ).rejects.toThrow();
   });

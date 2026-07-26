@@ -1,13 +1,12 @@
 import type { RecipeBookCatalog } from '@core/recipe-book/application/use-cases/list-recipe-book.use-case';
-import type { Ingredient } from '@core/recipe-book/domain/entities/ingredient';
+import type { Supply } from '@core/recipe-book/domain/entities/supply';
 import type { Recipe } from '@core/recipe-book/domain/entities/recipe';
 import type { RecipeCategory } from '@core/recipe-book/domain/entities/recipe-category';
-import type { IngredientLine } from '@core/recipe-book/domain/value-objects/ingredient-line';
 import type { PageContent } from '@platform/three/book/page-content';
-import { formatMoney, formatQuantity, recipeChips } from '../_shared/recipe-format';
+import { formatMoney, formatQuantity } from '../_shared/recipe-format';
 
 /** Sección opaca de Insumos (la lee el HUD; nunca aparece en el índice). */
-export const INGREDIENTS_SECTION = 'ingredients';
+export const INGREDIENTS_SECTION = 'supplies';
 
 /**
  * Proyecta el catálogo del libro de recetas a las páginas del libro 3D
@@ -19,14 +18,7 @@ export const INGREDIENTS_SECTION = 'ingredients';
  * el HUD sepa a qué categoría agregar/editar.
  */
 export function toPages(catalog: RecipeBookCatalog): PageContent[] {
-  const pages: PageContent[] = [{ kind: 'cover', title: 'Mi libro de recetas', subtitle: 'Recetario' }];
-
-  const ingredientName = nameResolver(catalog.ingredients);
-  const COLUMNS = ['Insumo', 'Cantidad'];
-  const rowsOf = (lines: readonly IngredientLine[]) =>
-    lines.map((l) => ({
-      cells: [ingredientName(l.ingredientId.value), formatQuantity(l.quantity.value, l.quantity.unit)],
-    }));
+  const pages: PageContent[] = [{ kind: 'cover', title: 'Mi libro de recetas..4', subtitle: 'Recetario' }];
 
   for (const category of catalog.categories) {
     pages.push({ kind: 'section', subtitle: 'Categoría', title: category.name, section: category.id.value });
@@ -43,22 +35,17 @@ export function toPages(catalog: RecipeBookCatalog): PageContent[] {
       continue;
     }
     for (const recipe of recipes) {
-      pages.push(...recipePages(recipe, category, rowsOf(recipe.lines), COLUMNS));
+      pages.push(...recipePages(recipe, category));
     }
   }
 
-  pages.push(...ingredientListPages(catalog.ingredients));
+  pages.push(...supplyListPages(catalog.supplies));
   return pages;
-}
-
-function nameResolver(ingredients: readonly Ingredient[]): (id: string) => string {
-  const byId = new Map(ingredients.map((i) => [i.id.value, i] as const));
-  return (id) => byId.get(id)?.name ?? '—';
 }
 
 /**
  * Filas que caben en una cara: menos en la **primera** (comparte espacio con el
- * título y los chips) y más en las de **continuación** (solo título + tabla).
+ * título) y más en las de **continuación** (solo título + tabla).
  */
 const ROWS_FIRST = 10;
 const ROWS_CONT = 14;
@@ -74,48 +61,25 @@ function chunkRows<T>(items: readonly T[], first: number, rest: number): T[][] {
 }
 
 /**
- * Una receta como una o varias caras: la primera con título + chips + tabla; si
- * los insumos no caben, **continúan** en las siguientes (marcadas `continued`,
- * fuera del índice). El pie muestra «Continúa…» salvo en la última (total).
+ * Una receta es SIEMPRE una sola cara y en la textura 3D lleva **solo el título** (paper + nombre):
+ * el contenido (ingredientes, preparación, imágenes) lo pinta un overlay DOM sobre la hoja, con
+ * scroll nativo. Nunca se parte en páginas de continuación.
  */
-function recipePages(
-  recipe: Recipe,
-  category: RecipeCategory,
-  rows: { cells: string[] }[],
-  columns: string[],
-): PageContent[] {
-  const chips = recipeChips(recipe, category);
-  const total = `${recipe.lines.length} insumos`;
-  const groups = chunkRows(rows, ROWS_FIRST, ROWS_CONT);
-  if (groups.length <= 1) {
-    return [{ kind: 'recipe', section: category.id.value, title: recipe.name, chips, columns, rows, footer: total }];
-  }
-  return groups.map((group, i) => {
-    const last = i === groups.length - 1;
-    return i === 0
-      ? { kind: 'recipe', section: category.id.value, title: recipe.name, chips, columns, rows: group, footer: 'Continúa…' }
-      : {
-          kind: 'recipe',
-          section: category.id.value,
-          title: recipe.name,
-          subtitle: 'continuación',
-          columns,
-          rows: group,
-          continued: true,
-          footer: last ? total : 'Continúa…',
-        };
-  });
+function recipePages(recipe: Recipe, category: RecipeCategory): PageContent[] {
+  // `overlay: true` → la textura pinta solo papel; el título y los ingredientes los dibuja el
+  // overlay DOM transparente sobre la hoja (para ver el fondo real del libro 3D detrás).
+  return [{ kind: 'recipe', section: category.id.value, title: recipe.name, overlay: true }];
 }
 
 /**
  * Una o más páginas de lista de insumos. Tres columnas bien separadas
  * (Insumo · Cantidad · Precio) para que se lea como una tabla, no apretado.
  */
-function ingredientListPages(ingredients: readonly Ingredient[]): PageContent[] {
+function supplyListPages(supplies: readonly Supply[]): PageContent[] {
   const pages: PageContent[] = [
     { kind: 'section', subtitle: 'Sección', title: 'Insumos', section: INGREDIENTS_SECTION },
   ];
-  if (ingredients.length === 0) {
+  if (supplies.length === 0) {
     pages.push({
       kind: 'recipe',
       section: INGREDIENTS_SECTION,
@@ -124,7 +88,7 @@ function ingredientListPages(ingredients: readonly Ingredient[]): PageContent[] 
     });
     return pages;
   }
-  const sorted = [...ingredients].sort((a, b) => a.name.localeCompare(b.name, 'es'));
+  const sorted = [...supplies].sort((a, b) => a.name.localeCompare(b.name, 'es'));
   const rows = sorted.map((i) => ({
     cells: [
       i.name,
@@ -132,7 +96,7 @@ function ingredientListPages(ingredients: readonly Ingredient[]): PageContent[] 
       formatMoney(i.purchasePrice.amount),
     ],
   }));
-  const total = `${ingredients.length} insumos`;
+  const total = `${supplies.length} insumos`;
   const groups = chunkRows(rows, ROWS_FIRST, ROWS_CONT);
   groups.forEach((group, i) => {
     const last = i === groups.length - 1;

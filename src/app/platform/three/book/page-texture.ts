@@ -1,4 +1,4 @@
-import { CanvasTexture, SRGBColorSpace } from 'three';
+import { CanvasTexture, LinearFilter, SRGBColorSpace } from 'three';
 import { PageContent } from './page-content';
 
 /**
@@ -30,7 +30,7 @@ const MUTED = '#9a886f'; // cacao apagado (subtítulos, pie)
 const FONT_SERIF = 'Georgia, "Times New Roman", serif';
 const FONT_SANS = 'system-ui, -apple-system, "Segoe UI", sans-serif';
 
-/** Renderiza una cara de página a textura. */
+/** Renderiza una cara de página a una textura. */
 export function renderPageTexture(content: PageContent): CanvasTexture {
   const canvas = document.createElement('canvas');
   canvas.width = W;
@@ -38,7 +38,9 @@ export function renderPageTexture(content: PageContent): CanvasTexture {
   const ctx = canvas.getContext('2d');
   if (ctx) {
     paintPaper(ctx);
-    switch (content.kind) {
+    // Páginas con overlay DOM: solo el papel; el título/contenido los dibuja el overlay transparente
+    // encima (así se ve la hoja real del libro 3D como fondo). Se omite el texto de la textura.
+    switch (content.overlay ? 'blank' : content.kind) {
       case 'cover':
         paintCover(ctx, content);
         break;
@@ -55,7 +57,9 @@ export function renderPageTexture(content: PageContent): CanvasTexture {
   }
   const texture = new CanvasTexture(canvas);
   texture.colorSpace = SRGBColorSpace;
-  texture.anisotropy = 4;
+  // Sin mipmaps: bilineal basta (el libro se ve casi de frente) y abarata las subidas de textura.
+  texture.generateMipmaps = false;
+  texture.minFilter = LinearFilter;
   texture.needsUpdate = true;
   return texture;
 }
@@ -103,7 +107,11 @@ function paintSection(ctx: CanvasRenderingContext2D, content: PageContent): void
   ctx.textAlign = 'left';
 }
 
-/** Página de receta / índice: título, chips, tabla rayada y pie. */
+/**
+ * Página de receta / índice. RECETA (sin columnas): solo título + subtítulo (el contenido rico —
+ * ingredientes, preparación, imágenes — lo pinta un overlay DOM con scroll nativo). INSUMOS (con
+ * columnas): título + tabla rayada + pie, paginada.
+ */
 function paintRecipe(ctx: CanvasRenderingContext2D, content: PageContent): void {
   const marginL = W * 0.12;
   const marginR = W * 0.08;
@@ -115,7 +123,7 @@ function paintRecipe(ctx: CanvasRenderingContext2D, content: PageContent): void 
   ctx.font = `bold 64px ${FONT_SERIF}`;
   y = wrapText(ctx, content.title ?? '', marginL, y, right - marginL, 72, 'left');
 
-  // Subtítulo (baseline bien por debajo del título para no solaparse).
+  // Subtítulo.
   if (content.subtitle) {
     y += 60;
     ctx.fillStyle = MUTED;
@@ -134,9 +142,9 @@ function paintRecipe(ctx: CanvasRenderingContext2D, content: PageContent): void 
   rule(ctx, marginL, y, right - marginL, COLOR.accent, 4);
   y += 48;
 
-  // Tabla.
+  // Tabla (solo Insumos; una receta no trae columnas).
   if (content.columns?.length) {
-    y = paintTable(ctx, content.columns, content.rows ?? [], marginL, y, right);
+    paintTable(ctx, content.columns, content.rows ?? [], marginL, y, right);
   }
 
   // Pie.

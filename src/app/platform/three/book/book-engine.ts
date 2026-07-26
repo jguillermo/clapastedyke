@@ -10,6 +10,7 @@ import {
   Scene,
   SRGBColorSpace,
   Texture,
+  Vector3,
   WebGLRenderer,
 } from 'three';
 import { buildBookMesh, BookMesh, PAGE_H, PAGE_W } from './book-mesh';
@@ -25,6 +26,8 @@ export interface BookSpread {
   readonly canNext: boolean;
   readonly left: PageContent | null;
   readonly right: PageContent | null;
+  /** `true` en modo single (una página, móvil); `false` en spread (dos páginas, escritorio). */
+  readonly single: boolean;
 }
 
 export type SpreadChangeHandler = (spread: BookSpread) => void;
@@ -34,7 +37,7 @@ export type BookMode = 'spread' | 'single';
 
 const FOV = 32;
 const MARGIN = 0.18; // aire alrededor del libro al encuadrar (spread)
-const SINGLE_MARGIN = 0.04; // en single la hoja llena casi todo el ancho (al borde)
+const SINGLE_MARGIN = 0; // en single la hoja llena todo el ancho (borde a borde, lo más grande posible)
 /** Por debajo de este aspect (alto/estrecho) o ancho se pasa a una sola página. */
 const SINGLE_ASPECT = 1.0;
 const SINGLE_WIDTH = 700;
@@ -101,7 +104,8 @@ export class BookEngine {
     this.renderer.toneMapping = ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.05;
 
-    this.scene.background = new Color(0xefe3cf); // crema un poco más cálida que la cocina
+    // Ambiente cálido alrededor del libro (crema un poco más cálida que la cocina).
+    this.scene.background = new Color(0xefe3cf);
 
     const hemi = new HemisphereLight(0xfff3df, 0xe8d9c4, 1.15);
     this.scene.add(hemi);
@@ -168,6 +172,7 @@ export class BookEngine {
         canNext: this.faceIndex < this.lastContentFace,
         left: null,
         right: this.faceAt(this.faceIndex),
+        single: true,
       };
     }
     return {
@@ -177,12 +182,53 @@ export class BookEngine {
       canNext: this.leafIndex < total,
       left: this.faceAt(2 * this.leafIndex - 1),
       right: this.faceAt(2 * this.leafIndex),
+      single: false,
     };
   }
 
   /** Cara activa actual (ancla de lectura, válida en ambos modos). */
   get currentFaceIndex(): number {
     return this.mode === 'single' ? this.faceIndex : 2 * this.leafIndex;
+  }
+
+  /**
+   * Rectángulo en pantalla (px de viewport) de la cara asentada visible, proyectando sus 4 esquinas
+   * con la cámara. El feature lo usa para colocar el overlay DOM justo sobre la hoja. En `single`
+   * solo existe la derecha → `getPageRect('left')` devuelve `null`.
+   */
+  getPageRect(side: 'left' | 'right'): { x: number; y: number; width: number; height: number } | null {
+    if (this.mode === 'single' && side === 'left') {
+      return null;
+    }
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) {
+      return null;
+    }
+    const mesh = side === 'left' ? this.book.leftPage : this.book.rightPage;
+    this.camera.updateMatrixWorld();
+    mesh.updateWorldMatrix(true, false);
+    // Esquinas del plano en coords locales (la geometría se trasladó: derecha x∈[0,PAGE_W], izq [-PAGE_W,0]).
+    const [x0, x1] = side === 'left' ? [-PAGE_W, 0] : [0, PAGE_W];
+    const hy = PAGE_H / 2;
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const [lx, ly] of [
+      [x0, -hy],
+      [x1, -hy],
+      [x0, hy],
+      [x1, hy],
+    ] as const) {
+      const p = new Vector3(lx, ly, 0).applyMatrix4(mesh.matrixWorld).project(this.camera);
+      const sx = rect.left + ((p.x + 1) / 2) * rect.width;
+      const sy = rect.top + ((1 - p.y) / 2) * rect.height;
+      minX = Math.min(minX, sx);
+      maxX = Math.max(maxX, sx);
+      minY = Math.min(minY, sy);
+      maxY = Math.max(maxY, sy);
+    }
+    return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
   }
 
   /**
@@ -515,7 +561,7 @@ export class BookEngine {
     const distH = halfH / Math.tan(vFov / 2);
     const hFov = 2 * Math.atan(Math.tan(vFov / 2) * this.aspect);
     const distW = halfW / Math.tan(hFov / 2);
-    const distance = Math.max(distH, distW) * (single ? 1.01 : 1.06);
+    const distance = Math.max(distH, distW) * (single ? 1.0 : 1.06);
 
     this.camera.position.set(targetX, 0.18, distance);
     this.camera.lookAt(targetX, 0, 0);

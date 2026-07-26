@@ -4,27 +4,31 @@ import { BaseUnit, Quantity } from '../../../_common/quantity';
 import { PurchasePrice } from '../../domain/value-objects/purchase-price';
 import { formatSoles } from '../money';
 
+/** Una línea de receta dentro de {@link PreviewRecipeCostRequest}: cómo se compra el insumo y la cantidad usada. */
 export interface PreviewRecipeCostLine {
     purchasePrice: { amount: number; per: { value: number; unit: BaseUnit } } | null;
     quantity?: { value: number; unit: BaseUnit };
 }
 
+/** Entrada de {@link PreviewRecipeCost}: las líneas de la receta a costear. */
 export interface PreviewRecipeCostRequest {
     lines: PreviewRecipeCostLine[];
 }
 
+/** Resultado de {@link PreviewRecipeCost}: el costo por línea y el total, formateados listos para pintar. */
 export interface PreviewRecipeCostResult {
-    /** Per-line proportional cost, formatted (`'S/ 1.50'`), aligned to the input order. */
+    /** Costo proporcional por línea, formateado (`'S/ 1.50'`), alineado al orden de la entrada. */
     items: { cost: string }[];
-    /** Materials total of the priced lines, formatted (`'S/ 4.00'`). */
+    /** Total de materiales de las líneas con precio, formateado (`'S/ 4.00'`). */
     total: string;
 }
 
 /**
- * Live reference calculation: the proportional cost of each recipe line and the
- * **materials total**, all formatted ready to paint (memoria
- * `calculos-solo-en-negocio`). A line with no price/quantity (or mismatched
- * unit) contributes an empty cost and is excluded from the total.
+ * Cálculo de referencia en vivo: el costo proporcional de cada línea de receta y el **total de
+ * materiales**, todo formateado listo para pintar (memoria `calculos-solo-en-negocio`). Una línea
+ * sin precio/cantidad (o con unidad que no coincide) aporta un costo vacío y queda excluida del
+ * total. La invoca el formulario de receta al teclear cantidades. Cálculo puro: usa el VO
+ * PurchasePrice y el helper `formatSoles` de `money`; no toca repositorios ni publica evento.
  */
 @Injectable({ providedIn: 'root' })
 export class PreviewRecipeCost extends UseCase<PreviewRecipeCostRequest, PreviewRecipeCostResult> {

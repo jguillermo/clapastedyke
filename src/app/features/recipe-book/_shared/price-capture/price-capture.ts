@@ -21,9 +21,9 @@ import { FormField } from '@components/form-field/form-field';
 import { CurrencyInput } from '@components/currency-input/currency-input';
 import { UnitInput, type UnitToken } from '@components/unit-input/unit-input';
 import { MeasureInput, type MeasureKind } from '@core/recipe-book/domain/value-objects/measure-input';
-import { PreviewIngredientCost } from '@core/recipe-book/application/use-cases/preview-ingredient-cost.use-case';
+import { PreviewSupplyCost } from '@core/recipe-book/application/use-cases/preview-supply-cost.use-case';
 
-/** How an ingredient is bought, normalised to its base unit. */
+/** How an supply is bought, normalised to its base unit. */
 export interface PurchaseValue {
   amount: number;
   per: { value: number; unit: BaseUnit };
@@ -33,7 +33,7 @@ export interface PurchaseValue {
 /**
  * Popover en línea para fijar el **costo de compra** de un insumo: presentación
  * (¿cuánto compras?) + precio. Muestra en vivo el costo por unidad base (lo
- * calcula el negocio, {@link PreviewIngredientCost}; la vista no calcula). Emite
+ * calcula el negocio, {@link PreviewSupplyCost}; la vista no calcula). Emite
  * `confirm` con el precio normalizado a la unidad base. Se reutiliza para
  * cualquier insumo (receta, topper, caja, base).
  *
@@ -84,7 +84,7 @@ export interface PurchaseValue {
 })
 export class PriceCapture implements OnInit {
   private readonly fb = inject(FormBuilder);
-  private readonly preview = inject(PreviewIngredientCost);
+  private readonly preview = inject(PreviewSupplyCost);
 
   readonly name = input('');
   readonly initial = input<PurchaseValue | null>(null);

@@ -1,269 +1,154 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal, viewChild } from '@angular/core';
-import { AbstractControl, FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { Button } from '@components/button/button';
 import { Card } from '@components/card/card';
 import { CardBody } from '@components/card/card-body';
 import { CardFooter } from '@components/card/card-footer';
 import { CardHeader } from '@components/card/card-header';
 import { CardTitle } from '@components/card/card-title';
 import { CardSubtitle } from '@components/card/card-subtitle';
+import { Button } from '@components/button/button';
 import { Icon } from '@components/icon/icon';
 import { FormField } from '@components/form-field/form-field';
 import { InputField } from '@components/input/input';
-import { SelectTag, type SelectTagType } from '@components/select-tag/select-tag';
 import { MIGO_DIALOG_DATA, MigoDialogRef } from '@components/dialog/dialog.service';
-import { MeasureInput } from '@core/recipe-book/domain/value-objects/measure-input';
-import type { RecipeCategory } from '@core/recipe-book/domain/entities/recipe-category';
+import type { Supply } from '@core/recipe-book/domain/entities/supply';
 import { SaveRecipe } from '@core/recipe-book/application/use-cases/save-recipe.use-case';
-import { SaveIngredient } from '@core/recipe-book/application/use-cases/save-ingredient.use-case';
-import { SaveFlavor } from '@core/recipe-book/application/use-cases/save-flavor.use-case';
-import { SaveConversionOption } from '@core/recipe-book/application/use-cases/save-conversion-option.use-case';
-import { IngredientGrid, type IngredientOption, type InitialLine } from '../_shared/ingredient-grid/ingredient-grid';
-import { messageOf, union, validateForType, validateServings } from '../_shared/recipe-form.utils';
+import { SaveSupply } from '@core/recipe-book/application/use-cases/save-supply.use-case';
+import { SupplyGrid, type InitialLine, type SupplyOption } from '../_shared/supply-grid/supply-grid';
 
-export type { IngredientOption };
-
-/** Receta existente proyectada para precargar el formulario al editar. */
-export interface RecipeFormPrefill {
-  name: string;
-  /** Valor (texto visible) por id de propiedad. */
-  values: Record<string, string>;
-  lines: InitialLine[];
+/** Datos del diálogo de crear/editar receta. */
+export interface RecipeFormData {
+  /** Categoría destino (fija): su id se guarda, su nombre se muestra como subtítulo. */
+  category: { id: string; name: string };
+  /** Catálogo de insumos (con precio) para autocompletar la grilla y resolver ids. */
+  supplies: readonly Supply[];
+  /** Presente → editar (precarga nombre + líneas); ausente → crear. */
+  recipe?: { id: string; name: string; lines: InitialLine[] };
 }
 
-/** Datos del diálogo: la categoría (esquema), insumos, sugerencias y receta a editar. */
-export interface RecipeFormData {
-  category: RecipeCategory;
-  ingredients: IngredientOption[];
-  /** Sugerencias por id de propiedad (valores ya usados por otras recetas). */
-  valuesByProp: Record<string, string[]>;
-  recipe?: RecipeFormPrefill;
+/** Resultado al guardar: para que el libro recargue y salte a la receta tocada. */
+export interface RecipeFormResult {
+  id: string;
+  categoryId: string;
+  name: string;
 }
 
 /**
- * Formulario de receta **dinámico**: el título y la grilla de insumos van siempre;
- * los demás campos se generan según el esquema de propiedades de la categoría
- * (texto/número/peso, obligatorias u opcionales). Reutiliza la grilla de
- * ingredientes y el `migo-select-tag` para capturar los valores de propiedad.
+ * Formulario ÚNICO de receta (crear y editar). Contenido de un MigoDialog. Edita el nombre y los
+ * ingredientes (grilla reutilizable {@link SupplyGrid}, que muestra el costo). Al guardar, asegura
+ * cada insumo por nombre ({@link SaveSupply}, create-if-absent) y persiste la receta
+ * ({@link SaveRecipe}); la categoría es fija. Inyecta solo use cases.
  */
 @Component({
   selector: 'app-recipe-form',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [
-    ReactiveFormsModule,
-    Button,
-    Card,
-    CardHeader,
-    CardTitle,
-    CardSubtitle,
-    CardBody,
-    CardFooter,
-    Icon,
-    FormField,
-    InputField,
-    SelectTag,
-    IngredientGrid,
-  ],
-  // `contents`: el host no genera caja, así el `migo-card fill` es el hijo flex directo del
-  // contenedor del diálogo y llena la pantalla en móvil (solo el body scrollea, sin scroll de página).
-  host: { class: 'contents', '(focusout)': 'bumpInteraction()' },
-  templateUrl: './recipe-form.html',
+  imports: [ReactiveFormsModule, Card, CardHeader, CardTitle, CardSubtitle, CardBody, CardFooter, Button, Icon, FormField, InputField, SupplyGrid],
+  // `contents`: el card `fill` es hijo flex directo del diálogo y llena la pantalla en móvil.
+  host: { class: 'contents' },
+  template: `
+    <migo-card fill>
+      <migo-card-header>
+        <migo-icon card-icon name="mat:layers" size="lg" color="brand" />
+        <migo-card-title>{{ data.recipe ? data.recipe.name : 'Nueva receta' }}</migo-card-title>
+        <migo-card-subtitle>{{ data.category.name }}</migo-card-subtitle>
+        <button card-actions migo-button variant="ghost" type="button" aria-label="Cerrar" (click)="cancel()">
+          <migo-icon icon-leading name="mat:close" size="sm" />
+        </button>
+      </migo-card-header>
+
+      <migo-card-body>
+        <div class="flex flex-col gap-4">
+          <migo-form-field label="Nombre">
+            <migo-input [formControl]="name" placeholder="Nombre de la receta" />
+          </migo-form-field>
+
+          <app-supply-grid [supplies]="supplyOptions()" [initialLines]="initialLines()" />
+
+          @if (errorMessage(); as error) {
+            <p class="m-0 text-sm text-error" role="alert">{{ error }}</p>
+          }
+        </div>
+      </migo-card-body>
+
+      <migo-card-footer>
+        <button migo-button variant="ghost" type="button" (click)="cancel()">Cancelar</button>
+        <button migo-button type="button" [disabled]="!canSave() || saving()" (click)="save()">
+          <migo-icon icon-leading name="mat:check" size="sm" />
+          <span>Guardar</span>
+        </button>
+      </migo-card-footer>
+    </migo-card>
+  `,
 })
 export class RecipeForm {
-  private readonly fb = inject(FormBuilder);
+  protected readonly ref = inject<MigoDialogRef<RecipeFormResult>>(MigoDialogRef);
+  protected readonly data = inject<RecipeFormData>(MIGO_DIALOG_DATA);
   private readonly saveRecipe = inject(SaveRecipe);
-  private readonly saveIngredient = inject(SaveIngredient);
-  private readonly saveFlavor = inject(SaveFlavor);
-  private readonly saveConversionOption = inject(SaveConversionOption);
-  protected readonly ref = inject<MigoDialogRef<{ id: string }>>(MigoDialogRef);
-  private readonly data = inject<RecipeFormData>(MIGO_DIALOG_DATA);
+  private readonly saveSupply = inject(SaveSupply);
 
-  protected readonly category = this.data.category;
-  protected readonly ingredientOptions = this.data.ingredients;
-  private readonly prefill = this.data.recipe ?? null;
-  protected readonly editing = this.prefill !== null;
-  protected readonly title = this.editing ? 'Editar receta' : 'Nueva receta';
-  protected readonly saveLabel = this.editing ? 'Guardar cambios' : 'Guardar receta';
-  protected readonly initialLines = this.prefill?.lines ?? [];
-  protected readonly initialChars: Record<string, string> = this.prefill?.values ?? {};
-  // Solo las propiedades marcadas visibles aparecen como inputs en el formulario.
-  private readonly visibleProperties = this.category.properties.filter((p) => p.selectable);
-  protected readonly hasProperties = this.visibleProperties.length > 0;
+  private readonly grid = viewChild.required(SupplyGrid);
 
-  protected readonly form = this.fb.nonNullable.group({
-    name: [{ value: this.prefill?.name ?? '', disabled: this.editing }, Validators.required],
-  });
+  protected readonly name = new FormControl<string>(this.data.recipe?.name ?? '', { nonNullable: true });
+  private readonly nameValue = toSignal(this.name.valueChanges, { initialValue: this.name.value });
 
-  protected readonly chars = signal<Record<string, string>>({ ...this.initialChars });
   protected readonly saving = signal(false);
-  protected readonly submitted = signal(false);
   protected readonly errorMessage = signal('');
 
-  private readonly grid = viewChild(IngredientGrid);
-  private readonly valueTick = toSignal(this.form.valueChanges, { initialValue: null });
-  private readonly interaction = signal(0);
+  protected readonly canSave = computed(() => this.nameValue().trim().length > 0);
 
-  protected readonly charTypes = computed<SelectTagType[]>(() =>
-    this.visibleProperties.map((property) => {
-      const isPortions = property.type === 'options' && property.group === 'portions';
-      const isMold = property.type === 'options' && property.group === 'mold';
-      return {
-        key: property.id,
-        label: property.name,
-        values: union([], this.data.valuesByProp[property.id]),
-        // Molde no se puede crear desde aquí (necesita un factor de conversión); se elige del catálogo.
-        allowCreate: !isMold,
-        // Las porciones son números enteros positivos; el resto, etiqueta libre.
-        validate: isPortions ? validateServings : validateForType(property.type),
-      };
-    }),
+  protected readonly supplyOptions = computed<SupplyOption[]>(() =>
+    this.data.supplies.map((s) => ({
+      name: s.name,
+      baseUnit: s.baseUnit,
+      purchase: {
+        amount: s.purchasePrice.amount,
+        per: { value: s.purchasePrice.per.value, unit: s.purchasePrice.per.unit },
+        currency: s.purchasePrice.currency,
+      },
+    })),
   );
 
-  protected readonly nameError = computed(() => this.errorFor(this.form.controls.name, 'El nombre es obligatorio.'));
-
-  protected readonly charsError = computed(() => {
-    if (!this.submitted()) {
-      return '';
-    }
-    const missing = this.firstMissingRequired();
-    return missing ? `Completa "${missing}".` : '';
-  });
-
-  protected onChars(selection: Record<string, string>): void {
-    this.chars.set(selection);
-  }
-
-  protected async save(): Promise<void> {
-    this.submitted.set(true);
-    this.errorMessage.set('');
-    this.form.markAllAsTouched();
-    this.interaction.update((n) => n + 1);
-
-    const grid = this.grid();
-    grid?.markSubmitted();
-
-    if (this.form.controls.name.invalid || this.firstMissingRequired()) {
-      return;
-    }
-
-    const parsed = grid?.collect() ?? null;
-    if (!parsed) {
-      return;
-    }
-
-    const values = this.buildValues();
-    if (!values) {
-      return;
-    }
-
-    this.saving.set(true);
-    try {
-      const lines: { ingredientId: string; quantity: number }[] = [];
-      for (const item of parsed) {
-        const { id } = await this.saveIngredient.execute({
-          name: item.name,
-          baseUnit: item.baseUnit,
-          usage: 'recipe',
-          purchasePrice: item.purchase,
-        });
-        lines.push({ ingredientId: id, quantity: item.quantity });
-      }
-      await this.ensureCatalog();
-      const result = await this.saveRecipe.execute({
-        categoryId: this.category.id.value,
-        name: this.form.getRawValue().name,
-        values,
-        lines,
-      });
-      this.ref.close(result);
-    } catch (error) {
-      this.errorMessage.set(messageOf(error));
-    } finally {
-      this.saving.set(false);
-    }
-  }
+  protected readonly initialLines = computed<InitialLine[]>(() => this.data.recipe?.lines ?? []);
 
   protected cancel(): void {
     this.ref.close();
   }
 
-  protected bumpInteraction(): void {
-    this.interaction.update((n) => n + 1);
-  }
-
-  // --- Helpers ---
-
-  /**
-   * Crea en el catálogo los valores nuevos elegidos: el Sabor y las Porciones
-   * (número entero = label y factor) se persisten si no existían. El Molde no se
-   * crea aquí (necesita factor; se gestiona en la categoría). Dedup por label en
-   * los use cases evita duplicados al reusar valores existentes.
-   */
-  private async ensureCatalog(): Promise<void> {
-    for (const property of this.visibleProperties) {
-      const raw = this.chars()[property.id]?.trim();
-      if (!raw) {
-        continue;
-      }
-      if (property.type === 'flavor') {
-        await this.saveFlavor.execute({ label: raw });
-      } else if (property.type === 'options' && property.group === 'portions') {
-        const n = Number(raw);
-        if (Number.isInteger(n) && n > 0) {
-          await this.saveConversionOption.execute({ group: 'portions', label: raw, factor: n });
-        }
-      }
+  protected async save(): Promise<void> {
+    const name = this.name.value.trim();
+    if (!name) {
+      return;
     }
-  }
-
-  /** Convierte los valores del select-tag a la entrada de SaveRecipe (peso → gramos). */
-  private buildValues(): { propertyId: string; value: string | number }[] | null {
-    const out: { propertyId: string; value: string | number }[] = [];
-    for (const property of this.visibleProperties) {
-      const raw = this.chars()[property.id]?.trim();
-      if (!raw) {
-        continue;
-      }
-      if (property.type === 'weight') {
-        const measure = MeasureInput.parse(raw, 'mass');
-        if (!measure.quantity) {
-          this.errorMessage.set(`El valor de "${property.name}" no es un peso válido.`);
-          return null;
-        }
-        out.push({ propertyId: property.id, value: measure.quantity.value });
-      } else if (property.type === 'number') {
-        out.push({ propertyId: property.id, value: Number(raw) });
-      } else {
-        out.push({ propertyId: property.id, value: raw });
-      }
+    const parsed = this.grid().collect();
+    if (!parsed) {
+      return; // la grilla muestra su propio error
     }
-    return out;
-  }
-
-  /** Nombre de la primera propiedad obligatoria sin valor válido (o null si todas ok). */
-  private firstMissingRequired(): string | null {
-    for (const property of this.visibleProperties) {
-      if (!property.required) {
-        continue;
+    this.saving.set(true);
+    this.errorMessage.set('');
+    try {
+      // Asegura cada insumo por nombre (create-if-absent) y resuelve su id.
+      const lines = [];
+      for (const line of parsed) {
+        const { id: supplyId } = await this.saveSupply.execute({
+          name: line.name,
+          baseUnit: line.baseUnit,
+          usage: 'recipe',
+          purchasePrice: line.purchase,
+        });
+        lines.push({ supplyId, quantity: line.quantity });
       }
-      const raw = this.chars()[property.id]?.trim();
-      const ok = property.type === 'weight' ? !!raw && MeasureInput.parse(raw, 'mass').isValid : !!raw;
-      if (!ok) {
-        return property.name;
-      }
+      const { id } = await this.saveRecipe.execute({
+        id: this.data.recipe?.id,
+        categoryId: this.data.category.id,
+        name,
+        lines,
+      });
+      this.ref.close({ id, categoryId: this.data.category.id, name });
+    } catch (error) {
+      this.errorMessage.set(error instanceof Error ? error.message : 'No se pudo guardar la receta.');
+    } finally {
+      this.saving.set(false);
     }
-    return null;
-  }
-
-  private shows(control: AbstractControl): boolean {
-    this.valueTick();
-    this.interaction();
-    this.submitted();
-    return control.invalid && (control.touched || this.submitted());
-  }
-
-  private errorFor(control: AbstractControl, message: string): string {
-    return this.shows(control) ? message : '';
   }
 }

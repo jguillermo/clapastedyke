@@ -4,8 +4,8 @@ import { DomainEvent } from './domain-event';
  * Aggregate root that records the domain events it produces during its own
  * state transitions. The use case pulls and publishes them after persisting.
  * Use this base only for aggregates whose events emerge from internal logic
- * (e.g. PlayerProgress reconciling levels); aggregates whose events are simple
- * outcomes can let the use case build the event directly.
+ * (e.g. Supply recording SupplyRepriced); aggregates whose events are
+ * simple outcomes can let the use case build the event directly.
  */
 export abstract class AggregateRoot {
     private events: DomainEvent[] = [];

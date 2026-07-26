@@ -1,6 +1,4 @@
 import { BaseUnit } from '@core/_common/quantity';
-import type { Recipe } from '@core/recipe-book/domain/entities/recipe';
-import type { RecipeCategory } from '@core/recipe-book/domain/entities/recipe-category';
 
 /**
  * Helpers de **presentación** del libro de recetas (solo formato, sin cálculo de
@@ -24,26 +22,4 @@ export function formatQuantity(value: number, unit: BaseUnit): string {
  */
 export function formatMoney(amount: number): string {
   return `S/ ${Number.isInteger(amount) ? amount : amount.toFixed(2)}`;
-}
-
-/**
- * Chips de una receta a partir de los valores de las propiedades de su categoría,
- * en el orden del esquema. Peso → "1 kg"; número → "4 porciones"; texto → su valor.
- */
-export function recipeChips(recipe: Recipe, category: RecipeCategory): string[] {
-  const chips: string[] = [];
-  for (const property of category.properties) {
-    const value = recipe.valueOf(property.id);
-    if (!value) {
-      continue;
-    }
-    if (property.type === 'weight') {
-      chips.push(formatWeight(value.asWeight().value));
-    } else if (property.type === 'number') {
-      chips.push(`${value.value} ${property.name.toLowerCase()}`);
-    } else {
-      chips.push(String(value.value));
-    }
-  }
-  return chips;
 }

@@ -41,4 +41,9 @@ export interface PageContent {
    * El feature la marca para no duplicarla en el índice; la plataforma no la usa.
    */
   readonly continued?: boolean;
+  /**
+   * `true` si el contenido de esta cara lo dibuja un **overlay DOM** sobre la hoja (no la textura):
+   * la plataforma pinta solo el papel en blanco y el título/contenido van en el overlay transparente.
+   */
+  readonly overlay?: boolean;
 }

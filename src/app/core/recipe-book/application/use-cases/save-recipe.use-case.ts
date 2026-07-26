@@ -4,89 +4,56 @@ import { EntityId } from '../../../_common/entity-id';
 import { Quantity } from '../../../_common/quantity';
 import { EventBus } from '../../../_common/event-bus';
 import { Recipe } from '../../domain/entities/recipe';
-import { RecipeCategory } from '../../domain/entities/recipe-category';
-import { IngredientLine } from '../../domain/value-objects/ingredient-line';
-import { RecipePropertyValue } from '../../domain/value-objects/recipe-property-value';
-import { RecipeCategoryRepository } from '../../domain/repositories/recipe-category.repository';
+import { SupplyLine } from '../../domain/value-objects/supply-line';
 import { RecipeRepository } from '../../domain/repositories/recipe.repository';
-import { IngredientRepository } from '../../domain/repositories/ingredient.repository';
+import { SupplyRepository } from '../../domain/repositories/supply.repository';
 import { RecipeBookEvents } from '../../domain/events/recipe-book-events';
 
-interface RecipeValueInput {
-    propertyId: string;
-    value: string | number; // peso → gramos; número → número; texto → string
-}
-
-interface RecipeLineInput {
-    ingredientId: string;
+/** Una línea de la receta: el insumo (por id) y su cantidad en la unidad base del insumo. */
+export interface RecipeLineInput {
+    supplyId: string;
     quantity: number;
 }
 
+/** Entrada de {@link SaveRecipe}: categoría, nombre y líneas de insumo (con id para editar, sin id para crear). */
 export interface SaveRecipeRequest {
+    id?: string; // presente → editar; ausente → crear
     categoryId: string;
     name: string;
-    values: RecipeValueInput[];
     lines: RecipeLineInput[];
 }
 
 /**
- * Guarda una receta dentro de su categoría. Upsert por (categoría, nombre).
- * Construye los valores de propiedad según el esquema de la categoría y valida
- * obligatorias/tipos (la regla vive en `RecipeCategory.validateValues`) y que
- * cada ingrediente exista.
+ * Guarda una receta (crea o edita). La invocan las pantallas de alta/edición de receta del
+ * recetario. Resuelve cada insumo por id (para tomar su unidad base) y arma las `SupplyLine`; la
+ * regla "al menos una línea" vive en `Recipe`. El use case orquesta: construye el agregado y lo
+ * persiste — **no decide crear-vs-editar**, eso es responsabilidad de la infraestructura
+ * (`RecipeRepository.save` es un upsert por id). Publica `RecipeSaved` vía EventBus.
  */
 @Injectable({ providedIn: 'root' })
 export class SaveRecipe extends UseCase<SaveRecipeRequest, { id: string }> {
     private readonly recipes = inject(RecipeRepository);
-    private readonly categories = inject(RecipeCategoryRepository);
-    private readonly ingredients = inject(IngredientRepository);
+    private readonly supplies = inject(SupplyRepository);
     private readonly bus = inject(EventBus);
 
-    async execute({ categoryId, name, values, lines }: SaveRecipeRequest): Promise<{ id: string }> {
-        const categoryEntityId = new EntityId(categoryId);
-        const category = await this.categories.byId(categoryEntityId);
-        if (!category) {
-            throw new Error(`Category ${categoryId} not found`);
-        }
-
-        const propertyValues = values.map((input) => this.toValue(category, input));
-        category.validateValues(propertyValues);
-
-        const ingredientLines = await this.buildLines(lines);
-
-        const existing = await this.recipes.byNameInCategory(categoryEntityId, name);
-        const id = existing?.id ?? this.recipes.nextIdentity();
-        const recipe = Recipe.create(id, categoryEntityId, name, propertyValues, ingredientLines);
-
+    async execute({ id, categoryId, name, lines }: SaveRecipeRequest): Promise<{ id: string }> {
+        const recipeId = id ? new EntityId(id) : this.recipes.nextIdentity();
+        const supplyLines = await this.buildLines(lines);
+        const recipe = Recipe.create(recipeId, new EntityId(categoryId), name, supplyLines);
         await this.recipes.save(recipe);
-        await this.bus.publish([RecipeBookEvents.recipeSaved(id.value, !existing, categoryId)]);
-        return { id: id.value };
+        await this.bus.publish([RecipeBookEvents.recipeSaved(recipeId.value, !id, categoryId)]);
+        return { id: recipeId.value };
     }
 
-    private toValue(category: RecipeCategory, input: RecipeValueInput): RecipePropertyValue {
-        const property = category.property(input.propertyId);
-        if (!property) {
-            throw new Error(`Unknown property ${input.propertyId}`);
-        }
-        if (property.type === 'weight') {
-            return RecipePropertyValue.of(input.propertyId, 'weight', Quantity.of(Number(input.value), 'g'));
-        }
-        if (property.type === 'number') {
-            return RecipePropertyValue.of(input.propertyId, 'number', Number(input.value));
-        }
-        // text / flavor / options: el valor guardado es el label (string).
-        return RecipePropertyValue.of(input.propertyId, property.type, String(input.value));
-    }
-
-    private async buildLines(lines: RecipeLineInput[]): Promise<IngredientLine[]> {
-        const built: IngredientLine[] = [];
+    private async buildLines(lines: RecipeLineInput[]): Promise<SupplyLine[]> {
+        const built: SupplyLine[] = [];
         for (const line of lines) {
-            const ingredientId = new EntityId(line.ingredientId);
-            const ingredient = await this.ingredients.byId(ingredientId);
-            if (!ingredient) {
-                throw new Error(`Ingredient ${line.ingredientId} does not exist`);
+            const supplyId = new EntityId(line.supplyId);
+            const supply = await this.supplies.byId(supplyId);
+            if (!supply) {
+                throw new Error(`Supply ${line.supplyId} does not exist`);
             }
-            built.push(IngredientLine.of(ingredientId, Quantity.of(line.quantity, ingredient.baseUnit)));
+            built.push(SupplyLine.of(supplyId, Quantity.of(line.quantity, supply.baseUnit)));
         }
         return built;
     }

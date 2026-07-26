@@ -1,12 +1,11 @@
 import { BaseUnit } from '../../_common/quantity';
-import { ConversionGroup } from '../domain/entities/conversion-option';
-import { IngredientUsage } from '../domain/value-objects/ingredient-usage';
-import { PropertyRole, PropertyType } from '../domain/value-objects/recipe-property';
+import { CapacityGroup } from '../domain/entities/recipe-capacity';
+import { SupplyUsage } from '../domain/value-objects/supply-usage';
 
 /**
- * Flat storage documents (primitives only) persisted in IndexedDB. They are
- * infrastructure contracts — never domain models. The aggregate ⇄ record
- * translation lives in the mappers (the Anticorruption Layer toward storage).
+ * Documentos de almacenamiento planos (solo primitivos) persistidos en IndexedDB. Son contratos
+ * de infraestructura — nunca modelos de dominio. La traducción agregado ⇄ record vive en los
+ * mappers (la capa anticorrupción hacia el almacenamiento).
  */
 
 export interface QuantityRecord {
@@ -17,41 +16,32 @@ export interface QuantityRecord {
 export interface PurchasePriceRecord {
     amount: number;
     per: QuantityRecord;
-    currency?: string; // optional for backward-compat with records written before currency was added
+    currency?: string; // opcional por retrocompatibilidad con records escritos antes de añadir la moneda
 }
 
-export interface IngredientLineRecord {
+export interface SupplyLineRecord {
+    // Clave persistida legacy: se conserva `ingredientId` (renombrarla orfanaría recetas guardadas);
+    // el dominio la mapea a `SupplyLine.supplyId`.
     ingredientId: string;
     quantity: QuantityRecord;
 }
 
-export interface IngredientRecord {
+export interface SupplyRecord {
     id: string;
     name: string;
     baseUnit: BaseUnit;
-    usage: IngredientUsage;
+    usage: SupplyUsage;
     purchasePrice: PurchasePriceRecord;
 }
 
-export interface RecipePropertyRecord {
-    id: string;
-    name: string;
-    type: PropertyType;
-    required: boolean;
-    locked: boolean;
-    role?: PropertyRole;
-    group?: string; // solo propiedades `options`: grupo del catálogo de conversión
-    selectable?: boolean; // se muestra al seleccionar la receta (default true para records viejos)
-}
-
-export interface FlavorRecord {
+export interface RecipeFlavorRecord {
     id: string;
     label: string;
 }
 
-export interface ConversionOptionRecord {
+export interface RecipeCapacityRecord {
     id: string;
-    group: ConversionGroup;
+    group: CapacityGroup;
     label: string;
     factor: number;
 }
@@ -59,47 +49,11 @@ export interface ConversionOptionRecord {
 export interface RecipeCategoryRecord {
     id: string;
     name: string;
-    order: number;
-    system: boolean;
-    properties: RecipePropertyRecord[];
-}
-
-export interface RecipePropertyValueRecord {
-    propertyId: string;
-    type: PropertyType;
-    value: string | number | QuantityRecord;
 }
 
 export interface RecipeRecord {
     id: string;
     categoryId: string;
     name: string;
-    values: RecipePropertyValueRecord[];
-    lines: IngredientLineRecord[];
-}
-
-export interface PackagingRuleRecord {
-    id: string;
-    range: { min: QuantityRecord; max: QuantityRecord };
-    boxId: string;
-    baseId: string;
-}
-
-export interface CakeCompositionRecord {
-    id: string;
-    name?: string;
-    targetWeight: QuantityRecord;
-    spongeRecipeId: string;
-    fillingRecipeId: string;
-    coveringRecipeId: string;
-    topperId?: string;
-    suggestedBoxId: string;
-    suggestedBaseId: string;
-}
-
-export interface PriceHistoryEntryRecord {
-    id: string;
-    ingredientId: string;
-    price: PurchasePriceRecord;
-    recordedAt: string;
+    lines: SupplyLineRecord[];
 }
