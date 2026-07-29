@@ -76,11 +76,15 @@ test.describe('Grilla de ingredientes · autocompletado', () => {
     await grid.nameInput(0).click();
     await grid.nameInput(0).fill('Azúcar');
     await expect(page.locator('[role="listbox"]')).toBeVisible();
+
+    // La flecha mueve la opción activa; se lee cuál quedó marcada antes de confirmar.
     await page.keyboard.press('ArrowDown');
-    const chosen = await page.getByRole('option').first().innerText();
+    const active = page.locator('[role="option"][aria-selected="true"]');
+    await expect(active).toHaveCount(1);
+    const chosen = (await active.innerText()).trim();
     await page.keyboard.press('Enter');
 
-    await expect(grid.nameInput(0)).toHaveValue(chosen.trim());
+    await expect(grid.nameInput(0)).toHaveValue(chosen);
     await grid.quantityInput(0).fill('80');
     await form.save.click();
     await form.waitClosed();

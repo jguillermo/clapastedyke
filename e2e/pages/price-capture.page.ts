@@ -1,4 +1,5 @@
 import { type Locator, type Page } from '@playwright/test';
+import type { UnitKey } from './supply-grid.page';
 
 /**
  * Page object de `features/recipe-book/_shared/price-capture` (`app-price-capture`):
@@ -24,9 +25,16 @@ export class PriceCapturePage {
   /** Chip de unidad del campo de presentación (`g`, `kg`, `u`). */
   readonly packagingUnit = this.root.locator('migo-unit-input');
 
-  /** Rellena la compra y confirma. */
-  async setPurchase(packaging: string, price: string): Promise<void> {
+  /**
+   * Rellena la compra y confirma. `unit` fija la unidad de la presentación pulsando su
+   * inicial (`k`/`g`/`u`): el `migo-unit-input` la lee en keydown, así que escribirla
+   * dentro del texto no sirve.
+   */
+  async setPurchase(packaging: string, price: string, unit?: UnitKey): Promise<void> {
     await this.packaging.fill(packaging);
+    if (unit) {
+      await this.packaging.press(unit);
+    }
     await this.price.fill(price);
     await this.confirm.click();
   }

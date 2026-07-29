@@ -1,6 +1,13 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 
 /**
+ * Inicial que fija la unidad en un `migo-unit-input`: `k` = kilos, `g` = gramos,
+ * `u` = unidades. El control la captura en **keydown**, así que hay que pulsarla
+ * como tecla — un `fill()` con la letra dentro del texto no la fija.
+ */
+export type UnitKey = 'k' | 'g' | 'u';
+
+/**
  * Page object de `features/recipe-book/_shared/supply-grid` (`app-supply-grid`): la
  * grilla de ingredientes del formulario de receta.
  *
@@ -64,13 +71,25 @@ export class SupplyGridPage {
     .last();
 
   /**
+   * Escribe la cantidad de una fila y, si se indica, fija su unidad pulsando su
+   * inicial (el control la lee en keydown, ver {@link UnitKey}).
+   */
+  async setQuantity(row: number, quantity: string, unit?: UnitKey): Promise<void> {
+    const input = this.quantityInput(row);
+    await input.fill(quantity);
+    if (unit) {
+      await input.press(unit);
+    }
+  }
+
+  /**
    * Escribe una línea con un insumo **existente** del catálogo (nombre exacto) y su
    * cantidad. Al terminar la fila ya tiene costo, porque la grilla jala el precio de
    * compra del catálogo por nombre.
    */
-  async fillExistingLine(row: number, name: string, quantity: string): Promise<void> {
+  async fillExistingLine(row: number, name: string, quantity: string, unit?: UnitKey): Promise<void> {
     await this.nameInput(row).fill(name);
-    await this.quantityInput(row).fill(quantity);
+    await this.setQuantity(row, quantity, unit);
     await expect(this.costButton(row)).not.toHaveText('＋ precio');
   }
 
@@ -89,9 +108,9 @@ export class SupplyGridPage {
   }
 
   /** Escribe un insumo **nuevo** (sin precio todavía): deja la fila lista para el popover. */
-  async fillNewLine(row: number, name: string, quantity: string): Promise<void> {
+  async fillNewLine(row: number, name: string, quantity: string, unit?: UnitKey): Promise<void> {
     await this.nameInput(row).fill(name);
-    await this.quantityInput(row).fill(quantity);
+    await this.setQuantity(row, quantity, unit);
     await expect(this.costButton(row)).toHaveText('＋ precio');
   }
 }
