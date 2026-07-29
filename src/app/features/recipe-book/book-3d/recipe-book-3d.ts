@@ -13,10 +13,14 @@ import {
 import { Button } from '@components/button/button';
 import { Icon } from '@components/icon/icon';
 import { Spacer } from '@components/spacer/spacer';
+import { Badge } from '@components/badge/badge';
 import { MigoDialog } from '@components/dialog/dialog.service';
+import type { EntityId } from '@core/_common/entity-id';
 import { ListRecipeBook, type RecipeBookCatalog } from '@core/recipe-book/application/use-cases/list-recipe-book.use-case';
 import type { Recipe } from '@core/recipe-book/domain/entities/recipe';
 import type { Supply } from '@core/recipe-book/domain/entities/supply';
+import type { RecipeFlavor } from '@core/recipe-book/domain/entities/recipe-flavor';
+import type { RecipeCapacity } from '@core/recipe-book/domain/entities/recipe-capacity';
 import { BookEngine, type BookSpread } from '@platform/three/book/book-engine';
 import type { PageContent } from '@platform/three/book/page-content';
 import { RecipeForm, type RecipeFormData, type RecipeFormResult } from '../recipe-form/recipe-form';
@@ -62,7 +66,7 @@ interface BookFocus {
 @Component({
   selector: 'app-recipe-book-3d',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Button, Icon, Spacer, RecipeOverlay],
+  imports: [Button, Icon, Spacer, Badge, RecipeOverlay],
   host: {
     class: 'fixed inset-0 z-40 block bg-surface-page',
     '(window:resize)': 'onResize()',
@@ -83,6 +87,8 @@ interface BookFocus {
         <app-recipe-overlay
           [recipe]="ov.recipe"
           [supplies]="supplyEntities()"
+          [flavors]="flavorEntities()"
+          [capacities]="capacityEntities()"
           [rect]="ov.rect"
           (edit)="openEditForm(ov.recipe)"
           (swipe)="onOverlaySwipe($event)"
@@ -234,10 +240,19 @@ interface BookFocus {
             @for (recipe of recipesOf(category.id.value); track recipe.id.value) {
               <button
                 type="button"
-                class="min-h-11 w-full rounded-lg bg-surface-sunken px-4 py-2 text-left font-body text-body hover:bg-surface-card focus-visible:shadow-focus focus-visible:outline-none"
+                class="flex min-h-11 w-full flex-col items-start gap-0.5 rounded-lg bg-surface-sunken px-4 py-2 text-left font-body text-body hover:bg-surface-card focus-visible:shadow-focus focus-visible:outline-none"
                 (click)="openEditForm(recipe)"
               >
-                {{ recipe.name }}
+                <span>{{ recipe.name }}</span>
+                @if (flavorLabelOf(recipe); as flavor) {
+                  <migo-badge>{{ flavor }}</migo-badge>
+                }
+                @if (portionsLabelOf(recipe); as portions) {
+                  <migo-badge>{{ portions }}</migo-badge>
+                }
+                @if (moldLabelOf(recipe); as mold) {
+                  <migo-badge>{{ mold }}</migo-badge>
+                }
               </button>
             } @empty {
               <p class="m-0 text-muted text-sm">Aún no hay recetas aquí.</p>
@@ -315,6 +330,37 @@ export class RecipeBook3d implements AfterViewInit, OnDestroy {
   );
   /** Insumos del catálogo (los pasa el overlay para resolver nombres). */
   protected readonly supplyEntities = computed<readonly Supply[]>(() => this.catalog()?.supplies ?? []);
+
+  private readonly flavorsById = computed(
+    () => new Map<string, RecipeFlavor>((this.catalog()?.flavors ?? []).map((f) => [f.id.value, f])),
+  );
+  /** Sabores del catálogo (los pasa el overlay para resolver el label). */
+  protected readonly flavorEntities = computed<readonly RecipeFlavor[]>(() => this.catalog()?.flavors ?? []);
+
+  /** Label del sabor de la receta, o `null` si no tiene. */
+  protected flavorLabelOf(recipe: Recipe): string | null {
+    return recipe.flavorId ? (this.flavorsById().get(recipe.flavorId.value)?.label ?? null) : null;
+  }
+
+  private readonly capacitiesById = computed(
+    () => new Map<string, RecipeCapacity>((this.catalog()?.recipeCapacities ?? []).map((c) => [c.id.value, c])),
+  );
+  /** Capacidades del catálogo (las pasa el overlay para resolver el label). */
+  protected readonly capacityEntities = computed<readonly RecipeCapacity[]>(() => this.catalog()?.recipeCapacities ?? []);
+
+  private capacityLabelById(id: EntityId | null): string | null {
+    return id ? (this.capacitiesById().get(id.value)?.label ?? null) : null;
+  }
+
+  /** Label de la capacidad por porciones de la receta, o `null` si no tiene. */
+  protected portionsLabelOf(recipe: Recipe): string | null {
+    return this.capacityLabelById(recipe.portionsCapacityId);
+  }
+
+  /** Label de la capacidad por molde de la receta, o `null` si no tiene. */
+  protected moldLabelOf(recipe: Recipe): string | null {
+    return this.capacityLabelById(recipe.moldCapacityId);
+  }
 
   /** Overlays DOM a pintar sobre las hojas de receta visibles (vacío durante el volteo). */
   protected readonly overlays = signal<RecipeOverlayView[]>([]);
@@ -451,7 +497,12 @@ export class RecipeBook3d implements AfterViewInit, OnDestroy {
     if (!catalog || !category) {
       return;
     }
-    this.openForm({ category: { id: category.id.value, name: category.name }, supplies: catalog.supplies });
+    this.openForm({
+      category: { id: category.id.value, name: category.name },
+      supplies: catalog.supplies,
+      flavors: catalog.flavors,
+      capacities: catalog.recipeCapacities,
+    });
   }
 
   /** Edita la receta de la página actual (el botón está deshabilitado si no hay ninguna). */
@@ -472,7 +523,16 @@ export class RecipeBook3d implements AfterViewInit, OnDestroy {
     this.openForm({
       category: { id: category.id.value, name: category.name },
       supplies: catalog.supplies,
-      recipe: { id: recipe.id.value, name: recipe.name, lines: this.prefillLines(recipe) },
+      flavors: catalog.flavors,
+      capacities: catalog.recipeCapacities,
+      recipe: {
+        id: recipe.id.value,
+        name: recipe.name,
+        lines: this.prefillLines(recipe),
+        flavorLabel: this.flavorLabelOf(recipe),
+        portionsLabel: this.portionsLabelOf(recipe),
+        moldLabel: this.moldLabelOf(recipe),
+      },
     });
   }
 
