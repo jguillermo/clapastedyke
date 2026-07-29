@@ -350,7 +350,7 @@ Subfolder inside a domain module that holds implementations only meant to run du
 
 | Example | Purpose |
 |---|---|
-| `simulation/_dev/stub-simulation-launcher.ts` | Alternative `SimulationLauncher` that spawns `tests/stubs/simulation/run-stub.ts` instead of the real binary when `ATSP_SIM_DEV_MODE=true` |
+| `simulation/_dev/stub-simulation-launcher.ts` | Alternative `SimulationLauncher` that spawns a stub script instead of the real binary when `ATSP_SIM_DEV_MODE=true` |
 
 **Rules:**
 
@@ -363,7 +363,7 @@ Subfolder inside a domain module that holds implementations only meant to run du
   }
   ```
 - `_dev/` implementations must satisfy the same domain interface as their production counterparts (`SimulationLauncher`, etc.) — the swap happens entirely at the composition root.
-- Do NOT use `_dev/` for tests or fixtures. Tests live in `tests/`; fixtures co-located with their spec. `_dev/` is strictly for runtime implementations used by `npm start`.
+- Do NOT use `_dev/` for tests or fixtures. Unit specs are co-located with their source (see `unit-tests-conventions.md`) and E2E lives in `e2e/` (see `e2e-tests-conventions.md`); fixtures go next to their spec. `_dev/` is strictly for runtime implementations used by `npm start`.
 
 ## Logging
 

@@ -46,13 +46,19 @@ ng test
 
 ## Running end-to-end tests
 
-For end-to-end (e2e) testing, run:
+End-to-end tests use [Playwright](https://playwright.dev/) and live **entirely** in the `e2e/`
+folder (config, specs, page objects, fixtures and helpers). They exercise the views under
+`src/app/features/` as complete user flows.
 
 ```bash
-ng e2e
+npm run test:e2e          # ng build + full suite (desktop 1280px + mobile 375px)
+npm run test:e2e:ui       # the same, in Playwright's UI mode
+npm run test:e2e:report   # open the last HTML report
 ```
 
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
+The suite runs against the **compiled build** (`dist/misaevol/browser`), served by
+`e2e/support/static-server.mjs` — no dev server needed. Conventions for writing them are in
+[`.claude/rules/e2e-tests-conventions.md`](.claude/rules/e2e-tests-conventions.md).
 
 ## Additional Resources
 

@@ -1,0 +1,48 @@
+/* Config de TypeScript de la suite E2E. Ver e2e-tests-conventions.md. */
+{
+  /*
+   * DELIBERADAMENTE NO extiende `../tsconfig.json`: la suite E2E es INDEPENDIENTE
+   * del proyecto Angular y prueba la app como una caja negra, a través del build
+   * compilado que sirve `support/static-server.mjs`. Heredar del tsconfig raíz
+   * arrastraba sus `paths` (`@core/*`, `@app/*`, `@components/*`, `@features/*`,
+   * `@platform/*`) y dejaba la puerta abierta a importar código de `src/`.
+   *
+   * Dos cerrojos hacen que esa independencia sea por construcción, no por
+   * convención:
+   *   - `paths: {}`      → un `import … from '@core/…'` falla con TS2307.
+   *   - `rootDir: "."`   → un `import … from '../src/app/…'` falla con TS6059.
+   *
+   * Se comprueba con `npm run typecheck:e2e`, que corre dentro de `npm run test:e2e`.
+   */
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "types": ["node"],
+    "noEmit": true,
+
+    /* Los dos cerrojos contra `src/`. No quitar. */
+    "paths": {},
+    "rootDir": ".",
+
+    /*
+     * Los page objects declaran sus locators como field initializers que leen el
+     * parameter property del constructor (`readonly root = this.page.locator(…)`).
+     * Con la semántica ES2022 (`useDefineForClassFields: true`, el default para
+     * este target) eso es TS2729, pero el transform de Playwright asigna los
+     * parameter properties ANTES de los field initializers — que es justo la
+     * semántica legacy. Declararla aquí alinea el type-check con el runtime real.
+     */
+    "useDefineForClassFields": false,
+
+    /* Mismo rigor que el resto del repo. */
+    "strict": true,
+    "noImplicitOverride": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "isolatedModules": true,
+    "skipLibCheck": true
+  },
+  "include": ["**/*.ts"]
+}
