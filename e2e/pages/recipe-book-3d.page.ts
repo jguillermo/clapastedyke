@@ -32,10 +32,11 @@ export class RecipeBook3dPage {
   readonly indexPanel = this.page.locator('nav[aria-label="Índice de recetas"]');
   readonly indexClose = this.indexPanel.getByRole('button', { name: 'Cerrar índice' });
   /**
-   * Entradas navegables del índice: los botones de la lista scrolleable (las categorías son
-   * rótulos `<p>`, no botones). Se excluye la cabecera del panel, que contiene la × de cerrar.
+   * Entradas navegables del índice: los botones **con rótulo** del panel (las categorías son
+   * rótulos `<p>`, no botones). El filtro por texto excluye la × de cerrar de la cabecera, que
+   * es icon-only y toma su nombre accesible del `aria-label`, no de texto propio.
    */
-  readonly indexRecipes = this.indexPanel.locator('div.overflow-y-auto > button');
+  readonly indexRecipes = this.indexPanel.getByRole('button').filter({ hasText: /\S/ });
 
   /** Etiqueta de categoría dentro del índice (no es navegable: es un rótulo). */
   indexSection(name: string): Locator {

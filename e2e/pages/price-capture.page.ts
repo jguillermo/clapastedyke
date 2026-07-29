@@ -46,4 +46,13 @@ export class PriceCapturePage {
   forSupply(name: string): Locator {
     return this.root.getByText(`¿Cómo compras "${name}"?`);
   }
+
+  /**
+   * Descarta la captura pulsando **fuera** del popover. El overlay conectado del CDK
+   * tiende un backdrop transparente que cubre el resto de la pantalla; es DOM generado
+   * por el CDK, sin rol ni nombre accesible, así que se localiza por su clase propia.
+   */
+  async dismissByBackdrop(): Promise<void> {
+    await this.page.locator('.cdk-overlay-transparent-backdrop').click();
+  }
 }

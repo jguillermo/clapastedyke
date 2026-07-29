@@ -40,6 +40,16 @@ export class HomePage {
     return this.dock.getByRole('button', { name: new RegExp(`^${label}`) });
   }
 
+  /**
+   * Contenido del `<meta name="viewport">` del documento. La app bloquea el zoom a
+   * propósito (`user-scalable=no`), la única excepción aceptada a las reglas de AXE.
+   * Es un meta del `<head>`: no tiene rol ni nombre accesible, así que se localiza por
+   * el elemento nativo y su atributo.
+   */
+  async viewportContent(): Promise<string | null> {
+    return this.page.locator('meta[name="viewport"]').getAttribute('content');
+  }
+
   /** Navega a la app y espera a que el HUD esté operable (el seed ya corrió). */
   async goto(): Promise<void> {
     await this.page.goto('/');

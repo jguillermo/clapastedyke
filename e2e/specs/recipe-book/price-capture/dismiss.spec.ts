@@ -98,11 +98,10 @@ test.describe('Captura de precio · descartar', () => {
     form,
     grid,
     priceCapture,
-    page,
   }) => {
     await openPriceCaptureFor('Clic fuera de la captura E2E', { openCatalog, catalog, form, grid });
 
-    await page.locator('.cdk-overlay-transparent-backdrop').click();
+    await priceCapture.dismissByBackdrop();
     await expect(priceCapture.root).toHaveCount(0);
     await expect(grid.costButton(0)).toHaveText('＋ precio');
 

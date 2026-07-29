@@ -55,6 +55,17 @@ export class RecipeFormPage {
   get dialogLabel(): Locator {
     return this.page.locator('[role="dialog"]');
   }
+
+  /**
+   * El diálogo CDK que lo hospeda, exigiendo su **nombre accesible** (lo fija
+   * `MigoDialogConfig.ariaLabel` al abrir: `Nueva receta` o `Editar receta`).
+   */
+  dialogNamed(name: 'Nueva receta' | 'Editar receta'): Locator {
+    return this.page.getByRole('dialog', { name });
+  }
+
+  /** Etiquetas de los campos del formulario, en el orden en que se pintan. */
+  readonly fieldLabels = this.root.locator('label');
 }
 
 /**

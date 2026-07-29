@@ -37,7 +37,6 @@ test.describe('Grilla de ingredientes · autocompletado', () => {
     catalog,
     form,
     grid,
-    page,
   }) => {
     await openCatalog();
     await catalog.newRecipeIn('Queques').click();
@@ -46,11 +45,10 @@ test.describe('Grilla de ingredientes · autocompletado', () => {
 
     await grid.nameInput(0).click();
     await grid.nameInput(0).fill('Azúcar');
-    const listbox = page.locator('[role="listbox"]');
-    await expect(listbox).toBeVisible();
-    await expect(page.getByRole('option')).toHaveCount(3);
+    await expect(grid.listbox).toBeVisible();
+    await expect(grid.options).toHaveCount(3);
 
-    await page.getByRole('option', { name: SUPPLIES.azucarBlanca.name, exact: true }).click();
+    await grid.option(SUPPLIES.azucarBlanca.name).click();
     await expect(grid.nameInput(0)).toHaveValue(SUPPLIES.azucarBlanca.name);
     await grid.quantityInput(0).fill('120');
     await form.save.click();
@@ -75,13 +73,10 @@ test.describe('Grilla de ingredientes · autocompletado', () => {
 
     await grid.nameInput(0).click();
     await grid.nameInput(0).fill('Azúcar');
-    await expect(page.locator('[role="listbox"]')).toBeVisible();
+    await expect(grid.listbox).toBeVisible();
 
     // La flecha mueve la opción activa; se lee cuál quedó marcada antes de confirmar.
-    await page.keyboard.press('ArrowDown');
-    const active = page.locator('[role="option"][aria-selected="true"]');
-    await expect(active).toHaveCount(1);
-    const chosen = (await active.innerText()).trim();
+    const chosen = await grid.moveActiveOption(0, 'ArrowDown');
     await page.keyboard.press('Enter');
 
     await expect(grid.nameInput(0)).toHaveValue(chosen);
@@ -117,7 +112,6 @@ test.describe('Grilla de ingredientes · autocompletado', () => {
     catalog,
     form,
     grid,
-    page,
   }) => {
     await openCatalog();
     await catalog.newRecipeIn('Queques').click();
@@ -126,9 +120,9 @@ test.describe('Grilla de ingredientes · autocompletado', () => {
 
     await grid.nameInput(0).click();
     await grid.nameInput(0).fill('Azúcar');
-    await expect(page.locator('[role="listbox"]')).toBeVisible();
+    await expect(grid.listbox).toBeVisible();
     await grid.nameInput(0).press('Escape');
-    await expect(page.locator('[role="listbox"]')).toHaveCount(0);
+    await expect(grid.listbox).toHaveCount(0);
 
     // Lo tecleado sigue en el campo y la receta se guarda con el insumo completado a mano.
     await grid.nameInput(0).fill(SUPPLIES.azucarImpalpable.name);

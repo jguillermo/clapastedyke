@@ -62,12 +62,10 @@ test.describe('Diálogo de Insumos · abrir y cerrar', () => {
     openSuppliesDialog,
     supplies,
     catalog,
-    page,
   }) => {
     await openSuppliesDialog();
 
-    // El panel va centrado y tapa el centro del backdrop: hay que pulsar una esquina.
-    await page.locator('.migo-dialog__backdrop').click({ position: { x: 4, y: 4 } });
+    await supplies.closeByBackdrop();
 
     await supplies.waitClosed();
     await expect(catalog.suppliesButton).toBeEnabled();

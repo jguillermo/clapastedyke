@@ -31,17 +31,57 @@ export class RecipeOverlayPage {
     return this.at(index).getByRole('button', { name: 'Editar receta' });
   }
 
+  /**
+   * Badges de características (Sabor/Porciones/Molde) de un overlay dado.
+   *
+   * Se localizan por el elemento del design system y no por rol: `migo-badge` no
+   * expone ninguno (es texto decorado), y lo que los tests cuentan es cuántas
+   * características pinta la receta.
+   */
+  badgesOf(overlay: Locator): Locator {
+    return overlay.locator('migo-badge');
+  }
+
   badges(index = 0): Locator {
-    return this.at(index).locator('migo-badge');
+    return this.badgesOf(this.at(index));
+  }
+
+  /** Líneas de insumo: los `listitem` de la lista «Líneas de insumo». */
+  linesOf(overlay: Locator): Locator {
+    return overlay.getByRole('list', { name: 'Líneas de insumo' }).getByRole('listitem');
   }
 
   lines(index = 0): Locator {
-    return this.at(index).locator('ul > li');
+    return this.linesOf(this.at(index));
   }
 
-  /** Cuerpo scrolleable (el título queda fijo fuera de él). */
+  /** Las tres celdas de una línea, en orden: insumo, cantidad y precio. */
+  cellsOf(line: Locator): Locator {
+    return line.locator('span');
+  }
+
+  /**
+   * Cuerpo scrolleable (el título queda fijo fuera de él). Es el grupo accesible
+   * `Ingredientes`: engloba la cabecera de columnas, las líneas y el total.
+   */
+  scrollBodyOf(overlay: Locator): Locator {
+    return overlay.getByRole('group', { name: 'Ingredientes' });
+  }
+
   scrollBody(index = 0): Locator {
-    return this.at(index).locator('div.overflow-y-auto');
+    return this.scrollBodyOf(this.at(index));
+  }
+
+  /** ¿El cuerpo tiene contenido por debajo del borde visible? */
+  async isScrollable(overlay: Locator): Promise<boolean> {
+    return this.scrollBodyOf(overlay).evaluate((el) => el.scrollHeight > el.clientHeight);
+  }
+
+  /** Lleva el cuerpo scrolleable hasta el final y devuelve el desplazamiento resultante. */
+  async scrollToBottom(overlay: Locator): Promise<number> {
+    const body = this.scrollBodyOf(overlay);
+    await body.evaluate((el) => el.scrollTo({ top: el.scrollHeight }));
+    return body.evaluate((el) => el.scrollTop);
   }
 
   /** Títulos de todos los overlays visibles, en orden de spread. */

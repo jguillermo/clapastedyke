@@ -31,6 +31,16 @@ export class SuppliesDialogPage {
   }
 
   /**
+   * Cierra el diálogo pulsando el backdrop **en una esquina**: el panel va centrado y
+   * tapa el centro del backdrop, así que un clic al medio caería sobre el propio panel.
+   * El backdrop lo genera el CDK fuera de todo componente y no tiene rol ni nombre
+   * accesible; se localiza por la clase que le pone el chrome de `MigoDialog`.
+   */
+  async closeByBackdrop(): Promise<void> {
+    await this.page.locator('.migo-dialog__backdrop').click({ position: { x: 4, y: 4 } });
+  }
+
+  /**
    * Espera a que el diálogo se haya cerrado **por completo**: el CDK retira su panel del overlay y
    * devuelve el `aria-hidden` al resto del documento (sin eso, una consulta por rol sobre el libro
    * que queda debajo podría no encontrar nada).

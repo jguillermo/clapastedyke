@@ -114,7 +114,7 @@ test.describe('Formulario de receta · editar', () => {
     await form.save.click();
     await form.waitClosed();
 
-    await expect(catalog.recipe('Queques', 'Vainilla Clásica').locator('migo-badge')).toHaveCount(0);
+    await expect(catalog.recipeBadges('Queques', 'Vainilla Clásica')).toHaveCount(0);
   });
 
   test('editar receta → cambiar de categoría no se ofrece (la categoría es fija)', async ({
@@ -129,7 +129,7 @@ test.describe('Formulario de receta · editar', () => {
 
     await expect(form.subtitle).toHaveText('Coberturas');
     // No hay control de categoría: solo Nombre, Sabor y Tamaño.
-    await expect(form.root.locator('label')).toHaveText([
+    await expect(form.fieldLabels).toHaveText([
       'Nombre',
       'Sabor (opcional)',
       'Tamaño (opcional)',

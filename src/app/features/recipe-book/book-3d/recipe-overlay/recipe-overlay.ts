@@ -91,6 +91,8 @@ const EMPTY_COST: PreviewRecipeCostResult = { items: [], total: '' };
     <div class="relative min-h-0 flex-1">
       <div
         #scrollBody
+        role="group"
+        aria-label="Ingredientes"
         class="absolute inset-0 overflow-y-auto overscroll-contain touch-pan-y scrollbar-hidden px-6 py-4"
         (scroll)="onScroll()"
       >
@@ -99,7 +101,7 @@ const EMPTY_COST: PreviewRecipeCostResult = { items: [], total: '' };
           <span class="w-16 shrink-0 text-right sm:w-20">Cant.</span>
           <span class="w-14 shrink-0 text-right sm:w-16">Precio</span>
         </div>
-        <ul class="m-0 p-0 list-none">
+        <ul class="m-0 p-0 list-none" aria-label="Líneas de insumo">
           @for (line of lines(); track $index) {
             <li class="flex items-start gap-3 border-b border-border-line py-3">
               <span class="min-w-0 flex-1 wrap-break-word font-display text-heading text-base sm:text-lead">{{ line.name }}</span>

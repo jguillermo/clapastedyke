@@ -23,7 +23,7 @@ test.describe('Overlay de receta · contenido', () => {
 
     const target = overlay.byName(GLASEADO.name);
     await expect(target).toBeVisible();
-    await expect(target.locator('ul > li')).toHaveCount(GLASEADO.lineCount);
+    await expect(overlay.linesOf(target)).toHaveCount(GLASEADO.lineCount);
     await expect(target).toContainText(`${GLASEADO.lineCount} insumos`);
     await expect(target).toContainText(GLASEADO.total);
   });
@@ -36,11 +36,11 @@ test.describe('Overlay de receta · contenido', () => {
     await openBook3d();
 
     await book.goToRecipe(GLASEADO.name);
-    const firstLine = overlay.byName(GLASEADO.name).locator('ul > li').first();
+    const firstLine = overlay.linesOf(overlay.byName(GLASEADO.name)).first();
 
     await expect(firstLine).toBeVisible();
     // Insumo + cantidad + precio: tres celdas, ninguna vacía ni sin costear («—»).
-    const cells = await firstLine.locator('span').allInnerTexts();
+    const cells = await overlay.cellsOf(firstLine).allInnerTexts();
     expect(cells).toHaveLength(3);
     for (const cell of cells) {
       expect(cell.trim()).not.toBe('');
@@ -71,7 +71,7 @@ test.describe('Overlay de receta · contenido', () => {
     await openBook3d();
     await book.goToRecipe('Keke de Chocolate');
     const target = overlay.byName('Keke de Chocolate');
-    await expect(target.locator('migo-badge')).toHaveCount(0);
+    await expect(overlay.badgesOf(target)).toHaveCount(0);
 
     await target.getByRole('button', { name: 'Editar receta' }).click();
     await form.waitReady();
@@ -81,7 +81,7 @@ test.describe('Overlay de receta · contenido', () => {
     await form.waitClosed();
 
     const updated = overlay.byName('Keke de Chocolate');
-    await expect(updated.locator('migo-badge')).toHaveCount(2);
+    await expect(overlay.badgesOf(updated)).toHaveCount(2);
     await expect(updated).toContainText('Sabor: Chocolate');
     await expect(updated).toContainText('Porciones: 24');
   });
@@ -94,13 +94,11 @@ test.describe('Overlay de receta · contenido', () => {
   }) => {
     await openBook3d();
     await book.goToRecipe(GLASEADO.name);
-    const body = overlay.byName(GLASEADO.name).locator('div.overflow-y-auto');
-    await expect(body).toBeVisible();
+    const target = overlay.byName(GLASEADO.name);
+    await expect(overlay.scrollBodyOf(target)).toBeVisible();
 
-    const scrollable = await body.evaluate((el) => el.scrollHeight > el.clientHeight);
-    if (scrollable) {
-      await body.evaluate((el) => el.scrollTo({ top: el.scrollHeight }));
-      expect(await body.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
+    if (await overlay.isScrollable(target)) {
+      expect(await overlay.scrollToBottom(target)).toBeGreaterThan(0);
     }
     // La página del documento nunca scrollea: el libro es una vista fija a pantalla completa.
     expect(await page.evaluate(() => window.scrollY)).toBe(0);

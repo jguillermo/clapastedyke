@@ -53,6 +53,17 @@ export class RecipeBookFallbackPage {
     });
   }
 
+  /**
+   * Badges de características (Sabor/Porciones/Molde) que pinta la fila de una receta.
+   *
+   * Se localizan por el elemento del design system y no por rol: `migo-badge` no expone
+   * ninguno (es texto decorado), y lo que los tests cuentan es cuántas características
+   * tiene la receta.
+   */
+  recipeBadges(category: CategoryName | string, name: string): Locator {
+    return this.recipe(category, name).locator('migo-badge');
+  }
+
   /** Nombres de las recetas listadas en una categoría, en el orden en que se pintan. */
   async recipeNamesIn(category: CategoryName | string): Promise<string[]> {
     return this.recipeRows(category).evaluateAll((rows) =>

@@ -26,7 +26,7 @@ Dos reglas duras, sin excepción:
 ```
 e2e/
 ├── playwright.config.ts      # ÚNICA config de Playwright del repo
-├── tsconfig.json             # type-check de la suite (extiende el de la raíz)
+├── tsconfig.json             # type-check de la suite (standalone: NO extiende el de la raíz)
 ├── fixtures/
 │   └── app-fixture.ts        # `test`/`expect` extendidos: page objects + opciones + guardas
 ├── pages/
@@ -59,16 +59,62 @@ feature sin E2E se considera incompleta.
 ## Comandos
 
 ```bash
-npm run test:e2e          # ng build + Playwright (toda la suite: desktop + mobile)
-npm run test:e2e:ui       # ng build + modo UI de Playwright
+npm run test:e2e          # typecheck:e2e + ng build + Playwright (toda la suite: desktop + mobile)
+npm run test:e2e:ui       # lo mismo, en modo UI de Playwright
 npm run test:e2e:debug    # inspector (asume que ya hay build)
 npm run test:e2e:report   # abre el último informe HTML
+npm run typecheck:e2e     # type-check SOLO de la suite (tsc -p e2e/tsconfig.json)
 npm run e2e:serve         # sirve el build ya compilado en :4200 (para depurar a mano)
 ```
 
 Se sirve el **build compilado** (`dist/misaevol/browser`) con `support/static-server.mjs`, no
 `ng serve`: la app carga como en producción y cada navegación es un fichero estático — más rápido y
 determinista.
+
+## CRITICAL: la suite es independiente de `src/` (por construcción)
+
+Los E2E prueban la app como **caja negra**, a través del **build compilado**. Su única dependencia
+del proyecto Angular es ese artefacto (`dist/misaevol/browser`), producido por `ng build` antes de
+arrancar Playwright. **Nada bajo `e2e/` importa código de `src/`** — ni con alias (`@core/*`,
+`@app/*`, `@components/*`, `@features/*`, `@platform/*`) ni con rutas relativas (`../src/app/…`).
+
+Por qué: si un spec importa una entidad del dominio o un token del tema, deja de verificar lo que el
+usuario recibe y empieza a verificar lo que el código dice de sí mismo. Un refactor que rompa la app
+seguiría pasando en verde porque test y producción comparten la misma mentira. Además el suite dejaría
+de poder correr contra un build ya publicado.
+
+**No es convención, son dos cerrojos** en `e2e/tsconfig.json` (que **no** extiende el tsconfig raíz,
+justo para no heredar sus `paths`):
+
+| Cerrojo | Bloquea | Error |
+|---|---|---|
+| `"paths": {}` | `import … from '@core/…'` | `TS2307` |
+| `"rootDir": "."` | `import … from '../src/app/…'` | `TS6059` |
+
+`npm run typecheck:e2e` los verifica y corre **dentro de `npm run test:e2e`**, antes del build: un
+import a `src/` no llega ni a compilar. Ninguno de los dos se quita.
+
+**Lo que sí se comparte es el contrato observable**, no el código: la URL (`/home`), los nombres
+accesibles (`Guardar`, `Nombre`), los roles/ARIA y el DOM que la vista publica.
+
+### `public/` SÍ es fuente de datos compartida
+
+La prohibición es sobre `src/`. **`public/` está permitido**: son assets publicados —los sirve el
+mismo build que prueban los E2E—, no código de la app. Es el sitio para compartir datos entre app y
+suite.
+
+Por eso `e2e/support/seed.ts` **lee** `public/seed/recipe-book.seed.json` (con `readFileSync`, no
+con un `import`) y **deriva** de él los hechos del estado inicial: categorías, recetas, sabores,
+capacidades, nombres de insumo y cuántos hay. Antes eran una transcripción a mano con una nota de
+«si el JSON cambia, actualiza esto» — deriva silenciosa. Ya no puede desalinearse.
+
+Lo que **sigue siendo literal** es lo que el test espera **ver en pantalla**: el total de una receta
+(lo calcula `PreviewRecipeCost`) y el empaque de un insumo (la vista normaliza 1000 g → «1 kg»).
+Recalcularlo en el test sería duplicar la lógica bajo prueba — el test asertaría su propia
+aritmética. Cada literal lleva una **guarda** contra el dato crudo del JSON: si el seed cambia, el
+módulo falla al importarse con un mensaje que dice qué actualizar.
+
+**Nunca** se importa una entidad, un VO ni un token del tema para construir un valor esperado.
 
 ## Cómo se escribe un spec (forma obligatoria)
 

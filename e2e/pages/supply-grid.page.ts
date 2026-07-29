@@ -32,6 +32,45 @@ export class SupplyGridPage {
     return this.root.locator(`[role="gridcell"][data-row="${row}"][data-col="${col}"]`);
   }
 
+  /*
+   * Desplegable del combobox de Ingrediente. Se monta en un overlay del CDK, fuera de
+   * `app-supply-grid`, así que estos locators cuelgan de la página y no de `root`.
+   */
+
+  /** Panel del desplegable (existe solo mientras está abierto). */
+  readonly listbox = this.page.getByRole('listbox');
+  /** Todas las opciones ofrecidas. */
+  readonly options = this.page.getByRole('option');
+
+  /** Opción concreta del desplegable, por su nombre exacto. */
+  option(name: string): Locator {
+    return this.page.getByRole('option', { name, exact: true });
+  }
+
+  /**
+   * Mueve la opción activa del desplegable con una flecha y devuelve el texto de la que
+   * queda marcada (la que aceptaría un Enter).
+   *
+   * **Espera a que el `aria-activedescendant` del combobox CAMBIE antes de leer.** La
+   * opción activa se repinta un tick después de la pulsación, así que leerla de inmediato
+   * devuelve la anterior y el Enter acaba eligiendo otra — era una intermitencia real.
+   */
+  async moveActiveOption(row: number, key: 'ArrowDown' | 'ArrowUp'): Promise<string> {
+    const input = this.nameInput(row);
+    const before = await input.getAttribute('aria-activedescendant');
+    await input.press(key);
+    if (before === null) {
+      // No había opción activa: basta con esperar a que aparezca una.
+      await expect(input).toHaveAttribute('aria-activedescendant', /.+/);
+    } else {
+      await expect(input).not.toHaveAttribute('aria-activedescendant', before);
+    }
+    // Se lee por el id al que apunta el combobox: es exactamente la opción que Enter acepta.
+    const activeId = await input.getAttribute('aria-activedescendant');
+    expect(activeId, 'el combobox debe seguir apuntando a una opción activa').toBeTruthy();
+    return (await this.page.locator(`#${activeId}`).innerText()).trim();
+  }
+
   nameInput(row: number): Locator {
     return this.cell(row, 0).getByLabel('Ingrediente');
   }

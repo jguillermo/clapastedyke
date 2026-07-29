@@ -77,14 +77,13 @@ test.describe('Libro de recetas · abrir el formulario desde la lista', () => {
     openCatalog,
     catalog,
     form,
-    page,
   }) => {
     await openCatalog();
 
     await catalog.newRecipeIn('Queques').click();
     await form.waitReady();
 
-    await expect(page.locator('[aria-label="Nueva receta"]')).toBeVisible();
+    await expect(form.dialogNamed('Nueva receta')).toBeVisible();
 
     await form.cancel.click();
     await form.waitClosed();

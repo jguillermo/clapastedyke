@@ -33,12 +33,10 @@ test.describe('Home 3D · móvil 375px', () => {
     }
   });
 
-  test('viewport bloqueado → sin zoom del usuario (excepción aceptada de AXE)', async ({ page, openHome }) => {
+  test('viewport bloqueado → sin zoom del usuario (excepción aceptada de AXE)', async ({ home, openHome }) => {
     await openHome();
 
-    const viewportMeta = await page
-      .locator('meta[name="viewport"]')
-      .getAttribute('content');
+    const viewportMeta = await home.viewportContent();
     expect(viewportMeta).toContain('user-scalable=no');
     expect(viewportMeta).toContain('maximum-scale=1');
   });

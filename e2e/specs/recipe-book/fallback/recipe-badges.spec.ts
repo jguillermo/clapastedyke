@@ -12,9 +12,8 @@ test.describe('Libro de recetas · badges de la lista', () => {
   }) => {
     await openCatalog();
 
-    const row = catalog.recipe('Queques', 'Keke de Chocolate');
-    await expect(row).toBeVisible();
-    await expect(row.locator('migo-badge')).toHaveCount(0);
+    await expect(catalog.recipe('Queques', 'Keke de Chocolate')).toBeVisible();
+    await expect(catalog.recipeBadges('Queques', 'Keke de Chocolate')).toHaveCount(0);
   });
 
   test('editar receta → añadir sabor y tamaño → guardar → su fila muestra los tres badges', async ({
@@ -34,7 +33,7 @@ test.describe('Libro de recetas · badges de la lista', () => {
     await form.waitClosed();
 
     const updated = catalog.recipe('Queques', 'Keke de Chocolate');
-    await expect(updated.locator('migo-badge')).toHaveCount(3);
+    await expect(catalog.recipeBadges('Queques', 'Keke de Chocolate')).toHaveCount(3);
     await expect(updated).toContainText('Sabor: Chocolate');
     await expect(updated).toContainText('Porciones: 24');
     await expect(updated).toContainText('Molde: Molde grande');
@@ -54,7 +53,7 @@ test.describe('Libro de recetas · badges de la lista', () => {
     await form.waitClosed();
 
     const updated = catalog.recipe('Rellenos', 'Crema Pastelera');
-    await expect(updated.locator('migo-badge')).toHaveCount(1);
+    await expect(catalog.recipeBadges('Rellenos', 'Crema Pastelera')).toHaveCount(1);
     await expect(updated).toContainText('Sabor: Vainilla');
   });
 });
