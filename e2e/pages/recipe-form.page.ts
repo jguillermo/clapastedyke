@@ -16,6 +16,13 @@ export class RecipeFormPage {
   readonly title = this.root.locator('migo-card-title');
   readonly subtitle = this.root.locator('migo-card-subtitle');
 
+  /** Panel del overlay de CDK que hospeda el diálogo (full-bleed en móvil). */
+  readonly panel = this.page.locator('.migo-dialog__panel.cdk-overlay-pane');
+  readonly header = this.root.locator('migo-card-header');
+  /** Cuerpo del card: la ÚNICA zona scrollable cuando el card está en `fill`. */
+  readonly body = this.root.locator('migo-card-body');
+  readonly footer = this.root.locator('migo-card-footer');
+
   readonly name = this.root.getByLabel('Nombre');
   readonly save = this.root.getByRole('button', { name: 'Guardar' });
   readonly cancel = this.root.getByRole('button', { name: 'Cancelar' });

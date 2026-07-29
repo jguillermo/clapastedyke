@@ -49,6 +49,15 @@ export class SupplyGridPage {
     return this.cell(row, 3).getByRole('button', { name: 'Quitar fila' });
   }
 
+  /**
+   * Chip de unidad de la fila (`g`, `kg`, `u`) como locator, para asertar con auto-retry:
+   * `await expect(grid.unitChip(0)).toHaveText('u')`. Preferible a {@link unitOf} cuando la unidad
+   * acaba de cambiar, porque el chip se repinta un tick después de la pulsación.
+   */
+  unitChip(row: number): Locator {
+    return this.cell(row, 1);
+  }
+
   /** Chip de unidad que se pinta junto a la cantidad (`g`, `kg`, `u`). */
   async unitOf(row: number): Promise<string> {
     return (await this.cell(row, 1).innerText()).trim();
@@ -73,11 +82,16 @@ export class SupplyGridPage {
   /**
    * Escribe la cantidad de una fila y, si se indica, fija su unidad pulsando su
    * inicial (el control la lee en keydown, ver {@link UnitKey}).
+   *
+   * Entre el valor y la tecla de unidad se espera a que el valor haya **aterrizado** en el control:
+   * si la pulsación llega antes de que Angular procese el `fill`, el control resuelve la unidad con
+   * el valor viejo y la familia se queda en la anterior (era una fuente de intermitencias).
    */
   async setQuantity(row: number, quantity: string, unit?: UnitKey): Promise<void> {
     const input = this.quantityInput(row);
     await input.fill(quantity);
     if (unit) {
+      await expect(input).toHaveValue(quantity);
       await input.press(unit);
     }
   }

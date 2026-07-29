@@ -96,7 +96,7 @@ Convenciones específicas por área. Consulta la regla correspondiente antes de 
 - [platform-conventions.md](rules/platform-conventions.md) — mecanismos técnicos transversales en `platform/`.
 - [providers-conventions.md](rules/providers-conventions.md) — DI por contexto con `provide*()` y `makeEnvironmentProviders`.
 - [assets-conventions.md](rules/assets-conventions.md) — recursos estáticos en `src/assets/`.
-- [unit-tests-conventions.md](rules/unit-tests-conventions.md) — specs de `core/` bajo `testing/`; specs de componentes co-locados.
-- [e2e-tests-conventions.md](rules/e2e-tests-conventions.md) — tests E2E en `tests/e2e/`: flujos completos, no estados intermedios.
+- [unit-tests-conventions.md](rules/unit-tests-conventions.md) — **regla dura**: los únicos tests unitarios son los de **dominio** y **casos de uso** de `src/app/core/<contexto>/`, y viven en `core/<contexto>/testing/` **replicando tal cual** la ruta de `domain/` y `application/` (nunca junto al fuente). Features → E2E; componentes del DS → el `play` de su story.
+- [e2e-tests-conventions.md](rules/e2e-tests-conventions.md) — **regla dura**: TODOS los tests E2E viven en la carpeta **`e2e/`** (config, `specs/` espejando `src/app/features/`, `pages/`, `fixtures/`, `support/`) y prueban las **vistas de `features/`** con **flujos completos** hasta un estado terminal, nunca estados intermedios. Se usan siempre los page objects y el fixture `app-fixture`; los estados/variantes de los componentes del DS se cubren en el `play` de su story, no aquí. **Cualquier petición de "crear tests E2E" se resuelve con esta forma.**
 - [main-process-conventions.md](rules/main-process-conventions.md) — proceso principal de Electron en `app/src/`.
 - [example-conventions.md](rules/example-conventions.md) — ejemplo DDD canónico de punta a punta.

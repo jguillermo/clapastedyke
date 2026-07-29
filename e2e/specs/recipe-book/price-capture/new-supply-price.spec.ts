@@ -161,7 +161,8 @@ test.describe('Captura de precio · insumo nuevo', () => {
     // Sin precio aún, la cantidad tecleada con `u` fija la familia de conteo.
     await grid.nameInput(0).fill('Physalis E2E');
     await grid.setQuantity(0, '12', 'u');
-    expect(await grid.unitOf(0)).toBe('u');
+    // Aserción con auto-retry: el chip de unidad se repinta un tick después de la pulsación.
+    await expect(grid.unitChip(0)).toHaveText('u');
 
     await grid.costButton(0).click();
     // Al venir la fila en conteo, la presentación queda bloqueada en unidades: aunque se

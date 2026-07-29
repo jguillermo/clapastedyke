@@ -15,6 +15,12 @@ export class SuppliesDialogPage {
   readonly title = this.root.locator('migo-card-title');
   readonly close = this.root.getByRole('button', { name: 'Cerrar' });
 
+  /** Panel del overlay de CDK que lo hospeda (full-bleed en móvil). */
+  readonly panel = this.page.locator('.migo-dialog__panel.cdk-overlay-pane');
+  readonly header = this.root.locator('migo-card-header');
+  /** Cuerpo del card: la única zona scrollable cuando el card está en `fill`. */
+  readonly body = this.root.locator('migo-card-body');
+
   /** La lista editable que vive dentro del diálogo. */
   readonly list = new SupplyListPage(this.page);
 
@@ -22,5 +28,15 @@ export class SuppliesDialogPage {
     await expect(this.root).toBeVisible();
     await expect(this.title).toHaveText('Insumos');
     await expect(this.list.table).toBeVisible();
+  }
+
+  /**
+   * Espera a que el diálogo se haya cerrado **por completo**: el CDK retira su panel del overlay y
+   * devuelve el `aria-hidden` al resto del documento (sin eso, una consulta por rol sobre el libro
+   * que queda debajo podría no encontrar nada).
+   */
+  async waitClosed(): Promise<void> {
+    await expect(this.root).toHaveCount(0);
+    await expect(this.page.locator('.cdk-overlay-pane')).toHaveCount(0);
   }
 }

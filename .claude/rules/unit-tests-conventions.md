@@ -2,83 +2,130 @@
 
 Applies to unit tests (`*.spec.ts`) of the bounded contexts under `src/app/core/`.
 
-## CRITICAL: specs live in `testing/`, never beside the source file
+## CRITICAL: solo el dominio y los casos de uso se testean por unidad
 
-A `*.spec.ts` sitting next to the file it tests mixes production and test code in the same folder and **hurts the readability of the source**. Every time you open `domain/entities/` you should see only domain entities, not their tests.
+Los **únicos** tests unitarios del proyecto son los de `src/app/core/<bounded-context>/`, y solo de
+**dos capas**:
 
-**Therefore: unit specs of a `core/` context live under that context's `testing/` folder, mirroring the source layer path** — they are never co-located with the source.
+| Capa | Qué se testea |
+|---|---|
+| `domain/` | entities, value objects y servicios de dominio puros — las **reglas de negocio** |
+| `application/use-cases/` | un spec por **caso de uso** (la orquestación de una intención del usuario) |
+
+**Nada más es un test unitario.** No se escriben specs unitarios de:
+
+| No se testea por unidad | Dónde se cubre |
+|---|---|
+| `features/` (páginas, diálogos, formularios) | **E2E** en `e2e/` — ver [e2e-tests-conventions.md](e2e-tests-conventions.md) |
+| `components/` (librería del design system) | el **`play`** de su `*.stories.ts` — ver [components-conventions.md](components-conventions.md) |
+| `platform/` (three.js, viewport…) | E2E de la vista que lo usa |
+| `core/*/infrastructure/` (repositorios, mappers, seed) | se ejercita desde los casos de uso y desde E2E |
+
+> Si una regla de negocio necesita test, **vive en el dominio** y se testea ahí. Si lo que se quiere
+> comprobar es que el usuario puede hacer algo de punta a punta, eso es un **E2E**, no un unitario.
+
+## CRITICAL: los specs viven en `testing/`, nunca junto al fuente
+
+Un `*.spec.ts` al lado del fichero que prueba mezcla producción y test en la misma carpeta y
+**estropea la legibilidad del fuente**: al abrir `domain/entities/` se deben ver solo entidades, no
+sus tests. Con muchas clases juntas, además, la carpeta se vuelve ilegible.
+
+**Por eso: los specs de un contexto de `core/` viven bajo la carpeta `testing/` de ese contexto,
+replicando exactamente la ruta del fuente.**
 
 ```
-Wrong — spec beside source:
+Mal — spec junto al fuente:
 core/recipe-book/domain/value-objects/weight-range.ts
-core/recipe-book/domain/value-objects/weight-range.spec.ts   ← clutters the source folder
+core/recipe-book/domain/value-objects/weight-range.spec.ts   ← ensucia la carpeta del fuente
 
-Correct — spec mirrored under testing/:
+Bien — spec replicado bajo testing/:
 core/recipe-book/domain/value-objects/weight-range.ts
 core/recipe-book/testing/domain/value-objects/weight-range.spec.ts
 ```
 
-The mirror inserts `testing/` right after the context root and keeps the rest of the path:
-`core/<ctx>/<layer>/<sub>/x.ts` → `core/<ctx>/testing/<layer>/<sub>/x.spec.ts`.
+El espejo inserta `testing/` justo después de la raíz del contexto y **conserva el resto de la ruta
+tal cual**:
 
-## Scope
+`core/<ctx>/<capa>/<sub>/x.ts` → `core/<ctx>/testing/<capa>/<sub>/x.spec.ts`
 
-This rule applies **only to `core/` bounded contexts** — the DDD layers `domain/`, `application/`, `infrastructure/`, and the shared kernel `_common/`.
-
-It does **not** apply to Angular component/feature specs: those stay **co-located** beside the component (idiomatic Angular), e.g. `src/app/app.spec.ts`, `features/<x>/<x>.spec.ts`.
-
-This is the unit-test counterpart of `e2e-tests-conventions.md` (which governs `tests/e2e/`).
-
-## Structure
+## Estructura
 
 ```
 core/recipe-book/
 ├── domain/
-│   ├── value-objects/        ← only source
-│   ├── entities/             ← only source
-│   └── services/             ← only source
-├── application/use-cases/    ← only source
-├── infrastructure/           ← only source
-└── testing/                  ← ALL tests + test doubles
-    ├── recipe-book-test-doubles.ts        ← doubles at the testing/ root
-    ├── domain/
+│   ├── value-objects/        ← solo fuente
+│   ├── entities/             ← solo fuente
+│   ├── services/             ← solo fuente
+│   └── repositories/         ← solo fuente
+├── application/use-cases/    ← solo fuente
+├── infrastructure/           ← solo fuente (no se testea por unidad)
+└── testing/                  ← TODOS los tests + los dobles
+    ├── recipe-book-test-doubles.ts        ← los dobles, en la raíz de testing/
+    ├── domain/                            ← espejo EXACTO de domain/
     │   ├── value-objects/*.spec.ts
     │   ├── entities/*.spec.ts
     │   └── services/*.spec.ts
-    ├── application/use-cases/*.spec.ts
-    └── infrastructure/*.spec.ts
+    └── application/                       ← espejo EXACTO de application/
+        └── use-cases/*.spec.ts
 ```
 
-- The `testing/` **root** holds the context's **test doubles** (in-memory repositories, recording event bus, fakes) — `recipe-book-test-doubles.ts`, `memory-progress.repository.ts`. Doubles are NOT mirrored into layer subfolders; only specs are.
-- Specs mirror the source layer path exactly so a reader can find the test for `domain/entities/sponge-recipe.ts` at `testing/domain/entities/sponge-recipe.spec.ts`.
+- **Solo se replican `domain/` y `application/`** dentro de `testing/`: son las dos capas con tests
+  unitarios.
+- La **raíz** de `testing/` guarda los **dobles** del contexto (repositorios en memoria, event bus de
+  registro, fakes) — `recipe-book-test-doubles.ts`. Los dobles **no** se replican en subcarpetas de
+  capa; solo los specs.
+- El espejo es literal: el test de `domain/entities/sponge-recipe.ts` está en
+  `testing/domain/entities/sponge-recipe.spec.ts`.
+- **`core/_common/`** es el shared kernel, no un bounded context: no tiene capas, así que sus specs de
+  primitivas de dominio (`EntityId`, `Quantity`) van directos en `_common/testing/`.
+
+> **Legado.** Quedan tres specs bajo `recipe-book/testing/infrastructure/` (mappers y seed) escritos
+> antes de esta regla. No se añaden más specs de `infrastructure/`; los existentes son deuda a
+> retirar cuando su cobertura quede absorbida por los casos de uso y los E2E.
 
 ## Naming
 
-Preserve the source file's name plus `.spec.ts`, keeping any role suffix:
+Se conserva el nombre del fuente más `.spec.ts`, manteniendo el sufijo de rol:
 
-| Source | Spec |
+| Fuente | Spec |
 |---|---|
 | `sponge-recipe.ts` | `sponge-recipe.spec.ts` |
 | `save-ingredient.use-case.ts` | `save-ingredient.use-case.spec.ts` |
-| `ingredient.mapper.ts` | `ingredient.mapper.spec.ts` |
+| `purchase-price.ts` | `purchase-price.spec.ts` |
 
-Cross-context integration tests use `*.integration.spec.ts` and live in the **downstream** context's `testing/` (it owns the integration), e.g. `progression/testing/infrastructure/cake-composed-progress.integration.spec.ts`.
+Los tests de integración entre contextos usan `*.integration.spec.ts` y viven en el `testing/` del
+contexto **aguas abajo** (el que posee la integración), p. ej.
+`progression/testing/application/cake-composed-progress.integration.spec.ts`.
 
 ## Framework
 
-- Tests run on **vitest** via the `@angular/build:unit-test` builder, using globals (`describe` / `it` / `expect`) — no per-file imports of the test API.
-- **Pure domain** (value objects, entities, pure domain services): plain unit tests, **no `TestBed`** — construct the class directly.
-- **DI-based** (use cases, subscribers, anything using `inject()`): use `TestBed.configureTestingModule({ providers })`, wiring the abstract repositories/`EventBus` to the context's `testing/` **doubles**. Use a real `InMemoryEventBus` when the test must exercise publish/subscribe end-to-end; a `RecordingEventBus` double when it only needs to assert what was published.
+- Corren con **vitest** vía el builder `@angular/build:unit-test`, con globals
+  (`describe` / `it` / `expect`) — sin imports de la API de test en cada fichero.
+- **Dominio puro** (value objects, entities, servicios de dominio puros): test unitario plano,
+  **sin `TestBed`** — se construye la clase directamente.
+- **Casos de uso** (usan `inject()`): `TestBed.configureTestingModule({ providers })`, enchufando los
+  repositorios abstractos y el `EventBus` a los **dobles** de `testing/`. `InMemoryEventBus` real
+  cuando el test debe ejercitar publish/subscribe de punta a punta; el doble `RecordingEventBus`
+  cuando solo hace falta asertar qué se publicó.
+- El caso de uso se testea por su **contrato**: entrada → efecto observable en el repositorio doble y
+  eventos publicados. Las reglas de negocio se asertan en el spec del dominio, no aquí (si una regla
+  solo se puede comprobar desde el caso de uso, está en la capa equivocada).
 
-## `testing/` is test-only
+## `testing/` es solo para tests
 
-- **Excluded from the production build:** `tsconfig.app.json` excludes `src/**/testing/**` (and `src/**/*.spec.ts`). Doubles and specs are never type-checked into nor bundled with the app.
-- **Discovered for tests:** `tsconfig.spec.json` includes `src/**/*.spec.ts`, so specs under `testing/` are found wherever they sit.
-- Production code (including `*.providers.ts`) must **never import from `testing/`**. Only specs import doubles.
+- **Fuera del build de producción:** `tsconfig.app.json` excluye `src/**/testing/**` (y
+  `src/**/*.spec.ts`). Dobles y specs nunca se type-checkean ni se empaquetan con la app.
+- **Descubiertos para test:** `tsconfig.spec.json` incluye `src/**/*.spec.ts`, así que los specs bajo
+  `testing/` se encuentran donde estén.
+- El código de producción (incluidos los `*.providers.ts`) **nunca** importa de `testing/`. Solo los
+  specs importan dobles.
 
-## Checklist before adding a `core/` unit test
+## Checklist antes de añadir un test unitario
 
-- [ ] The spec is under `core/<ctx>/testing/` mirroring the source layer path — not beside the source.
-- [ ] Its name is `<source-name>.spec.ts` (role suffix preserved).
-- [ ] Test doubles it needs live at the `testing/` root and are reused, not redefined per spec.
-- [ ] No production file imports anything from `testing/`.
+- [ ] Lo que se prueba es **dominio** o un **caso de uso** de `core/` (si no, no es un unitario: será
+      un E2E en `e2e/` o el `play` de una story).
+- [ ] El spec está bajo `core/<ctx>/testing/` **replicando la ruta del fuente** (`domain/…` o
+      `application/…`), no junto al fuente.
+- [ ] Se llama `<nombre-del-fuente>.spec.ts` (sufijo de rol incluido).
+- [ ] Los dobles que necesita viven en la raíz de `testing/` y se reutilizan, no se redefinen por spec.
+- [ ] Ningún fichero de producción importa nada de `testing/`.

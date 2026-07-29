@@ -31,10 +31,20 @@ export class RecipeBook3dPage {
 
   readonly indexPanel = this.page.locator('nav[aria-label="Índice de recetas"]');
   readonly indexClose = this.indexPanel.getByRole('button', { name: 'Cerrar índice' });
+  /**
+   * Entradas navegables del índice: los botones de la lista scrolleable (las categorías son
+   * rótulos `<p>`, no botones). Se excluye la cabecera del panel, que contiene la × de cerrar.
+   */
+  readonly indexRecipes = this.indexPanel.locator('div.overflow-y-auto > button');
 
   /** Etiqueta de categoría dentro del índice (no es navegable: es un rótulo). */
   indexSection(name: string): Locator {
     return this.indexPanel.getByText(name, { exact: true });
+  }
+
+  /** Entrada de receta del índice → salta a su página. */
+  indexRecipe(name: string): Locator {
+    return this.indexRecipes.filter({ hasText: name }).first();
   }
 
   /** Espera a que el libro esté montado y con el primer spread asentado (portada). */
@@ -70,6 +80,29 @@ export class RecipeBook3dPage {
       await this.goNext();
     }
     await expect(overlays.first()).toBeVisible();
+  }
+
+  /**
+   * Avanza hasta la cara de una receta concreta, detectándola por su overlay DOM (el único
+   * contenido accesible de la hoja). Las recetas van por categoría y, dentro de cada una, en
+   * orden alfabético, así que basta con pasar páginas hacia adelante.
+   *
+   * Se usa esto y **no** el índice porque el índice hoy no lista recetas (ver
+   * `specs/recipe-book/book-3d/index-panel.spec.ts`).
+   */
+  async goToRecipe(name: string): Promise<void> {
+    const target = this.page
+      .locator('app-recipe-overlay')
+      .filter({ has: this.page.getByRole('heading', { level: 2, name, exact: true }) });
+    // Se pasa página con `goNext()` (espera a que el spread ASIENTE): los overlays se vacían al
+    // voltear y solo se repueblan al asentar, así que encolar volteos dejaría la hoja sin overlay.
+    for (let turn = 0; turn < 30 && (await target.count()) === 0; turn++) {
+      if (await this.next.isDisabled()) {
+        break;
+      }
+      await this.goNext();
+    }
+    await expect(target.first()).toBeVisible();
   }
 
   /**

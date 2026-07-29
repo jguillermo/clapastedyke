@@ -1,205 +1,319 @@
 # E2E Test Conventions
 
-Applies to files in `tests/e2e/`.
+Applies to **todo** el testing end-to-end del proyecto, que vive **exclusivamente** en la carpeta
+`e2e/` de la raíz.
 
-## Dos modos de testing E2E
+## CRITICAL: todos los E2E viven en `e2e/` y prueban `src/app/features`
 
-Los tests E2E se dividen en **dos modos con reglas distintas**. Todo flujo o componente nuevo
-debe tener cobertura E2E — **no es opcional**.
+Dos reglas duras, sin excepción:
 
-### Modo 1 — Flujos de negocio (features que tocan `core/`)
+1. **Ubicación única — `e2e/`.** No hay E2E en `src/`, ni junto al componente, ni en ninguna otra
+   carpeta de tests: **la carpeta `tests/` de la raíz no existe y no debe volver a crearse.** Todo
+   lo relativo a E2E (config, specs, page objects, fixtures, helpers) está bajo `e2e/`. Si aparece
+   un spec de Playwright fuera de `e2e/`, se **mueve** a `e2e/specs/`, no se duplica.
+2. **Sujeto único — las features.** Un E2E ejercita una **vista de `src/app/features/`** por la
+   ruta del usuario (`/home` → estación → diálogo → dato guardado). Los componentes del design
+   system (`src/app/components/`) **no** se prueban aquí: su cobertura por estado/variante es el
+   `play` de su `*.stories.ts` (ver [components-conventions.md](components-conventions.md)).
 
-Todo flujo de negocio **debe** tener un test de flujo completo. No existe la opción de "lo
-testeo después":
+> **Cuando se pida "crear tests E2E", se crean SIEMPRE con la forma de esta regla**: un spec bajo
+> `e2e/specs/<área>/<vista>/`, usando los **page objects** de `e2e/pages/` y el **fixture** de
+> `e2e/fixtures/app-fixture.ts`. Nunca un spec suelto con `page.locator(...)` a pelo, nunca un
+> `playwright.config.ts` nuevo, nunca una carpeta de tests paralela.
 
-- El test empieza en el punto de entrada del usuario y termina en el **estado terminal observable**
-  (dato guardado, ruta cambiada, elemento ocultado de forma permanente).
-- Ningún test puede terminar en un estado intermedio (modal abierto, spinner visible, botón apareció).
-- Naming con `→`: `"crear receta → guardar → aparece en listado"`.
-- Aplica a todo lo que toque `core/` (recipe-book, progression, y cualquier contexto futuro).
+## Estructura de `e2e/`
 
-### Modo 2 — Componentes UI (showcase `/ui`)
+```
+e2e/
+├── playwright.config.ts      # ÚNICA config de Playwright del repo
+├── tsconfig.json             # type-check de la suite (extiende el de la raíz)
+├── fixtures/
+│   └── app-fixture.ts        # `test`/`expect` extendidos: page objects + opciones + guardas
+├── pages/
+│   └── <vista>.page.ts       # un page object por vista de features/ (o por parte estable)
+├── support/
+│   ├── seed.ts               # constantes del seed (estado inicial de cada test)
+│   ├── webgl.ts              # anulación de WebGL para la ruta accesible DOM
+│   └── static-server.mjs     # sirve el build compilado (no `ng serve`)
+└── specs/
+    └── <área>/<vista>/<caso>.spec.ts
+```
 
-Los componentes del design system se testean **exhaustivamente** por estado y variante:
+`specs/` **espeja la estructura de `src/app/features/`**: una carpeta por área, una por vista, y un
+fichero por **grupo de casos** (no por componente ni por elemento).
 
-- Un `describe` por componente, un test por estado/variante/interacción.
-- Validar DOM semántico: roles ARIA, `aria-label`, `aria-describedby`, `aria-disabled`.
-- Validar interacción de teclado: Tab, Enter, Escape, flechas donde aplique.
-- **No aplica la regla de "terminal state"**: el objetivo es cobertura de estados, no de flujos.
-- Ejemplo: `Button → variant primary → click → dispara acción`, `Button → disabled → click → no dispara`.
-- Usar `data-test-id` estables en el showcase; se añaden conforme se escribe cada test.
+| Feature | Specs |
+|---|---|
+| `features/game/home/` | `specs/game/home/*.spec.ts` |
+| `features/recipe-book/book-3d/` | `specs/recipe-book/book-3d/*.spec.ts` (3D) + `specs/recipe-book/fallback/*.spec.ts` (sin WebGL) |
+| `features/recipe-book/book-3d/recipe-overlay/` | `specs/recipe-book/recipe-overlay/*.spec.ts` |
+| `features/recipe-book/recipe-form/` | `specs/recipe-book/recipe-form/*.spec.ts` |
+| `features/recipe-book/_shared/supply-grid/` | `specs/recipe-book/supply-grid/*.spec.ts` |
+| `features/recipe-book/_shared/price-capture/` | `specs/recipe-book/price-capture/*.spec.ts` |
+| `features/recipe-book/supply-list/` | `specs/recipe-book/supply-list/*.spec.ts` |
+| `features/recipe-book/supplies-dialog/` | `specs/recipe-book/supplies-dialog/*.spec.ts` |
 
----
+**Toda feature nueva estrena su carpeta de specs en el mismo PR que la crea.** No es opcional: una
+feature sin E2E se considera incompleta.
 
-## CRITICAL: complete flows always win over intermediate state tests
+## Comandos
 
-**A complete flow test is always more valuable than an intermediate state test.**
+```bash
+npm run test:e2e          # ng build + Playwright (toda la suite: desktop + mobile)
+npm run test:e2e:ui       # ng build + modo UI de Playwright
+npm run test:e2e:debug    # inspector (asume que ya hay build)
+npm run test:e2e:report   # abre el último informe HTML
+npm run e2e:serve         # sirve el build ya compilado en :4200 (para depurar a mano)
+```
 
-An intermediate state test (button appeared, spinner visible, modal opened) only proves that one step worked — it says nothing about whether the feature actually works end-to-end. A complete flow test proves the entire user journey works. When you have to choose between the two, always write the complete flow test.
+Se sirve el **build compilado** (`dist/misaevol/browser`) con `support/static-server.mjs`, no
+`ng serve`: la app carga como en producción y cada navegación es un fichero estático — más rápido y
+determinista.
 
-If a complete flow test would be "too long", that is not a reason to split it into intermediate tests — it is a reason to extract a helper function and keep the complete flow intact.
+## Cómo se escribe un spec (forma obligatoria)
 
-## Core principle: complete flows, not intermediate states
-
-Every E2E test must exercise a **complete user flow** from entry point to final observable outcome. A test that only asserts an intermediate state (a button appeared, a spinner is visible, a modal opened) is not a complete flow test.
-
-**Wrong — tests an intermediate state:**
 ```typescript
-test('shows retry button when apply fails', async () => {
-    server.mockApplyUpdate('error', { errorBehavior: 500 });
-    await triggerApply();
-    await expect(firstWindow.locator('[data-test-id="update-retry-apply-button"]')).toBeVisible();
+import { test, expect } from '../../../fixtures/app-fixture';   // ← NUNCA de '@playwright/test'
+import { SUPPLIES } from '../../../support/seed';
+
+/**
+ * Qué flujo cubre este fichero y por qué (una vista de features/, su punto de entrada
+ * y su estado terminal).
+ */
+test.describe('Formulario de receta · crear', () => {
+  test('nueva receta con un insumo del catálogo → guardar → aparece en su categoría', async ({
+    openCatalog,   // fixture: navega hasta la vista
+    catalog,       // page objects
+    form,
+    grid,
+  }) => {
+    await openCatalog();
+
+    await catalog.newRecipeIn('Queques').click();
+    await form.waitReady();
+    await form.name.fill('Bizcocho E2E');
+    await grid.fillExistingLine(0, SUPPLIES.harina.name, '500');
+    await form.save.click();
+
+    await form.waitClosed();
+    await expect(catalog.recipe('Queques', 'Bizcocho E2E')).toBeVisible();   // ← estado terminal
+  });
 });
 ```
 
-**Correct — tests a complete flow:**
+Reglas de la forma:
+
+| Regla | Detalle |
+|---|---|
+| `test`/`expect` del fixture | `import { test, expect } from '.../fixtures/app-fixture'` — nunca de `@playwright/test` (perderías page objects, la anulación de WebGL y la guarda de errores). |
+| Cero selectores en el spec | Todo locator vive en un **page object**. Si falta uno, se **añade al page object**, no se escribe `page.locator('.foo')` en el test. |
+| Locators semánticos | `getByRole`, `getByLabel`, atributos ARIA, elemento nativo. **Nunca** clases de utilidad Tailwind (`.bg-brand`) ni clases BEM (ya no existen). |
+| `data-test-id` solo como último recurso | Cuando no hay rol ni nombre accesible posible. Si hace falta, probablemente falta accesibilidad en la vista: arréglala primero. |
+| Aserciones web-first | `await expect(locator).toBeVisible()` (auto-retry). **Prohibido** `waitForTimeout` como sincronización, `sleep`, o contar milisegundos. |
+| Estado inicial = el seed | Cada test arranca en un contexto de navegador nuevo (IndexedDB vacía) y el seed se resiembra. **No hay limpieza entre tests** ni `beforeEach` de datos: se leen las constantes de `support/seed.ts`. |
+| Sin errores no capturados | El fixture `pageErrors` es `auto` y falla el test si la vista lanza un error de página. No se desactiva. |
+
+### Page objects
+
+Uno por vista de `features/` (o por parte estable y reutilizable, como la grilla de insumos). Es el
+único sitio con conocimiento del DOM:
+
 ```typescript
-test('server error (5xx) → retry → success → dismiss → update card hidden', async () => {
-    server.mockApplyUpdate('error', { errorBehavior: 500 });
-    await triggerApply();
-    server.mockApplyUpdate('success');
-    await firstWindow.locator('[data-test-id="update-retry-apply-button"]').click();
-    await firstWindow.locator('[data-test-id="update-dismiss-button"]').waitFor({ state: 'visible', timeout: 10000 });
-    await firstWindow.locator('[data-test-id="update-dismiss-button"]').click();
-    await expect(firstWindow.locator('[data-test-id="update-now-button"]')).not.toBeVisible();
+export class RecipeFormPage {
+  constructor(private readonly page: Page) {}
+
+  readonly root = this.page.locator('app-recipe-form');
+  readonly name = this.root.getByLabel('Nombre');
+  readonly save = this.root.getByRole('button', { name: 'Guardar' });
+
+  /** Espera a que el diálogo esté montado y operable. */
+  async waitReady(): Promise<void> { … }
+
+  /** Espera a que el CDK haya retirado el panel del overlay (no solo desmontado el componente). */
+  async waitClosed(): Promise<void> { … }
+}
+```
+
+- Expone **locators** (`readonly`) y **acciones compuestas** (`fillExistingLine`, `setPurchase`),
+  no aserciones de negocio — esas van en el spec.
+- Documenta con JSDoc **qué vista** representa y las trampas del control (p.ej. el
+  `migo-unit-input` lee la unidad en `keydown`, así que se pulsa la tecla, no se escribe).
+- Se registra en `fixtures/app-fixture.ts` para llegar por destructuring a cada test.
+
+### Fixtures
+
+`fixtures/app-fixture.ts` extiende `base.extend<AppOptions & AppFixtures>` y aporta:
+
+- **Page objects** (`home`, `catalog`, `form`, `grid`, `priceCapture`, `supplies`, `supplyList`, …).
+- **Atajos de navegación** (`openHome`, `openCatalog`, `openBook3d`): llevan a la vista y esperan a
+  que esté operable. Si un flujo nuevo repite ≥ 4 líneas de navegación, se añade su fixture aquí.
+- **`pageErrors`** (`auto`): falla el test si hubo errores no capturados.
+- **La opción `webgl`** (ver abajo).
+
+## WebGL: la ruta accesible es el modo por defecto
+
+`Home3d` y `RecipeBook3d` detectan WebGL y, si no lo hay, renderizan su **ruta accesible en DOM**.
+La suite explota eso:
+
+- **Por defecto `webgl: false`** — se anula el contexto WebGL (`support/webgl.ts`) y la vista cae al
+  DOM: determinista, sin GPU, milisegundos. **Aquí se prueban los flujos de negocio.**
+- **Los specs del mundo/libro 3D declaran `test.use({ webgl: true })`** y viven en su propia carpeta
+  (`specs/game/home/`, `specs/recipe-book/book-3d/`, `specs/recipe-book/recipe-overlay/`).
+- En 3D el único texto accesible del contenido es la región `aria-live` (`book.announce`): se
+  sincroniza contra **ella**, no contra el canvas.
+
+```typescript
+test.describe('Libro 3D · paginación', () => {
+  test.use({ webgl: true });      // ← el bloque entero corre con el motor 3D real
+  …
 });
 ```
 
-`waitFor()` calls are allowed and necessary to drive the UI between steps — they are not "intermediate assertions". The distinction is: **`waitFor` drives the flow, `expect` asserts the final outcome**.
+## Mobile-first: `*.mobile.spec.ts`
 
-## What counts as a final state
+La regla dura mobile-first se verifica **a 375px** ([mobile-first-conventions.md](mobile-first-conventions.md)).
+La config tiene dos proyectos:
 
-A final state is a point where the user can take no further meaningful action within the scope of the feature under test, or where the system has reached a stable terminal condition:
+| Proyecto | Viewport | Qué corre |
+|---|---|---|
+| `desktop` | 1280×800 | todo **menos** `*.mobile.spec.ts` |
+| `mobile` | 375×667 + `hasTouch` | **solo** `*.mobile.spec.ts` |
 
-- A page/route has changed (navigated to a new screen)
-- A UI element has been permanently hidden (card hidden, modal closed)
-- The user is stuck and must interact with an external escape (e.g. navigate away via router)
-- An error loop is stable (retry button persists, no alternative action available)
+Un spec móvil se llama `<vista>.mobile.spec.ts`, vive en la carpeta de su vista y comprueba lo que
+la regla exige: sin desbordamiento horizontal, diálogos full-bleed (body scrollea, header/footer
+fijos), grillas que apilan o scrollean, targets ≥ 44px, viewport sin zoom. Interactúa con `tap()`,
+no `click()`.
 
-## Mapping flows before writing tests
+No se duplica la suite entera en móvil: un spec móvil por vista con lo que **cambia** en móvil.
 
-Before writing tests for a feature, map the **state machine** of the component under test:
+## Core principle: flujos completos, no estados intermedios
 
-1. **Read the component's inputs** — they define the context-specific configuration
-2. **Read the outputs and their handlers in the consuming template** — they define what constitutes a terminal state in this specific context
-3. **Enumerate every path** through the state machine from entry to terminal state
-4. **Write one test per path**
+**Un test de flujo completo siempre vale más que un test de estado intermedio.**
 
-### Example — mapping `app-update` in settings context
+Un estado intermedio (apareció un botón, se abrió un modal, hay un spinner) solo prueba que un paso
+funcionó — no dice nada de si la feature sirve. Cada test empieza en el **punto de entrada del
+usuario** y termina en el **estado terminal observable**.
 
-Settings template:
-```html
-<app-update
-    (noUpdates)="showUpdate.set(false)"
-    (postponed)="showUpdate.set(false)"
-    (dismissed)="showUpdate.set(false)"
-    (cancelled)="showUpdate.set(false)"
-/>
-```
-
-From the template: terminal state = `showUpdate.set(false)` = card hidden. Every test must end with the card hidden (or the stuck-on-error state if no exit exists).
-
-State machine paths:
-```
-checking → noUpdates                                      → card hidden
-checking → updatesFound → postpone                        → card hidden
-checking → updatesFound → modal cancel                    → card hidden
-checking → updatesFound → modal confirm → success → dismiss → card hidden
-checking → checkError → retry → (any of the above)
-applying → applyError → retry → success → dismiss         → card hidden
-applying → applyError → retry fails → (no exit in settings, stuck on retry)
-```
-
-Each path becomes one test.
-
-## Coverage requirement
-
-All paths through the state machine must be covered. When a context adds configuration (e.g. `showCancelOnError=true` in setup vs `false` in settings), the paths diverge — cover both variants.
-
-**Checklist before calling coverage complete:**
-- [ ] Every terminal output of the component is reachable via at least one test
-- [ ] Every error recovery path (retry, cancel-on-error) is exercised to completion
-- [ ] Context-specific configuration differences are covered (e.g. cancel button present/absent)
-- [ ] No path through the state machine is left untested
-
-## Test naming
-
-Test names must describe the complete flow, not the component state:
-
-| Wrong | Correct |
-|---|---|
-| `shows retry button on check error` | `check error → retry → no updates → card hidden` |
-| `clicking Update Now opens modal` | `updates found → Update Now → cancel modal → card hidden` |
-| `success state is shown after apply` | `updates found → confirm → success → dismiss → card hidden` |
-
-Use `→` as separator between steps in the name.
-
-## Extracting helpers
-
-When multiple tests share a repeated sequence of steps (≥ 4 lines), extract a named helper:
-
+**Mal — estado intermedio:**
 ```typescript
-/** Update Now → confirm modal → wait for dismiss → click dismiss. */
-const confirmUpdateAndDismiss = async (): Promise<void> => {
-    await firstWindow.locator('[data-test-id="update-now-button"]').waitFor({ state: 'visible', timeout: 10000 });
-    await firstWindow.locator('[data-test-id="update-now-button"]').click();
-    await firstWindow.locator('[data-test-id="update-warning-confirm-button"]').click();
-    await firstWindow.locator('[data-test-id="update-dismiss-button"]').waitFor({ state: 'visible', timeout: 10000 });
-    await firstWindow.locator('[data-test-id="update-dismiss-button"]').click();
-};
+test('el formulario se abre', async ({ openCatalog, catalog, form }) => {
+  await openCatalog();
+  await catalog.newRecipeIn('Queques').click();
+  await expect(form.root).toBeVisible();      // ← ¿y luego?
+});
 ```
 
-- Helpers that are shared across `describe` groups → define at the outer `describe` scope
-- Helpers only used within one group → define inside that `describe`
-- Helper names must describe the action sequence, not the UI element
-
-## How to validate a test file
-
-When asked to "validate" or "revisar" a test file against these conventions, always:
-
-1. **Read the current file from disk** — never use git history, diffs, or cached versions. The review must reflect the actual current state of the file.
-2. **Check every test** against the rules below and produce a diagnostic:
-
-### Diagnostic checklist
-
-For each test in the file, verify:
-
-| Rule | Check |
-|---|---|
-| Complete flow | Does the final `expect()` assert a terminal state, not an intermediate one? |
-| Naming | Does the name use `→` and describe the full path, not a UI element? |
-| No intermediate assertions | Are there any `expect()` calls mid-test before the final state? |
-
-Then verify coverage across the whole file:
-
-| Rule | Check |
-|---|---|
-| All paths covered | Is every path through the state machine represented by at least one test? |
-| Config differences | Are context-specific inputs (showPostpone, showCancelOnError, etc.) exercised? |
-| Error recovery | Are all retry/cancel paths exercised to their terminal state? |
-
-### Diagnostic output format
-
-Report findings grouped as:
-
-- **Violations** — tests that break a rule (with the rule name and what to fix)
-- **Missing flows** — paths through the state machine with no test
-- **Verdict** — PASS (all rules satisfied, all flows covered) or FAIL (list what's wrong)
-
-## Structure
-
-```
-tests/e2e/<feature>/
-└── <feature>.<context>.spec.ts   # One spec per context (setup, settings, etc.)
-```
-
-Group tests by the phase/scenario they start from, not by the element they interact with:
-
+**Bien — flujo completo:**
 ```typescript
-test.describe('No updates', () => { ... });
-test.describe('Updates available', () => { ... });
-test.describe('Check error', () => { ... });
-test.describe('Apply error', () => { ... });
+test('Nuevo en Queques → nombre + insumo → guardar → aparece en la categoría', async ({
+  openCatalog, catalog, form, grid,
+}) => {
+  await openCatalog();
+  await catalog.newRecipeIn('Queques').click();
+  await form.waitReady();
+  await form.name.fill('Bizcocho E2E');
+  await grid.fillExistingLine(0, SUPPLIES.harina.name, '500');
+  await form.save.click();
+  await form.waitClosed();
+  await expect(catalog.recipe('Queques', 'Bizcocho E2E')).toBeVisible();
+});
 ```
 
-Each `describe` has a `beforeEach` that sets up server mocks and launches the app.
+`waitReady()` / `waitClosed()` / `waitFor()` **conducen** el flujo; solo el `expect` final asserta
+el resultado. Esa es la distinción — no son "aserciones intermedias".
+
+### Qué cuenta como estado final
+
+- Un dato **persistido y proyectado de vuelta** (la receta aparece en su categoría; el insumo está
+  en la lista al reabrir el diálogo).
+- Una **ruta/vista cambiada** (el libro se desmontó y volvió la cocina).
+- Un elemento **ocultado de forma permanente** (el diálogo se cerró y el CDK retiró su overlay).
+- Un **error estable sin salida** (el mensaje persiste y no hay acción alternativa).
+
+Cuando un test necesita comprobar una **validación**, no termina en "apareció el error": corrige el
+motivo y llega a guardar, o descarta y comprueba que el catálogo quedó intacto.
+
+## Naming
+
+El nombre describe el **camino completo**, con `→` entre pasos:
+
+| Mal | Bien |
+|---|---|
+| `muestra el botón de reintentar` | `error al guardar → reintentar → receta guardada → aparece listada` |
+| `al pulsar Nuevo se abre el modal` | `Nuevo en Queques → Cancelar → el catálogo queda intacto` |
+| `el total se calcula` | `dos insumos → el total suma ambas líneas → guardar` |
+
+El `describe` agrupa por **vista + escenario**, usando `·` como separador:
+`'Formulario de receta · validación'`, `'Captura de precio · insumo nuevo'`.
+
+## Mapear el flujo antes de escribir
+
+Antes de escribir los tests de una vista, se mapea su **máquina de estados**:
+
+1. **Leer los `input()`** de la vista/diálogo — definen su configuración por contexto.
+2. **Leer los `output()` y sus handlers en el consumidor** — definen qué es un estado terminal
+   *en ese contexto* (p.ej. `(closed)="showBook.set(false)"` → terminal = libro desmontado).
+3. **Enumerar cada camino** desde la entrada hasta un terminal.
+4. **Un test por camino.**
+
+Ejemplo — `RecipeForm` abierto desde el libro:
+
+```
+Nuevo «Categoría» → nombre + insumo → Guardar          → receta listada
+Nuevo «Categoría» → Cancelar                            → catálogo intacto
+Nuevo «Categoría» → × cabecera                          → catálogo intacto
+Nuevo «Categoría» → Escape                              → catálogo intacto
+Nuevo «Categoría» → Guardar sin nombre                  → Guardar deshabilitado → Cancelar
+Nuevo «Categoría» → Guardar sin insumos                 → error de la grilla → añadir → guardar
+Receta existente  → renombrar → Guardar                 → la lista muestra el nombre nuevo
+Receta existente  → insumo sin precio → Guardar         → pide precio → ponerlo → guardar
+```
+
+Cuando el contexto cambia la configuración (con/sin WebGL, móvil/escritorio), **los caminos
+divergen: se cubren ambos**.
+
+## Extraer helpers
+
+Cuando varios tests comparten una secuencia (≥ 4 líneas), se extrae:
+
+- Secuencia de **navegación** reutilizable en varios specs → **fixture** en `app-fixture.ts`
+  (`openCatalog`).
+- Secuencia de **interacción con una vista** → **método del page object**
+  (`grid.fillExistingLine`, `priceCapture.setPurchase`).
+- Secuencia propia de **un solo spec** → función `async` con JSDoc en la cabecera del fichero.
+
+Los nombres describen la secuencia de acciones, no el elemento del DOM.
+
+## Cómo validar un fichero de tests
+
+Cuando se pida "validar" o "revisar" un spec contra estas convenciones:
+
+1. **Leer el fichero actual del disco** — nunca del historial de git, diffs ni versiones cacheadas.
+2. **Comprobar cada test** con la checklist y emitir un diagnóstico.
+
+### Checklist por test
+
+| Regla | Comprobación |
+|---|---|
+| Ubicación | ¿Está bajo `e2e/specs/<área>/<vista>/`, espejando `src/app/features/`? |
+| Fixture | ¿Importa `test`/`expect` de `fixtures/app-fixture`? |
+| Page objects | ¿Cero `page.locator(...)`/selectores crudos en el spec? |
+| Flujo completo | ¿El `expect` final asserta un estado terminal, no intermedio? |
+| Naming | ¿Usa `→` y describe el camino, no un elemento? |
+| Sincronización | ¿Aserciones web-first, sin `waitForTimeout` como espera? |
+| Semántica | ¿Locators por rol/ARIA, sin clases de utilidad? |
+
+### Checklist de cobertura del fichero
+
+| Regla | Comprobación |
+|---|---|
+| Todos los caminos | ¿Cada camino de la máquina de estados tiene test? |
+| Variantes de contexto | ¿Se cubren WebGL sí/no y móvil donde el comportamiento difiere? |
+| Recuperación de error | ¿Cada validación/error se lleva hasta su terminal (corregir y guardar, o descartar)? |
+| Feature cubierta | ¿Cada vista de `src/app/features/` tiene su carpeta de specs? |
+
+### Formato del diagnóstico
+
+- **Violaciones** — tests que rompen una regla (con la regla y qué arreglar).
+- **Flujos que faltan** — caminos sin test.
+- **Veredicto** — PASS (todo cumple y está cubierto) o FAIL (con la lista).

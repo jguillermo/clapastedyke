@@ -43,6 +43,8 @@ export interface AppFixtures {
   openCatalog: () => Promise<RecipeBookFallbackPage>;
   /** Abre `/home` → estación «Libro de recetas» → libro 3D con la portada asentada. */
   openBook3d: () => Promise<RecipeBook3dPage>;
+  /** Abre `/home` → libro (ruta DOM) → botón `Insumos` → diálogo de insumos listo. */
+  openSuppliesDialog: () => Promise<SuppliesDialogPage>;
 }
 
 export const test = base.extend<AppOptions & AppFixtures>({
@@ -97,6 +99,17 @@ export const test = base.extend<AppOptions & AppFixtures>({
       await home.station('Libro de recetas').click();
       await book.waitReady();
       return book;
+    });
+  },
+
+  openSuppliesDialog: async ({ home, catalog, supplies }, use) => {
+    await use(async () => {
+      await home.goto();
+      await home.station('Libro de recetas').click();
+      await catalog.waitReady();
+      await catalog.suppliesButton.click();
+      await supplies.waitReady();
+      return supplies;
     });
   },
 });

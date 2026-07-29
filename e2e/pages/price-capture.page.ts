@@ -1,4 +1,4 @@
-import { type Locator, type Page } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
 import type { UnitKey } from './supply-grid.page';
 
 /**
@@ -33,6 +33,9 @@ export class PriceCapturePage {
   async setPurchase(packaging: string, price: string, unit?: UnitKey): Promise<void> {
     await this.packaging.fill(packaging);
     if (unit) {
+      // Se espera a que el valor aterrice antes de la tecla de unidad: si la pulsación adelanta al
+      // `fill`, el control resuelve la unidad con el valor viejo (fuente de intermitencias).
+      await expect(this.packaging).toHaveValue(packaging);
       await this.packaging.press(unit);
     }
     await this.price.fill(price);

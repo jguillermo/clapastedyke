@@ -15,21 +15,26 @@ The authoritative coding rules are in **`.claude/CLAUDE.md`** (always loaded) an
 - `providers-conventions.md` — per-context DI via `provide*()` functions
 - `path-aliases-conventions.md` — `@app/@components/@core/@features/@platform`
 - `mobile-first-conventions.md` — **hard rule**: toda la UI DOM es mobile-first (diálogos/formularios full-bleed en móvil, grillas que no se aplastan, targets ≥44px, viewport sin zoom). Cada componente y feature debe cumplirla y verificarse a 375px.
-- `unit-tests-conventions.md`, `e2e-tests-conventions.md`, `assets-conventions.md`
+- `unit-tests-conventions.md` — **hard rule**: unit tests cover **only** `core/<context>/domain/` and `core/<context>/application/use-cases/`, and live in `core/<context>/testing/` mirroring the source path exactly. Features are covered by E2E, design-system components by their story's `play`.
+- `assets-conventions.md`
+- `e2e-tests-conventions.md` — **hard rule**: todos los E2E viven en `e2e/` (config, specs, page objects, fixtures) y prueban las vistas de `src/app/features/` con flujos completos. Cualquier petición de "crear tests E2E" se resuelve con esa forma.
 
 > Note: `main-process-conventions.md` and `asset-protocol-conventions.md` describe an Electron main process (`app/src/`) that does **not** exist in this repo. This is a **browser** Angular app — persistence is **IndexedDB**, not Electron IPC. Treat those two rules as inapplicable here unless an `app/` directory is added.
 
 ## Commands
 
 ```bash
-ng serve            # dev server at http://localhost:4200 (routes: /home, /ui)
+ng serve            # dev server at http://localhost:4200 (route: /home)
 ng build            # production build → dist/
 ng build --watch --configuration development   # also: npm run watch
 ng test             # unit tests — Vitest via @angular/build:unit-test (globals, jsdom)
+npm run test:e2e    # E2E: ng build + Playwright over e2e/ (projects: desktop 1280px, mobile 375px)
+npm run test:e2e:ui # the same, in Playwright's UI mode
+npm run sb          # Storybook (component states/variants live in *.stories.ts `play`)
 ```
 
 - **No lint script and no ESLint config** — conventions are enforced by code review, not tooling. Formatting is Prettier (`.prettierrc`: 100 cols, single quotes); there is no `format` script.
-- **No e2e runner is configured** despite `e2e-tests-conventions.md` existing.
+- **E2E lives only in `e2e/`** — one Playwright config (`e2e/playwright.config.ts`), specs mirroring `src/app/features/`, page objects in `e2e/pages/`, fixtures in `e2e/fixtures/`. Tests run against the **compiled build** served by `e2e/support/static-server.mjs`, not `ng serve`. See `e2e-tests-conventions.md` — that shape is mandatory for every new E2E test.
 - Tests use Vitest **globals** (`describe`/`it`/`expect`) — no per-file imports. `tsconfig.spec.json` discovers all `src/**/*.spec.ts` wherever they sit.
 - TypeScript **6** + Angular **22**. Path aliases have **no `baseUrl`** and use relative targets (`./src/app/*`) — required by TS6 (see `path-aliases-conventions.md`).
 
