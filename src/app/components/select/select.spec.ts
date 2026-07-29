@@ -57,4 +57,21 @@ describe('Select (ControlValueAccessor)', () => {
     await fixture.whenStable();
     expect(triggerButton().textContent).toContain('Alemania');
   });
+
+  it('renders the selected value as a tag/pill, not plain text', async () => {
+    fixture = TestBed.createComponent(Host);
+    fixture.componentInstance.control.setValue('de');
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const chip = triggerButton().querySelector('.rounded-full');
+    expect(chip).toBeTruthy();
+    expect(chip?.textContent).toContain('Alemania');
+  });
+
+  it('shows the placeholder as plain text (no tag) when nothing is selected', () => {
+    fixture = TestBed.createComponent(Host);
+    fixture.detectChanges();
+    expect(triggerButton().querySelector('.rounded-full')).toBeNull();
+    expect(triggerButton().textContent).toContain('Selecciona…');
+  });
 });

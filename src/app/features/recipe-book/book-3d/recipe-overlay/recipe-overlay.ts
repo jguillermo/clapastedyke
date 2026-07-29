@@ -12,12 +12,15 @@ import {
 } from '@angular/core';
 import { Button } from '@components/button/button';
 import { Icon } from '@components/icon/icon';
+import { Badge } from '@components/badge/badge';
 import {
   PreviewRecipeCost,
   type PreviewRecipeCostResult,
 } from '@core/recipe-book/application/use-cases/preview-recipe-cost.use-case';
 import type { Recipe } from '@core/recipe-book/domain/entities/recipe';
 import type { Supply } from '@core/recipe-book/domain/entities/supply';
+import type { RecipeFlavor } from '@core/recipe-book/domain/entities/recipe-flavor';
+import type { RecipeCapacity } from '@core/recipe-book/domain/entities/recipe-capacity';
 import { formatQuantity } from '../../_shared/recipe-format';
 
 /** Caja en pantalla (px de viewport) donde va el overlay: la cara de la receta en el libro. */
@@ -45,7 +48,7 @@ const EMPTY_COST: PreviewRecipeCostResult = { items: [], total: '' };
 @Component({
   selector: 'app-recipe-overlay',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Button, Icon],
+  imports: [Button, Icon, Badge],
   host: {
     // Caja fija sobre la hoja; por debajo de la barra inferior/flotantes (z-30) para no taparlos.
     // Fondo TRANSPARENTE: se ve la hoja real del libro 3D detrás (su degradado/sombra reales).
@@ -58,12 +61,27 @@ const EMPTY_COST: PreviewRecipeCostResult = { items: [], total: '' };
     '(pointerup)': 'onUp($event)',
   },
   template: `
-    <!-- Título FIJO (único bloque fijo: nombre + editar + su subrayado). Serif grande tipo recetario. -->
-    <header class="mx-6 flex items-start justify-between gap-4 border-b-2 border-brand pt-8 pb-4">
-      <h2 class="m-0 font-display font-bold text-heading text-h2 sm:text-h1">{{ recipe().name }}</h2>
-      <button migo-button variant="ghost" size="sm" type="button" aria-label="Editar receta" (click)="edit.emit()">
-        <migo-icon icon-leading name="mat:edit" size="md" />
-      </button>
+    <!-- Título FIJO (único bloque fijo: nombre + editar + sabor + su subrayado). Serif grande tipo recetario. -->
+    <header class="mx-6 flex flex-col gap-1 border-b-2 border-brand pt-8 pb-4">
+      <div class="flex items-start justify-between gap-4">
+        <h2 class="m-0 font-display font-bold text-heading text-h2 sm:text-h1">{{ recipe().name }}</h2>
+        <button migo-button variant="ghost" size="sm" type="button" aria-label="Editar receta" (click)="edit.emit()">
+          <migo-icon icon-leading name="mat:edit" size="md" />
+        </button>
+      </div>
+      @if (flavorLabel() || portionsLabel() || moldLabel()) {
+        <div class="flex flex-wrap gap-1.5">
+          @if (flavorLabel(); as flavor) {
+            <migo-badge size="xs">Sabor: {{ flavor }}</migo-badge>
+          }
+          @if (portionsLabel(); as portions) {
+            <migo-badge size="xs">Porciones: {{ portions }}</migo-badge>
+          }
+          @if (moldLabel(); as mold) {
+            <migo-badge size="xs">Molde: {{ mold }}</migo-badge>
+          }
+        </div>
+      }
     </header>
 
     <!-- Cuerpo SCROLLEABLE (scroll nativo, sin barra — ver hasMore): cabecera de columnas, filas
@@ -113,6 +131,8 @@ const EMPTY_COST: PreviewRecipeCostResult = { items: [], total: '' };
 export class RecipeOverlay {
   readonly recipe = input.required<Recipe>();
   readonly supplies = input<readonly Supply[]>([]);
+  readonly flavors = input<readonly RecipeFlavor[]>([]);
+  readonly capacities = input<readonly RecipeCapacity[]>([]);
   readonly rect = input.required<OverlayRect>();
   readonly edit = output<void>();
   /** Deslizamiento horizontal sobre el overlay → pasar página (el vertical scrollea nativo). */
@@ -195,6 +215,29 @@ export class RecipeOverlay {
   private readonly suppliesById = computed(
     () => new Map<string, Supply>(this.supplies().map((s) => [s.id.value, s])),
   );
+
+  private readonly flavorsById = computed(
+    () => new Map<string, RecipeFlavor>(this.flavors().map((f) => [f.id.value, f])),
+  );
+  /** Label del sabor de la receta (característica bajo el título), o `null` si no tiene. */
+  protected readonly flavorLabel = computed<string | null>(() => {
+    const id = this.recipe().flavorId;
+    return id ? (this.flavorsById().get(id.value)?.label ?? null) : null;
+  });
+
+  private readonly capacitiesById = computed(
+    () => new Map<string, RecipeCapacity>(this.capacities().map((c) => [c.id.value, c])),
+  );
+  /** Label de la capacidad por porciones (característica bajo el título), o `null` si no tiene. */
+  protected readonly portionsLabel = computed<string | null>(() => {
+    const id = this.recipe().portionsCapacityId;
+    return id ? (this.capacitiesById().get(id.value)?.label ?? null) : null;
+  });
+  /** Label de la capacidad por molde (característica bajo el título), o `null` si no tiene. */
+  protected readonly moldLabel = computed<string | null>(() => {
+    const id = this.recipe().moldCapacityId;
+    return id ? (this.capacitiesById().get(id.value)?.label ?? null) : null;
+  });
 
   /** Líneas a costear, en el mismo orden que `recipe().lines` — el use case las devuelve alineadas. */
   private readonly costRequestLines = computed(() => {

@@ -1,5 +1,6 @@
 import { ConnectedPosition, OverlayModule } from '@angular/cdk/overlay';
 import {
+  afterRenderEffect,
   ChangeDetectionStrategy,
   Component,
   computed,
@@ -7,12 +8,14 @@ import {
   ElementRef,
   inject,
   input,
+  OnDestroy,
   output,
   signal,
   viewChild,
 } from '@angular/core';
 import { FormField } from '@components/form-field/form-field';
 import { Icon } from '@components/icon/icon';
+import { Button } from '@components/button/button';
 
 /** Un tipo de etiqueta: sus valores, si admite crear, su sufijo y su validación. */
 export interface SelectTagType {
@@ -22,6 +25,24 @@ export interface SelectTagType {
   allowCreate?: boolean;
   /** Valida un valor para este tipo; devuelve el mensaje de error o `null` si es válido. */
   validate?: (value: string) => string | null;
+  /**
+   * Si se da, tras elegir el grupo se pide este dato numérico antes de confirmar (p.ej. un factor
+   * de escalado) — **salvo que el valor tecleado ya sea un número plano** (p.ej. "33"), en cuyo
+   * caso se usa ese mismo número como dato extra y no se pregunta nada. `reference` son los
+   * valores existentes de este tipo con su dato extra, para mostrarlos como contexto al pedirlo
+   * (p.ej. "Pequeño = 0.5").
+   */
+  extraField?: {
+    label: string;
+    placeholder?: string;
+    reference?: readonly { label: string; extra: number }[];
+  };
+}
+
+/** Un valor nuevo en proceso de creación mientras se pide su dato extra (`extraField`). */
+interface PendingExtra {
+  typeKey: string;
+  value: string;
 }
 
 type OptionKind = 'value' | 'create' | 'group';
@@ -45,18 +66,48 @@ const BOX_BASE =
   'flex flex-wrap items-center gap-1.5 w-full min-h-11 box-border px-3 py-1.5 rounded-md bg-surface-card ' +
   'border cursor-text transition duration-base ease-out hover:border-border-strong motion-reduce:transition-none';
 
+/** Cuánto queda visible el aviso de "ya no hay más para elegir" antes de desaparecer solo. */
+const ALL_PICKED_HINT_MS = 2200;
+
+/**
+ * Margen tras perder el foco antes de cerrar el panel: si el foco se movió a otro control propio
+ * (quitar un chip, el campo del dato extra) en vez de salir de verdad, no se cierra a mitad de
+ * camino.
+ */
+const BLUR_CLOSE_DELAY_MS = 120;
+
+/** `true` si lo tecleado ya es un número plano (p.ej. "33"), no texto (p.ej. "Grande"). */
+function isPlainNumber(value: string): boolean {
+  return /^-?\d+(\.\d+)?$/.test(value.trim());
+}
+
+/** Convierte el dato extra tecleado a número: acepta decimal ("0.2") o fracción ("1/8"). */
+function parseFactorInput(raw: string): number | null {
+  const trimmed = raw.trim();
+  const fraction = trimmed.match(/^(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)$/);
+  if (fraction) {
+    const denominator = Number(fraction[2]);
+    return denominator !== 0 ? Number(fraction[1]) / denominator : null;
+  }
+  const plain = Number(trimmed);
+  return Number.isFinite(plain) ? plain : null;
+}
+
 /**
  * Campo único estilo "Select2": caja con chips de lo elegido + un input donde se
  * escribe; al teclear, un panel (CDK Overlay) muestra sugerencias **agrupadas por
  * tipo**. **Una por tipo** (los ya elegidos no se vuelven a ofrecer). Para crear un
  * valor nuevo hay **un único "Añadir"**, que **pregunta a qué grupo** añadirlo y
- * **valida** el valor según ese tipo (`validate`). Presentacional: la validación y
- * los tipos los aporta el consumidor; aquí solo se ejecutan.
+ * **valida** el valor según ese tipo (`validate`). Si el tipo declara `extraField`,
+ * tras elegir el grupo se pide ese dato numérico (p.ej. un factor de escalado) antes
+ * de confirmar — al completarse emite `created` para que el consumidor lo persista.
+ * Presentacional: la validación y los tipos los aporta el consumidor; aquí solo se
+ * ejecutan.
  */
 @Component({
   selector: 'migo-select-tag',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [OverlayModule, Icon],
+  imports: [OverlayModule, Icon, Button],
   template: `
     <div #box cdkOverlayOrigin #origin="cdkOverlayOrigin" [class]="boxClasses()" (click)="focusInput()">
       @for (chip of chips(); track chip.key) {
@@ -89,61 +140,94 @@ const BOX_BASE =
         (focus)="onFocus()"
         (input)="onInput($event)"
         (keydown)="onKeydown($event)"
+        (blur)="onBlur()"
       />
     </div>
 
     <ng-template
       cdkConnectedOverlay
       [cdkConnectedOverlayOrigin]="origin"
-      [cdkConnectedOverlayOpen]="open()"
+      [cdkConnectedOverlayOpen]="overlayOpen()"
       [cdkConnectedOverlayWidth]="boxWidth()"
       [cdkConnectedOverlayPositions]="positions"
       (overlayOutsideClick)="close()"
       (detach)="close()"
     >
-      <ul
-        class="mt-0 p-1 list-none max-h-72 overflow-y-auto bg-surface-card border border-border-subtle rounded-md shadow-lg"
-        role="listbox"
-      >
-        @if (creating() !== null) {
-          <li class="px-3 pt-2 pb-1 text-caption text-muted">¿A qué grupo añadir «{{ creating() }}»?</li>
-        }
-        @for (opt of options(); track opt.id; let i = $index) {
-          <li
-            class="flex items-center gap-2 px-3 py-2 rounded-sm text-sm text-body cursor-pointer"
-            [class.bg-surface-sunken]="i === activeIndex()"
-            role="option"
-            [id]="opt.id"
-            [attr.aria-selected]="i === activeIndex()"
-            (mousedown)="$event.preventDefault()"
-            (click)="pick(opt)"
-          >
-            @switch (opt.kind) {
-              @case ('value') {
-                <span class="shrink-0 text-caption text-muted">{{ opt.typeLabel }}</span>
-                <span class="flex-1">{{ opt.display }}</span>
-              }
-              @case ('create') {
-                <migo-icon name="mat:add" size="sm" color="muted" />
-                <span class="flex-1">Añadir «{{ opt.value }}»…</span>
-              }
-              @case ('group') {
-                <span class="flex-1">{{ opt.typeLabel }}</span>
+      @if (allPickedHint()) {
+        <div class="mt-1 rounded-md border border-border-subtle bg-surface-card px-3 py-2 text-sm text-muted shadow-lg" role="status">
+          Ya elegiste todas las opciones disponibles.
+        </div>
+      } @else {
+        <ul
+          class="mt-0 p-1 list-none max-h-72 overflow-y-auto bg-surface-card border border-border-subtle rounded-md shadow-lg"
+          role="listbox"
+        >
+          @if (awaitingExtra(); as pendingExtra) {
+            <li class="px-3 pt-2 pb-1 text-caption text-muted">{{ extraFieldLabel(pendingExtra.typeKey) }}</li>
+            @if (extraFieldReference(pendingExtra.typeKey); as reference) {
+              @if (reference.length) {
+                <li class="flex flex-wrap gap-x-3 gap-y-1 px-3 pb-1 text-xs text-muted">
+                  @for (ref of reference; track ref.label) {
+                    <span>{{ ref.label }} = {{ ref.extra }}</span>
+                  }
+                </li>
               }
             }
-          </li>
-        } @empty {
-          <li class="px-3 py-2 text-sm text-muted">{{ pending().length ? 'Sin coincidencias' : 'Ya las elegiste todas' }}</li>
-        }
-        @if (createError()) {
-          <li class="px-3 py-2 text-caption font-medium text-error" role="alert">{{ createError() }}</li>
-        }
-      </ul>
+            <li class="flex items-center gap-2 px-3 py-2">
+              <input
+                #extraInput
+                type="number"
+                class="min-h-11 min-w-0 flex-1 rounded-md border border-border-subtle bg-surface-card px-3 py-2 font-body text-base text-body focus:outline-none focus:border-brand focus:shadow-focus"
+                [placeholder]="extraFieldPlaceholder(pendingExtra.typeKey)"
+                (keydown.enter)="confirmExtra(extraInput.value)"
+                (keydown.escape)="cancelCreate()"
+              />
+              <button migo-button size="sm" type="button" aria-label="Confirmar" (click)="confirmExtra(extraInput.value)">
+                <migo-icon icon-leading name="mat:check" size="sm" />
+              </button>
+            </li>
+          } @else {
+            @if (creating() !== null) {
+              <li class="px-3 pt-2 pb-1 text-caption text-muted">¿A qué grupo añadir «{{ creating() }}»?</li>
+            }
+            @for (opt of options(); track opt.id; let i = $index) {
+              <li
+                class="flex items-center gap-2 px-3 py-2 rounded-sm text-sm text-body cursor-pointer"
+                [class.bg-surface-sunken]="i === activeIndex()"
+                role="option"
+                [id]="opt.id"
+                [attr.aria-selected]="i === activeIndex()"
+                (mousedown)="$event.preventDefault()"
+                (click)="pick(opt)"
+              >
+                @switch (opt.kind) {
+                  @case ('value') {
+                    <span class="shrink-0 text-caption text-muted">{{ opt.typeLabel }}</span>
+                    <span class="flex-1">{{ opt.display }}</span>
+                  }
+                  @case ('create') {
+                    <migo-icon name="mat:add" size="sm" color="muted" />
+                    <span class="flex-1">Añadir «{{ opt.value }}»…</span>
+                  }
+                  @case ('group') {
+                    <span class="flex-1">{{ opt.typeLabel }}</span>
+                  }
+                }
+              </li>
+            } @empty {
+              <li class="px-3 py-2 text-sm text-muted">Sin coincidencias</li>
+            }
+          }
+          @if (createError()) {
+            <li class="px-3 py-2 text-caption font-medium text-error" role="alert">{{ createError() }}</li>
+          }
+        </ul>
+      }
     </ng-template>
   `,
   host: { class: 'block' },
 })
-export class SelectTag {
+export class SelectTag implements OnDestroy {
   protected readonly field = inject(FormField, { optional: true });
 
   readonly types = input<readonly SelectTagType[]>([]);
@@ -152,10 +236,13 @@ export class SelectTag {
   readonly ariaLabel = input('');
 
   readonly valueChange = output<Record<string, string>>();
+  /** Se emite cuando se completa la creación de un valor nuevo con `extraField` (p.ej. persistirlo). */
+  readonly created = output<{ typeKey: string; value: string; extra: number }>();
 
   protected readonly positions = POSITIONS;
   private readonly box = viewChild.required<ElementRef<HTMLElement>>('box');
   private readonly inputEl = viewChild.required<ElementRef<HTMLInputElement>>('input');
+  private readonly extraInputEl = viewChild<ElementRef<HTMLInputElement>>('extraInput');
   private readonly fieldId = `migo-select-tag-${nextId++}`;
 
   protected readonly selected = signal<Record<string, string>>({});
@@ -166,7 +253,16 @@ export class SelectTag {
   protected readonly boxWidth = signal(0);
   /** Valor en proceso de creación mientras se pregunta a qué grupo (null = no creando). */
   protected readonly creating = signal<string | null>(null);
+  /** Valor+tipo en espera de su dato extra (`extraField`), o `null` si no aplica. */
+  protected readonly awaitingExtra = signal<PendingExtra | null>(null);
   protected readonly createError = signal('');
+  /** `true` mientras se muestra el aviso transitorio de "ya no queda nada por elegir". */
+  protected readonly allPickedHint = signal(false);
+  private hintTimeoutId: ReturnType<typeof setTimeout> | null = null;
+  private blurTimeoutId: ReturnType<typeof setTimeout> | null = null;
+
+  /** El overlay se abre para la lista normal o para el aviso transitorio. */
+  protected readonly overlayOpen = computed(() => this.open() || this.allPickedHint());
 
   protected readonly controlId = computed(() => this.field?.controlId ?? this.fieldId);
   protected readonly describedBy = computed(() => this.field?.describedBy() ?? null);
@@ -193,6 +289,11 @@ export class SelectTag {
   });
 
   protected readonly options = computed<Option[]>(() => {
+    // Esperando el dato extra (p.ej. factor): el panel muestra ese prompt, no la lista.
+    if (this.awaitingExtra()) {
+      return [];
+    }
+
     // Modo "elegir grupo": tras pulsar Añadir, se listan los tipos pendientes creables.
     const creatingValue = this.creating();
     if (creatingValue !== null) {
@@ -221,25 +322,95 @@ export class SelectTag {
 
   constructor() {
     effect(() => this.selected.set({ ...this.value() }));
+    // Foco al campo del dato extra en cuanto aparece (paso 3 del flujo de creación).
+    afterRenderEffect(() => {
+      if (this.awaitingExtra()) {
+        this.extraInputEl()?.nativeElement.focus();
+      }
+    });
   }
 
   protected focusInput(): void {
     this.boxWidth.set(this.box().nativeElement.offsetWidth);
-    this.open.set(true);
+    this.tryOpen();
     this.inputEl().nativeElement.focus();
   }
 
   protected onFocus(): void {
     this.boxWidth.set(this.box().nativeElement.offsetWidth);
-    this.open.set(true);
+    this.tryOpen();
   }
 
   protected onInput(event: Event): void {
     this.query.set((event.target as HTMLInputElement).value);
     this.creating.set(null); // teclear vuelve al modo lista
+    this.awaitingExtra.set(null);
     this.createError.set('');
     this.activeIndex.set(0);
+    this.tryOpen();
+  }
+
+  /**
+   * Perder el foco cierra el panel (p.ej. Tab a otro campo) — no solo el clic afuera. Con un
+   * pequeño margen: si el foco se movió a un control propio (quitar chip, campo del dato extra),
+   * ese control ya se está usando y no debe interrumpirse a mitad de camino.
+   */
+  protected onBlur(): void {
+    if (this.blurTimeoutId !== null) {
+      clearTimeout(this.blurTimeoutId);
+    }
+    this.blurTimeoutId = setTimeout(() => {
+      this.blurTimeoutId = null;
+      if (!this.hasFocusWithin()) {
+        this.close();
+      }
+    }, BLUR_CLOSE_DELAY_MS);
+  }
+
+  private hasFocusWithin(): boolean {
+    const active = document.activeElement;
+    if (!active) {
+      return false;
+    }
+    if (this.box().nativeElement.contains(active)) {
+      return true;
+    }
+    return this.extraInputEl()?.nativeElement === active;
+  }
+
+  /** Abre el panel de opciones, o el aviso transitorio si ya no queda ningún tipo por elegir. */
+  private tryOpen(): void {
+    if (this.pending().length === 0) {
+      this.showAllPickedHint();
+      return;
+    }
     this.open.set(true);
+  }
+
+  private showAllPickedHint(): void {
+    this.open.set(false);
+    this.allPickedHint.set(true);
+    if (this.hintTimeoutId !== null) {
+      clearTimeout(this.hintTimeoutId);
+    }
+    this.hintTimeoutId = setTimeout(() => this.allPickedHint.set(false), ALL_PICKED_HINT_MS);
+  }
+
+  private dismissHint(): void {
+    if (this.hintTimeoutId !== null) {
+      clearTimeout(this.hintTimeoutId);
+      this.hintTimeoutId = null;
+    }
+    this.allPickedHint.set(false);
+  }
+
+  ngOnDestroy(): void {
+    if (this.hintTimeoutId !== null) {
+      clearTimeout(this.hintTimeoutId);
+    }
+    if (this.blurTimeoutId !== null) {
+      clearTimeout(this.blurTimeoutId);
+    }
   }
 
   protected onKeydown(event: KeyboardEvent): void {
@@ -265,6 +436,9 @@ export class SelectTag {
         if (this.creating() !== null) {
           event.stopPropagation();
           this.cancelCreate();
+        } else if (this.allPickedHint()) {
+          event.stopPropagation();
+          this.dismissHint();
         } else if (this.open()) {
           event.stopPropagation();
           this.close();
@@ -300,11 +474,51 @@ export class SelectTag {
           this.createError.set(error);
           return;
         }
+        if (type?.extraField && !isPlainNumber(option.value)) {
+          // El valor tecleado es texto (no un número plano) → pedir el dato extra (paso 3).
+          this.creating.set(null);
+          this.createError.set('');
+          this.awaitingExtra.set({ typeKey: option.typeKey!, value: option.value });
+          return;
+        }
         this.addExtra(option.typeKey!, option.value);
         this.commit(option.typeKey!, option.value);
+        if (type?.extraField) {
+          // El valor ya era un número (p.ej. "33"): se usa directo, sin preguntar nada más.
+          this.created.emit({ typeKey: option.typeKey!, value: option.value, extra: Number(option.value) });
+        }
         break;
       }
     }
+  }
+
+  /** Confirma el dato extra pedido (paso 3) y completa la creación del valor. */
+  protected confirmExtra(raw: string): void {
+    const pending = this.awaitingExtra();
+    if (!pending) {
+      return;
+    }
+    const extra = parseFactorInput(raw);
+    if (extra === null || extra <= 0) {
+      this.createError.set('Ingresa un número (o fracción, p.ej. 1/8) mayor que 0.');
+      return;
+    }
+    this.addExtra(pending.typeKey, pending.value);
+    this.commit(pending.typeKey, pending.value);
+    this.created.emit({ typeKey: pending.typeKey, value: pending.value, extra });
+  }
+
+  protected extraFieldLabel(typeKey: string): string {
+    return this.types().find((t) => t.key === typeKey)?.extraField?.label ?? '';
+  }
+
+  protected extraFieldPlaceholder(typeKey: string): string {
+    return this.types().find((t) => t.key === typeKey)?.extraField?.placeholder ?? '';
+  }
+
+  /** Valores existentes de este tipo con su dato extra, como contexto al pedirlo (p.ej. "Pequeño = 0.5"). */
+  protected extraFieldReference(typeKey: string): readonly { label: string; extra: number }[] {
+    return this.types().find((t) => t.key === typeKey)?.extraField?.reference ?? [];
   }
 
   protected removeChip(key: string): void {
@@ -318,11 +532,13 @@ export class SelectTag {
 
   protected close(): void {
     this.open.set(false);
+    this.dismissHint();
     this.cancelCreate();
   }
 
-  private cancelCreate(): void {
+  protected cancelCreate(): void {
     this.creating.set(null);
+    this.awaitingExtra.set(null);
     this.createError.set('');
     this.activeIndex.set(0);
   }
@@ -332,6 +548,10 @@ export class SelectTag {
     this.emit();
     this.query.set('');
     this.cancelCreate();
+    if (this.pending().length === 0) {
+      // Ese chip era el último tipo pendiente: no queda nada más que ofrecer.
+      this.showAllPickedHint();
+    }
     this.inputEl().nativeElement.focus();
   }
 
@@ -342,6 +562,10 @@ export class SelectTag {
   }
 
   private move(delta: number): void {
+    if (this.creating() === null && this.pending().length === 0) {
+      this.showAllPickedHint();
+      return;
+    }
     this.open.set(true);
     const count = this.options().length;
     if (count > 0) {

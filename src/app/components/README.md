@@ -44,6 +44,7 @@ targets táctiles ≥ 44px (`min-h-11`). Detalle en
 | [Combobox](#combobox) | `migo-combobox` | Texto: fantasma (1) + desplegable (2+) | ✅ | ✅ |
 | [Checkbox](#checkbox) | `migo-checkbox` | Control booleano | ✅ | ✅ |
 | [Select](#select) | `migo-select` | Control (CDK Overlay+Listbox) | ✅ | ✅ |
+| [Badge](#badge) | `migo-badge` | Presentacional (píldora de característica) | — | ✅ |
 | [Table](#table) | `migo-table` | Hoja de cálculo (`<table>` + teclado) | — | ✅ |
 | [SelectTag](#selecttag) | `migo-select-tag` | Etiquetas tipo Select2 (chips + autocompletar) | — | ✅ |
 | [Dialog](#dialog) | `MigoDialog` (servicio) | Servicio (CDK Dialog) | — | ✅ |
@@ -224,10 +225,22 @@ grilla de insumos (`seamless`).
 
 `migo-select` — combobox (CDK Overlay + Listbox), `ControlValueAccessor`. `options:
 SelectOption[]` (`{ value, label, disabled? }`) · `placeholder` · `ariaLabel` · `invalid` ·
-`disabled`.
+`disabled`. Una vez elegida una opción, su label se muestra como una **píldora/tag** dentro del
+disparador (no texto plano) — confirma visualmente que la selección quedó puesta.
 
 ```html
 <migo-select [options]="countries" placeholder="País" formControlName="country" />
+```
+
+## Badge
+
+`migo-badge` — píldora presentacional para una característica corta (p.ej. el sabor o el tamaño de
+una receta). Sin lógica, sin CVA (no es control de formulario). El texto es el contenido
+proyectado. `size`: `sm` (default) · `xs` (más compacta, para varias juntas bajo un título).
+
+```html
+<migo-badge>Vainilla</migo-badge>
+<migo-badge size="xs">Porciones: 40</migo-badge>
 ```
 
 ## Dialog
@@ -316,13 +329,32 @@ de fallback. `bleed` lleva la tabla a los bordes en móvil. Los inputs de celda 
 
 `migo-select-tag` — campo único estilo **Select2**: una caja con **chips** de lo elegido + un input;
 al escribir abre un **panel** (CDK Overlay) con sugerencias **agrupadas por tipo** y permite **crear**
-valores; **una por tipo** (elegir reemplaza). Toda la lógica vive en el componente; el consumidor solo
-configura `types` e interpreta la salida. Inputs: `types` (`{key,label,values,allowCreate?}[]`),
-`value?` (`Record<tipo,valor>`), `placeholder?`, `ariaLabel?`. Output: `valueChange`
-(`Record<tipo,valor>`).
+valores; **una por tipo** (un tipo con valor se oculta de las opciones — quitar su chip lo vuelve a
+ofrecer). Cada chip lleva su propia **×** para quitarlo. Toda la lógica vive en el componente; el
+consumidor solo configura `types` e interpreta la salida. Inputs: `types`
+(`{key,label,values,allowCreate?,validate?,extraField?}[]`), `value?` (`Record<tipo,valor>`),
+`placeholder?`, `ariaLabel?`. Outputs: `valueChange` (`Record<tipo,valor>`) y `created`
+(`{typeKey,value,extra}`, solo cuando se completa la creación de un valor nuevo con `extraField`).
 
 ```html
 <migo-select-tag [types]="charTypes()" (valueChange)="onChars($event)" placeholder="Añade…" />
+```
+
+**`extraField`** — cuando un tipo lo declara (`{ label, placeholder? }`), tras elegir a qué grupo
+añadir el valor nuevo, el panel pide **un dato numérico más** (p.ej. un factor de escalado) antes de
+confirmar; al completarse, emite `created` para que el consumidor lo persista con su propio caso de
+uso (el componente no llama a ningún servicio).
+
+```html
+<migo-select-tag
+  [types]="[
+    { key: 'portions', label: 'Porciones', values: portionLabels(), allowCreate: true, extraField: { label: 'Factor de escalado' } },
+    { key: 'mold', label: 'Molde', values: moldLabels(), allowCreate: true, extraField: { label: 'Factor de escalado' } }
+  ]"
+  [value]="capacityValue()"
+  (valueChange)="capacityValue.set($event)"
+  (created)="onCapacityCreated($event)"
+/>
 ```
 
 ---
@@ -364,7 +396,8 @@ Pendiente (ningún componente de abajo existe todavía). Orden sugerido por uso 
 - [ ] **Menu / Dropdown** (`migo-menu`, CDK Menu `@angular/cdk/menu`).
 - [ ] **Tabs** (`migo-tabs` + `migo-tab`).
 - [ ] **Accordion / Expansion** (`migo-accordion`, CDK Accordion).
-- [ ] **Badge / Chip** (`migo-badge`, `migo-chip`).
+- [x] **Badge** (`migo-badge`) — ✅ hecho: píldora presentacional de característica corta, una
+      variante neutral. `migo-chip` (interactivo/eliminable) sigue pendiente si se necesita.
 - [ ] **Avatar** (`migo-avatar`) — imagen/iniciales.
 
 ### Prioridad baja (datos / formularios avanzados)

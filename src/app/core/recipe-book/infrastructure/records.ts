@@ -56,4 +56,7 @@ export interface RecipeRecord {
     categoryId: string;
     name: string;
     lines: SupplyLineRecord[];
+    flavorId?: string | null; // opcional por retrocompatibilidad con records escritos antes del sabor
+    portionsCapacityId?: string | null; // opcional por retrocompatibilidad con records escritos antes de la capacidad
+    moldCapacityId?: string | null; // opcional por retrocompatibilidad con records escritos antes de la capacidad
 }

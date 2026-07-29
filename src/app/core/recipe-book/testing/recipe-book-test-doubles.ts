@@ -191,14 +191,35 @@ export function makeCategory(id: string, name: string): RecipeCategory {
     return RecipeCategory.create(new EntityId(id), name);
 }
 
-/** Test helper: una receta con sus líneas de insumo. */
+/** Test helper: una receta con sus líneas de insumo, sabor y capacidades opcionales. */
 export function makeRecipe(
     id: string,
     categoryId: string,
     name: string,
     lines: SupplyLine[],
+    flavorId: string | null = null,
+    portionsCapacityId: string | null = null,
+    moldCapacityId: string | null = null,
 ): Recipe {
-    return Recipe.create(new EntityId(id), new EntityId(categoryId), name, lines);
+    return Recipe.create(
+        new EntityId(id),
+        new EntityId(categoryId),
+        name,
+        lines,
+        flavorId ? new EntityId(flavorId) : null,
+        portionsCapacityId ? new EntityId(portionsCapacityId) : null,
+        moldCapacityId ? new EntityId(moldCapacityId) : null,
+    );
+}
+
+/** Test helper: un sabor de catálogo (id + label). */
+export function makeFlavor(id: string, label: string): RecipeFlavor {
+    return RecipeFlavor.create(new EntityId(id), label);
+}
+
+/** Test helper: una capacidad de catálogo (id + grupo + label + factor). */
+export function makeCapacity(id: string, group: CapacityGroup, label: string, factor = 1): RecipeCapacity {
+    return RecipeCapacity.create(new EntityId(id), group, label, factor);
 }
 
 /** Helper de test: un insumo con precio (usa `restore` para no grabar eventos). */

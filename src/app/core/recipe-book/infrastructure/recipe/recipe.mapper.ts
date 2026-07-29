@@ -14,6 +14,9 @@ export const RecipeMapper = {
             categoryId: recipe.categoryId.value,
             name: recipe.name,
             lines: recipe.lines.map(lineToRecord),
+            flavorId: recipe.flavorId ? recipe.flavorId.value : null,
+            portionsCapacityId: recipe.portionsCapacityId ? recipe.portionsCapacityId.value : null,
+            moldCapacityId: recipe.moldCapacityId ? recipe.moldCapacityId.value : null,
         };
     },
 
@@ -23,6 +26,9 @@ export const RecipeMapper = {
             new EntityId(record.categoryId),
             record.name,
             record.lines.map(lineToDomain),
+            record.flavorId ? new EntityId(record.flavorId) : null,
+            record.portionsCapacityId ? new EntityId(record.portionsCapacityId) : null,
+            record.moldCapacityId ? new EntityId(record.moldCapacityId) : null,
         );
     },
 };

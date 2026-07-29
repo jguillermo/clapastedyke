@@ -33,10 +33,11 @@ const TRIGGER_BASE =
 
 /**
  * Select (combobox) presentacional. El disparador abre, vía CDK Overlay, un panel con un
- * `cdkListbox` que aporta teclado (flechas, Home/End, type-ahead), roles ARIA y foco.
- * Implementa `ControlValueAccessor` (valor `string`), así que enchufa con Reactive Forms.
- * Si está dentro de `<migo-form-field>`, toma de él id / `aria-describedby` / estado inválido.
- * Sin lógica de negocio.
+ * `cdkListbox` que aporta teclado (flechas, Home/End, type-ahead), roles ARIA y foco. Una vez
+ * elegida una opción, su label se muestra como una **píldora/tag** dentro del disparador (no texto
+ * plano) — señal visual clara de que la selección "quedó puesta". Implementa
+ * `ControlValueAccessor` (valor `string`), así que enchufa con Reactive Forms. Si está dentro de
+ * `<migo-form-field>`, toma de él id / `aria-describedby` / estado inválido. Sin lógica de negocio.
  */
 @Component({
   selector: 'migo-select',
@@ -58,11 +59,12 @@ const TRIGGER_BASE =
       [attr.aria-describedby]="describedBy()"
       (click)="toggle()"
     >
-      <span
-        class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
-        [class.text-placeholder]="selectedLabel() === null"
-      >
-        {{ selectedLabel() ?? placeholder() }}
+      <span class="flex-1 overflow-hidden">
+        @if (selectedLabel(); as label) {
+          <span class="inline-flex max-w-full items-center truncate rounded-full bg-brand px-3 py-1 text-sm text-on-brand">{{ label }}</span>
+        } @else {
+          <span class="text-placeholder">{{ placeholder() }}</span>
+        }
       </span>
       <migo-icon
         name="mat:expand_more"
