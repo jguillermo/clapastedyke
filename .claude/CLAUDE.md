@@ -87,7 +87,7 @@ el render **three.js** (`platform/three/*` + el render 3D de `features/game/*`),
 
 Convenciones específicas por área. Consulta la regla correspondiente antes de tocar esos ficheros:
 
-- [components-conventions.md](rules/components-conventions.md) — **librería de componentes** en `src/app/components/`: UI agnóstica con **Angular CDK**, **cero lógica de negocio**, estilo con **utilidades Tailwind del tema Migo** (sin CSS por componente; sin valores arbitrarios), `ControlValueAccessor` para form controls, patrón de Overlay.
+- [components-conventions.md](rules/components-conventions.md) — **librería de componentes** en `src/app/components/`: UI agnóstica con **Angular CDK**, **cero lógica de negocio**, estilo con **utilidades Tailwind del tema Migo** (sin CSS por componente; sin valores arbitrarios), `ControlValueAccessor` para form controls, patrón de Overlay, y la **forma obligatoria del `*.stories.ts`** de Storybook (un único story `Playground` + Controls + `play` obligatorio).
 - [mobile-first-conventions.md](rules/mobile-first-conventions.md) — **regla dura**: toda la UI DOM es **mobile-first** (base = móvil, se mejora con `sm:`/`md:`/`lg:`); diálogos/formularios **full-bleed** en móvil (`migo-card` con `fill`), grillas que no se aplastan, targets ≥44px, **viewport sin zoom** (excepción aceptada a AXE). Verificar a 375px.
 - [path-aliases-conventions.md](rules/path-aliases-conventions.md) — alias `@app/@components/@core/@features/@platform`: **cruzar áreas con alias, intra-contexto `core/` relativo**.
 - [core-conventions.md](rules/core-conventions.md) — DDD en `core/`: entities, value objects, aggregates, repositories vs services, use cases.
