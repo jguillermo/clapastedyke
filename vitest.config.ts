@@ -4,10 +4,14 @@ import { defineConfig } from 'vitest/config';
 import { storybookTest } from '@storybook/addon-vitest/vitest-plugin';
 import { playwright } from '@vitest/browser-playwright';
 import { storybookAngularVitest } from "@storybook/angular-vite/vitest";
+import { angularPathAliases } from './.storybook/aliases';
 const dirname = typeof __dirname !== 'undefined' ? __dirname : path.dirname(fileURLToPath(import.meta.url));
 
 // More info at: https://storybook.js.org/docs/next/writing-tests/integrations/vitest-addon
 export default defineConfig({
+  // Los alias `@` de tsconfig no llegan solos al resolver de Vite; se declaran una sola vez en
+  // .storybook/aliases.ts y los comparten el dev server / build de Storybook y esta corrida.
+  resolve: { alias: angularPathAliases },
   test: {
     projects: [{
       extends: true,

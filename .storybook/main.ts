@@ -1,4 +1,6 @@
 import type { StorybookConfig } from '@storybook/angular-vite';
+import { mergeConfig } from 'vite';
+import { angularPathAliases } from './aliases';
 
 const config: StorybookConfig = {
   "stories": [
@@ -21,6 +23,10 @@ const config: StorybookConfig = {
         "."
       ]
     }
-  }
+  },
+  // Los alias `@` de tsconfig no llegan solos al resolver de Vite (ver ./aliases.ts).
+  // `mergeConfig` los combina con los que ya trae Storybook: da prioridad a los nuestros y
+  // normaliza la forma (objeto/array) sin pisar nada.
+  viteFinal: async (viteConfig) => mergeConfig(viteConfig, { resolve: { alias: angularPathAliases } })
 };
 export default config;

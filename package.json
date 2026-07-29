@@ -11,7 +11,8 @@
     "e2e:ui": "playwright test --ui",
     "e2e:report": "playwright show-report",
     "sb": "ng run misaevol:storybook",
-    "build-sb": "ng run misaevol:build-storybook"
+    "sb:test": "vitest run --project=storybook",
+    "sb:build": "ng run misaevol:build-storybook"
   },
   "private": true,
   "packageManager": "npm@11.13.0",
