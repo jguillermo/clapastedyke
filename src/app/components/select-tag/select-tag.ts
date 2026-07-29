@@ -174,9 +174,14 @@ function parseFactorInput(raw: string): number | null {
               }
             }
             <li class="flex items-center gap-2 px-3 py-2">
+              <!-- Es de texto y NO numérico a propósito: el dato extra admite fracciones (1/8)
+                   además de decimales, y un input numérico las descarta al sanear su valor
+                   (llegaría vacío al parser). La validación la hace confirmExtra. -->
               <input
                 #extraInput
-                type="number"
+                type="text"
+                inputmode="text"
+                autocomplete="off"
                 class="min-h-11 min-w-0 flex-1 rounded-md border border-border-subtle bg-surface-card px-3 py-2 font-body text-base text-body focus:outline-none focus:border-brand focus:shadow-focus"
                 [placeholder]="extraFieldPlaceholder(pendingExtra.typeKey)"
                 (keydown.enter)="confirmExtra(extraInput.value)"

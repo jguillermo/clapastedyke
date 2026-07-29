@@ -357,6 +357,106 @@ CSS global en `src/styles.css` — no pueden ser utilidades porque el CDK genera
 - Los specs de `components/` van junto al componente (idiomático Angular); la regla de
   `testing/` de [unit-tests-conventions.md](unit-tests-conventions.md) aplica solo a `core/`.
 
+## Storybook stories
+
+**Todo componente de `components/` lleva un `*.stories.ts` co-locado** (`button.stories.ts` junto a
+`button.ts`) y **se escribe siempre con esta misma forma**. Referencia canónica:
+[`src/app/components/button/button.stories.ts`](../../src/app/components/button/button.stories.ts).
+
+### La forma (obligatoria)
+
+1. **Un ÚNICO story exportado** — `Playground`. **Prohibido** un export por variante/estado
+   (`Primary`, `Secondary`, `Ghost`, `Disabled`, `Loading`…): esas combinaciones se recorren desde
+   el panel **Controls**, no duplicando stories. Un story por componente, nada más.
+2. **`tags: ['autodocs']`** en el `meta` + `parameters.docs.description.component`: qué es el
+   componente y cómo probarlo desde Controls.
+3. **Un `argType` por cada `input()` del componente**, con `description` (qué hace, consecuencias) y
+   `table: { defaultValue: { summary: '…' } }` cuando tiene default. Mapeo 1:1:
+   unión de strings → `control: 'select'` con las `options` tipadas; `booleanAttribute` →
+   `control: 'boolean'`.
+4. **`args`** con el estado por defecto del componente (el mismo default que declara el `input()`).
+5. **`render`** devuelve `{ props, template }`: bindea cada arg (`[prop]="prop"`) y, si el componente
+   emite algo (`(click)`, `output()`), engancha un spy `fn()` de `storybook/test` vía
+   `props: { ...args, onX: fn() }`.
+6. **`play` obligatorio** con `storybook/test` (`within`, `userEvent`, `expect`, `fn`): localiza por
+   **rol / semántica ARIA** (nunca por clase de utilidad), asserta el estado inicial y ejerce al
+   menos **una interacción real** (click, teclado, escritura). Esto es lo que corre
+   `@storybook/addon-vitest` como test — **un story sin `play` no cuenta como cubierto**.
+7. Importar siempre de **`storybook/test`**, nunca de `@storybook/test` (deprecado en esta versión).
+
+### Plantilla
+
+```typescript
+import type { Meta, StoryObj } from '@storybook/angular-vite';
+import { expect, fn, userEvent, within } from 'storybook/test';
+import { Button, ButtonSize, ButtonVariant } from './button';
+
+const VARIANTS: ButtonVariant[] = ['primary', 'secondary', 'ghost', 'danger'];
+const SIZES: ButtonSize[] = ['2xs', 'xs', 'sm', 'md', 'lg', 'xl', '2xl'];
+
+const meta: Meta<Button> = {
+  title: 'Components/Button',
+  component: Button,
+  tags: ['autodocs'],                                   // ← 2
+  parameters: {
+    docs: { description: { component: 'Qué es y cómo probarlo desde Controls.' } },
+  },
+  render: (args) => ({                                  // ← 5
+    props: { ...args, onClick: fn() },
+    template: `
+      <button migo-button [variant]="variant" [size]="size" [loading]="loading"
+              [block]="block" [disabled]="disabled" (click)="onClick()">
+        Guardar
+      </button>
+    `,
+  }),
+  argTypes: {                                           // ← 3
+    variant: {
+      control: 'select',
+      options: VARIANTS,
+      description: 'Estilo visual del botón.',
+      table: { defaultValue: { summary: 'primary' } },
+    },
+    size: {
+      control: 'select',
+      options: SIZES,
+      description: 'Altura y padding. `md` (44px) es el único que cumple el target táctil por sí solo.',
+      table: { defaultValue: { summary: 'md' } },
+    },
+    loading: { control: 'boolean', description: 'Spinner + `aria-busy`; deshabilita el botón.' },
+    block: { control: 'boolean', description: 'Ocupa el 100% del ancho (`flex w-full`).' },
+    disabled: { control: 'boolean', description: 'Deshabilita el nativo y añade `aria-disabled`.' },
+  },
+  args: { variant: 'primary', size: 'md', loading: false, block: false, disabled: false }, // ← 4
+};
+export default meta;
+
+type Story = StoryObj<Button>;
+
+/** Único story: recorre variantes y estados desde el panel Controls. */
+export const Playground: Story = {                      // ← 1
+  play: async ({ canvasElement }) => {                  // ← 6
+    const canvas = within(canvasElement);
+    const button = canvas.getByRole('button', { name: 'Guardar' }); // por rol, no por clase
+
+    await expect(button).toBeVisible();
+    await expect(button).not.toHaveAttribute('disabled');
+
+    await userEvent.click(button);
+  },
+};
+```
+
+### Qué NO hacer
+
+| Antipatrón | En su lugar |
+|---|---|
+| `export const Primary`, `Secondary`, `Disabled`… (un story por combinación) | Un único `Playground` + Controls |
+| Story sin `play` | Siempre `play` con al menos una interacción real |
+| `argTypes` sin `description` | Cada input documentado |
+| `canvas.querySelector('.bg-brand')` | `canvas.getByRole(...)` / consulta por ARIA |
+| `import { fn } from '@storybook/test'` | `import { fn } from 'storybook/test'` |
+
 ## Showcase
 
 El banco de pruebas / documentación viva vive en `features/ui-showcase/` (ruta `/ui`), **fuera**

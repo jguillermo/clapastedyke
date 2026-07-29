@@ -49,3 +49,7 @@ __screenshots__/
 Thumbs.db
 /3dmodel/
 /.notas/
+
+*storybook.log
+storybook-static
+/documentation.json

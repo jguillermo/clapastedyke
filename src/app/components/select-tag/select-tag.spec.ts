@@ -217,8 +217,9 @@ describe('SelectTag (extraField / factor capture)', () => {
     return [...document.querySelectorAll('[role="option"]')] as HTMLElement[];
   }
 
+  /** El campo del dato extra es el único input dentro del panel (no se busca por `type`). */
   function extraInput(): HTMLInputElement {
-    return document.querySelector('input[type="number"]') as HTMLInputElement;
+    return document.querySelector('[role="listbox"] input') as HTMLInputElement;
   }
 
   it('creating a plain-number value (portions) skips the factor prompt entirely', () => {
