@@ -240,18 +240,22 @@ interface BookFocus {
             @for (recipe of recipesOf(category.id.value); track recipe.id.value) {
               <button
                 type="button"
-                class="flex min-h-11 w-full flex-col items-start gap-0.5 rounded-lg bg-surface-sunken px-4 py-2 text-left font-body text-body hover:bg-surface-card focus-visible:shadow-focus focus-visible:outline-none"
+                class="flex min-h-11 w-full flex-col items-start gap-1 rounded-lg bg-surface-sunken px-4 py-2 text-left font-body text-body hover:bg-surface-card focus-visible:shadow-focus focus-visible:outline-none"
                 (click)="openEditForm(recipe)"
               >
                 <span>{{ recipe.name }}</span>
-                @if (flavorLabelOf(recipe); as flavor) {
-                  <migo-badge>{{ flavor }}</migo-badge>
-                }
-                @if (portionsLabelOf(recipe); as portions) {
-                  <migo-badge>{{ portions }}</migo-badge>
-                }
-                @if (moldLabelOf(recipe); as mold) {
-                  <migo-badge>{{ mold }}</migo-badge>
+                @if (flavorLabelOf(recipe) || portionsLabelOf(recipe) || moldLabelOf(recipe)) {
+                  <div class="flex flex-wrap gap-1.5">
+                    @if (flavorLabelOf(recipe); as flavor) {
+                      <migo-badge size="xs">Sabor: {{ flavor }}</migo-badge>
+                    }
+                    @if (portionsLabelOf(recipe); as portions) {
+                      <migo-badge size="xs">Porciones: {{ portions }}</migo-badge>
+                    }
+                    @if (moldLabelOf(recipe); as mold) {
+                      <migo-badge size="xs">Molde: {{ mold }}</migo-badge>
+                    }
+                  </div>
                 }
               </button>
             } @empty {

@@ -69,14 +69,18 @@ const EMPTY_COST: PreviewRecipeCostResult = { items: [], total: '' };
           <migo-icon icon-leading name="mat:edit" size="md" />
         </button>
       </div>
-      @if (flavorLabel(); as flavor) {
-        <migo-badge>{{ flavor }}</migo-badge>
-      }
-      @if (portionsLabel(); as portions) {
-        <migo-badge>{{ portions }}</migo-badge>
-      }
-      @if (moldLabel(); as mold) {
-        <migo-badge>{{ mold }}</migo-badge>
+      @if (flavorLabel() || portionsLabel() || moldLabel()) {
+        <div class="flex flex-wrap gap-1.5">
+          @if (flavorLabel(); as flavor) {
+            <migo-badge size="xs">Sabor: {{ flavor }}</migo-badge>
+          }
+          @if (portionsLabel(); as portions) {
+            <migo-badge size="xs">Porciones: {{ portions }}</migo-badge>
+          }
+          @if (moldLabel(); as mold) {
+            <migo-badge size="xs">Molde: {{ mold }}</migo-badge>
+          }
+        </div>
       }
     </header>
 

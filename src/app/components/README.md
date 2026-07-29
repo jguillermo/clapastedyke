@@ -234,12 +234,13 @@ disparador (no texto plano) — confirma visualmente que la selección quedó pu
 
 ## Badge
 
-`migo-badge` — píldora presentacional para una característica corta (p.ej. el sabor de una
-receta). Sin lógica, sin CVA (no es control de formulario), una sola variante neutral. El texto es
-el contenido proyectado.
+`migo-badge` — píldora presentacional para una característica corta (p.ej. el sabor o el tamaño de
+una receta). Sin lógica, sin CVA (no es control de formulario). El texto es el contenido
+proyectado. `size`: `sm` (default) · `xs` (más compacta, para varias juntas bajo un título).
 
 ```html
 <migo-badge>Vainilla</migo-badge>
+<migo-badge size="xs">Porciones: 40</migo-badge>
 ```
 
 ## Dialog
