@@ -1,22 +1,18 @@
 import { test, expect } from '../../../fixtures/app-fixture';
-import { CATEGORIES } from '../../../support/seed';
+import { CATEGORIES, GLASEADO, RECIPES } from '../../../support/seed';
 
 /**
- * Panel de índice del libro 3D: se abre desde la barra inferior, lista las categorías y se cierra con
- * su ×, con Escape o volviendo a pulsar el botón.
- *
- * > **BUG conocido — el índice no lista recetas.** `buildIndex` (en `recipe-book-3d.ts`) solo añade
- * > una entrada de receta si su página trae `rows` o `chips`; desde que el contenido de la receta se
- * > pinta con un overlay DOM (`recipePages` devuelve `{ kind: 'recipe', overlay: true }`, sin `rows`
- * > ni `chips`), **ninguna receta entra al índice** y el panel queda sin saltos: solo los rótulos de
- * > categoría, que no son navegables. Los tests de abajo documentan el comportamiento ACTUAL; cuando
- * > se corrija, el test marcado con «BUG» se sustituye por los saltos reales (elegir receta → el
- * > panel se cierra y el libro salta a su página).
+ * Panel de índice del libro 3D: se abre desde la barra inferior, lista **cada categoría con todas
+ * sus recetas** (Queques, Rellenos, Coberturas) y **nunca los insumos**, salta a la receta elegida y
+ * se cierra con su ×, con Escape o volviendo a pulsar el botón.
  */
 test.describe('Libro 3D · índice', () => {
   test.use({ webgl: true });
 
-  test('Índice → lista las tres categorías como rótulos → Cerrar → vuelve el libro operable', async ({
+  /** Todas las recetas sembradas, en el orden en que las lista el índice (por categoría, alfabéticas). */
+  const ALL_RECIPES = CATEGORIES.flatMap((category) => RECIPES[category]);
+
+  test('Índice → las tres categorías con todas sus recetas y ningún insumo → Cerrar → vuelve el libro operable', async ({
     openBook3d,
     book,
   }) => {
@@ -27,6 +23,12 @@ test.describe('Libro 3D · índice', () => {
     for (const category of CATEGORIES) {
       await expect(book.indexSection(category)).toBeVisible();
     }
+    // Un salto por receta del catálogo, ni uno más: los insumos no son recetas y no se listan.
+    await expect(book.indexRecipes).toHaveCount(ALL_RECIPES.length);
+    for (const recipe of ALL_RECIPES) {
+      await expect(book.indexRecipe(recipe)).toBeVisible();
+    }
+    await expect(book.indexSection('Insumos')).toHaveCount(0);
 
     await book.indexClose.click();
     await expect(book.indexPanel).toHaveCount(0);
@@ -34,24 +36,19 @@ test.describe('Libro 3D · índice', () => {
     await expect(book.next).toBeEnabled();
   });
 
-  /**
-   * BUG (ver la cabecera del fichero): el panel debería ofrecer un salto por receta y hoy no ofrece
-   * ninguno. Se asserta el estado actual para que la corrección haga fallar este test.
-   */
-  test('BUG · Índice → no ofrece ningún salto de receta, solo rótulos de categoría', async ({
+  test('Índice → elegir una receta → el panel se cierra y el libro salta a su página', async ({
     openBook3d,
     book,
+    overlay,
   }) => {
     await openBook3d();
 
     await book.indexToggle.click();
     await expect(book.indexPanel).toBeVisible();
+    await book.indexRecipe(GLASEADO.name).click();
 
-    await expect(book.indexRecipes).toHaveCount(0);
-    await expect(book.indexRecipe('Glaseado de Queso Crema')).toHaveCount(0);
-
-    await book.indexClose.click();
     await expect(book.indexPanel).toHaveCount(0);
+    await expect(overlay.byName(GLASEADO.name).first()).toBeVisible();
   });
 
   test('Índice → Escape → cierra solo el índice, el libro sigue abierto y paginable', async ({

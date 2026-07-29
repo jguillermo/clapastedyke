@@ -88,8 +88,8 @@ export class RecipeBook3dPage {
    * contenido accesible de la hoja). Las recetas van por categoría y, dentro de cada una, en
    * orden alfabético, así que basta con pasar páginas hacia adelante.
    *
-   * Se usa esto y **no** el índice porque el índice hoy no lista recetas (ver
-   * `specs/recipe-book/book-3d/index-panel.spec.ts`).
+   * Se pasa página a mano (y no se salta desde el índice) para ejercitar la navegación real del
+   * libro; el salto desde el índice se cubre en `specs/recipe-book/book-3d/index-panel.spec.ts`.
    */
   async goToRecipe(name: string): Promise<void> {
     const target = this.page

@@ -101,17 +101,16 @@ interface BookFocus {
         variant="secondary"
         size="md"
         class="absolute left-4 top-4 shadow-md"
+        aria-label="Volver"
         (click)="close()"
       >
         <migo-icon icon-leading name="mat:arrow_back" size="sm" />
-        <migo-spacer />Volver
       </button>
 
       <!-- Título del libro -->
       <header
         class="absolute right-4 top-4 rounded-full border border-border-subtle bg-surface-card px-4 py-2 shadow-md"
       >
-        <span class="font-display text-heading text-sm">Mi libro de recetas..2</span>
       </header>
 
       <!-- Anuncio para lectores de pantalla (el texto 3D no es accesible) -->
@@ -641,7 +640,7 @@ export class RecipeBook3d implements AfterViewInit, OnDestroy {
     const catalog = await this.listRecipeBook.execute();
     this.catalog.set(catalog);
     const pages = toPages(catalog);
-    this._indexEntries.set(buildIndex(pages));
+    this._indexEntries.set(buildIndex(catalog, pages));
     // Tras cerrar un formulario/diálogo salta a lo último que se tocó (receta/categoría/insumos);
     // si no hay foco, conserva la cara actual (no volver al inicio).
     const target = focus ? resolveFace(pages, focus) : -1;
@@ -681,20 +680,39 @@ function resolveFace(pages: PageContent[], focus: BookFocus): number {
   return -1;
 }
 
-/** Construye el índice (categorías + recetas) a partir de las páginas. Excluye Insumos. */
-function buildIndex(pages: PageContent[]): IndexEntry[] {
+/**
+ * Construye el índice: un rótulo por **categoría** del catálogo (Queques, Rellenos, Coberturas…) y
+ * un salto por cada una de sus **recetas**. Insumos **nunca** entra.
+ *
+ * Qué es indexable lo decide el CATÁLOGO, no la pinta de la página: el contenido de una receta lo
+ * dibuja un overlay DOM, así que su `PageContent` no trae `rows` ni `chips` y no se puede inferir
+ * de ahí. Se recorren las páginas una sola vez (en orden) para resolver la cara de cada entrada, y
+ * solo se acepta una cara de receta cuyo título sea una receta real de esa categoría — así la hoja
+ * de relleno de una categoría vacía («Aún no tienes nada aquí.») queda fuera.
+ */
+function buildIndex(catalog: RecipeBookCatalog, pages: PageContent[]): IndexEntry[] {
+  const recipeNamesByCategory = new Map<string, Set<string>>(
+    catalog.categories.map((category) => [
+      category.id.value,
+      new Set(
+        catalog.recipes.filter((r) => r.categoryId.value === category.id.value).map((r) => r.name),
+      ),
+    ]),
+  );
+
   const entries: IndexEntry[] = [];
   pages.forEach((page, faceIndex) => {
-    if (page.section === INGREDIENTS_SECTION) {
-      return; // Insumos nunca va en el índice
+    const section = page.section;
+    // Insumos (y cualquier sección que no sea una categoría del catálogo) nunca va en el índice.
+    if (!section || !recipeNamesByCategory.has(section)) {
+      return;
     }
     if (page.continued) {
       return; // las hojas de continuación no se listan aparte
     }
     if (page.kind === 'section') {
       entries.push({ label: page.title ?? '', faceIndex, section: true });
-    } else if (page.kind === 'recipe' && page.title && (page.rows?.length || page.chips?.length)) {
-      // Las hojas vacías de sección (solo título) no entran al índice: ya está su divisor.
+    } else if (page.kind === 'recipe' && page.title && recipeNamesByCategory.get(section)!.has(page.title)) {
       entries.push({ label: page.title, faceIndex, section: false });
     }
   });
