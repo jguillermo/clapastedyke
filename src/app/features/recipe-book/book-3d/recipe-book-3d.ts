@@ -107,12 +107,6 @@ interface BookFocus {
         <migo-icon icon-leading name="mat:arrow_back" size="sm" />
       </button>
 
-      <!-- Título del libro -->
-      <header
-        class="absolute right-4 top-4 rounded-full border border-border-subtle bg-surface-card px-4 py-2 shadow-md"
-      >
-      </header>
-
       <!-- Anuncio para lectores de pantalla (el texto 3D no es accesible) -->
       <p class="absolute h-px w-px overflow-hidden whitespace-nowrap" role="status" aria-live="polite">
         {{ announce() }}
