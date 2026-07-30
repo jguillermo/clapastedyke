@@ -126,7 +126,9 @@ test.describe('Captura de precio · descartar', () => {
     await grid.fillNewLine(0, 'Insumo impago E2E', '30');
 
     await form.save.click();
-    await expect(grid.error).toHaveText('Falta el precio de "Insumo impago E2E". Tócalo en la columna Costo.');
+    await expect(grid.error).toHaveText(
+      'Falta el precio de "Insumo impago E2E". Tócalo en la columna Costo.',
+    );
     await expect(form.root).toBeVisible();
 
     await grid.costButton(0).click();

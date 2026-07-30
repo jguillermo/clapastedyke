@@ -38,7 +38,9 @@ const BOX_BASE =
   template: `
     <span [class]="boxClasses()" (mousedown)="focusFromBox($event)">
       @if (symbol()) {
-        <span class="shrink-0 text-base text-muted select-none" aria-hidden="true">{{ symbol() }}</span>
+        <span class="shrink-0 text-base text-muted select-none" aria-hidden="true">{{
+          symbol()
+        }}</span>
       }
       <input
         #control

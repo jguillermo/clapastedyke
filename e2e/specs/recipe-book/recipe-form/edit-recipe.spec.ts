@@ -129,10 +129,7 @@ test.describe('Formulario de receta · editar', () => {
 
     await expect(form.subtitle).toHaveText('Coberturas');
     // No hay control de categoría: solo Nombre y Características.
-    await expect(form.fieldLabels).toHaveText([
-      'Nombre',
-      'Características (opcional)',
-    ]);
+    await expect(form.fieldLabels).toHaveText(['Nombre', 'Características (opcional)']);
 
     await form.cancel.click();
     await form.waitClosed();

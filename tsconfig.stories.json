@@ -1,0 +1,28 @@
+/* Config de type-check de la app + las stories. Ver CLAUDE.md → Commands. */
+{
+  /*
+   * DELIBERADAMENTE NO se usa `.storybook/tsconfig.json` para esto: ese es el config de BUILD de
+   * Storybook, y type-chequearlo tal cual falla por dos cosas que solo entiende el bundler —
+   * `preview.ts` importa `../documentation.json` (lo genera compodoc al arrancar Storybook y está
+   * en .gitignore, así que en CI no existe) y `../src/styles.css` (import de efecto lateral, sin
+   * declaración de tipos). Además, su `files: ["./typings.d.ts"]` hace que TS infiera
+   * `rootDir` = `.storybook/` y todo `src/` quede fuera (TS6059).
+   *
+   * Aquí se chequea lo que SÍ tiene tipos que verificar: todo `src/` (incluidas las stories, que
+   * `tsconfig.app.json` excluye del build) y el config de Storybook que es TypeScript puro.
+   * `preview.ts` se queda fuera a propósito: su corrección la demuestra `npm run sb:test`.
+   *
+   * Las plantillas de Angular NO se chequean aquí (tsc no las entiende): eso es trabajo de
+   * `ng build`, que corre en su propio job del CI.
+   */
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    /* Los `*.md` que se importan en las stories los declara el typings de Storybook. */
+    "types": ["node"]
+  },
+  "files": [".storybook/typings.d.ts"],
+  "include": ["src/**/*.ts", ".storybook/main.ts", ".storybook/aliases.ts"],
+  /* Los specs tienen su propio config, con los globals de vitest (`tsconfig.spec.json`). */
+  "exclude": ["src/**/*.spec.ts"]
+}

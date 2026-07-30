@@ -17,7 +17,11 @@ test.describe('Home 3D · móvil 375px', () => {
     expect(scrollWidth).toBeLessThanOrEqual(innerWidth);
   });
 
-  test('dock a 375px → cabe en el viewport y sus targets miden ≥ 44px', async ({ openHome, home, page }) => {
+  test('dock a 375px → cabe en el viewport y sus targets miden ≥ 44px', async ({
+    openHome,
+    home,
+    page,
+  }) => {
     await openHome();
     await expect(home.dock).toBeVisible();
 
@@ -33,7 +37,10 @@ test.describe('Home 3D · móvil 375px', () => {
     }
   });
 
-  test('viewport bloqueado → sin zoom del usuario (excepción aceptada de AXE)', async ({ home, openHome }) => {
+  test('viewport bloqueado → sin zoom del usuario (excepción aceptada de AXE)', async ({
+    home,
+    openHome,
+  }) => {
     await openHome();
 
     const viewportMeta = await home.viewportContent();

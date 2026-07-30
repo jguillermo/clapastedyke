@@ -22,7 +22,9 @@ describe('MigoSwiper', () => {
     TestBed.configureTestingModule({ imports: [Host] });
     const fixture = TestBed.createComponent(Host);
     fixture.detectChanges();
-    const tabs = (): HTMLButtonElement[] => [...fixture.nativeElement.querySelectorAll('[role="tab"]')];
+    const tabs = (): HTMLButtonElement[] => [
+      ...fixture.nativeElement.querySelectorAll('[role="tab"]'),
+    ];
     return { fixture, tabs };
   }
 
@@ -58,9 +60,13 @@ describe('MigoSwiper', () => {
 
   it('un panel (tabpanel) por slide, etiquetado por su pestaña', () => {
     const { fixture } = setup();
-    const panels = [...fixture.nativeElement.querySelectorAll('[role="tabpanel"]')] as HTMLElement[];
+    const panels = [
+      ...fixture.nativeElement.querySelectorAll('[role="tabpanel"]'),
+    ] as HTMLElement[];
     expect(panels).toHaveLength(3);
-    expect(panels[0].getAttribute('aria-labelledby')).toBe(panels[0].getAttribute('aria-labelledby'));
+    expect(panels[0].getAttribute('aria-labelledby')).toBe(
+      panels[0].getAttribute('aria-labelledby'),
+    );
     expect(panels[0].textContent?.trim()).toBe('A');
   });
 });

@@ -60,7 +60,9 @@
   /* ---- Bordes ---- */
   --color-border-subtle: var(--masa-200);
   --color-border-strong: var(--masa-300);
-  --color-border-line: var(--cacao-400); /* regla oscura sobre papel (líneas de la hoja de receta) */
+  --color-border-line: var(
+    --cacao-400
+  ); /* regla oscura sobre papel (líneas de la hoja de receta) */
 
   /* ---- Estado ---- */
   --color-success: var(--exito);

@@ -10,11 +10,11 @@ import { RecipeBookEvents } from '../../domain/events/recipe-book-events';
 
 /** Entrada de {@link SaveSupply}: los datos del insumo a guardar (incluye su precio de compra). */
 export interface SaveSupplyRequest {
-    name: string;
-    baseUnit: BaseUnit;
-    usage: SupplyUsage;
-    /** Cómo se compra: presentación (en unidad base) + precio + moneda. */
-    purchasePrice: { amount: number; per: { value: number; unit: BaseUnit }; currency?: string };
+  name: string;
+  baseUnit: BaseUnit;
+  usage: SupplyUsage;
+  /** Cómo se compra: presentación (en unidad base) + precio + moneda. */
+  purchasePrice: { amount: number; per: { value: number; unit: BaseUnit }; currency?: string };
 }
 
 /**
@@ -28,28 +28,33 @@ export interface SaveSupplyRequest {
  */
 @Injectable({ providedIn: 'root' })
 export class SaveSupply extends UseCase<SaveSupplyRequest, { id: string }> {
-    private readonly supplies = inject(SupplyRepository);
-    private readonly bus = inject(EventBus);
+  private readonly supplies = inject(SupplyRepository);
+  private readonly bus = inject(EventBus);
 
-    async execute({ name, baseUnit, usage, purchasePrice }: SaveSupplyRequest): Promise<{ id: string }> {
-        const price = PurchasePrice.of(
-            purchasePrice.amount,
-            Quantity.of(purchasePrice.per.value, purchasePrice.per.unit),
-            purchasePrice.currency ?? 'PEN',
-        );
-        const existing = await this.supplies.byName(name);
+  async execute({
+    name,
+    baseUnit,
+    usage,
+    purchasePrice,
+  }: SaveSupplyRequest): Promise<{ id: string }> {
+    const price = PurchasePrice.of(
+      purchasePrice.amount,
+      Quantity.of(purchasePrice.per.value, purchasePrice.per.unit),
+      purchasePrice.currency ?? 'PEN',
+    );
+    const existing = await this.supplies.byName(name);
 
-        let supply: Supply;
-        if (!existing) {
-            supply = Supply.create(this.supplies.nextIdentity(), name, baseUnit, usage, price);
-        } else if (!existing.purchasePrice.equals(price)) {
-            supply = existing.repricedTo(price);
-        } else {
-            supply = existing;
-        }
-
-        await this.supplies.save(supply);
-        await this.bus.publish([RecipeBookEvents.supplySaved(supply.id.value, !existing)]);
-        return { id: supply.id.value };
+    let supply: Supply;
+    if (!existing) {
+      supply = Supply.create(this.supplies.nextIdentity(), name, baseUnit, usage, price);
+    } else if (!existing.purchasePrice.equals(price)) {
+      supply = existing.repricedTo(price);
+    } else {
+      supply = existing;
     }
+
+    await this.supplies.save(supply);
+    await this.bus.publish([RecipeBookEvents.supplySaved(supply.id.value, !existing)]);
+    return { id: supply.id.value };
+  }
 }

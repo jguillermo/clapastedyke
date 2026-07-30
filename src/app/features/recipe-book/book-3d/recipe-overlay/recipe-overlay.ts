@@ -78,7 +78,14 @@ const SHRINK_OFF_PX = 4;
     <header [class]="headerClasses()">
       <div class="flex items-start justify-between gap-4">
         <h2 [class]="titleClasses()">{{ recipe().name }}</h2>
-        <button migo-button variant="ghost" size="sm" type="button" aria-label="Editar receta" (click)="edit.emit()">
+        <button
+          migo-button
+          variant="ghost"
+          size="sm"
+          type="button"
+          aria-label="Editar receta"
+          (click)="edit.emit()"
+        >
           <migo-icon icon-leading name="mat:edit" size="md" />
         </button>
       </div>
@@ -111,7 +118,9 @@ const SHRINK_OFF_PX = 4;
           </div>
         }
 
-        <div class="flex items-baseline gap-3 pb-2 text-sm font-semibold uppercase tracking-wide text-muted">
+        <div
+          class="flex items-baseline gap-3 pb-2 text-sm font-semibold uppercase tracking-wide text-muted"
+        >
           <span class="flex-1">Insumo</span>
           <span class="w-16 shrink-0 text-right sm:w-20">Cant.</span>
           <span class="w-14 shrink-0 text-right sm:w-16">Precio</span>
@@ -119,9 +128,18 @@ const SHRINK_OFF_PX = 4;
         <ul class="m-0 p-0 list-none" aria-label="Líneas de insumo">
           @for (line of lines(); track $index) {
             <li class="flex items-start gap-3 border-b border-border-line py-3">
-              <span class="min-w-0 flex-1 wrap-break-word font-display text-heading text-base sm:text-lead">{{ line.name }}</span>
-              <span class="w-16 shrink-0 whitespace-nowrap text-right font-display font-bold text-heading text-base tabular-nums sm:w-20 sm:text-lead">{{ line.quantity }}</span>
-              <span class="w-14 shrink-0 whitespace-nowrap text-right text-xs tabular-nums text-muted sm:w-16 sm:text-sm">{{ line.price }}</span>
+              <span
+                class="min-w-0 flex-1 wrap-break-word font-display text-heading text-base sm:text-lead"
+                >{{ line.name }}</span
+              >
+              <span
+                class="w-16 shrink-0 whitespace-nowrap text-right font-display font-bold text-heading text-base tabular-nums sm:w-20 sm:text-lead"
+                >{{ line.quantity }}</span
+              >
+              <span
+                class="w-14 shrink-0 whitespace-nowrap text-right text-xs tabular-nums text-muted sm:w-16 sm:text-sm"
+                >{{ line.price }}</span
+              >
             </li>
           }
         </ul>
@@ -129,7 +147,9 @@ const SHRINK_OFF_PX = 4;
           <span class="text-sm italic text-muted">{{ lines().length }} insumos</span>
           <span class="flex items-baseline gap-3">
             <span class="font-display text-sm uppercase tracking-wide text-muted">Total</span>
-            <span class="font-display font-bold text-heading text-lead tabular-nums">{{ total() }}</span>
+            <span class="font-display font-bold text-heading text-lead tabular-nums">{{
+              total()
+            }}</span>
           </span>
         </div>
         <!-- Aquí irán, a futuro, secciones de preparación e imágenes (contenido rico). -->
@@ -229,7 +249,9 @@ export class RecipeOverlay {
     }
     const remaining = el.scrollHeight - el.scrollTop - el.clientHeight;
     this.hasMore.set(remaining > 4);
-    this.scrolled.update((was) => (was ? el.scrollTop > SHRINK_OFF_PX : el.scrollTop > SHRINK_ON_PX));
+    this.scrolled.update((was) =>
+      was ? el.scrollTop > SHRINK_OFF_PX : el.scrollTop > SHRINK_ON_PX,
+    );
   }
 
   protected onDown(event: PointerEvent): void {

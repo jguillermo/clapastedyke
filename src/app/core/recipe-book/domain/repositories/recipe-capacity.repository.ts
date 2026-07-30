@@ -8,10 +8,10 @@ import { CapacityGroup, RecipeCapacity } from '../entities/recipe-capacity';
  * IndexedDbRecipeCapacityRepository sobre IndexedDbStore.
  */
 export abstract class RecipeCapacityRepository {
-    abstract nextIdentity(): EntityId;
-    abstract byId(id: EntityId): Promise<RecipeCapacity | null>;
-    abstract byGroup(group: CapacityGroup): Promise<RecipeCapacity[]>;
-    abstract all(): Promise<RecipeCapacity[]>;
-    abstract save(capacity: RecipeCapacity): Promise<void>;
-    abstract delete(id: EntityId): Promise<void>;
+  abstract nextIdentity(): EntityId;
+  abstract byId(id: EntityId): Promise<RecipeCapacity | null>;
+  abstract byGroup(group: CapacityGroup): Promise<RecipeCapacity[]>;
+  abstract all(): Promise<RecipeCapacity[]>;
+  abstract save(capacity: RecipeCapacity): Promise<void>;
+  abstract delete(id: EntityId): Promise<void>;
 }

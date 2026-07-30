@@ -14,7 +14,9 @@ test.describe('Home 3D · HUD de nivel', () => {
     await expect(home.levelTitle).toHaveText('El libro de recetas en blanco');
   });
 
-  test('mundo cargado → la cabecera es un landmark único con ambos textos', async ({ openHome }) => {
+  test('mundo cargado → la cabecera es un landmark único con ambos textos', async ({
+    openHome,
+  }) => {
     const home = await openHome();
 
     await expect(home.hud).toHaveCount(1);

@@ -1,0 +1,213 @@
+name: CI
+
+# Puerta de calidad de cada Pull Request: TODO tiene que pasar para poder mergear.
+# El job final `ci-ok` es el único que hay que marcar como *required status check* en la
+# protección de rama (Settings → Branches → Require status checks): agrupa a los demás, así
+# que añadir o quitar jobs aquí no obliga a tocar la configuración de GitHub.
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Solo lectura del repo: este workflow verifica, no publica nada.
+permissions:
+  contents: read
+
+# Un push nuevo a la misma rama cancela la corrida anterior (en `main` no se cancela).
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  NODE_VERSION: '22'
+
+jobs:
+  # ───────────────────────────────────────────────────────────────────────────
+  # 1. Formato (Prettier) + lint (ESLint) + tipos
+  #    Checks estáticos: rápidos y sin build, van juntos para fallar pronto.
+  # ───────────────────────────────────────────────────────────────────────────
+  static:
+    name: Formato · lint · tipos
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Prettier (formato)
+        run: npm run format:check
+
+      - name: ESLint (Angular + a11y de plantillas + límites entre capas)
+        run: npm run lint
+
+      # Las PLANTILLAS de Angular no las chequea tsc: eso lo hace `ng build` en el job `build`.
+      # Estos tres pasos cubren lo demás, cada uno con los tipos que le tocan.
+      - name: TypeScript — app + stories
+        run: npm run typecheck:src
+
+      - name: TypeScript — specs unitarios
+        run: npm run typecheck:spec
+
+      # Los dos cerrojos que mantienen la suite E2E independiente de `src/`
+      # (paths: {} y rootDir: "." en e2e/tsconfig.json).
+      - name: TypeScript — suite E2E (independiente de src/)
+        run: npm run typecheck:e2e
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # 2. Tests unitarios — solo dominio y casos de uso de core/ (vitest + jsdom)
+  # ───────────────────────────────────────────────────────────────────────────
+  unit:
+    name: Tests unitarios (core)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: ng test
+        run: npm run test:unit
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # 3. Build de producción — incluye el type-check de plantillas de Angular y
+  #    hace cumplir los budgets de tamaño declarados en angular.json.
+  # ───────────────────────────────────────────────────────────────────────────
+  build:
+    name: Build de producción
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: ng build (production, con budgets)
+        run: npm run build
+
+      # Lo consume el job de E2E: la suite prueba el BUILD COMPILADO, no `ng serve`.
+      - name: Subir el build para los E2E
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          retention-days: 1
+          if-no-files-found: error
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # 4. Storybook — el `play` de cada story es el test de estado/variante de los
+  #    componentes del design system (incluye los checks de a11y del addon).
+  # ───────────────────────────────────────────────────────────────────────────
+  storybook:
+    name: Stories del design system (play)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Instalar Chromium de Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: vitest --project=storybook
+        run: npm run sb:test
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # 5. E2E (Playwright) — flujos completos sobre las vistas de features/.
+  #    Dos proyectos: `desktop` (1280px) y `mobile` (375px, regla mobile-first).
+  #    Reutiliza el `dist/` del job de build en vez de recompilar.
+  # ───────────────────────────────────────────────────────────────────────────
+  e2e:
+    name: E2E · ${{ matrix.project }}
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [desktop, mobile]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Instalar Chromium de Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Descargar el build
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      # Sin `npm run test:e2e` a propósito: ese script vuelve a hacer `ng build`, y aquí el
+      # build ya viene del job anterior. El type-check de la suite lo cubre el job `static`.
+      - name: playwright test (${{ matrix.project }})
+        run: npx playwright test --config e2e/playwright.config.ts --project=${{ matrix.project }}
+
+      - name: Subir el informe si algo falla
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ matrix.project }}
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # 6. Puerta única — ESTE es el check requerido en la protección de rama.
+  #    Falla si cualquiera de los anteriores falló, se canceló o se saltó.
+  # ───────────────────────────────────────────────────────────────────────────
+  ci-ok:
+    name: CI OK (required)
+    if: always()
+    needs: [static, unit, build, storybook, e2e]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Comprobar el resultado de todos los jobs
+        run: |
+          echo "static:    ${{ needs.static.result }}"
+          echo "unit:      ${{ needs.unit.result }}"
+          echo "build:     ${{ needs.build.result }}"
+          echo "storybook: ${{ needs.storybook.result }}"
+          echo "e2e:       ${{ needs.e2e.result }}"
+          if [ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped') }}" = "true" ]; then
+            echo "::error::Hay checks que no han pasado — el PR no se puede mergear."
+            exit 1
+          fi
+          echo "Todos los checks han pasado."

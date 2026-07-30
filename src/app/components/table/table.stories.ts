@@ -40,7 +40,7 @@ const meta: Meta<Table> = {
           'un botón y llama a `remove(rowIndex)` por referencia de plantilla (`#t` → `t.remove(r)`), ' +
           'que dispara la salida `removeRow`. Así decide él cuándo y dónde mostrar el botón.\n\n' +
           '**Tamaños sin valores arbitrarios**: `size` se mapea a utilidades del tema mediante mapas ' +
-          'de literales (`number`→`w-*`, `\'40%\'`→fracción, `\'fit\'`→ajustado al contenido, ' +
+          "de literales (`number`→`w-*`, `'40%'`→fracción, `'fit'`→ajustado al contenido, " +
           'omitido→flexible) y se **ajusta al paso más cercano** de la escala; nunca se usa ' +
           '`[style.width]`. Mobile-first: vertical nunca scrollea (crece), las columnas fijas que ' +
           'sumen de más activan scroll horizontal, y `bleed` lleva la tabla borde a borde en móvil.\n\n' +
@@ -91,7 +91,7 @@ const meta: Meta<Table> = {
       control: 'object',
       description:
         'Definición de columnas: `{ name, size?, align?, max? }`. `name` es la cabecera (puede ir ' +
-        'vacía, p.ej. la columna de acciones); `size` gobierna el ancho (px, `\'NN%\'`, `\'fit\'` o ' +
+        "vacía, p.ej. la columna de acciones); `size` gobierna el ancho (px, `'NN%'`, `'fit'` o " +
         'omitido = flexible); `align` alinea el contenido; `max` pone un tope. Los valores se ' +
         'redondean al paso más cercano de la escala del tema.',
       table: { defaultValue: { summary: '[]' } },

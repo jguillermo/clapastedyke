@@ -5,8 +5,8 @@
  * swapear la fuente en tests (igual que las repositories).
  */
 export abstract class SeedState {
-    /** Versión del seed `key` ya aplicada, o `null` si nunca se aplicó. */
-    abstract appliedVersion(key: string): Promise<number | null>;
-    /** Registra que el seed `key` se aplicó en la versión `version`. */
-    abstract markApplied(key: string, version: number): Promise<void>;
+  /** Versión del seed `key` ya aplicada, o `null` si nunca se aplicó. */
+  abstract appliedVersion(key: string): Promise<number | null>;
+  /** Registra que el seed `key` se aplicó en la versión `version`. */
+  abstract markApplied(key: string, version: number): Promise<void>;
 }

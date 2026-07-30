@@ -8,16 +8,21 @@ import { RecipeCapacityRecord } from '../records';
  * `factor`.
  */
 export const RecipeCapacityMapper = {
-    toRecord(capacity: RecipeCapacity): RecipeCapacityRecord {
-        return {
-            id: capacity.id.value,
-            group: capacity.group,
-            label: capacity.label,
-            factor: capacity.factor,
-        };
-    },
+  toRecord(capacity: RecipeCapacity): RecipeCapacityRecord {
+    return {
+      id: capacity.id.value,
+      group: capacity.group,
+      label: capacity.label,
+      factor: capacity.factor,
+    };
+  },
 
-    toDomain(record: RecipeCapacityRecord): RecipeCapacity {
-        return RecipeCapacity.create(new EntityId(record.id), record.group, record.label, record.factor);
-    },
+  toDomain(record: RecipeCapacityRecord): RecipeCapacity {
+    return RecipeCapacity.create(
+      new EntityId(record.id),
+      record.group,
+      record.label,
+      record.factor,
+    );
+  },
 };

@@ -6,21 +6,21 @@ import { formatSoles } from '../money';
 
 /** Una línea de receta dentro de {@link PreviewRecipeCostRequest}: cómo se compra el insumo y la cantidad usada. */
 export interface PreviewRecipeCostLine {
-    purchasePrice: { amount: number; per: { value: number; unit: BaseUnit } } | null;
-    quantity?: { value: number; unit: BaseUnit };
+  purchasePrice: { amount: number; per: { value: number; unit: BaseUnit } } | null;
+  quantity?: { value: number; unit: BaseUnit };
 }
 
 /** Entrada de {@link PreviewRecipeCost}: las líneas de la receta a costear. */
 export interface PreviewRecipeCostRequest {
-    lines: PreviewRecipeCostLine[];
+  lines: PreviewRecipeCostLine[];
 }
 
 /** Resultado de {@link PreviewRecipeCost}: el costo por línea y el total, formateados listos para pintar. */
 export interface PreviewRecipeCostResult {
-    /** Costo proporcional por línea, formateado (`'S/ 1.50'`), alineado al orden de la entrada. */
-    items: { cost: string }[];
-    /** Total de materiales de las líneas con precio, formateado (`'S/ 4.00'`). */
-    total: string;
+  /** Costo proporcional por línea, formateado (`'S/ 1.50'`), alineado al orden de la entrada. */
+  items: { cost: string }[];
+  /** Total de materiales de las líneas con precio, formateado (`'S/ 4.00'`). */
+  total: string;
 }
 
 /**
@@ -32,24 +32,32 @@ export interface PreviewRecipeCostResult {
  */
 @Injectable({ providedIn: 'root' })
 export class PreviewRecipeCost extends UseCase<PreviewRecipeCostRequest, PreviewRecipeCostResult> {
-    async execute({ lines }: PreviewRecipeCostRequest): Promise<PreviewRecipeCostResult> {
-        let total = 0;
-        const items = lines.map((line) => {
-            const cost = this.lineCost(line);
-            if (cost !== null) {
-                total += cost;
-            }
-            return { cost: cost === null ? '' : formatSoles(cost) };
-        });
-        return { items, total: formatSoles(total) };
-    }
+  async execute({ lines }: PreviewRecipeCostRequest): Promise<PreviewRecipeCostResult> {
+    let total = 0;
+    const items = lines.map((line) => {
+      const cost = this.lineCost(line);
+      if (cost !== null) {
+        total += cost;
+      }
+      return { cost: cost === null ? '' : formatSoles(cost) };
+    });
+    return { items, total: formatSoles(total) };
+  }
 
-    private lineCost(line: PreviewRecipeCostLine): number | null {
-        const { purchasePrice, quantity } = line;
-        if (!purchasePrice || !quantity || quantity.value <= 0 || quantity.unit !== purchasePrice.per.unit) {
-            return null;
-        }
-        const price = PurchasePrice.of(purchasePrice.amount, Quantity.of(purchasePrice.per.value, purchasePrice.per.unit));
-        return price.costFor(Quantity.of(quantity.value, quantity.unit));
+  private lineCost(line: PreviewRecipeCostLine): number | null {
+    const { purchasePrice, quantity } = line;
+    if (
+      !purchasePrice ||
+      !quantity ||
+      quantity.value <= 0 ||
+      quantity.unit !== purchasePrice.per.unit
+    ) {
+      return null;
     }
+    const price = PurchasePrice.of(
+      purchasePrice.amount,
+      Quantity.of(purchasePrice.per.value, purchasePrice.per.unit),
+    );
+    return price.costFor(Quantity.of(quantity.value, quantity.unit));
+  }
 }

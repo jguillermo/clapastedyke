@@ -2,8 +2,8 @@ import { EntityId } from '../../../_common/entity-id';
 import { Quantity } from '../../../_common/quantity';
 
 interface SupplyLineData {
-    supplyId: EntityId;
-    quantity: Quantity;
+  supplyId: EntityId;
+  quantity: Quantity;
 }
 
 /**
@@ -12,20 +12,20 @@ interface SupplyLineData {
  * un Quantity; es parte de Recipe.
  */
 export class SupplyLine {
-    readonly supplyId: EntityId;
-    readonly quantity: Quantity;
+  readonly supplyId: EntityId;
+  readonly quantity: Quantity;
 
-    private constructor(data: SupplyLineData) {
-        this.supplyId = data.supplyId;
-        this.quantity = data.quantity;
-    }
+  private constructor(data: SupplyLineData) {
+    this.supplyId = data.supplyId;
+    this.quantity = data.quantity;
+  }
 
-    static of(supplyId: EntityId, quantity: Quantity): SupplyLine {
-        // Quantity.of ya exige value > 0; la línea solo compone los dos VOs.
-        return new SupplyLine({ supplyId, quantity });
-    }
+  static of(supplyId: EntityId, quantity: Quantity): SupplyLine {
+    // Quantity.of ya exige value > 0; la línea solo compone los dos VOs.
+    return new SupplyLine({ supplyId, quantity });
+  }
 
-    equals(other: SupplyLine): boolean {
-        return this.supplyId.equals(other.supplyId) && this.quantity.equals(other.quantity);
-    }
+  equals(other: SupplyLine): boolean {
+    return this.supplyId.equals(other.supplyId) && this.quantity.equals(other.quantity);
+  }
 }

@@ -5,7 +5,11 @@ import { UnitInput, type UnitToken } from './unit-input';
 
 @Component({
   imports: [ReactiveFormsModule, UnitInput],
-  template: `<migo-unit-input [formControl]="control" [unit]="unit()" (unitToken)="token = $event" />`,
+  template: `<migo-unit-input
+    [formControl]="control"
+    [unit]="unit()"
+    (unitToken)="token = $event"
+  />`,
 })
 class Host {
   readonly control = new FormControl('');

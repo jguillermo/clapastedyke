@@ -17,11 +17,11 @@ import { RecipeCapacityRepository } from '../../domain/repositories/recipe-capac
  * `Supply` (separado, nunca en el índice).
  */
 export interface RecipeBookCatalog {
-    supplies: Supply[];
-    categories: RecipeCategory[];
-    recipes: Recipe[];
-    flavors: RecipeFlavor[];
-    recipeCapacities: RecipeCapacity[];
+  supplies: Supply[];
+  categories: RecipeCategory[];
+  recipes: Recipe[];
+  flavors: RecipeFlavor[];
+  recipeCapacities: RecipeCapacity[];
 }
 
 /**
@@ -33,21 +33,21 @@ export interface RecipeBookCatalog {
  */
 @Injectable({ providedIn: 'root' })
 export class ListRecipeBook extends UseCase<void, RecipeBookCatalog> {
-    private readonly supplies = inject(SupplyRepository);
-    private readonly recipes = inject(RecipeRepository);
-    private readonly categories = inject(RecipeCategoryRepository);
-    private readonly flavors = inject(RecipeFlavorRepository);
-    private readonly recipeCapacities = inject(RecipeCapacityRepository);
+  private readonly supplies = inject(SupplyRepository);
+  private readonly recipes = inject(RecipeRepository);
+  private readonly categories = inject(RecipeCategoryRepository);
+  private readonly flavors = inject(RecipeFlavorRepository);
+  private readonly recipeCapacities = inject(RecipeCapacityRepository);
 
-    async execute(): Promise<RecipeBookCatalog> {
-        const [supplies, categories, recipes, flavors, recipeCapacities] = await Promise.all([
-            this.supplies.all(),
-            this.categories.all(),
-            this.recipes.all(),
-            this.flavors.all(),
-            this.recipeCapacities.all(),
-        ]);
-        categories.sort((a, b) => a.name.localeCompare(b.name, 'es'));
-        return { supplies, categories, recipes, flavors, recipeCapacities };
-    }
+  async execute(): Promise<RecipeBookCatalog> {
+    const [supplies, categories, recipes, flavors, recipeCapacities] = await Promise.all([
+      this.supplies.all(),
+      this.categories.all(),
+      this.recipes.all(),
+      this.flavors.all(),
+      this.recipeCapacities.all(),
+    ]);
+    categories.sort((a, b) => a.name.localeCompare(b.name, 'es'));
+    return { supplies, categories, recipes, flavors, recipeCapacities };
+  }
 }

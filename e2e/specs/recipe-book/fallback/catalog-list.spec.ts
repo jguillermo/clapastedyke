@@ -8,7 +8,9 @@ import { CATEGORIES, RECIPES } from '../../../support/seed';
  * acciones de crear/editar/gestionar insumos presentes.
  */
 test.describe('Libro de recetas · lista accesible', () => {
-  test('abrir el libro → lista las tres categorías en orden alfabético', async ({ openCatalog }) => {
+  test('abrir el libro → lista las tres categorías en orden alfabético', async ({
+    openCatalog,
+  }) => {
     const catalog = await openCatalog();
 
     await expect(catalog.categoryHeadings).toHaveCount(CATEGORIES.length);
@@ -27,7 +29,9 @@ test.describe('Libro de recetas · lista accesible', () => {
     }
   });
 
-  test('abrir el libro → cada categoría ofrece su acción de crear receta', async ({ openCatalog }) => {
+  test('abrir el libro → cada categoría ofrece su acción de crear receta', async ({
+    openCatalog,
+  }) => {
     const catalog = await openCatalog();
 
     for (const category of CATEGORIES) {
@@ -35,7 +39,9 @@ test.describe('Libro de recetas · lista accesible', () => {
     }
   });
 
-  test('abrir el libro → ofrece la acción de gestionar insumos y volver', async ({ openCatalog }) => {
+  test('abrir el libro → ofrece la acción de gestionar insumos y volver', async ({
+    openCatalog,
+  }) => {
     const catalog = await openCatalog();
 
     await expect(catalog.suppliesButton).toBeEnabled();

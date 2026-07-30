@@ -67,7 +67,9 @@ describe('Combobox (ghost + dropdown)', () => {
   it('accepts the ghost on Tab, completing with the suggestion casing and emitting selected', () => {
     const { fixture, input } = setup();
     type(input, 'hue');
-    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', cancelable: true, bubbles: true }));
+    input.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Tab', cancelable: true, bubbles: true }),
+    );
     expect(fixture.componentInstance.control.value).toBe('Huevos');
     expect(fixture.componentInstance.picked).toEqual(['Huevos']); // → avanzar al siguiente campo
   });
@@ -77,7 +79,9 @@ describe('Combobox (ghost + dropdown)', () => {
     type(input, 'hue');
     // caret al final para que → acepte
     input.setSelectionRange(input.value.length, input.value.length);
-    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', cancelable: true, bubbles: true }));
+    input.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'ArrowRight', cancelable: true, bubbles: true }),
+    );
     expect(fixture.componentInstance.control.value).toBe('Huevos');
     expect(fixture.componentInstance.picked).toEqual([]); // → solo completa, no avanza
   });
@@ -111,9 +115,13 @@ describe('Combobox (ghost + dropdown)', () => {
   it('Enter picks the active option in the dropdown', () => {
     const { fixture, input } = setup();
     type(input, 'Har');
-    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', cancelable: true, bubbles: true }));
+    input.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'ArrowDown', cancelable: true, bubbles: true }),
+    );
     fixture.detectChanges();
-    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', cancelable: true, bubbles: true }));
+    input.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', cancelable: true, bubbles: true }),
+    );
     expect(fixture.componentInstance.control.value).toBe('Harina integral');
     expect(fixture.componentInstance.picked).toEqual(['Harina integral']); // → avanzar al siguiente campo
   });
@@ -134,7 +142,11 @@ describe('Combobox (ghost + dropdown)', () => {
     const spy = () => (bubbledToHost = true);
     document.addEventListener('keydown', spy);
     try {
-      const event = new KeyboardEvent('keydown', { key: 'ArrowDown', cancelable: true, bubbles: true });
+      const event = new KeyboardEvent('keydown', {
+        key: 'ArrowDown',
+        cancelable: true,
+        bubbles: true,
+      });
       input.dispatchEvent(event);
       expect(event.defaultPrevented).toBe(true);
       expect(bubbledToHost).toBe(false);

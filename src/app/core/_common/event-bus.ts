@@ -8,6 +8,6 @@ export type EventHandler = (event: DomainEvent) => void | Promise<void>;
  * concrete transports are bound via providers.
  */
 export abstract class EventBus {
-    abstract publish(events: readonly DomainEvent[]): Promise<void>;
-    abstract subscribe(eventName: string, handler: EventHandler): void;
+  abstract publish(events: readonly DomainEvent[]): Promise<void>;
+  abstract subscribe(eventName: string, handler: EventHandler): void;
 }

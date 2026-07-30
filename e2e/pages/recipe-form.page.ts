@@ -34,7 +34,11 @@ export class RecipeFormPage {
    * Campo ÚNICO de características (`migo-select-tag` con tres tipos: `Sabor`, `Porciones` y
    * `Molde`). Cada llamada indica el tipo: `properties.pick('Sabor', 'Chocolate')`.
    */
-  readonly properties = new SelectTag(this.page, this.root.locator('migo-select-tag'), 'Características');
+  readonly properties = new SelectTag(
+    this.page,
+    this.root.locator('migo-select-tag'),
+    'Características',
+  );
 
   /** Espera a que el diálogo esté montado y con el nombre enfocable. */
   async waitReady(): Promise<void> {

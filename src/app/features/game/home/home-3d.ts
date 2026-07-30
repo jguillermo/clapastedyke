@@ -1,4 +1,8 @@
 import { AfterViewInit, Component, ElementRef, OnDestroy, signal, viewChild } from '@angular/core';
+// DEUDA (features-conventions.md · «las features son independientes): la cocina monta el libro 3D
+// importando otra feature. Se retira abriendo el libro desde la ruta/host — el libro emite
+// `(closed)` y quien decide qué se muestra debería ser el contenedor, no esta vista.
+// eslint-disable-next-line no-restricted-imports
 import { RecipeBook3d } from '@features/recipe-book/book-3d/recipe-book-3d';
 import { KitchenEngine } from '@platform/three/kitchen-engine';
 import { KitchenStation } from '@platform/three/kitchen-station';

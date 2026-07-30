@@ -67,7 +67,9 @@ test.describe('Lista de insumos · validación', () => {
     await catalog.suppliesButton.click();
     await supplies.waitReady();
     const reopened = await supplies.list.rowOf(SUPPLIES.azucarImpalpable.name);
-    await expect(supplies.list.packagingInput(reopened)).toHaveValue(SUPPLIES.azucarImpalpable.packaging);
+    await expect(supplies.list.packagingInput(reopened)).toHaveValue(
+      SUPPLIES.azucarImpalpable.packaging,
+    );
   });
 
   test('renglón de agregar solo con nombre → no crea nada → completarlo → se crea', async ({

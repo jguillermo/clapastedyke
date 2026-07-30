@@ -4,13 +4,12 @@
     para añadir uno nuevo.
   </p>
 
-  <migo-table
-    [columns]="columns"
-    [rows]="lineControls()"
-    bleed
-    ariaLabel="Insumos del libro"
-  >
+  <migo-table [columns]="columns" [rows]="lineControls()" bleed ariaLabel="Insumos del libro">
     <ng-template let-line let-r="rowIndex" let-c="colIndex">
+      <!-- El (keydown.enter) no es un control: escucha el Enter que BURBUJEA desde los inputs de
+           la fila (que sí son focusables) para añadir la siguiente. Hacer focusable este div
+           añadiría una parada de tabulación vacía por celda. -->
+      <!-- eslint-disable-next-line @angular-eslint/template/interactive-supports-focus -->
       <div [formGroup]="line" (keydown.enter)="onAddRowEnter($event, r)">
         @switch (c) {
           @case (0) {

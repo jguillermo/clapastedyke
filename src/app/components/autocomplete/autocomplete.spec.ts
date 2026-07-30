@@ -43,7 +43,9 @@ describe('Autocomplete (ghost completion)', () => {
     const { fixture, input } = setup();
     type(input, 'hue');
     fixture.detectChanges();
-    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', cancelable: true, bubbles: true }));
+    input.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Tab', cancelable: true, bubbles: true }),
+    );
     expect(fixture.componentInstance.control.value).toBe('Huevos');
   });
 
@@ -51,7 +53,9 @@ describe('Autocomplete (ghost completion)', () => {
     const { fixture, input } = setup();
     type(input, 'Queque');
     fixture.detectChanges();
-    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', cancelable: true, bubbles: true }));
+    input.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', cancelable: true, bubbles: true }),
+    );
     expect(fixture.componentInstance.control.value).toBe('Queque');
   });
 });

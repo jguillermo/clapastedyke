@@ -1,4 +1,11 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal, viewChild } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { Card } from '@components/card/card';
@@ -22,7 +29,11 @@ import {
   SaveRecipeProperty,
   type RecipePropertyKind,
 } from '@core/recipe-book/application/use-cases/save-recipe-property.use-case';
-import { SupplyGrid, type InitialLine, type SupplyOption } from '../_shared/supply-grid/supply-grid';
+import {
+  SupplyGrid,
+  type InitialLine,
+  type SupplyOption,
+} from '../_shared/supply-grid/supply-grid';
 
 /** Datos del diálogo de crear/editar receta. */
 export interface RecipeFormData {
@@ -64,7 +75,21 @@ export interface RecipeFormResult {
 @Component({
   selector: 'app-recipe-form',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, Card, CardHeader, CardTitle, CardSubtitle, CardBody, CardFooter, Button, Icon, FormField, InputField, SelectTag, SupplyGrid],
+  imports: [
+    ReactiveFormsModule,
+    Card,
+    CardHeader,
+    CardTitle,
+    CardSubtitle,
+    CardBody,
+    CardFooter,
+    Button,
+    Icon,
+    FormField,
+    InputField,
+    SelectTag,
+    SupplyGrid,
+  ],
   // `contents`: el card `fill` es hijo flex directo del diálogo y llena la pantalla en móvil.
   host: { class: 'contents' },
   template: `
@@ -73,7 +98,14 @@ export interface RecipeFormResult {
         <migo-icon card-icon name="mat:layers" size="lg" color="brand" />
         <migo-card-title>{{ data.recipe ? data.recipe.name : 'Nueva receta' }}</migo-card-title>
         <migo-card-subtitle>{{ data.category.name }}</migo-card-subtitle>
-        <button card-actions migo-button variant="ghost" type="button" aria-label="Cerrar" (click)="cancel()">
+        <button
+          card-actions
+          migo-button
+          variant="ghost"
+          type="button"
+          aria-label="Cerrar"
+          (click)="cancel()"
+        >
           <migo-icon icon-leading name="mat:close" size="sm" />
         </button>
       </migo-card-header>
@@ -121,7 +153,9 @@ export class RecipeForm {
 
   private readonly grid = viewChild.required(SupplyGrid);
 
-  protected readonly name = new FormControl<string>(this.data.recipe?.name ?? '', { nonNullable: true });
+  protected readonly name = new FormControl<string>(this.data.recipe?.name ?? '', {
+    nonNullable: true,
+  });
   private readonly nameValue = toSignal(this.name.valueChanges, { initialValue: this.name.value });
 
   /**
@@ -132,7 +166,12 @@ export class RecipeForm {
     const portions = this.data.capacities.filter((c) => c.group === 'portions');
     const mold = this.data.capacities.filter((c) => c.group === 'mold');
     return [
-      { key: 'flavor', label: 'Sabor', values: this.data.flavors.map((f) => f.label), allowCreate: true },
+      {
+        key: 'flavor',
+        label: 'Sabor',
+        values: this.data.flavors.map((f) => f.label),
+        allowCreate: true,
+      },
       {
         key: 'portions',
         label: 'Porciones',
@@ -219,7 +258,10 @@ export class RecipeForm {
       }
 
       const flavorId = await this.resolveProperty('flavor', this.propertyValue()['flavor']);
-      const portionsCapacityId = await this.resolveProperty('portions', this.propertyValue()['portions']);
+      const portionsCapacityId = await this.resolveProperty(
+        'portions',
+        this.propertyValue()['portions'],
+      );
       const moldCapacityId = await this.resolveProperty('mold', this.propertyValue()['mold']);
 
       const { id } = await this.saveRecipe.execute({
@@ -233,7 +275,9 @@ export class RecipeForm {
       });
       this.ref.close({ id, categoryId: this.data.category.id, name });
     } catch (error) {
-      this.errorMessage.set(error instanceof Error ? error.message : 'No se pudo guardar la receta.');
+      this.errorMessage.set(
+        error instanceof Error ? error.message : 'No se pudo guardar la receta.',
+      );
     } finally {
       this.saving.set(false);
     }
@@ -244,7 +288,10 @@ export class RecipeForm {
    * {@link SaveRecipeProperty} (devuelve el id del que ya existe, sin tocar su factor); si es nuevo,
    * lo crea con el factor capturado al añadirlo (`onPropertyCreated`).
    */
-  private async resolveProperty(kind: RecipePropertyKind, label: string | undefined): Promise<string | null> {
+  private async resolveProperty(
+    kind: RecipePropertyKind,
+    label: string | undefined,
+  ): Promise<string | null> {
     const trimmed = label?.trim() ?? '';
     if (!trimmed) {
       return null;

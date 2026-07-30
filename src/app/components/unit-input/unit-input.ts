@@ -63,7 +63,9 @@ export type UnitToken = 'k' | 'g' | 'u';
         (blur)="onBlur()"
       />
       @if (unit() && value()) {
-        <span class="shrink-0 text-base text-muted select-none" aria-hidden="true">{{ unit() }}</span>
+        <span class="shrink-0 text-base text-muted select-none" aria-hidden="true">{{
+          unit()
+        }}</span>
       }
     </span>
   `,

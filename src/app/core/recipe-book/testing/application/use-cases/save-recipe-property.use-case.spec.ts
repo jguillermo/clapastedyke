@@ -13,7 +13,10 @@ describe('SaveRecipeProperty', () => {
 
   describe('kind: flavor', () => {
     it('creates a flavor and publishes FlavorSaved (new)', async () => {
-      const { id } = await TestBed.inject(SaveRecipeProperty).execute({ kind: 'flavor', label: 'Vainilla' });
+      const { id } = await TestBed.inject(SaveRecipeProperty).execute({
+        kind: 'flavor',
+        label: 'Vainilla',
+      });
 
       const saved = await TestBed.inject(RecipeFlavorRepository).byId(new EntityId(id));
       expect(saved?.label).toBe('Vainilla');
@@ -87,7 +90,10 @@ describe('SaveRecipeProperty', () => {
     });
 
     it('defaults the factor to 1 when omitted', async () => {
-      const { id } = await TestBed.inject(SaveRecipeProperty).execute({ kind: 'portions', label: '12' });
+      const { id } = await TestBed.inject(SaveRecipeProperty).execute({
+        kind: 'portions',
+        label: '12',
+      });
 
       const saved = await TestBed.inject(RecipeCapacityRepository).byId(new EntityId(id));
       expect(saved?.factor).toBe(1);

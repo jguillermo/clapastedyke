@@ -8,23 +8,23 @@ import { EventBus, EventHandler } from './event-bus';
  */
 @Injectable()
 export class InMemoryEventBus extends EventBus {
-    private readonly handlers = new Map<string, EventHandler[]>();
+  private readonly handlers = new Map<string, EventHandler[]>();
 
-    subscribe(eventName: string, handler: EventHandler): void {
-        const list = this.handlers.get(eventName) ?? [];
-        list.push(handler);
-        this.handlers.set(eventName, list);
-    }
+  subscribe(eventName: string, handler: EventHandler): void {
+    const list = this.handlers.get(eventName) ?? [];
+    list.push(handler);
+    this.handlers.set(eventName, list);
+  }
 
-    async publish(events: readonly DomainEvent[]): Promise<void> {
-        for (const event of events) {
-            for (const handler of this.handlers.get(event.name) ?? []) {
-                try {
-                    await handler(event);
-                } catch (error) {
-                    console.error(`Handler for ${event.name} failed:`, error);
-                }
-            }
+  async publish(events: readonly DomainEvent[]): Promise<void> {
+    for (const event of events) {
+      for (const handler of this.handlers.get(event.name) ?? []) {
+        try {
+          await handler(event);
+        } catch (error) {
+          console.error(`Handler for ${event.name} failed:`, error);
         }
+      }
     }
+  }
 }

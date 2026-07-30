@@ -6,20 +6,20 @@ import { formatPerBaseUnit, formatReference, formatSoles } from '../money';
 
 /** Entrada de {@link PreviewSupplyCost}: cómo se compra el insumo y la cantidad que usa la línea. */
 export interface PreviewSupplyCostRequest {
-    /** Cómo se compra el insumo (presentación + precio), normalizado a la unidad base. */
-    purchasePrice: { amount: number; per: { value: number; unit: BaseUnit } };
-    /** La cantidad que usa la línea de receta (misma unidad base que `per`). */
-    quantity?: { value: number; unit: BaseUnit };
+  /** Cómo se compra el insumo (presentación + precio), normalizado a la unidad base. */
+  purchasePrice: { amount: number; per: { value: number; unit: BaseUnit } };
+  /** La cantidad que usa la línea de receta (misma unidad base que `per`). */
+  quantity?: { value: number; unit: BaseUnit };
 }
 
 /** Resultado de {@link PreviewSupplyCost}: los tres strings formateados listos para pintar. */
 export interface PreviewSupplyCostResult {
-    /** Costo proporcional de `quantity`, listo para pintar (vacío si aún no hay cantidad). */
-    cost: string;
-    /** Costo por unidad base, p. ej. `'S/ 0.0050 / g'`. */
-    perBaseUnitLabel: string;
-    /** Referencia fantasma de cómo se compra, p. ej. `'1 kg · S/ 5'`. */
-    reference: string;
+  /** Costo proporcional de `quantity`, listo para pintar (vacío si aún no hay cantidad). */
+  cost: string;
+  /** Costo por unidad base, p. ej. `'S/ 0.0050 / g'`. */
+  perBaseUnitLabel: string;
+  /** Referencia fantasma de cómo se compra, p. ej. `'1 kg · S/ 5'`. */
+  reference: string;
 }
 
 /**
@@ -33,14 +33,20 @@ export interface PreviewSupplyCostResult {
  */
 @Injectable({ providedIn: 'root' })
 export class PreviewSupplyCost extends UseCase<PreviewSupplyCostRequest, PreviewSupplyCostResult> {
-    async execute({ purchasePrice, quantity }: PreviewSupplyCostRequest): Promise<PreviewSupplyCostResult> {
-        const price = PurchasePrice.of(purchasePrice.amount, Quantity.of(purchasePrice.per.value, purchasePrice.per.unit));
+  async execute({
+    purchasePrice,
+    quantity,
+  }: PreviewSupplyCostRequest): Promise<PreviewSupplyCostResult> {
+    const price = PurchasePrice.of(
+      purchasePrice.amount,
+      Quantity.of(purchasePrice.per.value, purchasePrice.per.unit),
+    );
 
-        let cost = '';
-        if (quantity && quantity.value > 0 && quantity.unit === price.per.unit) {
-            cost = formatSoles(price.costFor(Quantity.of(quantity.value, quantity.unit)));
-        }
-
-        return { cost, perBaseUnitLabel: formatPerBaseUnit(price), reference: formatReference(price) };
+    let cost = '';
+    if (quantity && quantity.value > 0 && quantity.unit === price.per.unit) {
+      cost = formatSoles(price.costFor(Quantity.of(quantity.value, quantity.unit)));
     }
+
+    return { cost, perBaseUnitLabel: formatPerBaseUnit(price), reference: formatReference(price) };
+  }
 }

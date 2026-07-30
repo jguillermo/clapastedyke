@@ -148,7 +148,12 @@ const ALIGN: Record<TableAlign, string> = {
                 >
                   <ng-container
                     [ngTemplateOutlet]="cellTemplate"
-                    [ngTemplateOutletContext]="{ $implicit: row, rowIndex: r, col: col, colIndex: c }"
+                    [ngTemplateOutletContext]="{
+                      $implicit: row,
+                      rowIndex: r,
+                      col: col,
+                      colIndex: c,
+                    }"
                   />
                 </td>
               }
@@ -291,7 +296,9 @@ export class Table {
     const cell = this.host.nativeElement.querySelector<HTMLElement>(
       `[role="gridcell"][data-row="${r}"][data-col="${c}"]`,
     );
-    const focusable = cell?.querySelector<HTMLElement>('input, textarea, select, button, [tabindex]');
+    const focusable = cell?.querySelector<HTMLElement>(
+      'input, textarea, select, button, [tabindex]',
+    );
     if (!focusable) {
       return false;
     }

@@ -140,7 +140,12 @@ export class SupplyGridPage {
    * cantidad. Al terminar la fila ya tiene costo, porque la grilla jala el precio de
    * compra del catálogo por nombre.
    */
-  async fillExistingLine(row: number, name: string, quantity: string, unit?: UnitKey): Promise<void> {
+  async fillExistingLine(
+    row: number,
+    name: string,
+    quantity: string,
+    unit?: UnitKey,
+  ): Promise<void> {
     await this.nameInput(row).fill(name);
     await this.setQuantity(row, quantity, unit);
     await expect(this.costButton(row)).not.toHaveText('＋ precio');

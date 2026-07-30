@@ -8,9 +8,9 @@ import { Supply } from '../entities/supply';
  * IndexedDbStore.
  */
 export abstract class SupplyRepository {
-    abstract nextIdentity(): EntityId;
-    abstract byId(id: EntityId): Promise<Supply | null>;
-    abstract byName(name: string): Promise<Supply | null>;
-    abstract save(supply: Supply): Promise<void>;
-    abstract all(): Promise<Supply[]>;
+  abstract nextIdentity(): EntityId;
+  abstract byId(id: EntityId): Promise<Supply | null>;
+  abstract byName(name: string): Promise<Supply | null>;
+  abstract save(supply: Supply): Promise<void>;
+  abstract all(): Promise<Supply[]>;
 }

@@ -72,8 +72,20 @@ describe('RecipeBookSeed · contenido desde JSON', () => {
     flavors: [{ id: 'flv-vainilla', label: 'Vainilla' }],
     recipeCapacities: [{ id: 'co-mold-medium', group: 'mold', label: 'Molde mediano', factor: 1 }],
     supplies: [
-      { id: 'ing-harina', name: 'Harina', baseUnit: 'g', usage: 'recipe', purchasePrice: { amount: 4.5, per: { value: 1000, unit: 'g' }, currency: 'PEN' } },
-      { id: 'ing-huevos', name: 'Huevos', baseUnit: 'u', usage: 'recipe', purchasePrice: { amount: 0.5, per: { value: 1, unit: 'u' }, currency: 'PEN' } },
+      {
+        id: 'ing-harina',
+        name: 'Harina',
+        baseUnit: 'g',
+        usage: 'recipe',
+        purchasePrice: { amount: 4.5, per: { value: 1000, unit: 'g' }, currency: 'PEN' },
+      },
+      {
+        id: 'ing-huevos',
+        name: 'Huevos',
+        baseUnit: 'u',
+        usage: 'recipe',
+        purchasePrice: { amount: 0.5, per: { value: 1, unit: 'u' }, currency: 'PEN' },
+      },
     ],
     recipes: [
       {
@@ -95,9 +107,15 @@ describe('RecipeBookSeed · contenido desde JSON', () => {
     configure(sampleDoc());
     await TestBed.inject(RecipeBookSeed).run();
 
-    expect((await TestBed.inject(RecipeFlavorRepository).all()).map((f) => f.label)).toEqual(['Vainilla']);
-    expect((await TestBed.inject(RecipeCapacityRepository).all()).map((o) => o.label)).toEqual(['Molde mediano']);
-    expect((await TestBed.inject(RecipeCategoryRepository).all()).map((c) => c.name)).toEqual(['Queques']);
+    expect((await TestBed.inject(RecipeFlavorRepository).all()).map((f) => f.label)).toEqual([
+      'Vainilla',
+    ]);
+    expect((await TestBed.inject(RecipeCapacityRepository).all()).map((o) => o.label)).toEqual([
+      'Molde mediano',
+    ]);
+    expect((await TestBed.inject(RecipeCategoryRepository).all()).map((c) => c.name)).toEqual([
+      'Queques',
+    ]);
     const ingredients = await TestBed.inject(SupplyRepository).all();
     expect(ingredients.map((i) => i.name).sort()).toEqual(['Harina', 'Huevos']);
 
@@ -125,7 +143,9 @@ describe('RecipeBookSeed · contenido desde JSON', () => {
   it('never modifies an item the user already edited (create-if-absent by id)', async () => {
     configure(sampleDoc());
     // El usuario ya renombró el sabor con el mismo id que trae el seed.
-    await TestBed.inject(RecipeFlavorRepository).save(RecipeFlavor.create(new EntityId('flv-vainilla'), 'Vainilla Bourbon'));
+    await TestBed.inject(RecipeFlavorRepository).save(
+      RecipeFlavor.create(new EntityId('flv-vainilla'), 'Vainilla Bourbon'),
+    );
 
     await TestBed.inject(RecipeBookSeed).run();
 
@@ -175,7 +195,9 @@ describe('RecipeBookSeed · contenido desde JSON', () => {
     await TestBed.inject(RecipeBookSeed).run();
 
     const harina = await TestBed.inject(SupplyRepository).byId(new EntityId('ing-harina'));
-    expect(harina?.purchasePrice.equals(PurchasePrice.of(4.5, Quantity.of(1000, 'g'), 'PEN'))).toBe(true);
+    expect(harina?.purchasePrice.equals(PurchasePrice.of(4.5, Quantity.of(1000, 'g'), 'PEN'))).toBe(
+      true,
+    );
   });
 
   it('hasSeeded(): false before running, true after', async () => {

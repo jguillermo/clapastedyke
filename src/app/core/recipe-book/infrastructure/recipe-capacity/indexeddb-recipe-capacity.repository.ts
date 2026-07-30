@@ -13,32 +13,32 @@ import { RecipeCapacityRecord } from '../records';
  */
 @Injectable()
 export class IndexedDbRecipeCapacityRepository extends RecipeCapacityRepository {
-    private readonly store = new IndexedDbStore<RecipeCapacityRecord>('conversion_options');
+  private readonly store = new IndexedDbStore<RecipeCapacityRecord>('conversion_options');
 
-    nextIdentity(): EntityId {
-        return new EntityId(crypto.randomUUID());
-    }
+  nextIdentity(): EntityId {
+    return new EntityId(crypto.randomUUID());
+  }
 
-    async byId(id: EntityId): Promise<RecipeCapacity | null> {
-        const record = await this.store.get(id.value);
-        return record ? RecipeCapacityMapper.toDomain(record) : null;
-    }
+  async byId(id: EntityId): Promise<RecipeCapacity | null> {
+    const record = await this.store.get(id.value);
+    return record ? RecipeCapacityMapper.toDomain(record) : null;
+  }
 
-    async byGroup(group: CapacityGroup): Promise<RecipeCapacity[]> {
-        return (await this.store.all())
-            .filter((r) => r.group === group)
-            .map(RecipeCapacityMapper.toDomain);
-    }
+  async byGroup(group: CapacityGroup): Promise<RecipeCapacity[]> {
+    return (await this.store.all())
+      .filter((r) => r.group === group)
+      .map(RecipeCapacityMapper.toDomain);
+  }
 
-    async all(): Promise<RecipeCapacity[]> {
-        return (await this.store.all()).map(RecipeCapacityMapper.toDomain);
-    }
+  async all(): Promise<RecipeCapacity[]> {
+    return (await this.store.all()).map(RecipeCapacityMapper.toDomain);
+  }
 
-    async save(capacity: RecipeCapacity): Promise<void> {
-        await this.store.put(RecipeCapacityMapper.toRecord(capacity));
-    }
+  async save(capacity: RecipeCapacity): Promise<void> {
+    await this.store.put(RecipeCapacityMapper.toRecord(capacity));
+  }
 
-    async delete(id: EntityId): Promise<void> {
-        await this.store.delete(id.value);
-    }
+  async delete(id: EntityId): Promise<void> {
+    await this.store.delete(id.value);
+  }
 }

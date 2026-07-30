@@ -16,7 +16,10 @@ import { Spacer } from '@components/spacer/spacer';
 import { Badge } from '@components/badge/badge';
 import { MigoDialog } from '@components/dialog/dialog.service';
 import type { EntityId } from '@core/_common/entity-id';
-import { ListRecipeBook, type RecipeBookCatalog } from '@core/recipe-book/application/use-cases/list-recipe-book.use-case';
+import {
+  ListRecipeBook,
+  type RecipeBookCatalog,
+} from '@core/recipe-book/application/use-cases/list-recipe-book.use-case';
 import type { Recipe } from '@core/recipe-book/domain/entities/recipe';
 import type { Supply } from '@core/recipe-book/domain/entities/supply';
 import type { RecipeFlavor } from '@core/recipe-book/domain/entities/recipe-flavor';
@@ -108,7 +111,11 @@ interface BookFocus {
       </button>
 
       <!-- Anuncio para lectores de pantalla (el texto 3D no es accesible) -->
-      <p class="absolute h-px w-px overflow-hidden whitespace-nowrap" role="status" aria-live="polite">
+      <p
+        class="absolute h-px w-px overflow-hidden whitespace-nowrap"
+        role="status"
+        aria-live="polite"
+      >
         {{ announce() }}
       </p>
 
@@ -187,16 +194,27 @@ interface BookFocus {
           class="absolute inset-y-0 left-0 z-50 flex w-full sm:w-80 flex-col bg-surface-card border-e border-border-subtle shadow-lg"
           aria-label="Índice de recetas"
         >
-          <div class="flex items-center justify-between gap-3 px-4 py-3 border-b border-border-subtle">
+          <div
+            class="flex items-center justify-between gap-3 px-4 py-3 border-b border-border-subtle"
+          >
             <span class="font-display text-heading text-sm">Índice</span>
-            <button migo-button variant="ghost" size="sm" type="button" aria-label="Cerrar índice" (click)="toggleIndex()">
+            <button
+              migo-button
+              variant="ghost"
+              size="sm"
+              type="button"
+              aria-label="Cerrar índice"
+              (click)="toggleIndex()"
+            >
               <migo-icon icon-leading name="mat:close" size="sm" />
             </button>
           </div>
           <div class="flex-1 overflow-y-auto p-3">
             @for (entry of indexEntries(); track entry.faceIndex) {
               @if (entry.section) {
-                <p class="m-0 mt-3 mb-1 px-2 font-display text-heading text-sm first:mt-0">{{ entry.label }}</p>
+                <p class="m-0 mt-3 mb-1 px-2 font-display text-heading text-sm first:mt-0">
+                  {{ entry.label }}
+                </p>
               } @else {
                 <button
                   type="button"
@@ -225,7 +243,12 @@ interface BookFocus {
           <section class="flex flex-col gap-2">
             <div class="flex items-center justify-between gap-3">
               <h2 class="m-0 font-display text-heading text-base">{{ category.name }}</h2>
-              <button migo-button variant="secondary" size="sm" (click)="openNewForm(category.id.value)">
+              <button
+                migo-button
+                variant="secondary"
+                size="sm"
+                (click)="openNewForm(category.id.value)"
+              >
                 <migo-icon icon-leading name="mat:add" size="sm" />
                 <migo-spacer />Nuevo
               </button>
@@ -306,33 +329,54 @@ export class RecipeBook3d implements AfterViewInit, OnDestroy {
   });
 
   /** Receta mostrada en la página izquierda del spread (o `null`). */
-  protected readonly leftRecipe = computed<Recipe | null>(() => this.recipeOfPage(this.spread()?.left));
+  protected readonly leftRecipe = computed<Recipe | null>(() =>
+    this.recipeOfPage(this.spread()?.left),
+  );
   /** Receta mostrada en la página derecha del spread / la única en single (o `null`). */
-  protected readonly rightRecipe = computed<Recipe | null>(() => this.recipeOfPage(this.spread()?.right));
+  protected readonly rightRecipe = computed<Recipe | null>(() =>
+    this.recipeOfPage(this.spread()?.right),
+  );
 
   /** La receta de la página actual: derecha con prioridad, luego izquierda (para el atajo de teclado). */
-  protected readonly currentRecipe = computed<Recipe | null>(() => this.rightRecipe() ?? this.leftRecipe());
+  protected readonly currentRecipe = computed<Recipe | null>(
+    () => this.rightRecipe() ?? this.leftRecipe(),
+  );
 
   /** Resuelve la receta del catálogo que corresponde a una cara de página (por categoría + título). */
   private recipeOfPage(page: PageContent | null | undefined): Recipe | null {
     const catalog = this.catalog();
-    if (!catalog || !page || page.kind !== 'recipe' || !page.section || page.section === INGREDIENTS_SECTION || !page.title) {
+    if (
+      !catalog ||
+      !page ||
+      page.kind !== 'recipe' ||
+      !page.section ||
+      page.section === INGREDIENTS_SECTION ||
+      !page.title
+    ) {
       return null;
     }
-    return catalog.recipes.find((r) => r.categoryId.value === page.section && r.name === page.title) ?? null;
+    return (
+      catalog.recipes.find((r) => r.categoryId.value === page.section && r.name === page.title) ??
+      null
+    );
   }
 
   private readonly suppliesById = computed(
     () => new Map<string, Supply>((this.catalog()?.supplies ?? []).map((s) => [s.id.value, s])),
   );
   /** Insumos del catálogo (los pasa el overlay para resolver nombres). */
-  protected readonly supplyEntities = computed<readonly Supply[]>(() => this.catalog()?.supplies ?? []);
+  protected readonly supplyEntities = computed<readonly Supply[]>(
+    () => this.catalog()?.supplies ?? [],
+  );
 
   private readonly flavorsById = computed(
-    () => new Map<string, RecipeFlavor>((this.catalog()?.flavors ?? []).map((f) => [f.id.value, f])),
+    () =>
+      new Map<string, RecipeFlavor>((this.catalog()?.flavors ?? []).map((f) => [f.id.value, f])),
   );
   /** Sabores del catálogo (los pasa el overlay para resolver el label). */
-  protected readonly flavorEntities = computed<readonly RecipeFlavor[]>(() => this.catalog()?.flavors ?? []);
+  protected readonly flavorEntities = computed<readonly RecipeFlavor[]>(
+    () => this.catalog()?.flavors ?? [],
+  );
 
   /** Label del sabor de la receta, o `null` si no tiene. */
   protected flavorLabelOf(recipe: Recipe): string | null {
@@ -340,10 +384,15 @@ export class RecipeBook3d implements AfterViewInit, OnDestroy {
   }
 
   private readonly capacitiesById = computed(
-    () => new Map<string, RecipeCapacity>((this.catalog()?.recipeCapacities ?? []).map((c) => [c.id.value, c])),
+    () =>
+      new Map<string, RecipeCapacity>(
+        (this.catalog()?.recipeCapacities ?? []).map((c) => [c.id.value, c]),
+      ),
   );
   /** Capacidades del catálogo (las pasa el overlay para resolver el label). */
-  protected readonly capacityEntities = computed<readonly RecipeCapacity[]>(() => this.catalog()?.recipeCapacities ?? []);
+  protected readonly capacityEntities = computed<readonly RecipeCapacity[]>(
+    () => this.catalog()?.recipeCapacities ?? [],
+  );
 
   private capacityLabelById(id: EntityId | null): string | null {
     return id ? (this.capacitiesById().get(id.value)?.label ?? null) : null;
@@ -575,7 +624,11 @@ export class RecipeBook3d implements AfterViewInit, OnDestroy {
     const byId = this.suppliesById();
     return recipe.lines.map((line) => {
       const supply = byId.get(line.supplyId.value);
-      return { name: supply?.name ?? '—', quantity: line.quantity.value, baseUnit: line.quantity.unit };
+      return {
+        name: supply?.name ?? '—',
+        quantity: line.quantity.value,
+        baseUnit: line.quantity.unit,
+      };
     });
   }
 
@@ -638,7 +691,7 @@ export class RecipeBook3d implements AfterViewInit, OnDestroy {
     // Tras cerrar un formulario/diálogo salta a lo último que se tocó (receta/categoría/insumos);
     // si no hay foco, conserva la cara actual (no volver al inicio).
     const target = focus ? resolveFace(pages, focus) : -1;
-    const face = target >= 0 ? target : this.engine?.currentFaceIndex ?? 0;
+    const face = target >= 0 ? target : (this.engine?.currentFaceIndex ?? 0);
     this.engine?.setPages(pages);
     if (face > 0) {
       this.engine?.jumpToFace(face);
@@ -662,7 +715,11 @@ function resolveFace(pages: PageContent[], focus: BookFocus): number {
   }
   if (focus.recipeName && focus.categoryId) {
     const i = pages.findIndex(
-      (p) => p.kind === 'recipe' && !p.continued && p.section === focus.categoryId && p.title === focus.recipeName,
+      (p) =>
+        p.kind === 'recipe' &&
+        !p.continued &&
+        p.section === focus.categoryId &&
+        p.title === focus.recipeName,
     );
     if (i >= 0) {
       return i;
@@ -706,7 +763,11 @@ function buildIndex(catalog: RecipeBookCatalog, pages: PageContent[]): IndexEntr
     }
     if (page.kind === 'section') {
       entries.push({ label: page.title ?? '', faceIndex, section: true });
-    } else if (page.kind === 'recipe' && page.title && recipeNamesByCategory.get(section)!.has(page.title)) {
+    } else if (
+      page.kind === 'recipe' &&
+      page.title &&
+      recipeNamesByCategory.get(section)!.has(page.title)
+    ) {
       entries.push({ label: page.title, faceIndex, section: false });
     }
   });

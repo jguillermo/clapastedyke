@@ -8,9 +8,9 @@ import { RecipeFlavor } from '../entities/recipe-flavor';
  * IndexedDbStore.
  */
 export abstract class RecipeFlavorRepository {
-    abstract nextIdentity(): EntityId;
-    abstract byId(id: EntityId): Promise<RecipeFlavor | null>;
-    abstract all(): Promise<RecipeFlavor[]>;
-    abstract save(flavor: RecipeFlavor): Promise<void>;
-    abstract delete(id: EntityId): Promise<void>;
+  abstract nextIdentity(): EntityId;
+  abstract byId(id: EntityId): Promise<RecipeFlavor | null>;
+  abstract all(): Promise<RecipeFlavor[]>;
+  abstract save(flavor: RecipeFlavor): Promise<void>;
+  abstract delete(id: EntityId): Promise<void>;
 }

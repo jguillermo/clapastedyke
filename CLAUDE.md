@@ -24,16 +24,29 @@ The authoritative coding rules are in **`.claude/CLAUDE.md`** (always loaded) an
 ## Commands
 
 ```bash
+npm run check       # ⇦ THE one to run before a PR: fixes (lint + format) and then verifies EVERYTHING
+npm run fix         # autofix only: eslint --fix + prettier --write
+npm run verify      # validate only, in CI order: lint · format · types · unit · stories · E2E
+
 ng serve            # dev server at http://localhost:4200 (route: /home)
 ng build            # production build → dist/
 ng build --watch --configuration development   # also: npm run watch
 ng test             # unit tests — Vitest via @angular/build:unit-test (globals, jsdom)
+npm run test:unit   # the same, single run (no watch) — what CI runs
 npm run test:e2e    # E2E: ng build + Playwright over e2e/ (projects: desktop 1280px, mobile 375px)
 npm run test:e2e:ui # the same, in Playwright's UI mode
 npm run sb          # Storybook (component states/variants live in *.stories.ts `play`)
+npm run sb:test     # the stories' `play` as tests (vitest browser + chromium)
+npm run lint        # ESLint (angular-eslint) — `npm run lint:fix` to autofix
+npm run format      # Prettier --write .   (npm run format:check to verify only)
+npm run typecheck   # tsc over app + stories, unit specs, and the E2E suite
 ```
 
-- **No lint script and no ESLint config** — conventions are enforced by code review, not tooling. Formatting is Prettier (`.prettierrc`: 100 cols, single quotes); there is no `format` script.
+- **Three tsconfigs, three type-checks** — `tsconfig.stories.json` (app + stories, `typecheck:src`), `tsconfig.spec.json` (unit specs, with vitest globals), `e2e/tsconfig.json` (the E2E suite, standalone). **Angular templates are checked only by `ng build`**, so the build job is not optional. Do **not** point `tsc` at `.storybook/tsconfig.json`: that is Storybook's *build* config — `preview.ts` imports `documentation.json` (compodoc-generated, gitignored) and `src/styles.css` (bundler-only), and its `files` entry makes TS infer `rootDir` as `.storybook/` (`TS6059`).
+- **Lint = ESLint flat config** (`eslint.config.mjs`, `angular-eslint` + `typescript-eslint`): Angular rules (signals over decorators, native control flow, OnPush), template **a11y**, and the **layer boundaries** as `no-restricted-imports` (`components/` with no app imports, `core/` isolated, features without `infrastructure/`, the E2E suite without `src/`). Not type-aware on purpose — `ng build` and the `tsc -p …` steps already type-check. What is not AST-analysable (real mobile-first at 375px, arbitrary Tailwind values inside a class string, specs living in `core/<ctx>/testing/`, one `Playground` with `play` per component) is still code review.
+- Formatting is Prettier (`.prettierrc`: 100 cols, single quotes) via `npm run format` / `npm run format:check`.
+- **CI gate** — `.github/workflows/ci.yml` runs on every PR to `main`: format + lint + types, unit tests, production build (with budgets), the stories' `play`, and the E2E suite (desktop + mobile). The single job to require in branch protection is **`CI OK (required)`**; it fails if any other job fails, is cancelled or skipped.
+- **`npm run check` is the local mirror of that gate**: it autofixes first (`fix`) and then runs the same checks in the same order, cheapest first (`verify`), so the slow E2E run only happens once everything else is green. The production build is covered inside `test:e2e` (it builds before serving `dist/`). CI splits the same work into parallel jobs instead of one chain.
 - **E2E lives only in `e2e/`** — one Playwright config (`e2e/playwright.config.ts`), specs mirroring `src/app/features/`, page objects in `e2e/pages/`, fixtures in `e2e/fixtures/`. Tests run against the **compiled build** served by `e2e/support/static-server.mjs`, not `ng serve`. See `e2e-tests-conventions.md` — that shape is mandatory for every new E2E test.
 - Tests use Vitest **globals** (`describe`/`it`/`expect`) — no per-file imports. `tsconfig.spec.json` discovers all `src/**/*.spec.ts` wherever they sit.
 - TypeScript **6** + Angular **22**. Path aliases have **no `baseUrl`** and use relative targets (`./src/app/*`) — required by TS6 (see `path-aliases-conventions.md`).

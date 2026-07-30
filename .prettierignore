@@ -1,0 +1,21 @@
+# Artefactos de build y caché — no son fuente, no se formatean.
+dist/
+dist-dev/
+out-tsc/
+.angular/
+node_modules/
+storybook-static/
+playwright-report/
+test-results/
+coverage/
+documentation.json
+package-lock.json
+
+# Snapshots y salidas generadas
+__screenshots__/
+*.log
+
+# Documentación: las reglas de `.claude/` y los READMEs usan tablas y saltos pensados para leerse
+# en GitHub; reformatearlos con Prettier no aporta nada y mete ruido en cada diff.
+*.md
+

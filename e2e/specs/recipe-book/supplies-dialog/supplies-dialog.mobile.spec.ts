@@ -102,7 +102,9 @@ test.describe('Diálogo de Insumos · móvil 375px', () => {
 
     for (const col of [0, 1, 2] as const) {
       const box = (await supplies.list.cell(add, col).boundingBox())!;
-      expect(box.height, `la celda ${col} debe cumplir el target táctil`).toBeGreaterThanOrEqual(44);
+      expect(box.height, `la celda ${col} debe cumplir el target táctil`).toBeGreaterThanOrEqual(
+        44,
+      );
     }
 
     await supplies.close.tap();

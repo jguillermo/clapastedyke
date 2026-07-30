@@ -12,7 +12,9 @@ import { test, expect } from '../../../fixtures/app-fixture';
 test.describe('Libro 3D · paginación', () => {
   test.use({ webgl: true });
 
-  test('libro recién abierto → está en la portada y solo se puede avanzar', async ({ openBook3d }) => {
+  test('libro recién abierto → está en la portada y solo se puede avanzar', async ({
+    openBook3d,
+  }) => {
     const book = await openBook3d();
 
     await expect(book.announce).toHaveText('Portada');
