@@ -26,9 +26,9 @@ test.describe('Libro de recetas · badges de la lista', () => {
 
     await row.click();
     await form.waitReady();
-    await form.flavor.pick('Sabor', 'Chocolate');
-    await form.size.pick('Porciones', '24');
-    await form.size.pick('Molde', 'Molde grande');
+    await form.properties.pick('Sabor', 'Chocolate');
+    await form.properties.pick('Porciones', '24');
+    await form.properties.pick('Molde', 'Molde grande');
     await form.save.click();
     await form.waitClosed();
 
@@ -48,7 +48,7 @@ test.describe('Libro de recetas · badges de la lista', () => {
 
     await catalog.recipe('Rellenos', 'Crema Pastelera').click();
     await form.waitReady();
-    await form.flavor.pick('Sabor', 'Vainilla');
+    await form.properties.pick('Sabor', 'Vainilla');
     await form.save.click();
     await form.waitClosed();
 

@@ -348,12 +348,13 @@ uso (el componente no llama a ningún servicio).
 ```html
 <migo-select-tag
   [types]="[
+    { key: 'flavor', label: 'Sabor', values: flavorLabels(), allowCreate: true },
     { key: 'portions', label: 'Porciones', values: portionLabels(), allowCreate: true, extraField: { label: 'Factor de escalado' } },
     { key: 'mold', label: 'Molde', values: moldLabels(), allowCreate: true, extraField: { label: 'Factor de escalado' } }
   ]"
-  [value]="capacityValue()"
-  (valueChange)="capacityValue.set($event)"
-  (created)="onCapacityCreated($event)"
+  [value]="propertyValue()"
+  (valueChange)="propertyValue.set($event)"
+  (created)="onPropertyCreated($event)"
 />
 ```
 

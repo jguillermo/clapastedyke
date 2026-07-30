@@ -15,11 +15,13 @@ import { SelectTag, type SelectTagType } from '@components/select-tag/select-tag
 import { MIGO_DIALOG_DATA, MigoDialogRef } from '@components/dialog/dialog.service';
 import type { Supply } from '@core/recipe-book/domain/entities/supply';
 import type { RecipeFlavor } from '@core/recipe-book/domain/entities/recipe-flavor';
-import type { CapacityGroup, RecipeCapacity } from '@core/recipe-book/domain/entities/recipe-capacity';
+import type { RecipeCapacity } from '@core/recipe-book/domain/entities/recipe-capacity';
 import { SaveRecipe } from '@core/recipe-book/application/use-cases/save-recipe.use-case';
 import { SaveSupply } from '@core/recipe-book/application/use-cases/save-supply.use-case';
-import { SaveRecipeFlavor } from '@core/recipe-book/application/use-cases/save-recipe-flavor.use-case';
-import { SaveRecipeCapacity } from '@core/recipe-book/application/use-cases/save-recipe-capacity.use-case';
+import {
+  SaveRecipeProperty,
+  type RecipePropertyKind,
+} from '@core/recipe-book/application/use-cases/save-recipe-property.use-case';
 import { SupplyGrid, type InitialLine, type SupplyOption } from '../_shared/supply-grid/supply-grid';
 
 /** Datos del diálogo de crear/editar receta. */
@@ -28,9 +30,9 @@ export interface RecipeFormData {
   category: { id: string; name: string };
   /** Catálogo de insumos (con precio) para autocompletar la grilla y resolver ids. */
   supplies: readonly Supply[];
-  /** Catálogo de sabores para el select de sabor (elegir uno existente o crear uno nuevo). */
+  /** Catálogo de sabores para el campo de características (elegir uno existente o crear uno nuevo). */
   flavors: readonly RecipeFlavor[];
-  /** Catálogo de capacidades (porciones/molde) para el select de tamaño. */
+  /** Catálogo de capacidades (porciones/molde) para el campo de características. */
   capacities: readonly RecipeCapacity[];
   /** Presente → editar (precarga nombre + líneas + sabor + tamaño); ausente → crear. */
   recipe?: {
@@ -52,12 +54,12 @@ export interface RecipeFormResult {
 
 /**
  * Formulario ÚNICO de receta (crear y editar). Contenido de un MigoDialog. Edita el nombre y los
- * ingredientes (grilla reutilizable {@link SupplyGrid}, que muestra el costo). El sabor y el
- * tamaño (porciones/molde, ambos pueden coexistir) son campos estilo Select2
- * ({@link SelectTag}): eligen o crean una etiqueta, con su × para quitarla. Al guardar, asegura
- * cada insumo por nombre ({@link SaveSupply}, create-if-absent), resuelve sabor/tamaño a sus ids
- * (creándolos si son nuevos) y persiste la receta ({@link SaveRecipe}); la categoría es fija.
- * Inyecta solo use cases.
+ * ingredientes (grilla reutilizable {@link SupplyGrid}, que muestra el costo). Las tres
+ * características —sabor, porciones y molde, que coexisten— se piden en UN solo campo estilo Select2
+ * ({@link SelectTag}) con un tipo por característica: elige o crea una etiqueta, con su × para
+ * quitarla. Al guardar, asegura cada insumo por nombre ({@link SaveSupply}, create-if-absent),
+ * resuelve cada característica a su id ({@link SaveRecipeProperty}, creándola si es nueva) y
+ * persiste la receta ({@link SaveRecipe}); la categoría es fija. Inyecta solo use cases.
  */
 @Component({
   selector: 'app-recipe-form',
@@ -82,22 +84,13 @@ export interface RecipeFormResult {
             <migo-input [formControl]="name" placeholder="Nombre de la receta" />
           </migo-form-field>
 
-          <migo-form-field label="Sabor (opcional)">
+          <migo-form-field label="Características (opcional)">
             <migo-select-tag
-              [types]="flavorTypes()"
-              [value]="flavorValue()"
-              (valueChange)="flavorValue.set($event)"
-              placeholder="Añade un sabor…"
-            />
-          </migo-form-field>
-
-          <migo-form-field label="Tamaño (opcional)">
-            <migo-select-tag
-              [types]="capacityTypes()"
-              [value]="capacityValue()"
-              (valueChange)="capacityValue.set($event)"
-              (created)="onCapacityCreated($event)"
-              placeholder="Añade porciones y/o molde…"
+              [types]="propertyTypes()"
+              [value]="propertyValue()"
+              (valueChange)="propertyValue.set($event)"
+              (created)="onPropertyCreated($event)"
+              placeholder="Añade sabor, porciones y/o molde…"
             />
           </migo-form-field>
 
@@ -124,25 +117,22 @@ export class RecipeForm {
   protected readonly data = inject<RecipeFormData>(MIGO_DIALOG_DATA);
   private readonly saveRecipe = inject(SaveRecipe);
   private readonly saveSupply = inject(SaveSupply);
-  private readonly saveFlavor = inject(SaveRecipeFlavor);
-  private readonly saveRecipeCapacity = inject(SaveRecipeCapacity);
+  private readonly saveProperty = inject(SaveRecipeProperty);
 
   private readonly grid = viewChild.required(SupplyGrid);
 
   protected readonly name = new FormControl<string>(this.data.recipe?.name ?? '', { nonNullable: true });
   private readonly nameValue = toSignal(this.name.valueChanges, { initialValue: this.name.value });
 
-  protected readonly flavorTypes = computed<SelectTagType[]>(() => [
-    { key: 'flavor', label: 'Sabor', values: this.data.flavors.map((f) => f.label), allowCreate: true },
-  ]);
-  protected readonly flavorValue = signal<Record<string, string>>(
-    this.data.recipe?.flavorLabel ? { flavor: this.data.recipe.flavorLabel } : {},
-  );
-
-  protected readonly capacityTypes = computed<SelectTagType[]>(() => {
+  /**
+   * Los tres tipos del campo único de características: el sabor y las dos dimensiones de tamaño
+   * (porciones y molde, que coexisten). Las claves son los `RecipePropertyKind` del caso de uso.
+   */
+  protected readonly propertyTypes = computed<SelectTagType[]>(() => {
     const portions = this.data.capacities.filter((c) => c.group === 'portions');
     const mold = this.data.capacities.filter((c) => c.group === 'mold');
     return [
+      { key: 'flavor', label: 'Sabor', values: this.data.flavors.map((f) => f.label), allowCreate: true },
       {
         key: 'portions',
         label: 'Porciones',
@@ -169,12 +159,13 @@ export class RecipeForm {
       },
     ];
   });
-  protected readonly capacityValue = signal<Record<string, string>>({
+  protected readonly propertyValue = signal<Record<string, string>>({
+    ...(this.data.recipe?.flavorLabel ? { flavor: this.data.recipe.flavorLabel } : {}),
     ...(this.data.recipe?.portionsLabel ? { portions: this.data.recipe.portionsLabel } : {}),
     ...(this.data.recipe?.moldLabel ? { mold: this.data.recipe.moldLabel } : {}),
   });
-  /** Factor capturado al crear una capacidad nueva (por grupo), pendiente de persistir en `save()`. */
-  private readonly pendingFactors = signal<Partial<Record<CapacityGroup, number>>>({});
+  /** Factor capturado al crear una capacidad nueva (por tipo), pendiente de persistir en `save()`. */
+  private readonly pendingFactors = signal<Partial<Record<RecipePropertyKind, number>>>({});
 
   protected readonly saving = signal(false);
   protected readonly errorMessage = signal('');
@@ -199,7 +190,7 @@ export class RecipeForm {
     this.ref.close();
   }
 
-  protected onCapacityCreated(event: { typeKey: string; value: string; extra: number }): void {
+  protected onPropertyCreated(event: { typeKey: string; value: string; extra: number }): void {
     this.pendingFactors.update((current) => ({ ...current, [event.typeKey]: event.extra }));
   }
 
@@ -227,15 +218,9 @@ export class RecipeForm {
         lines.push({ supplyId, quantity: line.quantity });
       }
 
-      let flavorId: string | null = null;
-      const flavorLabel = this.flavorValue()['flavor']?.trim() ?? '';
-      if (flavorLabel) {
-        const saved = await this.saveFlavor.execute({ label: flavorLabel });
-        flavorId = saved.id;
-      }
-
-      const portionsCapacityId = await this.resolveCapacityLabel('portions', this.capacityValue()['portions']);
-      const moldCapacityId = await this.resolveCapacityLabel('mold', this.capacityValue()['mold']);
+      const flavorId = await this.resolveProperty('flavor', this.propertyValue()['flavor']);
+      const portionsCapacityId = await this.resolveProperty('portions', this.propertyValue()['portions']);
+      const moldCapacityId = await this.resolveProperty('mold', this.propertyValue()['mold']);
 
       const { id } = await this.saveRecipe.execute({
         id: this.data.recipe?.id,
@@ -255,21 +240,20 @@ export class RecipeForm {
   }
 
   /**
-   * Resuelve el label elegido en el select de tamaño a un id: reutiliza la capacidad existente
-   * del catálogo si el label coincide, o crea una nueva con el factor capturado al añadirla
-   * (`onCapacityCreated`).
+   * Resuelve a un id el label elegido para una característica. El dedup por label lo hace
+   * {@link SaveRecipeProperty} (devuelve el id del que ya existe, sin tocar su factor); si es nuevo,
+   * lo crea con el factor capturado al añadirlo (`onPropertyCreated`).
    */
-  private async resolveCapacityLabel(group: CapacityGroup, label: string | undefined): Promise<string | null> {
-    if (!label) {
+  private async resolveProperty(kind: RecipePropertyKind, label: string | undefined): Promise<string | null> {
+    const trimmed = label?.trim() ?? '';
+    if (!trimmed) {
       return null;
     }
-    const target = label.trim().toLowerCase();
-    const existing = this.data.capacities.find((c) => c.group === group && c.label.toLowerCase() === target);
-    if (existing) {
-      return existing.id.value;
-    }
-    const factor = this.pendingFactors()[group] ?? 1;
-    const saved = await this.saveRecipeCapacity.execute({ group, label, factor });
-    return saved.id;
+    const { id } = await this.saveProperty.execute({
+      kind,
+      label: trimmed,
+      factor: this.pendingFactors()[kind],
+    });
+    return id;
   }
 }

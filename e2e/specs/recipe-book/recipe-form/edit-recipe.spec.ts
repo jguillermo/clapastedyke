@@ -101,7 +101,7 @@ test.describe('Formulario de receta · editar', () => {
     // Primero se le pone un sabor (el seed no trae ninguno).
     await catalog.recipe('Queques', 'Vainilla Clásica').click();
     await form.waitReady();
-    await form.flavor.pick('Sabor', 'Vainilla');
+    await form.properties.pick('Sabor', 'Vainilla');
     await form.save.click();
     await form.waitClosed();
     await expect(catalog.recipe('Queques', 'Vainilla Clásica')).toContainText('Sabor: Vainilla');
@@ -109,8 +109,8 @@ test.describe('Formulario de receta · editar', () => {
     // Y luego se le quita.
     await catalog.recipe('Queques', 'Vainilla Clásica').click();
     await form.waitReady();
-    await form.flavor.removeChip('Sabor', 'Vainilla').click();
-    await expect(form.flavor.chip('Sabor', 'Vainilla')).toHaveCount(0);
+    await form.properties.removeChip('Sabor', 'Vainilla').click();
+    await expect(form.properties.chip('Sabor', 'Vainilla')).toHaveCount(0);
     await form.save.click();
     await form.waitClosed();
 
@@ -128,11 +128,10 @@ test.describe('Formulario de receta · editar', () => {
     await form.waitReady();
 
     await expect(form.subtitle).toHaveText('Coberturas');
-    // No hay control de categoría: solo Nombre, Sabor y Tamaño.
+    // No hay control de categoría: solo Nombre y Características.
     await expect(form.fieldLabels).toHaveText([
       'Nombre',
-      'Sabor (opcional)',
-      'Tamaño (opcional)',
+      'Características (opcional)',
     ]);
 
     await form.cancel.click();

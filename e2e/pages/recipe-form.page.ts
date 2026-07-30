@@ -4,8 +4,9 @@ import { expect, type Locator, type Page } from '@playwright/test';
  * Page object de `features/recipe-book/recipe-form` (`app-recipe-form`): el
  * formulario ÚNICO de receta (crear y editar), abierto como `MigoDialog`.
  *
- * Contiene nombre, dos `migo-select-tag` (Sabor y Tamaño → porciones/molde), la
- * grilla de ingredientes ({@link SupplyGridPage}) y el pie con Cancelar/Guardar.
+ * Contiene nombre, un `migo-select-tag` de características (Sabor, Porciones y
+ * Molde), la grilla de ingredientes ({@link SupplyGridPage}) y el pie con
+ * Cancelar/Guardar.
  * La cabecera trae el título (nombre de la receta o «Nueva receta»), el subtítulo
  * (categoría destino) y la × de cerrar.
  */
@@ -29,10 +30,11 @@ export class RecipeFormPage {
   readonly close = this.root.getByRole('button', { name: 'Cerrar' });
   readonly error = this.root.locator('migo-card-body > div > [role="alert"]');
 
-  /** Select de sabor (`migo-select-tag` con un solo tipo, `Sabor`). */
-  readonly flavor = new SelectTag(this.page, this.root.locator('migo-select-tag').first(), 'Sabor');
-  /** Select de tamaño (`migo-select-tag` con dos tipos, `Porciones` y `Molde`). */
-  readonly size = new SelectTag(this.page, this.root.locator('migo-select-tag').nth(1), 'Tamaño');
+  /**
+   * Campo ÚNICO de características (`migo-select-tag` con tres tipos: `Sabor`, `Porciones` y
+   * `Molde`). Cada llamada indica el tipo: `properties.pick('Sabor', 'Chocolate')`.
+   */
+  readonly properties = new SelectTag(this.page, this.root.locator('migo-select-tag'), 'Características');
 
   /** Espera a que el diálogo esté montado y con el nombre enfocable. */
   async waitReady(): Promise<void> {

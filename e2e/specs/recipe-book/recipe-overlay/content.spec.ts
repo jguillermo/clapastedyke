@@ -75,8 +75,8 @@ test.describe('Overlay de receta · contenido', () => {
 
     await target.getByRole('button', { name: 'Editar receta' }).click();
     await form.waitReady();
-    await form.flavor.pick('Sabor', 'Chocolate');
-    await form.size.pick('Porciones', '24');
+    await form.properties.pick('Sabor', 'Chocolate');
+    await form.properties.pick('Porciones', '24');
     await form.save.click();
     await form.waitClosed();
 
