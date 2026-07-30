@@ -238,6 +238,11 @@ disparador (no texto plano) — confirma visualmente que la selección quedó pu
 una receta). Sin lógica, sin CVA (no es control de formulario). El texto es el contenido
 proyectado. `size`: `sm` (default) · `xs` (más compacta, para varias juntas bajo un título).
 
+Es un **dato secundario**: se dibuja con **contorno y sin relleno**, para que se vea el fondo a
+través y no sobresalga. Por eso el texto va en `text-body` y no en `text-muted`: sin relleno propio
+hereda el fondo de debajo, y `text-muted` sobre el papel del libro 3D se queda en 3.9:1 (por debajo
+del 4.5:1 de WCAG AA). La jerarquía la marcan el tamaño y el peso, no una mancha de color.
+
 ```html
 <migo-badge>Vainilla</migo-badge>
 <migo-badge size="xs">Porciones: 40</migo-badge>
