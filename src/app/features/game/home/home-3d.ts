@@ -9,7 +9,7 @@ import { KitchenStation } from '@platform/three/kitchen-station';
 
 /** Estilo del botón de estación del dock (ruta accesible). Solo utilidades del tema Migo. */
 const STATION_BASE =
-  'inline-flex items-center gap-2 min-h-11 px-5 rounded-full border font-body text-sm ' +
+  'inline-flex items-center gap-2 min-h-11 px-4 sm:px-5 rounded-full border font-body text-sm ' +
   'font-semibold cursor-pointer transition duration-base ease-out focus-visible:outline-none ' +
   'focus-visible:shadow-focus disabled:cursor-not-allowed disabled:opacity-70';
 

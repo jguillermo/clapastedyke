@@ -24,13 +24,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      # Misma preparación que el CI: reaprovecha la caché de `node_modules` que deja el
+      # workflow de CI en `main`, así que aquí normalmente no se instala nada.
+      - uses: ./.github/actions/setup
         with:
-          node-version: 22
-          cache: npm
-
-      - name: Instalar dependencias
-        run: npm ci
+          node-version: '22'
 
       - name: Build de producción
         run: npm run build -- --base-href /clapastedyke/

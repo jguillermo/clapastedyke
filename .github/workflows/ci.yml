@@ -4,6 +4,16 @@ name: CI
 # El job final `ci-ok` es el único que hay que marcar como *required status check* en la
 # protección de rama (Settings → Branches → Require status checks): agrupa a los demás, así
 # que añadir o quitar jobs aquí no obliga a tocar la configuración de GitHub.
+#
+# Forma del pipeline — se instala UNA vez y se reutiliza:
+#
+#   setup ─┬─ static (formato · lint · tipos)
+#          ├─ unit
+#          ├─ storybook
+#          └─ build ── e2e (desktop · mobile)   → ci-ok
+#
+# `setup` es el único job que puede ejecutar `npm ci` y bajarse los navegadores de Playwright;
+# deja ambas cosas en caché y el resto de jobs solo las restaura (ver .github/actions/setup).
 on:
   pull_request:
     branches: [main]
@@ -25,23 +35,37 @@ env:
 
 jobs:
   # ───────────────────────────────────────────────────────────────────────────
-  # 1. Formato (Prettier) + lint (ESLint) + tipos
-  #    Checks estáticos: rápidos y sin build, van juntos para fallar pronto.
+  # 0. Instalación única — calienta las cachés que consumen todos los demás jobs.
+  #    Antes cada job hacía su propio `npm ci` (4 instalaciones idénticas en
+  #    paralelo) y tres de ellos se bajaban Chromium por separado.
   # ───────────────────────────────────────────────────────────────────────────
-  static:
-    name: Formato · lint · tipos
+  setup:
+    name: Instalar dependencias (una sola vez)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - uses: ./.github/actions/setup
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: npm
+          playwright: 'true'
 
-      - name: Instalar dependencias
-        run: npm ci
+  # ───────────────────────────────────────────────────────────────────────────
+  # 1. Formato (Prettier) + lint (ESLint) + tipos
+  #    Checks estáticos: rápidos y sin build, van juntos para fallar pronto.
+  # ───────────────────────────────────────────────────────────────────────────
+  static:
+    name: Formato · lint · tipos
+    needs: setup
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup
+        with:
+          node-version: ${{ env.NODE_VERSION }}
 
       - name: Prettier (formato)
         run: npm run format:check
@@ -67,18 +91,15 @@ jobs:
   # ───────────────────────────────────────────────────────────────────────────
   unit:
     name: Tests unitarios (core)
+    needs: setup
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - uses: ./.github/actions/setup
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-
-      - name: Instalar dependencias
-        run: npm ci
 
       - name: ng test
         run: npm run test:unit
@@ -89,29 +110,29 @@ jobs:
   # ───────────────────────────────────────────────────────────────────────────
   build:
     name: Build de producción
+    needs: setup
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - uses: ./.github/actions/setup
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-
-      - name: Instalar dependencias
-        run: npm ci
 
       - name: ng build (production, con budgets)
         run: npm run build
 
       # Lo consume el job de E2E: la suite prueba el BUILD COMPILADO, no `ng serve`.
+      # Sin comprimir: el artefacto vive un día y se descarga dos veces en la misma
+      # corrida, así que comprimirlo cuesta más de lo que ahorra.
       - name: Subir el build para los E2E
         uses: actions/upload-artifact@v4
         with:
           name: dist
           path: dist/
           retention-days: 1
+          compression-level: 0
           if-no-files-found: error
 
   # ───────────────────────────────────────────────────────────────────────────
@@ -120,21 +141,16 @@ jobs:
   # ───────────────────────────────────────────────────────────────────────────
   storybook:
     name: Stories del design system (play)
+    needs: setup
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - uses: ./.github/actions/setup
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-
-      - name: Instalar dependencias
-        run: npm ci
-
-      - name: Instalar Chromium de Playwright
-        run: npx playwright install --with-deps chromium
+          playwright: 'true'
 
       - name: vitest --project=storybook
         run: npm run sb:test
@@ -156,16 +172,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - uses: ./.github/actions/setup
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-
-      - name: Instalar dependencias
-        run: npm ci
-
-      - name: Instalar Chromium de Playwright
-        run: npx playwright install --with-deps chromium
+          playwright: 'true'
 
       - name: Descargar el build
         uses: actions/download-artifact@v4
@@ -195,12 +205,13 @@ jobs:
   ci-ok:
     name: CI OK (required)
     if: always()
-    needs: [static, unit, build, storybook, e2e]
+    needs: [setup, static, unit, build, storybook, e2e]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - name: Comprobar el resultado de todos los jobs
         run: |
+          echo "setup:     ${{ needs.setup.result }}"
           echo "static:    ${{ needs.static.result }}"
           echo "unit:      ${{ needs.unit.result }}"
           echo "build:     ${{ needs.build.result }}"
