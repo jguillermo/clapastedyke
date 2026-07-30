@@ -11,61 +11,61 @@ import { SupplyUsage } from '../../domain/value-objects/supply-usage';
  * toca).
  */
 export interface RecipeBookSeedDocument {
-    /** Interruptor del seed. `false` → no se siembra contenido (las categorías de sistema sí). */
-    enabled: boolean;
-    /**
-     * Versión del seed. Se siembra una sola vez por versión: subirla re-aplica el documento
-     * (los items nuevos se crean; los existentes no se tocan). Por defecto 1.
-     */
-    version?: number;
-    flavors?: SeedRecipeFlavor[];
-    recipeCapacities?: SeedRecipeCapacity[];
-    supplies?: SeedSupply[];
-    /** Categorías del recetario. Opcional. */
-    categories?: SeedCategory[];
-    recipes?: SeedRecipe[];
+  /** Interruptor del seed. `false` → no se siembra contenido (las categorías de sistema sí). */
+  enabled: boolean;
+  /**
+   * Versión del seed. Se siembra una sola vez por versión: subirla re-aplica el documento
+   * (los items nuevos se crean; los existentes no se tocan). Por defecto 1.
+   */
+  version?: number;
+  flavors?: SeedRecipeFlavor[];
+  recipeCapacities?: SeedRecipeCapacity[];
+  supplies?: SeedSupply[];
+  /** Categorías del recetario. Opcional. */
+  categories?: SeedCategory[];
+  recipes?: SeedRecipe[];
 }
 
 export interface SeedRecipeFlavor {
-    id: string;
-    label: string;
+  id: string;
+  label: string;
 }
 
 export interface SeedRecipeCapacity {
-    id: string;
-    group: CapacityGroup;
-    label: string;
-    factor: number;
+  id: string;
+  group: CapacityGroup;
+  label: string;
+  factor: number;
 }
 
 export interface SeedPurchasePrice {
-    amount: number;
-    per: { value: number; unit: BaseUnit };
-    currency?: string;
+  amount: number;
+  per: { value: number; unit: BaseUnit };
+  currency?: string;
 }
 
 export interface SeedSupply {
-    id: string;
-    name: string;
-    baseUnit: BaseUnit;
-    usage: SupplyUsage;
-    purchasePrice: SeedPurchasePrice;
+  id: string;
+  name: string;
+  baseUnit: BaseUnit;
+  usage: SupplyUsage;
+  purchasePrice: SeedPurchasePrice;
 }
 
 export interface SeedCategory {
-    id: string;
-    name: string;
+  id: string;
+  name: string;
 }
 
 export interface SeedRecipeLine {
-    supplyId: string;
-    /** Cantidad en la unidad base del insumo (g o u). */
-    quantity: number;
+  supplyId: string;
+  /** Cantidad en la unidad base del insumo (g o u). */
+  quantity: number;
 }
 
 export interface SeedRecipe {
-    id: string;
-    categoryId: string;
-    name: string;
-    lines: SeedRecipeLine[];
+  id: string;
+  categoryId: string;
+  name: string;
+  lines: SeedRecipeLine[];
 }

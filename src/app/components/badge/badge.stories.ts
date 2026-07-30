@@ -17,7 +17,8 @@ const meta: Meta<Badge> = {
           'estado, no es un control de formulario (sin `ControlValueAccessor`) y no es ' +
           'interactivo: no se puede hacer clic ni recibe foco. Si necesitas una etiqueta que se ' +
           'pueda quitar o seleccionar, eso es un `migo-chip` (todavía no existe en la librería).\n\n' +
-          'Una sola variante visual (neutral sobre `surface-sunken`); lo único que cambia es el ' +
+          'Una sola variante visual, deliberadamente **secundaria**: contorno y **sin relleno**, ' +
+          'para que se vea el fondo a través y la píldora no sobresalga. Lo único que cambia es el ' +
           '`size` desde **Controls**: `sm` para una píldora aislada, `xs` cuando van varias juntas ' +
           'bajo un título.',
       },

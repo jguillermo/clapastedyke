@@ -8,9 +8,9 @@ import { RecipeCategory } from '../entities/recipe-category';
  * por IndexedDbRecipeCategoryRepository sobre IndexedDbStore.
  */
 export abstract class RecipeCategoryRepository {
-    abstract nextIdentity(): EntityId;
-    abstract byId(id: EntityId): Promise<RecipeCategory | null>;
-    abstract byName(name: string): Promise<RecipeCategory | null>;
-    abstract save(category: RecipeCategory): Promise<void>;
-    abstract all(): Promise<RecipeCategory[]>;
+  abstract nextIdentity(): EntityId;
+  abstract byId(id: EntityId): Promise<RecipeCategory | null>;
+  abstract byName(name: string): Promise<RecipeCategory | null>;
+  abstract save(category: RecipeCategory): Promise<void>;
+  abstract all(): Promise<RecipeCategory[]>;
 }

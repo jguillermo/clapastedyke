@@ -8,16 +8,16 @@ import { DomainEvent } from './domain-event';
  * simple outcomes can let the use case build the event directly.
  */
 export abstract class AggregateRoot {
-    private events: DomainEvent[] = [];
+  private events: DomainEvent[] = [];
 
-    protected recordEvent(event: DomainEvent): void {
-        this.events.push(event);
-    }
+  protected recordEvent(event: DomainEvent): void {
+    this.events.push(event);
+  }
 
-    /** Returns pending events and clears the queue (published exactly once). */
-    pullEvents(): DomainEvent[] {
-        const pending = this.events;
-        this.events = [];
-        return pending;
-    }
+  /** Returns pending events and clears the queue (published exactly once). */
+  pullEvents(): DomainEvent[] {
+    const pending = this.events;
+    this.events = [];
+    return pending;
+  }
 }

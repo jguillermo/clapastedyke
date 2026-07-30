@@ -196,7 +196,9 @@ export class BookEngine {
    * con la cámara. El feature lo usa para colocar el overlay DOM justo sobre la hoja. En `single`
    * solo existe la derecha → `getPageRect('left')` devuelve `null`.
    */
-  getPageRect(side: 'left' | 'right'): { x: number; y: number; width: number; height: number } | null {
+  getPageRect(
+    side: 'left' | 'right',
+  ): { x: number; y: number; width: number; height: number } | null {
     if (this.mode === 'single' && side === 'left') {
       return null;
     }
@@ -411,7 +413,9 @@ export class BookEngine {
 
   /** Salta a la última página con contenido. */
   end(): void {
-    this.mode === 'single' ? this.jumpToFace(this.lastContentFace) : this.goToLeaf(this.totalLeaves);
+    this.mode === 'single'
+      ? this.jumpToFace(this.lastContentFace)
+      : this.goToLeaf(this.totalLeaves);
   }
 
   /** Ajusta el render y reencuadra (cambiando de modo si cruza el breakpoint). */

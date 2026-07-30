@@ -18,10 +18,17 @@ export const INGREDIENTS_SECTION = 'supplies';
  * el HUD sepa a qué categoría agregar/editar.
  */
 export function toPages(catalog: RecipeBookCatalog): PageContent[] {
-  const pages: PageContent[] = [{ kind: 'cover', title: 'Mi libro de recetas', subtitle: 'Recetario' }];
+  const pages: PageContent[] = [
+    { kind: 'cover', title: 'Mi libro de recetas', subtitle: 'Recetario' },
+  ];
 
   for (const category of catalog.categories) {
-    pages.push({ kind: 'section', subtitle: 'Categoría', title: category.name, section: category.id.value });
+    pages.push({
+      kind: 'section',
+      subtitle: 'Categoría',
+      title: category.name,
+      section: category.id.value,
+    });
     const recipes = catalog.recipes
       .filter((r) => r.categoryId.value === category.id.value)
       .sort((a, b) => a.name.localeCompare(b.name, 'es'));

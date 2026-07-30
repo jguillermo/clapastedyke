@@ -276,7 +276,12 @@ function columnAnchors(count: number, x: number, right: number): number[] {
  * y el símbolo `S/` más fino, pequeño y apagado a su izquierda, para que no se
  * sature. Asume `ctx.textAlign = 'right'`.
  */
-function drawPrice(ctx: CanvasRenderingContext2D, amount: string, anchorRight: number, y: number): void {
+function drawPrice(
+  ctx: CanvasRenderingContext2D,
+  amount: string,
+  anchorRight: number,
+  y: number,
+): void {
   ctx.fillStyle = COLOR.heading;
   ctx.font = `bold 40px ${FONT_SERIF}`;
   ctx.fillText(amount, anchorRight, y);

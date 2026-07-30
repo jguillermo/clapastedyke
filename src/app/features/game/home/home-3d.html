@@ -30,9 +30,13 @@
     <span class="font-display text-heading text-sm">El libro de recetas en blanco</span>
   </header>
 
-  <!-- Dock: ruta accesible, siempre operable -->
+  <!-- Dock: ruta accesible, siempre operable.
+       Mobile-first: se acota a los bordes del viewport (`inset-x-3` + `w-fit`, centrado con
+       `mx-auto`) y ENVUELVE. Antes era `left-1/2 -translate-x-1/2` con el ancho del contenido,
+       así que a 375px el dock salía del viewport (`x` negativo) en cuanto las etiquetas medían
+       un pelo más — depende de las métricas de fuente del sistema. -->
   <nav
-    class="absolute bottom-5 left-1/2 -translate-x-1/2 flex gap-3 p-3 bg-surface-card border border-border-subtle rounded-2xl shadow-lg"
+    class="absolute bottom-5 inset-x-3 mx-auto flex w-fit flex-wrap justify-center gap-2 p-2 sm:gap-3 sm:p-3 bg-surface-card border border-border-subtle rounded-2xl shadow-lg"
     aria-label="Estaciones de la cocina"
   >
     @for (item of stations; track item.station) {

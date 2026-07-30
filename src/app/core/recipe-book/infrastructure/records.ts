@@ -9,54 +9,54 @@ import { SupplyUsage } from '../domain/value-objects/supply-usage';
  */
 
 export interface QuantityRecord {
-    value: number;
-    unit: BaseUnit;
+  value: number;
+  unit: BaseUnit;
 }
 
 export interface PurchasePriceRecord {
-    amount: number;
-    per: QuantityRecord;
-    currency?: string; // opcional por retrocompatibilidad con records escritos antes de añadir la moneda
+  amount: number;
+  per: QuantityRecord;
+  currency?: string; // opcional por retrocompatibilidad con records escritos antes de añadir la moneda
 }
 
 export interface SupplyLineRecord {
-    // Clave persistida legacy: se conserva `ingredientId` (renombrarla orfanaría recetas guardadas);
-    // el dominio la mapea a `SupplyLine.supplyId`.
-    ingredientId: string;
-    quantity: QuantityRecord;
+  // Clave persistida legacy: se conserva `ingredientId` (renombrarla orfanaría recetas guardadas);
+  // el dominio la mapea a `SupplyLine.supplyId`.
+  ingredientId: string;
+  quantity: QuantityRecord;
 }
 
 export interface SupplyRecord {
-    id: string;
-    name: string;
-    baseUnit: BaseUnit;
-    usage: SupplyUsage;
-    purchasePrice: PurchasePriceRecord;
+  id: string;
+  name: string;
+  baseUnit: BaseUnit;
+  usage: SupplyUsage;
+  purchasePrice: PurchasePriceRecord;
 }
 
 export interface RecipeFlavorRecord {
-    id: string;
-    label: string;
+  id: string;
+  label: string;
 }
 
 export interface RecipeCapacityRecord {
-    id: string;
-    group: CapacityGroup;
-    label: string;
-    factor: number;
+  id: string;
+  group: CapacityGroup;
+  label: string;
+  factor: number;
 }
 
 export interface RecipeCategoryRecord {
-    id: string;
-    name: string;
+  id: string;
+  name: string;
 }
 
 export interface RecipeRecord {
-    id: string;
-    categoryId: string;
-    name: string;
-    lines: SupplyLineRecord[];
-    flavorId?: string | null; // opcional por retrocompatibilidad con records escritos antes del sabor
-    portionsCapacityId?: string | null; // opcional por retrocompatibilidad con records escritos antes de la capacidad
-    moldCapacityId?: string | null; // opcional por retrocompatibilidad con records escritos antes de la capacidad
+  id: string;
+  categoryId: string;
+  name: string;
+  lines: SupplyLineRecord[];
+  flavorId?: string | null; // opcional por retrocompatibilidad con records escritos antes del sabor
+  portionsCapacityId?: string | null; // opcional por retrocompatibilidad con records escritos antes de la capacidad
+  moldCapacityId?: string | null; // opcional por retrocompatibilidad con records escritos antes de la capacidad
 }

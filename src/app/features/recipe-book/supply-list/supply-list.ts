@@ -9,7 +9,7 @@ import {
   output,
   signal,
 } from '@angular/core';
-import { FormArray, FormBuilder, FormGroup, ReactiveFormsModule, type FormControl } from '@angular/forms';
+import { FormBuilder, FormGroup, ReactiveFormsModule, type FormControl } from '@angular/forms';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { Table, type TableColumn } from '@components/table/table';
 import { Autocomplete } from '@components/autocomplete/autocomplete';
@@ -17,7 +17,10 @@ import { UnitInput, type UnitToken } from '@components/unit-input/unit-input';
 import { CurrencyInput } from '@components/currency-input/currency-input';
 import { Icon } from '@components/icon/icon';
 import { BaseUnit } from '@core/_common/quantity';
-import { MeasureInput, type MeasureKind } from '@core/recipe-book/domain/value-objects/measure-input';
+import {
+  MeasureInput,
+  type MeasureKind,
+} from '@core/recipe-book/domain/value-objects/measure-input';
 import { SaveSupply } from '@core/recipe-book/application/use-cases/save-supply.use-case';
 import { UpdateSupply } from '@core/recipe-book/application/use-cases/update-supply.use-case';
 import type { Supply } from '@core/recipe-book/domain/entities/supply';
@@ -93,7 +96,6 @@ export class SupplyList implements OnInit {
     for (const supply of [...seeds].sort((a, b) => a.name.localeCompare(b.name, 'es'))) {
       this.lines.push(this.seededLine(supply));
     }
-
   }
 
   protected readonly lineControls = computed(() => {
@@ -146,7 +148,9 @@ export class SupplyList implements OnInit {
 
   /** Lleva el foco al renglón vacío de arriba (para "Agregar insumo"). */
   focusNew(): void {
-    const first = this.host.nativeElement.querySelector<HTMLElement>('[role="gridcell"][data-col="0"]');
+    const first = this.host.nativeElement.querySelector<HTMLElement>(
+      '[role="gridcell"][data-col="0"]',
+    );
     first?.querySelector<HTMLInputElement>('input')?.focus();
   }
 
@@ -292,12 +296,15 @@ function displayPackaging(value: number, baseUnit: BaseUnit): { value: string; u
   if (baseUnit === 'u') {
     return { value: String(value), unit: 'u' };
   }
-  return value >= 1000 ? { value: String(value / 1000), unit: 'k' } : { value: String(value), unit: 'g' };
+  return value >= 1000
+    ? { value: String(value / 1000), unit: 'k' }
+    : { value: String(value), unit: 'g' };
 }
 
 /** Índice de fila de la celda que contiene al elemento, o `null` si está fuera de la grilla. */
 function rowIndexOf(target: EventTarget | null): number | null {
-  const cell = target instanceof HTMLElement ? target.closest<HTMLElement>('[role="gridcell"]') : null;
+  const cell =
+    target instanceof HTMLElement ? target.closest<HTMLElement>('[role="gridcell"]') : null;
   const row = cell?.dataset['row'];
   return row === undefined ? null : Number(row);
 }

@@ -17,7 +17,9 @@ test.describe('Home 3D · dock de estaciones', () => {
     await expect(home.stations.nth(2)).toContainText('Horno');
   });
 
-  test('estación activa → el libro de recetas está habilitado y sin candado', async ({ openHome }) => {
+  test('estación activa → el libro de recetas está habilitado y sin candado', async ({
+    openHome,
+  }) => {
     const home = await openHome();
     const station = home.station('Libro de recetas');
 

@@ -11,31 +11,31 @@ import { quantityToDomain, quantityToRecord } from '../value-record.mappers';
  * moneda.
  */
 export const SupplyMapper = {
-    toRecord(supply: Supply): SupplyRecord {
-        return {
-            id: supply.id.value,
-            name: supply.name,
-            baseUnit: supply.baseUnit,
-            usage: supply.usage,
-            purchasePrice: {
-                amount: supply.purchasePrice.amount,
-                per: quantityToRecord(supply.purchasePrice.per),
-                currency: supply.purchasePrice.currency,
-            },
-        };
-    },
+  toRecord(supply: Supply): SupplyRecord {
+    return {
+      id: supply.id.value,
+      name: supply.name,
+      baseUnit: supply.baseUnit,
+      usage: supply.usage,
+      purchasePrice: {
+        amount: supply.purchasePrice.amount,
+        per: quantityToRecord(supply.purchasePrice.per),
+        currency: supply.purchasePrice.currency,
+      },
+    };
+  },
 
-    toDomain(record: SupplyRecord): Supply {
-        return Supply.restore({
-            id: new EntityId(record.id),
-            name: record.name,
-            baseUnit: record.baseUnit,
-            usage: record.usage,
-            purchasePrice: PurchasePrice.of(
-                record.purchasePrice.amount,
-                quantityToDomain(record.purchasePrice.per),
-                record.purchasePrice.currency ?? 'PEN',
-            ),
-        });
-    },
+  toDomain(record: SupplyRecord): Supply {
+    return Supply.restore({
+      id: new EntityId(record.id),
+      name: record.name,
+      baseUnit: record.baseUnit,
+      usage: record.usage,
+      purchasePrice: PurchasePrice.of(
+        record.purchasePrice.amount,
+        quantityToDomain(record.purchasePrice.per),
+        record.purchasePrice.currency ?? 'PEN',
+      ),
+    });
+  },
 };

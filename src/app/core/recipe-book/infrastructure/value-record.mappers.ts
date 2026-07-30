@@ -10,10 +10,10 @@ export const quantityToRecord = (q: Quantity): QuantityRecord => ({ value: q.val
 export const quantityToDomain = (r: QuantityRecord): Quantity => Quantity.of(r.value, r.unit);
 
 export const lineToRecord = (line: SupplyLine): SupplyLineRecord => ({
-    // Clave persistida legacy `ingredientId` conservada; el dominio la expone como `supplyId`.
-    ingredientId: line.supplyId.value,
-    quantity: quantityToRecord(line.quantity),
+  // Clave persistida legacy `ingredientId` conservada; el dominio la expone como `supplyId`.
+  ingredientId: line.supplyId.value,
+  quantity: quantityToRecord(line.quantity),
 });
 
 export const lineToDomain = (r: SupplyLineRecord): SupplyLine =>
-    SupplyLine.of(new EntityId(r.ingredientId), quantityToDomain(r.quantity));
+  SupplyLine.of(new EntityId(r.ingredientId), quantityToDomain(r.quantity));

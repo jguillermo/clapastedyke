@@ -15,7 +15,8 @@ class Host {
       label: 'Porciones',
       values: ['8', '10'],
       allowCreate: true,
-      validate: (v) => (Number.isInteger(Number(v)) && Number(v) > 0 ? null : 'Las porciones deben ser un entero.'),
+      validate: (v) =>
+        Number.isInteger(Number(v)) && Number(v) > 0 ? null : 'Las porciones deben ser un entero.',
     },
   ];
   last: Record<string, string> = {};
@@ -129,7 +130,9 @@ describe('SelectTag (Select2)', () => {
     fixture.detectChanges();
     expect(fixture.componentInstance.last).toEqual({ sabor: 'Vainilla' });
 
-    const removeButton = document.querySelector('button[aria-label*="Quitar"]') as HTMLButtonElement;
+    const removeButton = document.querySelector(
+      'button[aria-label*="Quitar"]',
+    ) as HTMLButtonElement;
     removeButton.click();
     fixture.detectChanges();
 
@@ -158,7 +161,11 @@ describe('SelectTag (Select2)', () => {
 
 @Component({
   imports: [SelectTag],
-  template: `<migo-select-tag [types]="types" (valueChange)="last = $event" (created)="createdEvents.push($event)" />`,
+  template: `<migo-select-tag
+    [types]="types"
+    (valueChange)="last = $event"
+    (created)="createdEvents.push($event)"
+  />`,
 })
 class ExtraFieldHost {
   readonly types: SelectTagType[] = [
@@ -187,7 +194,7 @@ class ExtraFieldHost {
     },
   ];
   last: Record<string, string> = {};
-  createdEvents: Array<{ typeKey: string; value: string; extra: number }> = [];
+  createdEvents: { typeKey: string; value: string; extra: number }[] = [];
 }
 
 describe('SelectTag (extraField / factor capture)', () => {
@@ -225,23 +232,33 @@ describe('SelectTag (extraField / factor capture)', () => {
   it('creating a plain-number value (portions) skips the factor prompt entirely', () => {
     const { input } = setup();
     type(input, '33');
-    options().find((o) => o.textContent?.includes('Añadir «33»'))!.click();
+    options()
+      .find((o) => o.textContent?.includes('Añadir «33»'))!
+      .click();
     fixture.detectChanges();
-    options().find((o) => o.textContent?.trim() === 'Porciones')!.click();
+    options()
+      .find((o) => o.textContent?.trim() === 'Porciones')!
+      .click();
     fixture.detectChanges();
 
     // Se confirma directo: no hay paso de "pedir factor".
     expect(extraInput()).toBeNull();
     expect(fixture.componentInstance.last).toEqual({ portions: '33' });
-    expect(fixture.componentInstance.createdEvents).toEqual([{ typeKey: 'portions', value: '33', extra: 33 }]);
+    expect(fixture.componentInstance.createdEvents).toEqual([
+      { typeKey: 'portions', value: '33', extra: 33 },
+    ]);
   });
 
   it('asks for the extra field when the new value is text (mold), without committing yet', () => {
     const { input } = setup();
     type(input, 'Extra grande');
-    options().find((o) => o.textContent?.includes('Añadir «Extra grande»'))!.click();
+    options()
+      .find((o) => o.textContent?.includes('Añadir «Extra grande»'))!
+      .click();
     fixture.detectChanges();
-    options().find((o) => o.textContent?.trim() === 'Molde')!.click();
+    options()
+      .find((o) => o.textContent?.trim() === 'Molde')!
+      .click();
     fixture.detectChanges();
 
     expect(fixture.componentInstance.last).toEqual({}); // aún no confirmado
@@ -252,9 +269,13 @@ describe('SelectTag (extraField / factor capture)', () => {
   it('shows the existing values of that group as reference while asking for the factor', () => {
     const { input } = setup();
     type(input, 'Extra grande');
-    options().find((o) => o.textContent?.includes('Añadir «Extra grande»'))!.click();
+    options()
+      .find((o) => o.textContent?.includes('Añadir «Extra grande»'))!
+      .click();
     fixture.detectChanges();
-    options().find((o) => o.textContent?.trim() === 'Molde')!.click();
+    options()
+      .find((o) => o.textContent?.trim() === 'Molde')!
+      .click();
     fixture.detectChanges();
 
     const text = document.querySelector('[role="listbox"]')?.textContent ?? '';
@@ -266,9 +287,13 @@ describe('SelectTag (extraField / factor capture)', () => {
   it('confirming the extra field (Enter) commits the chip and emits created with the numeric value', () => {
     const { input } = setup();
     type(input, 'Extra grande');
-    options().find((o) => o.textContent?.includes('Añadir «Extra grande»'))!.click();
+    options()
+      .find((o) => o.textContent?.includes('Añadir «Extra grande»'))!
+      .click();
     fixture.detectChanges();
-    options().find((o) => o.textContent?.trim() === 'Molde')!.click();
+    options()
+      .find((o) => o.textContent?.trim() === 'Molde')!
+      .click();
     fixture.detectChanges();
 
     extraInput().value = '4';
@@ -276,30 +301,42 @@ describe('SelectTag (extraField / factor capture)', () => {
     fixture.detectChanges();
 
     expect(fixture.componentInstance.last).toEqual({ mold: 'Extra grande' });
-    expect(fixture.componentInstance.createdEvents).toEqual([{ typeKey: 'mold', value: 'Extra grande', extra: 4 }]);
+    expect(fixture.componentInstance.createdEvents).toEqual([
+      { typeKey: 'mold', value: 'Extra grande', extra: 4 },
+    ]);
   });
 
   it('accepts a fraction (e.g. "1/8") as the factor and converts it to a plain number', () => {
     const { input } = setup();
     type(input, 'Mini');
-    options().find((o) => o.textContent?.includes('Añadir «Mini»'))!.click();
+    options()
+      .find((o) => o.textContent?.includes('Añadir «Mini»'))!
+      .click();
     fixture.detectChanges();
-    options().find((o) => o.textContent?.trim() === 'Molde')!.click();
+    options()
+      .find((o) => o.textContent?.trim() === 'Molde')!
+      .click();
     fixture.detectChanges();
 
     extraInput().value = '1/8';
     extraInput().dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
     fixture.detectChanges();
 
-    expect(fixture.componentInstance.createdEvents).toEqual([{ typeKey: 'mold', value: 'Mini', extra: 0.125 }]);
+    expect(fixture.componentInstance.createdEvents).toEqual([
+      { typeKey: 'mold', value: 'Mini', extra: 0.125 },
+    ]);
   });
 
   it('rejects an invalid fraction (division by zero) without committing', () => {
     const { input } = setup();
     type(input, 'Mini');
-    options().find((o) => o.textContent?.includes('Añadir «Mini»'))!.click();
+    options()
+      .find((o) => o.textContent?.includes('Añadir «Mini»'))!
+      .click();
     fixture.detectChanges();
-    options().find((o) => o.textContent?.trim() === 'Molde')!.click();
+    options()
+      .find((o) => o.textContent?.trim() === 'Molde')!
+      .click();
     fixture.detectChanges();
 
     extraInput().value = '1/0';
@@ -313,9 +350,13 @@ describe('SelectTag (extraField / factor capture)', () => {
   it('rejects a non-positive extra value without committing', () => {
     const { input } = setup();
     type(input, 'Grande extra');
-    options().find((o) => o.textContent?.includes('Añadir «Grande extra»'))!.click();
+    options()
+      .find((o) => o.textContent?.includes('Añadir «Grande extra»'))!
+      .click();
     fixture.detectChanges();
-    options().find((o) => o.textContent?.trim() === 'Molde')!.click();
+    options()
+      .find((o) => o.textContent?.trim() === 'Molde')!
+      .click();
     fixture.detectChanges();
 
     extraInput().value = '0';
@@ -329,11 +370,15 @@ describe('SelectTag (extraField / factor capture)', () => {
   it('holds one chip per group at the same time (portions + mold simultaneously)', () => {
     const { input } = setup();
     open(input);
-    options().find((o) => o.textContent?.includes('20'))!.click();
+    options()
+      .find((o) => o.textContent?.includes('20'))!
+      .click();
     fixture.detectChanges();
 
     open(input);
-    options().find((o) => o.textContent?.includes('Pequeño'))!.click();
+    options()
+      .find((o) => o.textContent?.includes('Pequeño'))!
+      .click();
     fixture.detectChanges();
 
     expect(fixture.componentInstance.last).toEqual({ portions: '20', mold: 'Pequeño' });
@@ -342,10 +387,14 @@ describe('SelectTag (extraField / factor capture)', () => {
   it('picking the last pending type closes the panel with a transient hint instead of an empty list', () => {
     const { input } = setup();
     open(input);
-    options().find((o) => o.textContent?.includes('20'))!.click();
+    options()
+      .find((o) => o.textContent?.includes('20'))!
+      .click();
     fixture.detectChanges();
     open(input);
-    options().find((o) => o.textContent?.includes('Pequeño'))!.click();
+    options()
+      .find((o) => o.textContent?.includes('Pequeño'))!
+      .click();
     fixture.detectChanges();
 
     expect(fixture.componentInstance.last).toEqual({ portions: '20', mold: 'Pequeño' });
@@ -356,10 +405,14 @@ describe('SelectTag (extraField / factor capture)', () => {
   it('focusing again once everything is picked shows the hint instead of reopening an empty panel', () => {
     const { input } = setup();
     open(input);
-    options().find((o) => o.textContent?.includes('20'))!.click();
+    options()
+      .find((o) => o.textContent?.includes('20'))!
+      .click();
     fixture.detectChanges();
     open(input);
-    options().find((o) => o.textContent?.includes('Pequeño'))!.click();
+    options()
+      .find((o) => o.textContent?.includes('Pequeño'))!
+      .click();
     fixture.detectChanges();
 
     open(input); // todo ya elegido → no debe abrir un listbox vacío
@@ -374,10 +427,14 @@ describe('SelectTag (extraField / factor capture)', () => {
     try {
       const { input } = setup();
       open(input);
-      options().find((o) => o.textContent?.includes('20'))!.click();
+      options()
+        .find((o) => o.textContent?.includes('20'))!
+        .click();
       fixture.detectChanges();
       open(input);
-      options().find((o) => o.textContent?.includes('Pequeño'))!.click();
+      options()
+        .find((o) => o.textContent?.includes('Pequeño'))!
+        .click();
       fixture.detectChanges();
 
       expect(document.querySelector('[role="status"]')).toBeTruthy();

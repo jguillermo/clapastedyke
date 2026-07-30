@@ -51,7 +51,8 @@ const meta: Meta<UnitInput> = {
     },
     placeholder: {
       control: 'text',
-      description: 'Texto de ejemplo mientras el campo está vacío (con el campo vacío no hay unidad).',
+      description:
+        'Texto de ejemplo mientras el campo está vacío (con el campo vacío no hay unidad).',
       table: { defaultValue: { summary: '(vacío)' } },
     },
     ariaLabel: {

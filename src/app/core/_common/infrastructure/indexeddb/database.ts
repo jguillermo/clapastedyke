@@ -8,30 +8,30 @@ export const DB_NAME = 'clapastedyke';
 export const DB_VERSION = 5;
 
 const STORES = [
-    'ingredients',
-    // Recetario por categorías: una receta genérica + su categoría.
-    'recipes',
-    'recipe_categories',
-    // Catálogos de sabores y opciones de conversión (porciones/molde).
-    'flavors',
-    'conversion_options',
-    // 'recipe_selections' es legacy: la "selección por tamaño" se retiró; el store se conserva
-    // (los stores solo se AÑADEN, nunca se quitan) aunque ya no tenga repositorio.
-    'recipe_selections',
-    // 'sponge_recipes'/'filling_recipes'/'covering_recipes' son legacy (el recetario
-    // se unificó en 'recipes'); 'toppers'/'packaging_items' también. Se conservan en
-    // la lista para no romper DBs existentes, pero ya no se leen.
-    'sponge_recipes',
-    'filling_recipes',
-    'covering_recipes',
-    'toppers',
-    'packaging_items',
-    'packaging_rules',
-    'cake_compositions',
-    'ingredient_price_history',
-    'progress',
-    // Marcador de seeds aplicados (para ejecutar la siembra una sola vez). Ver SeedState.
-    'seed_state',
+  'ingredients',
+  // Recetario por categorías: una receta genérica + su categoría.
+  'recipes',
+  'recipe_categories',
+  // Catálogos de sabores y opciones de conversión (porciones/molde).
+  'flavors',
+  'conversion_options',
+  // 'recipe_selections' es legacy: la "selección por tamaño" se retiró; el store se conserva
+  // (los stores solo se AÑADEN, nunca se quitan) aunque ya no tenga repositorio.
+  'recipe_selections',
+  // 'sponge_recipes'/'filling_recipes'/'covering_recipes' son legacy (el recetario
+  // se unificó en 'recipes'); 'toppers'/'packaging_items' también. Se conservan en
+  // la lista para no romper DBs existentes, pero ya no se leen.
+  'sponge_recipes',
+  'filling_recipes',
+  'covering_recipes',
+  'toppers',
+  'packaging_items',
+  'packaging_rules',
+  'cake_compositions',
+  'ingredient_price_history',
+  'progress',
+  // Marcador de seeds aplicados (para ejecutar la siembra una sola vez). Ver SeedState.
+  'seed_state',
 ] as const;
 
 export type StoreName = (typeof STORES)[number];
@@ -39,33 +39,33 @@ export type StoreName = (typeof STORES)[number];
 let connection: Promise<IDBDatabase> | null = null;
 
 export function openDatabase(): Promise<IDBDatabase> {
-    connection ??= new Promise((resolve, reject) => {
-        const request = indexedDB.open(DB_NAME, DB_VERSION);
+  connection ??= new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
 
-        request.onupgradeneeded = () => {
-            const db = request.result;
-            for (const name of STORES) {
-                if (!db.objectStoreNames.contains(name)) {
-                    db.createObjectStore(name, { keyPath: 'id' });
-                }
-            }
-        };
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      for (const name of STORES) {
+        if (!db.objectStoreNames.contains(name)) {
+          db.createObjectStore(name, { keyPath: 'id' });
+        }
+      }
+    };
 
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error ?? new Error('Could not open IndexedDB.'));
-    });
-    return connection;
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error ?? new Error('Could not open IndexedDB.'));
+  });
+  return connection;
 }
 
 /** Tests only: forget the cached connection. */
 export function resetConnectionForTests(): void {
-    connection = null;
+  connection = null;
 }
 
 /** Promisifies an IDBRequest. */
 export function ask<T>(request: IDBRequest<T>): Promise<T> {
-    return new Promise((resolve, reject) => {
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error ?? new Error('IndexedDB operation failed.'));
-    });
+  return new Promise((resolve, reject) => {
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error ?? new Error('IndexedDB operation failed.'));
+  });
 }

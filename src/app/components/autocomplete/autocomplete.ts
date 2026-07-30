@@ -37,7 +37,8 @@ const CONTROL_COMMON =
     <span class="relative block">
       @if (ghostSuffix()) {
         <span [class]="ghostClasses()" aria-hidden="true">
-          <span class="invisible">{{ value() }}</span><span class="text-placeholder">{{ ghostSuffix() }}</span>
+          <span class="invisible">{{ value() }}</span
+          ><span class="text-placeholder">{{ ghostSuffix() }}</span>
         </span>
       }
       <input
@@ -118,7 +119,11 @@ export class Autocomplete implements ControlValueAccessor {
     const typed = this.value().trim();
     if (!typed) return null;
     const lower = typed.toLowerCase();
-    return this.suggestions().find((s) => s.toLowerCase().startsWith(lower) && s.length > typed.length) ?? null;
+    return (
+      this.suggestions().find(
+        (s) => s.toLowerCase().startsWith(lower) && s.length > typed.length,
+      ) ?? null
+    );
   });
 
   /** El sufijo tenue que se pinta tras el texto del usuario. */
@@ -136,7 +141,8 @@ export class Autocomplete implements ControlValueAccessor {
       return;
     }
     const input = this.control().nativeElement;
-    const caretAtEnd = input.selectionStart === input.value.length && input.selectionEnd === input.value.length;
+    const caretAtEnd =
+      input.selectionStart === input.value.length && input.selectionEnd === input.value.length;
     const accepts =
       event.key === 'Enter' ||
       (event.key === 'Tab' && !event.shiftKey) ||

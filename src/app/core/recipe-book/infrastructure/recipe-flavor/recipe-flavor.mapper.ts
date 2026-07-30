@@ -7,11 +7,11 @@ import { RecipeFlavorRecord } from '../records';
  * Usado por `IndexedDbRecipeFlavorRepository`. Mapea el `EntityId` y el `label`.
  */
 export const RecipeFlavorMapper = {
-    toRecord(flavor: RecipeFlavor): RecipeFlavorRecord {
-        return { id: flavor.id.value, label: flavor.label };
-    },
+  toRecord(flavor: RecipeFlavor): RecipeFlavorRecord {
+    return { id: flavor.id.value, label: flavor.label };
+  },
 
-    toDomain(record: RecipeFlavorRecord): RecipeFlavor {
-        return RecipeFlavor.create(new EntityId(record.id), record.label);
-    },
+  toDomain(record: RecipeFlavorRecord): RecipeFlavor {
+    return RecipeFlavor.create(new EntityId(record.id), record.label);
+  },
 };

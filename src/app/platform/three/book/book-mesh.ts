@@ -1,11 +1,4 @@
-import {
-  BoxGeometry,
-  Group,
-  Mesh,
-  MeshStandardMaterial,
-  PlaneGeometry,
-  Texture,
-} from 'three';
+import { BoxGeometry, Group, Mesh, MeshStandardMaterial, PlaneGeometry } from 'three';
 import { createPageCurlMaterial, PageCurlMaterial } from './page-curl.material';
 
 /**

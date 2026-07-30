@@ -30,7 +30,14 @@ export interface SuppliesDialogData {
       <migo-card-header>
         <migo-icon card-icon name="mat:layers" size="lg" color="brand" />
         <migo-card-title>Insumos</migo-card-title>
-        <button card-actions migo-button variant="ghost" type="button" aria-label="Cerrar" (click)="close()">
+        <button
+          card-actions
+          migo-button
+          variant="ghost"
+          type="button"
+          aria-label="Cerrar"
+          (click)="close()"
+        >
           <migo-icon icon-leading name="mat:close" size="sm" />
         </button>
       </migo-card-header>

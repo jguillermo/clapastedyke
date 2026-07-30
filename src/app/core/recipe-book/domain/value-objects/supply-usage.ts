@@ -8,5 +8,5 @@ export type SupplyUsage = 'recipe' | 'topper' | 'box' | 'base';
 export const SUPPLY_USAGES: readonly SupplyUsage[] = ['recipe', 'topper', 'box', 'base'];
 
 export function isSupplyUsage(value: string): value is SupplyUsage {
-    return (SUPPLY_USAGES as readonly string[]).includes(value);
+  return (SUPPLY_USAGES as readonly string[]).includes(value);
 }

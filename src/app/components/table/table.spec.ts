@@ -25,7 +25,11 @@ import { Table, type TableColumn } from './table';
 })
 class Host {
   // 3ª columna = el botón de eliminar que pinta el consumidor (la tabla ya no trae columna propia).
-  columns: TableColumn[] = [{ name: 'Ingrediente' }, { name: 'Cantidad' }, { name: '', size: 'fit' }];
+  columns: TableColumn[] = [
+    { name: 'Ingrediente' },
+    { name: 'Cantidad' },
+    { name: '', size: 'fit' },
+  ];
   readonly rows = [0, 1, 2];
   bleed = false;
   maxWidth: 'reading' | 'page' | null = null;
@@ -55,7 +59,9 @@ describe('Table (spreadsheet shell)', () => {
     const { el } = setup();
     const table = el.querySelector('table')!;
     expect(table.getAttribute('role')).toBe('grid');
-    const headers = [...el.querySelectorAll('th[role="columnheader"]')].map((h) => h.textContent?.trim());
+    const headers = [...el.querySelectorAll('th[role="columnheader"]')].map((h) =>
+      h.textContent?.trim(),
+    );
     expect(headers).toContain('Ingrediente');
     expect(headers).toContain('Cantidad');
     expect(el.querySelector('th[role="columnheader"]')!.getAttribute('scope')).toBe('col');
@@ -69,7 +75,9 @@ describe('Table (spreadsheet shell)', () => {
     const { el } = setup();
     const start = cellInput(el, 0, 1);
     start.focus();
-    start.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }));
+    start.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }),
+    );
     expect(document.activeElement).toBe(cellInput(el, 1, 1));
   });
 
@@ -77,7 +85,9 @@ describe('Table (spreadsheet shell)', () => {
     const { el } = setup();
     const start = cellInput(el, 0, 1);
     start.focus();
-    start.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+    start.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }),
+    );
     expect(document.activeElement).toBe(cellInput(el, 1, 0));
   });
 
@@ -106,7 +116,10 @@ describe('Table (spreadsheet shell)', () => {
 
   it('applies per-column alignment', () => {
     const { el } = setupWith((h) => {
-      h.columns = [{ name: 'A', align: 'end' }, { name: 'B', align: 'center' }];
+      h.columns = [
+        { name: 'A', align: 'end' },
+        { name: 'B', align: 'center' },
+      ];
     });
     const ths = [...el.querySelectorAll('th[role="columnheader"]')];
     expect(ths[0].className).toContain('text-end');

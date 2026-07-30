@@ -67,7 +67,11 @@ test.describe('Home 3D · abrir el libro de recetas', () => {
     await expect(book.canvas).toHaveCount(1);
   });
 
-  test('clics repetidos en la estación → el libro no se duplica', async ({ openHome, home, book }) => {
+  test('clics repetidos en la estación → el libro no se duplica', async ({
+    openHome,
+    home,
+    book,
+  }) => {
     await openHome();
     const station = home.station('Libro de recetas');
 

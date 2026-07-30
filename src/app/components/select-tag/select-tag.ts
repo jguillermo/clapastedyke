@@ -109,9 +109,21 @@ function parseFactorInput(raw: string): number | null {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [OverlayModule, Icon, Button],
   template: `
-    <div #box cdkOverlayOrigin #origin="cdkOverlayOrigin" [class]="boxClasses()" (click)="focusInput()">
+    <!-- La caja es un afluente del input: tocar el hueco vacío enfoca el input, que SÍ es
+         focusable y lleva todo el teclado. Darle tabindex/keydown a la caja crearía una parada
+         de tabulación duplicada, que es peor para el lector de pantalla. -->
+    <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -->
+    <div
+      #box
+      cdkOverlayOrigin
+      #origin="cdkOverlayOrigin"
+      [class]="boxClasses()"
+      (click)="focusInput()"
+    >
       @for (chip of chips(); track chip.key) {
-        <span class="inline-flex items-center gap-1 min-h-7 ps-3 pe-1 rounded-full bg-brand text-on-brand text-sm">
+        <span
+          class="inline-flex items-center gap-1 min-h-7 ps-3 pe-1 rounded-full bg-brand text-on-brand text-sm"
+        >
           {{ chip.display }}
           <button
             type="button"
@@ -135,6 +147,7 @@ function parseFactorInput(raw: string): number | null {
         [placeholder]="inputPlaceholder()"
         [attr.aria-label]="field ? null : ariaLabel() || null"
         [attr.aria-expanded]="open()"
+        [attr.aria-controls]="listboxRendered() ? listboxId : null"
         [attr.aria-describedby]="describedBy()"
         [attr.aria-activedescendant]="activeId()"
         (focus)="onFocus()"
@@ -154,16 +167,22 @@ function parseFactorInput(raw: string): number | null {
       (detach)="close()"
     >
       @if (allPickedHint()) {
-        <div class="mt-1 rounded-md border border-border-subtle bg-surface-card px-3 py-2 text-sm text-muted shadow-lg" role="status">
+        <div
+          class="mt-1 rounded-md border border-border-subtle bg-surface-card px-3 py-2 text-sm text-muted shadow-lg"
+          role="status"
+        >
           Ya elegiste todas las opciones disponibles.
         </div>
       } @else {
         <ul
+          [id]="listboxId"
           class="mt-0 p-1 list-none max-h-72 overflow-y-auto bg-surface-card border border-border-subtle rounded-md shadow-lg"
           role="listbox"
         >
           @if (awaitingExtra(); as pendingExtra) {
-            <li class="px-3 pt-2 pb-1 text-caption text-muted">{{ extraFieldLabel(pendingExtra.typeKey) }}</li>
+            <li class="px-3 pt-2 pb-1 text-caption text-muted">
+              {{ extraFieldLabel(pendingExtra.typeKey) }}
+            </li>
             @if (extraFieldReference(pendingExtra.typeKey); as reference) {
               @if (reference.length) {
                 <li class="flex flex-wrap gap-x-3 gap-y-1 px-3 pb-1 text-xs text-muted">
@@ -187,15 +206,27 @@ function parseFactorInput(raw: string): number | null {
                 (keydown.enter)="confirmExtra(extraInput.value)"
                 (keydown.escape)="cancelCreate()"
               />
-              <button migo-button size="sm" type="button" aria-label="Confirmar" (click)="confirmExtra(extraInput.value)">
+              <button
+                migo-button
+                size="sm"
+                type="button"
+                aria-label="Confirmar"
+                (click)="confirmExtra(extraInput.value)"
+              >
                 <migo-icon icon-leading name="mat:check" size="sm" />
               </button>
             </li>
           } @else {
             @if (creating() !== null) {
-              <li class="px-3 pt-2 pb-1 text-caption text-muted">¿A qué grupo añadir «{{ creating() }}»?</li>
+              <li class="px-3 pt-2 pb-1 text-caption text-muted">
+                ¿A qué grupo añadir «{{ creating() }}»?
+              </li>
             }
             @for (opt of options(); track opt.id; let i = $index) {
+              <!-- Patrón ARIA de listbox con foco gestionado: las opciones NO son focusables; el
+                   foco se queda en el input, que mueve aria-activedescendant con las flechas y
+                   confirma con Enter (ver onKeydown). El (click) es solo el atajo de ratón. -->
+              <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -->
               <li
                 class="flex items-center gap-2 px-3 py-2 rounded-sm text-sm text-body cursor-pointer"
                 [class.bg-surface-sunken]="i === activeIndex()"
@@ -224,7 +255,9 @@ function parseFactorInput(raw: string): number | null {
             }
           }
           @if (createError()) {
-            <li class="px-3 py-2 text-caption font-medium text-error" role="alert">{{ createError() }}</li>
+            <li class="px-3 py-2 text-caption font-medium text-error" role="alert">
+              {{ createError() }}
+            </li>
           }
         </ul>
       }
@@ -249,6 +282,8 @@ export class SelectTag implements OnDestroy {
   private readonly inputEl = viewChild.required<ElementRef<HTMLInputElement>>('input');
   private readonly extraInputEl = viewChild<ElementRef<HTMLInputElement>>('extraInput');
   private readonly fieldId = `migo-select-tag-${nextId++}`;
+  /** `role="combobox"` exige `aria-controls` apuntando al listbox del overlay (ARIA 1.2). */
+  protected readonly listboxId = `${this.fieldId}-listbox`;
 
   protected readonly selected = signal<Record<string, string>>({});
   private readonly extras = signal<Record<string, string[]>>({});
@@ -269,6 +304,13 @@ export class SelectTag implements OnDestroy {
   /** El overlay se abre para la lista normal o para el aviso transitorio. */
   protected readonly overlayOpen = computed(() => this.open() || this.allPickedHint());
 
+  /**
+   * El `<ul role="listbox">` solo existe cuando el overlay muestra la lista (con el aviso de
+   * «ya elegiste todas» se pinta un `role="status"` en su lugar). `aria-controls` solo debe
+   * apuntar al listbox mientras esté en el DOM: una referencia colgada es un fallo de ARIA.
+   */
+  protected readonly listboxRendered = computed(() => this.overlayOpen() && !this.allPickedHint());
+
   protected readonly controlId = computed(() => this.field?.controlId ?? this.fieldId);
   protected readonly describedBy = computed(() => this.field?.describedBy() ?? null);
   protected readonly isInvalid = computed(() => this.field?.invalid() ?? false);
@@ -280,11 +322,17 @@ export class SelectTag implements OnDestroy {
   );
 
   protected readonly chips = computed(() =>
-    Object.entries(this.selected()).map(([key, value]) => ({ key, value, display: this.displayFor(key, value) })),
+    Object.entries(this.selected()).map(([key, value]) => ({
+      key,
+      value,
+      display: this.displayFor(key, value),
+    })),
   );
 
   /** Tipos aún sin valor (los ya elegidos no se vuelven a ofrecer). */
-  protected readonly pending = computed(() => this.types().filter((t) => this.selected()[t.key] === undefined));
+  protected readonly pending = computed(() =>
+    this.types().filter((t) => this.selected()[t.key] === undefined),
+  );
 
   protected readonly inputPlaceholder = computed(() => {
     if (this.chips().length) return '';
@@ -304,7 +352,14 @@ export class SelectTag implements OnDestroy {
     if (creatingValue !== null) {
       return this.pending()
         .filter((t) => t.allowCreate)
-        .map((t) => ({ kind: 'group' as const, id: `${this.fieldId}-group-${t.key}`, typeKey: t.key, typeLabel: t.label, value: creatingValue, display: t.label }));
+        .map((t) => ({
+          kind: 'group' as const,
+          id: `${this.fieldId}-group-${t.key}`,
+          typeKey: t.key,
+          typeLabel: t.label,
+          value: creatingValue,
+          display: t.label,
+        }));
     }
 
     // Modo lista: valores existentes de los tipos pendientes + un único "Añadir".
@@ -313,12 +368,24 @@ export class SelectTag implements OnDestroy {
     for (const type of this.pending()) {
       for (const value of this.valuesFor(type.key, type.values)) {
         if (!q || value.toLowerCase().includes(q)) {
-          result.push({ kind: 'value', id: `${this.fieldId}-${type.key}-${value}`, typeKey: type.key, typeLabel: type.label, value, display: value });
+          result.push({
+            kind: 'value',
+            id: `${this.fieldId}-${type.key}-${value}`,
+            typeKey: type.key,
+            typeLabel: type.label,
+            value,
+            display: value,
+          });
         }
       }
     }
     if (q && this.pending().some((t) => t.allowCreate)) {
-      result.push({ kind: 'create', id: `${this.fieldId}-create`, value: this.query().trim(), display: this.query().trim() });
+      result.push({
+        kind: 'create',
+        id: `${this.fieldId}-create`,
+        value: this.query().trim(),
+        display: this.query().trim(),
+      });
     }
     return result;
   });
@@ -490,7 +557,11 @@ export class SelectTag implements OnDestroy {
         this.commit(option.typeKey!, option.value);
         if (type?.extraField) {
           // El valor ya era un número (p.ej. "33"): se usa directo, sin preguntar nada más.
-          this.created.emit({ typeKey: option.typeKey!, value: option.value, extra: Number(option.value) });
+          this.created.emit({
+            typeKey: option.typeKey!,
+            value: option.value,
+            extra: Number(option.value),
+          });
         }
         break;
       }
@@ -561,8 +632,15 @@ export class SelectTag implements OnDestroy {
   }
 
   private addExtra(typeKey: string, value: string): void {
-    if (!this.valuesFor(typeKey, this.typeValues(typeKey)).some((v) => v.toLowerCase() === value.toLowerCase())) {
-      this.extras.update((current) => ({ ...current, [typeKey]: [...(current[typeKey] ?? []), value] }));
+    if (
+      !this.valuesFor(typeKey, this.typeValues(typeKey)).some(
+        (v) => v.toLowerCase() === value.toLowerCase(),
+      )
+    ) {
+      this.extras.update((current) => ({
+        ...current,
+        [typeKey]: [...(current[typeKey] ?? []), value],
+      }));
     }
   }
 

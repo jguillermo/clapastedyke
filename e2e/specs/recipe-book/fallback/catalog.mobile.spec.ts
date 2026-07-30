@@ -96,8 +96,10 @@ test.describe('Libro de recetas · lista a 375px', () => {
     await openCatalog();
     const nuevo = catalog.newRecipeIn('Coberturas');
     const box = (await nuevo.boundingBox())!;
-    expect(box.height, 'DEUDA: `Nuevo` es size="sm" (36px), no llega al mínimo táctil de 44px')
-      .toBeLessThan(44);
+    expect(
+      box.height,
+      'DEUDA: `Nuevo` es size="sm" (36px), no llega al mínimo táctil de 44px',
+    ).toBeLessThan(44);
 
     await nuevo.tap();
     await form.waitReady();

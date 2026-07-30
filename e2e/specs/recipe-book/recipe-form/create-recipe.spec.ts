@@ -64,9 +64,9 @@ test.describe('Formulario de receta · crear', () => {
     await catalog.newRecipeIn('Coberturas').click();
     await form.waitReady();
     await form.name.fill('Cobertura completa E2E');
-    await form.flavor.pick('Sabor', 'Fresa');
-    await form.size.pick('Porciones', '40');
-    await form.size.pick('Molde', 'Molde pequeño');
+    await form.properties.pick('Sabor', 'Fresa');
+    await form.properties.pick('Porciones', '40');
+    await form.properties.pick('Molde', 'Molde pequeño');
     await grid.fillExistingLine(0, SUPPLIES.huevos.name, '2');
     await form.save.click();
     await form.waitClosed();

@@ -13,30 +13,32 @@ import { SupplyRecord } from '../records';
  */
 @Injectable()
 export class IndexedDbSupplyRepository extends SupplyRepository {
-    private readonly store = new IndexedDbStore<SupplyRecord>('ingredients');
+  private readonly store = new IndexedDbStore<SupplyRecord>('ingredients');
 
-    nextIdentity(): EntityId {
-        return new EntityId(crypto.randomUUID());
-    }
+  nextIdentity(): EntityId {
+    return new EntityId(crypto.randomUUID());
+  }
 
-    async byId(id: EntityId): Promise<Supply | null> {
-        const record = await this.store.get(id.value);
-        return record && isPriced(record) ? SupplyMapper.toDomain(record) : null;
-    }
+  async byId(id: EntityId): Promise<Supply | null> {
+    const record = await this.store.get(id.value);
+    return record && isPriced(record) ? SupplyMapper.toDomain(record) : null;
+  }
 
-    async byName(name: string): Promise<Supply | null> {
-        const target = name.trim().toLowerCase();
-        const record = (await this.store.all()).find((r) => isPriced(r) && r.name.toLowerCase() === target);
-        return record ? SupplyMapper.toDomain(record) : null;
-    }
+  async byName(name: string): Promise<Supply | null> {
+    const target = name.trim().toLowerCase();
+    const record = (await this.store.all()).find(
+      (r) => isPriced(r) && r.name.toLowerCase() === target,
+    );
+    return record ? SupplyMapper.toDomain(record) : null;
+  }
 
-    async save(supply: Supply): Promise<void> {
-        await this.store.put(SupplyMapper.toRecord(supply));
-    }
+  async save(supply: Supply): Promise<void> {
+    await this.store.put(SupplyMapper.toRecord(supply));
+  }
 
-    async all(): Promise<Supply[]> {
-        return (await this.store.all()).filter(isPriced).map(SupplyMapper.toDomain);
-    }
+  async all(): Promise<Supply[]> {
+    return (await this.store.all()).filter(isPriced).map(SupplyMapper.toDomain);
+  }
 }
 
 /**
@@ -45,5 +47,5 @@ export class IndexedDbSupplyRepository extends SupplyRepository {
  * reutilizar un insumo así simplemente lo vuelve a crear con precio.
  */
 function isPriced(record: SupplyRecord): boolean {
-    return !!record.purchasePrice && typeof record.purchasePrice.amount === 'number';
+  return !!record.purchasePrice && typeof record.purchasePrice.amount === 'number';
 }

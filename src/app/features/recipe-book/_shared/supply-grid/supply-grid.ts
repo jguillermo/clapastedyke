@@ -9,7 +9,7 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
-import { FormArray, FormBuilder, FormGroup, ReactiveFormsModule, type FormControl } from '@angular/forms';
+import { FormBuilder, FormGroup, ReactiveFormsModule, type FormControl } from '@angular/forms';
 import { toSignal, takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { OverlayModule } from '@angular/cdk/overlay';
 import { BaseUnit } from '@core/_common/quantity';
@@ -18,7 +18,10 @@ import { Combobox } from '@components/combobox/combobox';
 import { Table, type TableColumn } from '@components/table/table';
 import { Button } from '@components/button/button';
 import { Icon } from '@components/icon/icon';
-import { MeasureInput, type MeasureKind } from '@core/recipe-book/domain/value-objects/measure-input';
+import {
+  MeasureInput,
+  type MeasureKind,
+} from '@core/recipe-book/domain/value-objects/measure-input';
 import { PreviewRecipeCost } from '@core/recipe-book/application/use-cases/preview-recipe-cost.use-case';
 import { PriceCapture, type PurchaseValue } from '../price-capture/price-capture';
 import type { SupplyOption, ParsedLine } from './types';
@@ -55,7 +58,16 @@ interface CostView {
 @Component({
   selector: 'app-supply-grid',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, OverlayModule, UnitInput, Combobox, Table, Button, Icon, PriceCapture],
+  imports: [
+    ReactiveFormsModule,
+    OverlayModule,
+    UnitInput,
+    Combobox,
+    Table,
+    Button,
+    Icon,
+    PriceCapture,
+  ],
   host: { '(focusout)': 'bumpInteraction()' },
   templateUrl: './supply-grid.html',
 })
@@ -384,5 +396,7 @@ function displayQuantity(quantity: number, baseUnit: BaseUnit): { value: string;
   if (baseUnit === 'u') {
     return { value: String(quantity), unit: 'u' };
   }
-  return quantity >= 1000 ? { value: String(quantity / 1000), unit: 'k' } : { value: String(quantity), unit: 'g' };
+  return quantity >= 1000
+    ? { value: String(quantity / 1000), unit: 'k' }
+    : { value: String(quantity), unit: 'g' };
 }

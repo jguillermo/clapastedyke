@@ -35,110 +35,112 @@ const SEED_KEY = 'recipe-book';
  */
 @Injectable({ providedIn: 'root' })
 export class RecipeBookSeed {
-    private readonly categories = inject(RecipeCategoryRepository);
-    private readonly flavors = inject(RecipeFlavorRepository);
-    private readonly capacities = inject(RecipeCapacityRepository);
-    private readonly supplies = inject(SupplyRepository);
-    private readonly recipes = inject(RecipeRepository);
-    private readonly source = inject(SeedDataSource);
-    private readonly seedState = inject(SeedState);
+  private readonly categories = inject(RecipeCategoryRepository);
+  private readonly flavors = inject(RecipeFlavorRepository);
+  private readonly capacities = inject(RecipeCapacityRepository);
+  private readonly supplies = inject(SupplyRepository);
+  private readonly recipes = inject(RecipeRepository);
+  private readonly source = inject(SeedDataSource);
+  private readonly seedState = inject(SeedState);
 
-    /** ¿Ya se insertó la data seed alguna vez? (marcador persistido en IndexedDB). */
-    async hasSeeded(): Promise<boolean> {
-        return (await this.seedState.appliedVersion(SEED_KEY)) !== null;
+  /** ¿Ya se insertó la data seed alguna vez? (marcador persistido en IndexedDB). */
+  async hasSeeded(): Promise<boolean> {
+    return (await this.seedState.appliedVersion(SEED_KEY)) !== null;
+  }
+
+  async run(): Promise<void> {
+    const doc = await this.source.load();
+    if (!doc || doc.enabled === false) {
+      return;
     }
 
-    async run(): Promise<void> {
-        const doc = await this.source.load();
-        if (!doc || doc.enabled === false) {
-            return;
-        }
-
-        // Ejecuta una sola vez: si ya se sembró esta versión (o mayor), no se repite.
-        const applied = await this.seedState.appliedVersion(SEED_KEY);
-        const version = doc.version ?? 1;
-        if (applied !== null && applied >= version) {
-            return;
-        }
-
-        // Orden: primero lo que las recetas referencian (sabores/capacidades/categorías/insumos).
-        for (const f of doc.flavors ?? []) {
-            await this.createIfAbsent(f.id, this.flavors, () =>
-                RecipeFlavor.create(new EntityId(f.id), f.label),
-            );
-        }
-        for (const c of doc.recipeCapacities ?? []) {
-            await this.createIfAbsent(c.id, this.capacities, () =>
-                RecipeCapacity.create(new EntityId(c.id), c.group, c.label, c.factor),
-            );
-        }
-        for (const c of doc.categories ?? []) {
-            await this.createIfAbsent(c.id, this.categories, () => this.buildCategory(c));
-        }
-        for (const s of doc.supplies ?? []) {
-            await this.createIfAbsent(s.id, this.supplies, () => this.buildSupply(s));
-        }
-        for (const r of doc.recipes ?? []) {
-            if (await this.recipes.byId(new EntityId(r.id))) {
-                continue; // ya existe → no se modifica
-            }
-            const recipe = await this.buildRecipe(r);
-            if (recipe) {
-                await this.recipes.save(recipe);
-            }
-        }
-
-        // Marca la siembra como aplicada: no se repetirá salvo que suba la versión del JSON.
-        await this.seedState.markApplied(SEED_KEY, version);
+    // Ejecuta una sola vez: si ya se sembró esta versión (o mayor), no se repite.
+    const applied = await this.seedState.appliedVersion(SEED_KEY);
+    const version = doc.version ?? 1;
+    if (applied !== null && applied >= version) {
+      return;
     }
 
-    /** Guarda el agregado que produce `build` solo si su id no existe ya (create-if-absent). */
-    private async createIfAbsent<T>(
-        id: string,
-        repo: { byId(id: EntityId): Promise<T | null>; save(aggregate: T): Promise<void> },
-        build: () => T,
-    ): Promise<void> {
-        const entityId = new EntityId(id);
-        if (await repo.byId(entityId)) {
-            return;
-        }
-        try {
-            await repo.save(build());
-        } catch (error) {
-            console.warn(`[recipe-book-seed] no se pudo sembrar "${id}":`, error);
-        }
+    // Orden: primero lo que las recetas referencian (sabores/capacidades/categorías/insumos).
+    for (const f of doc.flavors ?? []) {
+      await this.createIfAbsent(f.id, this.flavors, () =>
+        RecipeFlavor.create(new EntityId(f.id), f.label),
+      );
+    }
+    for (const c of doc.recipeCapacities ?? []) {
+      await this.createIfAbsent(c.id, this.capacities, () =>
+        RecipeCapacity.create(new EntityId(c.id), c.group, c.label, c.factor),
+      );
+    }
+    for (const c of doc.categories ?? []) {
+      await this.createIfAbsent(c.id, this.categories, () => this.buildCategory(c));
+    }
+    for (const s of doc.supplies ?? []) {
+      await this.createIfAbsent(s.id, this.supplies, () => this.buildSupply(s));
+    }
+    for (const r of doc.recipes ?? []) {
+      if (await this.recipes.byId(new EntityId(r.id))) {
+        continue; // ya existe → no se modifica
+      }
+      const recipe = await this.buildRecipe(r);
+      if (recipe) {
+        await this.recipes.save(recipe);
+      }
     }
 
-    private buildCategory(c: SeedCategory): RecipeCategory {
-        return RecipeCategory.create(new EntityId(c.id), c.name);
-    }
+    // Marca la siembra como aplicada: no se repetirá salvo que suba la versión del JSON.
+    await this.seedState.markApplied(SEED_KEY, version);
+  }
 
-    private buildSupply(s: SeedSupply): Supply {
-        const per = Quantity.of(s.purchasePrice.per.value, s.purchasePrice.per.unit);
-        const price = PurchasePrice.of(s.purchasePrice.amount, per, s.purchasePrice.currency);
-        return Supply.create(new EntityId(s.id), s.name, s.baseUnit, s.usage, price);
+  /** Guarda el agregado que produce `build` solo si su id no existe ya (create-if-absent). */
+  private async createIfAbsent<T>(
+    id: string,
+    repo: { byId(id: EntityId): Promise<T | null>; save(aggregate: T): Promise<void> },
+    build: () => T,
+  ): Promise<void> {
+    const entityId = new EntityId(id);
+    if (await repo.byId(entityId)) {
+      return;
     }
+    try {
+      await repo.save(build());
+    } catch (error) {
+      console.warn(`[recipe-book-seed] no se pudo sembrar "${id}":`, error);
+    }
+  }
 
-    /** Construye una receta, resolviendo la unidad de cada línea desde su insumo. Devuelve null si no puede. */
-    private async buildRecipe(r: SeedRecipe): Promise<Recipe | null> {
-        try {
-            const lines: SupplyLine[] = [];
-            for (const line of r.lines) {
-                const supply = await this.supplies.byId(new EntityId(line.supplyId));
-                if (!supply) {
-                    console.warn(`[recipe-book-seed] receta "${r.id}": insumo "${line.supplyId}" no encontrado, se omite la línea`);
-                    continue;
-                }
-                lines.push(SupplyLine.of(supply.id, Quantity.of(line.quantity, supply.baseUnit)));
-            }
-            if (lines.length === 0) {
-                console.warn(`[recipe-book-seed] receta "${r.id}" sin líneas válidas, se omite`);
-                return null;
-            }
-            return Recipe.create(new EntityId(r.id), new EntityId(r.categoryId), r.name, lines);
-        } catch (error) {
-            console.warn(`[recipe-book-seed] no se pudo construir la receta "${r.id}":`, error);
-            return null;
+  private buildCategory(c: SeedCategory): RecipeCategory {
+    return RecipeCategory.create(new EntityId(c.id), c.name);
+  }
+
+  private buildSupply(s: SeedSupply): Supply {
+    const per = Quantity.of(s.purchasePrice.per.value, s.purchasePrice.per.unit);
+    const price = PurchasePrice.of(s.purchasePrice.amount, per, s.purchasePrice.currency);
+    return Supply.create(new EntityId(s.id), s.name, s.baseUnit, s.usage, price);
+  }
+
+  /** Construye una receta, resolviendo la unidad de cada línea desde su insumo. Devuelve null si no puede. */
+  private async buildRecipe(r: SeedRecipe): Promise<Recipe | null> {
+    try {
+      const lines: SupplyLine[] = [];
+      for (const line of r.lines) {
+        const supply = await this.supplies.byId(new EntityId(line.supplyId));
+        if (!supply) {
+          console.warn(
+            `[recipe-book-seed] receta "${r.id}": insumo "${line.supplyId}" no encontrado, se omite la línea`,
+          );
+          continue;
         }
+        lines.push(SupplyLine.of(supply.id, Quantity.of(line.quantity, supply.baseUnit)));
+      }
+      if (lines.length === 0) {
+        console.warn(`[recipe-book-seed] receta "${r.id}" sin líneas válidas, se omite`);
+        return null;
+      }
+      return Recipe.create(new EntityId(r.id), new EntityId(r.categoryId), r.name, lines);
+    } catch (error) {
+      console.warn(`[recipe-book-seed] no se pudo construir la receta "${r.id}":`, error);
+      return null;
     }
+  }
 }

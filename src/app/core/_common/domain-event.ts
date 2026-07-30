@@ -4,21 +4,21 @@
  * context boundaries as a Published Language.
  */
 export interface DomainEvent {
-    readonly name: string;
-    readonly aggregateId: string;
-    readonly occurredOn: Date;
-    readonly data: Readonly<Record<string, unknown>>;
+  readonly name: string;
+  readonly aggregateId: string;
+  readonly occurredOn: Date;
+  readonly data: Readonly<Record<string, unknown>>;
 }
 
 export function domainEvent(
-    name: string,
-    aggregateId: string,
-    data: Record<string, unknown> = {},
+  name: string,
+  aggregateId: string,
+  data: Record<string, unknown> = {},
 ): DomainEvent {
-    return Object.freeze({
-        name,
-        aggregateId,
-        occurredOn: new Date(),
-        data: Object.freeze({ ...data }),
-    });
+  return Object.freeze({
+    name,
+    aggregateId,
+    occurredOn: new Date(),
+    data: Object.freeze({ ...data }),
+  });
 }

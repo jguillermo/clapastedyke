@@ -1,4 +1,9 @@
-import { EnvironmentProviders, inject, makeEnvironmentProviders, provideAppInitializer } from '@angular/core';
+import {
+  EnvironmentProviders,
+  inject,
+  makeEnvironmentProviders,
+  provideAppInitializer,
+} from '@angular/core';
 import { SupplyRepository } from './domain/repositories/supply.repository';
 import { RecipeRepository } from './domain/repositories/recipe.repository';
 import { RecipeCategoryRepository } from './domain/repositories/recipe-category.repository';
@@ -21,14 +26,14 @@ import { IndexedDbSeedState } from './infrastructure/seed/indexeddb-seed-state';
  * (`RecipeBookSeed.run()`). Se agrega en `app.config.ts` vía `provideRecipeBook()`.
  */
 export function provideRecipeBook(): EnvironmentProviders {
-    return makeEnvironmentProviders([
-        { provide: SupplyRepository, useClass: IndexedDbSupplyRepository },
-        { provide: RecipeRepository, useClass: IndexedDbRecipeRepository },
-        { provide: RecipeCategoryRepository, useClass: IndexedDbRecipeCategoryRepository },
-        { provide: RecipeFlavorRepository, useClass: IndexedDbRecipeFlavorRepository },
-        { provide: RecipeCapacityRepository, useClass: IndexedDbRecipeCapacityRepository },
-        { provide: SeedDataSource, useClass: HttpSeedDataSource },
-        { provide: SeedState, useClass: IndexedDbSeedState },
-        provideAppInitializer(() => inject(RecipeBookSeed).run()),
-    ]);
+  return makeEnvironmentProviders([
+    { provide: SupplyRepository, useClass: IndexedDbSupplyRepository },
+    { provide: RecipeRepository, useClass: IndexedDbRecipeRepository },
+    { provide: RecipeCategoryRepository, useClass: IndexedDbRecipeCategoryRepository },
+    { provide: RecipeFlavorRepository, useClass: IndexedDbRecipeFlavorRepository },
+    { provide: RecipeCapacityRepository, useClass: IndexedDbRecipeCapacityRepository },
+    { provide: SeedDataSource, useClass: HttpSeedDataSource },
+    { provide: SeedState, useClass: IndexedDbSeedState },
+    provideAppInitializer(() => inject(RecipeBookSeed).run()),
+  ]);
 }

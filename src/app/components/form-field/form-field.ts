@@ -38,11 +38,7 @@ let nextFieldId = 0;
     </div>
 
     @if (error()) {
-      <p
-        class="m-0 text-caption leading-snug text-error font-medium"
-        [id]="errorId"
-        role="alert"
-      >
+      <p class="m-0 text-caption leading-snug text-error font-medium" [id]="errorId" role="alert">
         {{ error() }}
       </p>
     } @else if (hint()) {

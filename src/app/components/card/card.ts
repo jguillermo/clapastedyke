@@ -56,9 +56,7 @@ export class Card {
   protected readonly hostClasses = computed(() => {
     const parts = [
       'overflow-hidden',
-      this.fill()
-        ? 'flex flex-1 flex-col min-h-0 rounded-none sm:rounded-xl'
-        : 'block rounded-xl',
+      this.fill() ? 'flex flex-1 flex-col min-h-0 rounded-none sm:rounded-xl' : 'block rounded-xl',
     ];
     switch (this.variant()) {
       case 'outlined':

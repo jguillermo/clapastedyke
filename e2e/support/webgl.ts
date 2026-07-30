@@ -10,14 +10,28 @@
  * Los contextos 2D siguen funcionando (los usa la textura del libro), así que la
  * anulación no rompe nada más.
  */
+/**
+ * Firma real de `getContext`. Está **sobrecargada** (una por tipo de contexto), así que un único
+ * reemplazo no puede satisfacerla: se escribe con parámetros `unknown[]` y se reintroduce el tipo
+ * original con un doble cast. Antes esto se resolvía con `any` + un `eslint-disable`, pero el
+ * directive dependía de que la firma cupiera en una línea — al reformatear, dejaba de cubrirla.
+ */
+type GetContext = typeof HTMLCanvasElement.prototype.getContext;
+
 export const DISABLE_WEBGL_SCRIPT = (): void => {
-  const original = HTMLCanvasElement.prototype.getContext;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  HTMLCanvasElement.prototype.getContext = function (this: HTMLCanvasElement, type: any, ...rest: any[]) {
+  const original = HTMLCanvasElement.prototype.getContext as (
+    this: HTMLCanvasElement,
+    ...args: unknown[]
+  ) => unknown;
+
+  HTMLCanvasElement.prototype.getContext = function (
+    this: HTMLCanvasElement,
+    ...args: unknown[]
+  ): unknown {
+    const [type] = args;
     if (typeof type === 'string' && type.toLowerCase().includes('webgl')) {
       return null;
     }
-    return (original as (...args: unknown[]) => unknown).call(this, type, ...rest);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  } as any;
+    return original.apply(this, args);
+  } as unknown as GetContext;
 };

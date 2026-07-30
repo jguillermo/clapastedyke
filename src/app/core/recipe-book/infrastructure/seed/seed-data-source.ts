@@ -9,7 +9,7 @@ export const SEED_DOCUMENT_URL = 'seed/recipe-book.seed.json';
  * en tests (igual que las repositories). Devuelve `null` cuando no hay documento disponible.
  */
 export abstract class SeedDataSource {
-    abstract load(): Promise<RecipeBookSeedDocument | null>;
+  abstract load(): Promise<RecipeBookSeedDocument | null>;
 }
 
 /**
@@ -19,15 +19,15 @@ export abstract class SeedDataSource {
  */
 @Injectable()
 export class HttpSeedDataSource extends SeedDataSource {
-    async load(): Promise<RecipeBookSeedDocument | null> {
-        try {
-            const res = await fetch(SEED_DOCUMENT_URL, { cache: 'no-cache' });
-            if (!res.ok) {
-                return null;
-            }
-            return (await res.json()) as RecipeBookSeedDocument;
-        } catch {
-            return null;
-        }
+  async load(): Promise<RecipeBookSeedDocument | null> {
+    try {
+      const res = await fetch(SEED_DOCUMENT_URL, { cache: 'no-cache' });
+      if (!res.ok) {
+        return null;
+      }
+      return (await res.json()) as RecipeBookSeedDocument;
+    } catch {
+      return null;
     }
+  }
 }

@@ -20,7 +20,10 @@ import { Button } from '@components/button/button';
 import { FormField } from '@components/form-field/form-field';
 import { CurrencyInput } from '@components/currency-input/currency-input';
 import { UnitInput, type UnitToken } from '@components/unit-input/unit-input';
-import { MeasureInput, type MeasureKind } from '@core/recipe-book/domain/value-objects/measure-input';
+import {
+  MeasureInput,
+  type MeasureKind,
+} from '@core/recipe-book/domain/value-objects/measure-input';
 import { PreviewSupplyCost } from '@core/recipe-book/application/use-cases/preview-supply-cost.use-case';
 
 /** How an supply is bought, normalised to its base unit. */
@@ -45,12 +48,28 @@ export interface PurchaseValue {
 @Component({
   selector: 'app-price-capture',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, CdkTrapFocus, Card, CardBody, CardFooter, Button, FormField, CurrencyInput, UnitInput],
+  imports: [
+    ReactiveFormsModule,
+    CdkTrapFocus,
+    Card,
+    CardBody,
+    CardFooter,
+    Button,
+    FormField,
+    CurrencyInput,
+    UnitInput,
+  ],
   host: { '(keydown.escape)': 'onEscape()' },
   template: `
     <migo-card variant="elevated" elevation="lg" class="w-80">
       <migo-card-body>
-        <form cdkTrapFocus cdkTrapFocusAutoCapture class="flex flex-col gap-3" [formGroup]="form" (ngSubmit)="confirmPrice()">
+        <form
+          cdkTrapFocus
+          cdkTrapFocusAutoCapture
+          class="flex flex-col gap-3"
+          [formGroup]="form"
+          (ngSubmit)="confirmPrice()"
+        >
           <p class="m-0 text-sm font-semibold text-heading">¿Cómo compras "{{ name() }}"?</p>
 
           <div class="flex items-end gap-3">
@@ -64,7 +83,11 @@ export interface PurchaseValue {
               />
             </migo-form-field>
             <migo-form-field label="Precio" class="flex-1">
-              <migo-currency-input formControlName="price" ariaLabel="Precio de la compra" (keydown.enter)="onEnterPrice($event)" />
+              <migo-currency-input
+                formControlName="price"
+                ariaLabel="Precio de la compra"
+                (keydown.enter)="onEnterPrice($event)"
+              />
             </migo-form-field>
           </div>
 
@@ -76,8 +99,18 @@ export interface PurchaseValue {
         </form>
       </migo-card-body>
       <migo-card-footer>
-        <button migo-button variant="ghost" size="sm" type="button" (click)="cancelled.emit()">Cancelar</button>
-        <button migo-button size="sm" type="button" [disabled]="!canConfirm()" (click)="confirmPrice()">Listo</button>
+        <button migo-button variant="ghost" size="sm" type="button" (click)="cancelled.emit()">
+          Cancelar
+        </button>
+        <button
+          migo-button
+          size="sm"
+          type="button"
+          [disabled]="!canConfirm()"
+          (click)="confirmPrice()"
+        >
+          Listo
+        </button>
       </migo-card-footer>
     </migo-card>
   `,
@@ -112,7 +145,9 @@ export class PriceCapture implements OnInit {
   });
 
   constructor() {
-    this.form.valueChanges.pipe(takeUntilDestroyed(inject(DestroyRef))).subscribe(() => void this.recompute());
+    this.form.valueChanges
+      .pipe(takeUntilDestroyed(inject(DestroyRef)))
+      .subscribe(() => void this.recompute());
   }
 
   ngOnInit(): void {
@@ -121,7 +156,9 @@ export class PriceCapture implements OnInit {
     // Pre-fill when editing an existing price (inputs are set by now, not in the constructor).
     this.unitToken.set(initial.per.unit === 'u' ? 'u' : initial.per.value >= 1000 ? 'k' : 'g');
     const display =
-      initial.per.unit === 'g' && initial.per.value >= 1000 ? initial.per.value / 1000 : initial.per.value;
+      initial.per.unit === 'g' && initial.per.value >= 1000
+        ? initial.per.value / 1000
+        : initial.per.value;
     this.form.setValue({ presentation: String(display), price: String(initial.amount) });
   }
 
@@ -162,7 +199,11 @@ export class PriceCapture implements OnInit {
     if (!measure.quantity || !Number.isFinite(amount) || amount <= 0) {
       return null;
     }
-    return { amount, per: { value: measure.quantity.value, unit: measure.baseUnit }, currency: 'PEN' };
+    return {
+      amount,
+      per: { value: measure.quantity.value, unit: measure.baseUnit },
+      currency: 'PEN',
+    };
   }
 
   private async recompute(): Promise<void> {

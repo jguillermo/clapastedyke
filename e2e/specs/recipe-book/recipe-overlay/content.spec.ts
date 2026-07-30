@@ -3,8 +3,8 @@ import { GLASEADO } from '../../../support/seed';
 
 /**
  * Contenido del overlay de receta (`features/recipe-book/book-3d/recipe-overlay`): el DOM que se
- * coloca **encima** de la hoja del libro 3D. Título fijo (nombre + editar + badges) y cuerpo
- * scrolleable con las líneas de insumo, su contador y el total.
+ * coloca **encima** de la hoja del libro 3D. Título fijo (solo nombre + editar) y cuerpo
+ * scrolleable con las características, las líneas de insumo, su contador y el total.
  *
  * El total lo calcula el negocio (`PreviewRecipeCost`) y la vista solo lo pinta: los importes
  * esperados salen del seed.
@@ -75,8 +75,8 @@ test.describe('Overlay de receta · contenido', () => {
 
     await target.getByRole('button', { name: 'Editar receta' }).click();
     await form.waitReady();
-    await form.flavor.pick('Sabor', 'Chocolate');
-    await form.size.pick('Porciones', '24');
+    await form.properties.pick('Sabor', 'Chocolate');
+    await form.properties.pick('Porciones', '24');
     await form.save.click();
     await form.waitClosed();
 

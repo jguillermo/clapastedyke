@@ -61,7 +61,10 @@ const TRIGGER_BASE =
     >
       <span class="flex-1 overflow-hidden">
         @if (selectedLabel(); as label) {
-          <span class="inline-flex max-w-full items-center truncate rounded-full bg-brand px-3 py-1 text-sm text-on-brand">{{ label }}</span>
+          <span
+            class="inline-flex max-w-full items-center truncate rounded-full bg-brand px-3 py-1 text-sm text-on-brand"
+            >{{ label }}</span
+          >
         } @else {
           <span class="text-placeholder">{{ placeholder() }}</span>
         }

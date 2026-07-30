@@ -7,14 +7,14 @@ import { RecipeCategoryRecord } from '../records';
  * Usado por `IndexedDbRecipeCategoryRepository`. Entidad de catálogo: solo id + nombre.
  */
 export const RecipeCategoryMapper = {
-    toRecord(category: RecipeCategory): RecipeCategoryRecord {
-        return {
-            id: category.id.value,
-            name: category.name,
-        };
-    },
+  toRecord(category: RecipeCategory): RecipeCategoryRecord {
+    return {
+      id: category.id.value,
+      name: category.name,
+    };
+  },
 
-    toDomain(record: RecipeCategoryRecord): RecipeCategory {
-        return RecipeCategory.create(new EntityId(record.id), record.name);
-    },
+  toDomain(record: RecipeCategoryRecord): RecipeCategory {
+    return RecipeCategory.create(new EntityId(record.id), record.name);
+  },
 };

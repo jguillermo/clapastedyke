@@ -18,7 +18,9 @@ test.describe('Home 3D · sin WebGL', () => {
     await expect(home.station('Libro de recetas')).toBeEnabled();
   });
 
-  test('sin soporte 3D → no se muestra el globo del coach (no hubo flyIn)', async ({ openHome }) => {
+  test('sin soporte 3D → no se muestra el globo del coach (no hubo flyIn)', async ({
+    openHome,
+  }) => {
     const home = await openHome();
 
     await expect(home.noWebglHeading).toBeVisible();

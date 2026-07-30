@@ -74,7 +74,8 @@ const CONTROL_COMMON =
            input lo taparía). El tramo tecleado es invisible: deja ver el texto real del input. -->
       @if (ghostSuffix()) {
         <span #ghost [class]="ghostClasses()" aria-hidden="true">
-          <span class="invisible">{{ value() }}</span><span class="text-placeholder">{{ ghostSuffix() }}</span>
+          <span class="invisible">{{ value() }}</span
+          ><span class="text-placeholder">{{ ghostSuffix() }}</span>
         </span>
       }
     </span>
@@ -94,6 +95,10 @@ const CONTROL_COMMON =
         role="listbox"
       >
         @for (option of dropdownOptions(); track option; let i = $index) {
+          <!-- Patrón ARIA de listbox con foco gestionado: las opciones NO son focusables; el foco
+               se queda en el input, que mueve aria-activedescendant con las flechas y confirma
+               con Enter (ver onKeydown). El (click) es solo el atajo de ratón. -->
+          <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -->
           <li
             class="flex items-center gap-2 px-3 py-2 min-h-11 rounded-sm text-sm text-body cursor-pointer"
             [class.bg-surface-sunken]="i === activeIndex()"
@@ -110,9 +115,7 @@ const CONTROL_COMMON =
     </ng-template>
   `,
   host: { class: 'block' },
-  providers: [
-    { provide: NG_VALUE_ACCESSOR, useExisting: forwardRef(() => Combobox), multi: true },
-  ],
+  providers: [{ provide: NG_VALUE_ACCESSOR, useExisting: forwardRef(() => Combobox), multi: true }],
 })
 export class Combobox implements ControlValueAccessor {
   protected readonly field = inject(FormField, { optional: true });
@@ -166,7 +169,9 @@ export class Combobox implements ControlValueAccessor {
   /** Hay fantasma cuando hay **una sola** coincidencia y **empieza por** lo tecleado. */
   private readonly isGhostMode = computed(() => {
     const matches = this.matches();
-    return matches.length === 1 && matches[0].toLowerCase().startsWith(this.value().trim().toLowerCase());
+    return (
+      matches.length === 1 && matches[0].toLowerCase().startsWith(this.value().trim().toLowerCase())
+    );
   });
 
   /** El sufijo tenue que se pinta tras el texto del usuario (solo en modo fantasma). */
@@ -178,7 +183,9 @@ export class Combobox implements ControlValueAccessor {
   protected readonly dropdownOptions = computed(() => (this.isGhostMode() ? [] : this.matches()));
 
   /** El overlay solo se muestra abierto si hay foco/tecleo y hay opciones que listar. */
-  protected readonly showDropdown = computed(() => this.open() && this.dropdownOptions().length > 0);
+  protected readonly showDropdown = computed(
+    () => this.open() && this.dropdownOptions().length > 0,
+  );
 
   private onChange: (value: string) => void = () => {};
   private onTouched: () => void = () => {};

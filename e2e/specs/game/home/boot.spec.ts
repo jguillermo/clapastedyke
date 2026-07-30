@@ -7,7 +7,10 @@ import { test, expect } from '../../../fixtures/app-fixture';
 test.describe('Home 3D · arranque', () => {
   test.use({ webgl: true });
 
-  test('/ → redirige a /home → canvas del mundo montado y dock operable', async ({ page, home }) => {
+  test('/ → redirige a /home → canvas del mundo montado y dock operable', async ({
+    page,
+    home,
+  }) => {
     await page.goto('/');
 
     await page.waitForURL('**/home');

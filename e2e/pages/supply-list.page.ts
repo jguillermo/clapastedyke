@@ -48,9 +48,9 @@ export class SupplyListPage {
 
   /** Nombres de todos los insumos listados, incluido el renglón vacío de agregar. */
   async names(): Promise<string[]> {
-    return this.root.locator('[data-col="0"] input').evaluateAll((inputs) =>
-      inputs.map((input) => (input as HTMLInputElement).value),
-    );
+    return this.root
+      .locator('[data-col="0"] input')
+      .evaluateAll((inputs) => inputs.map((input) => (input as HTMLInputElement).value));
   }
 
   /** Índice de fila de un insumo por nombre exacto, o `-1` si no está. */
