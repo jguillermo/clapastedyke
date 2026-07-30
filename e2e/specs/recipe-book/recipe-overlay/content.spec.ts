@@ -3,8 +3,8 @@ import { GLASEADO } from '../../../support/seed';
 
 /**
  * Contenido del overlay de receta (`features/recipe-book/book-3d/recipe-overlay`): el DOM que se
- * coloca **encima** de la hoja del libro 3D. Título fijo (nombre + editar + badges) y cuerpo
- * scrolleable con las líneas de insumo, su contador y el total.
+ * coloca **encima** de la hoja del libro 3D. Título fijo (solo nombre + editar) y cuerpo
+ * scrolleable con las características, las líneas de insumo, su contador y el total.
  *
  * El total lo calcula el negocio (`PreviewRecipeCost`) y la vista solo lo pinta: los importes
  * esperados salen del seed.

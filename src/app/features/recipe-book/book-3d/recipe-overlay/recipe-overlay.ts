@@ -40,10 +40,21 @@ interface LineView {
 const EMPTY_COST: PreviewRecipeCostResult = { items: [], total: '' };
 
 /**
- * Overlay DOM del contenido de una receta, colocado sobre la hoja del libro 3D. El **título** queda
- * fijo arriba y el cuerpo (ingredientes; a futuro preparación e imágenes) **scrollea de forma
- * nativa** (rápido, con inercia). Un botón de editar emite `edit`. Es presentacional: recibe la
- * receta y el catálogo de insumos ya cargados; no inyecta nada de dominio.
+ * Umbrales (px de scroll) para encoger el título, con histéresis: encoge pasados 12px y solo
+ * vuelve a crecer por debajo de 4px. La franja muerta evita el parpadeo en listas que apenas
+ * desbordan: al encogerse la cabecera el cuerpo crece, el navegador recorta `scrollTop` al nuevo
+ * máximo y, con un único umbral, eso podría devolverlo por debajo y oscilar sin parar.
+ */
+const SHRINK_ON_PX = 12;
+const SHRINK_OFF_PX = 4;
+
+/**
+ * Overlay DOM del contenido de una receta, colocado sobre la hoja del libro 3D. El **título** (con
+ * su botón de editar) es lo **único fijo** arriba, y **se encoge al scrollear** para devolverle
+ * espacio a la lista. Todo lo demás —características, ingredientes y, a futuro, preparación e
+ * imágenes— **scrollea de forma nativa** (rápido, con inercia): las características describen la
+ * receta, no son cabecera, así que acompañan a la lista. Un botón de editar emite `edit`. Es
+ * presentacional: recibe la receta y el catálogo de insumos ya cargados; no inyecta nada de dominio.
  */
 @Component({
   selector: 'app-recipe-overlay',
@@ -61,27 +72,16 @@ const EMPTY_COST: PreviewRecipeCostResult = { items: [], total: '' };
     '(pointerup)': 'onUp($event)',
   },
   template: `
-    <!-- Título FIJO (único bloque fijo: nombre + editar + sabor + su subrayado). Serif grande tipo recetario. -->
-    <header class="mx-6 flex flex-col gap-1 border-b-2 border-brand pt-8 pb-4">
+    <!-- Título FIJO: el ÚNICO bloque que no scrollea (nombre + editar + su subrayado). Serif
+         grande tipo recetario que se ENCOGE al empezar a scrollear, para devolverle a la lista el
+         espacio que ocupa. Las características NO viven aquí: scrollean con la lista. -->
+    <header [class]="headerClasses()">
       <div class="flex items-start justify-between gap-4">
-        <h2 class="m-0 font-display font-bold text-heading text-h2 sm:text-h1">{{ recipe().name }}</h2>
+        <h2 [class]="titleClasses()">{{ recipe().name }}</h2>
         <button migo-button variant="ghost" size="sm" type="button" aria-label="Editar receta" (click)="edit.emit()">
           <migo-icon icon-leading name="mat:edit" size="md" />
         </button>
       </div>
-      @if (flavorLabel() || portionsLabel() || moldLabel()) {
-        <div class="flex flex-wrap gap-1.5">
-          @if (flavorLabel(); as flavor) {
-            <migo-badge size="xs">Sabor: {{ flavor }}</migo-badge>
-          }
-          @if (portionsLabel(); as portions) {
-            <migo-badge size="xs">Porciones: {{ portions }}</migo-badge>
-          }
-          @if (moldLabel(); as mold) {
-            <migo-badge size="xs">Molde: {{ mold }}</migo-badge>
-          }
-        </div>
-      }
     </header>
 
     <!-- Cuerpo SCROLLEABLE (scroll nativo, sin barra — ver hasMore): cabecera de columnas, filas
@@ -96,6 +96,21 @@ const EMPTY_COST: PreviewRecipeCostResult = { items: [], total: '' };
         class="absolute inset-0 overflow-y-auto overscroll-contain touch-pan-y scrollbar-hidden px-6 py-4"
         (scroll)="onScroll()"
       >
+        <!-- Características: son de la receta, no de la cabecera → scrollean con la lista. -->
+        @if (flavorLabel() || portionsLabel() || moldLabel()) {
+          <div class="flex flex-wrap gap-1.5 pb-4">
+            @if (flavorLabel(); as flavor) {
+              <migo-badge size="xs">Sabor: {{ flavor }}</migo-badge>
+            }
+            @if (portionsLabel(); as portions) {
+              <migo-badge size="xs">Porciones: {{ portions }}</migo-badge>
+            }
+            @if (moldLabel(); as mold) {
+              <migo-badge size="xs">Molde: {{ mold }}</migo-badge>
+            }
+          </div>
+        }
+
         <div class="flex items-baseline gap-3 pb-2 text-sm font-semibold uppercase tracking-wide text-muted">
           <span class="flex-1">Insumo</span>
           <span class="w-16 shrink-0 text-right sm:w-20">Cant.</span>
@@ -148,6 +163,22 @@ export class RecipeOverlay {
   private readonly scrollBody = viewChild<ElementRef<HTMLDivElement>>('scrollBody');
   /** Hay más contenido debajo (aún no se llegó al final) → se pinta la flechita, nunca la barra. */
   protected readonly hasMore = signal(false);
+  /** El cuerpo ya se desplazó → el título se encoge y cede su espacio a la lista. */
+  protected readonly scrolled = signal(false);
+
+  /** Cabecera fija: al scrollear pierde parte de su aire vertical. */
+  protected readonly headerClasses = computed(
+    () =>
+      'mx-6 flex flex-col border-b-2 border-brand transition-all duration-base ease-out motion-reduce:transition-none ' +
+      (this.scrolled() ? 'pt-4 pb-2' : 'pt-8 pb-4'),
+  );
+
+  /** Título fijo: grande de entrada, compacto al scrollear. */
+  protected readonly titleClasses = computed(
+    () =>
+      'm-0 font-display font-bold text-heading wrap-break-word transition-all duration-base ease-out motion-reduce:transition-none ' +
+      (this.scrolled() ? 'text-h4 sm:text-h3' : 'text-h2 sm:text-h1'),
+  );
 
   constructor() {
     // El costo/total se calcula en el negocio (PreviewRecipeCost), nunca aquí — ver memoria
@@ -163,37 +194,42 @@ export class RecipeOverlay {
       requestAnimationFrame(() => this.resetScroll());
     });
 
-    // El contenido cambia (p.ej. llega el precio calculado) → solo recalcula el indicador, sin
+    // El contenido cambia (p.ej. llega el precio calculado) → solo recalcula los indicadores, sin
     // mover el scroll (no interrumpir al usuario si ya está leyendo más abajo).
     effect(() => {
       this.lines();
-      requestAnimationFrame(() => this.updateHasMore());
+      requestAnimationFrame(() => this.syncScrollState());
     });
   }
 
   protected onScroll(): void {
-    this.updateHasMore();
+    this.syncScrollState();
   }
 
-  /** Vuelve al inicio del scroll (nueva receta) y recalcula si hay más contenido. */
+  /** Vuelve al inicio del scroll (nueva receta): título grande otra vez y recalcula la flechita. */
   private resetScroll(): void {
     const el = this.scrollBody()?.nativeElement;
     if (!el) {
       return;
     }
     el.scrollTop = 0;
-    this.updateHasMore();
+    this.syncScrollState();
   }
 
-  /** `true` si queda contenido por debajo del borde visible (con un pequeño margen). */
-  private updateHasMore(): void {
+  /**
+   * Deriva del scroll los dos indicadores visuales: si queda contenido por debajo (la flechita) y
+   * si ya se desplazó lo bastante como para encoger el título (con la histéresis de arriba).
+   */
+  private syncScrollState(): void {
     const el = this.scrollBody()?.nativeElement;
     if (!el) {
       this.hasMore.set(false);
+      this.scrolled.set(false);
       return;
     }
     const remaining = el.scrollHeight - el.scrollTop - el.clientHeight;
     this.hasMore.set(remaining > 4);
+    this.scrolled.update((was) => (was ? el.scrollTop > SHRINK_OFF_PX : el.scrollTop > SHRINK_ON_PX));
   }
 
   protected onDown(event: PointerEvent): void {
