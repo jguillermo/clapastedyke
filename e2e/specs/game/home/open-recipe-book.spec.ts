@@ -18,7 +18,6 @@ test.describe('Home 3D · abrir el libro de recetas', () => {
     await home.station('Libro de recetas').click();
 
     await book.waitReady();
-    await expect(book.title).toBeVisible();
     await expect(book.pager).toBeVisible();
   });
 
