@@ -6,7 +6,7 @@ import {
   RecordingEventBus,
 } from '../../recipe-book-test-doubles';
 import { SupplyRepository } from '../../../domain/repositories/supply.repository';
-import { EventBus } from '../../../../_common/event-bus';
+import { EventBus } from '../../../../_common/eventbus/event-bus';
 import { EntityId } from '../../../../_common/entity-id';
 import { Quantity } from '../../../../_common/quantity';
 import { UpdateSupply } from '../../../application/use-cases/update-supply.use-case';

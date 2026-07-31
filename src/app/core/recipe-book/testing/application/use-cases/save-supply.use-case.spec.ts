@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { aPurchase, makeRecipeBookFakes, RecordingEventBus } from '../../recipe-book-test-doubles';
 import { SupplyRepository } from '../../../domain/repositories/supply.repository';
-import { EventBus } from '../../../../_common/event-bus';
+import { EventBus } from '../../../../_common/eventbus/event-bus';
 import { EntityId } from '../../../../_common/entity-id';
 import { SaveSupply } from '../../../application/use-cases/save-supply.use-case';
 

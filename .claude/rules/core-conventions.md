@@ -12,6 +12,61 @@ Names are part of the design, not decoration. Contexts, entities, value objects,
 
 A file that satisfies every structural rule below but uses non-domain names (`DeviceManagerService.processData()`) still violates this convention.
 
+## CRITICAL: los contextos no se conocen entre sí
+
+**Un bounded context NO puede importar NADA de otro bounded context.** Ni una entidad, ni un value
+object, ni un caso de uso, ni un nombre de evento. Ni con alias (`@core/otro/...`) ni con ruta
+relativa (`../../otro/...`). No hay excepciones.
+
+Por qué: en cuanto un contexto importa de otro, deja de poder evolucionar solo. Un cambio en el
+modelo del recetario rompería la compilación del contexto que sincroniza, y el «bounded» del bounded
+context sería decorativo. Aislarlos es lo que permite renombrar, dividir o tirar un contexto entero
+sin salir de su carpeta.
+
+Solo hay **dos formas legítimas** de que dos contextos colaboren:
+
+| Forma | Para qué | Dónde vive |
+|---|---|---|
+| **Contrato compartido** | Que uno pida algo a otro sin conocerlo (credenciales, exportar datos) | Clase abstracta en `core/_common/`; cada lado la implementa o la consume |
+| **Eventos** | Que uno reaccione a lo que pasó en otro | `EventBus` + el nombre en `core/_common/events/integration-events.ts` |
+
+```typescript
+// PROHIBIDO — external-sync depende de recipe-book
+import { ExportRecipeBookRows } from '@core/recipe-book/application/use-cases/export-recipe-book-rows.use-case';
+import { RecipeBookEventName } from '@core/recipe-book/domain/events/recipe-book-events';
+
+// CORRECTO — ambos dependen del shared kernel, ninguno del otro
+import { ExportableData } from '@core/_common/export/exportable-data';          // contrato
+import { IntegrationEventName } from '@core/_common/events/integration-events'; // nombre publicado
+```
+
+Cómo se cablea, sin que nadie conozca a nadie:
+
+1. El contrato abstracto vive en `core/_common/` (p. ej. `ExportableData`, `CredentialsProvider`).
+2. El contexto **dueño** lo implementa en su `infrastructure/` y lo enlaza en su `*.providers.ts` —
+   `{ provide: ExportableData, useClass: RecipeBookExportableData }`.
+3. El **consumidor** inyecta la clase abstracta. Angular resuelve la implementación; el consumidor
+   nunca sabe cuál es.
+
+### Los eventos salen del caso de uso, siempre
+
+Un agregado cambia → **el caso de uso publica el evento por el `EventBus` después de persistir**, con
+la factoría de eventos de su contexto y un nombre tomado de
+`core/_common/events/integration-events.ts`. El `aggregateId` es el id del agregado que cambió.
+
+```typescript
+await this.recipes.save(recipe);
+await this.bus.publish([RecipeBookEvents.recipeSaved(recipeId.value, !id, categoryId)]);
+```
+
+El payload es **solo de primitivos** y mínimo: quien reacciona no debe poder reconstruir el modelo
+del emisor a partir del evento. Si necesita datos, los pide por un contrato de `core/_common/`.
+
+> **Está en ESLint.** `eslint.config.mjs` genera un bloque `no-restricted-imports` por contexto a
+> partir de `CORE_CONTEXTS`. Importar de un hermano es un error de lint, no una convención que se
+> pueda olvidar. **Al crear un contexto nuevo hay que añadirlo a esa lista**, o su aislamiento no se
+> comprueba.
+
 ## Folder structure
 
 ```

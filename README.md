@@ -60,6 +60,16 @@ The suite runs against the **compiled build** (`dist/misaevol/browser`), served 
 `e2e/support/static-server.mjs` — no dev server needed. Conventions for writing them are in
 [`.claude/rules/e2e-tests-conventions.md`](.claude/rules/e2e-tests-conventions.md).
 
+## Google Sheets sync
+
+Recipes and supplies can be backed up to a Google Sheets file in **each user's own Drive**. The app
+never talks to the Sheets or Drive APIs: it posts to a **Google Apps Script Web App**
+(`apps-script/Code.gs`), which validates the user's token and writes the sheet on their behalf.
+
+Setting it up needs a one-time manual pass through Google Cloud and Apps Script. Every step is in
+[`appscript.md`](appscript.md) — start there. Once configured, users connect from the `/cuenta`
+screen; without it the app keeps working exactly as before, fully local.
+
 ## Additional Resources
 
 For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.

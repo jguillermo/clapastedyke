@@ -1,0 +1,158 @@
+<!-- Mobile-first: una sola columna a todo el ancho, acotada y centrada en pantallas grandes. -->
+<div class="mx-auto flex w-full max-w-reading flex-col gap-4 p-4 sm:gap-6 sm:p-6">
+  <header class="flex flex-wrap items-start justify-between gap-3">
+    <div class="flex flex-col gap-1">
+      <h1 class="m-0 font-display text-h3 text-heading sm:text-h2">Tu cuenta de Google</h1>
+      <p class="m-0 text-sm text-muted">
+        Copia de seguridad de tus recetas e insumos en una hoja de cálculo de tu propio Drive.
+      </p>
+    </div>
+    <a migo-button variant="ghost" size="md" routerLink="/home">
+      <migo-icon icon-leading name="mat:arrow_back" size="sm" />
+      Volver a la cocina
+    </a>
+  </header>
+
+  <!-- 1 · Configuración de este navegador -->
+  <migo-card variant="outlined">
+    <migo-card-header>
+      <migo-icon card-icon name="mat:settings" size="lg" />
+      <migo-card-title>Configuración</migo-card-title>
+      <migo-card-subtitle>
+        Identificador de la app ante Google. La URL del Apps Script la pone el despliegue.
+      </migo-card-subtitle>
+    </migo-card-header>
+
+    <migo-card-body>
+      <form class="flex flex-col gap-4" [formGroup]="form" (ngSubmit)="saveSettings()">
+        <migo-form-field
+          label="Client ID de OAuth"
+          hint="Acaba en .apps.googleusercontent.com. Se crea en Google Cloud (appscript.md, paso 4)."
+        >
+          <migo-input
+            formControlName="clientId"
+            placeholder="123456-abc.apps.googleusercontent.com"
+          />
+        </migo-form-field>
+
+        @if (settingsSaved()) {
+          <p class="m-0 text-caption text-success" role="status">Configuración guardada.</p>
+        }
+
+        <button migo-button type="submit" variant="secondary" [loading]="busy()">
+          Guardar configuración
+        </button>
+      </form>
+    </migo-card-body>
+  </migo-card>
+
+  <!-- 2 · La cuenta conectada -->
+  <migo-card variant="outlined">
+    <migo-card-header>
+      <migo-card-title>Cuenta</migo-card-title>
+      <migo-card-subtitle>
+        @if (session().connected) {
+          Conectada. Todo se sincroniza con el Drive de esta cuenta.
+        } @else {
+          Sin conectar. Tus datos siguen guardados en este dispositivo.
+        }
+      </migo-card-subtitle>
+    </migo-card-header>
+
+    <migo-card-body>
+      <div class="flex flex-col gap-3">
+        @if (session().connected) {
+          <div class="flex flex-col gap-0.5">
+            <p class="m-0 text-base font-semibold text-body">{{ session().displayName }}</p>
+            <p class="m-0 text-sm text-muted">{{ session().email }}</p>
+          </div>
+        } @else {
+          <p class="m-0 text-sm text-body">
+            Al conectar, la app crea una hoja llamada «Clapastedyke — Recetario» en tu Google Drive
+            y escribe en ella tus recetas e insumos. Solo puede ver los archivos que ella misma
+            crea.
+          </p>
+        }
+
+        @if (actionError()) {
+          <p class="m-0 text-sm font-medium text-error" role="alert">{{ actionError() }}</p>
+        }
+      </div>
+    </migo-card-body>
+
+    <migo-card-footer>
+      @if (session().connected) {
+        <button
+          migo-button
+          type="button"
+          variant="secondary"
+          [loading]="busy()"
+          (click)="disconnect()"
+        >
+          Cerrar sesión
+        </button>
+      } @else {
+        <button migo-button type="button" variant="primary" [loading]="busy()" (click)="connect()">
+          Conectar con Google
+        </button>
+      }
+    </migo-card-footer>
+  </migo-card>
+
+  <!-- 3 · Estado de la sincronización -->
+  <migo-card variant="outlined">
+    <migo-card-header>
+      <migo-card-title>Sincronización</migo-card-title>
+      <migo-badge card-actions size="xs">{{ status().label }}</migo-badge>
+    </migo-card-header>
+
+    <migo-card-body>
+      <div class="flex flex-col gap-3">
+        <!-- Mobile-first: apila en móvil, dos columnas desde sm. -->
+        <dl class="m-0 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div class="flex flex-col gap-0.5">
+            <dt class="text-eyebrow uppercase text-muted">Última sincronización</dt>
+            <dd class="m-0 text-sm text-body">{{ status().lastSyncedLabel }}</dd>
+          </div>
+          <div class="flex flex-col gap-0.5">
+            <dt class="text-eyebrow uppercase text-muted">Cambios pendientes</dt>
+            <dd class="m-0 text-sm text-body">{{ status().pending }}</dd>
+          </div>
+        </dl>
+
+        @if (status().targetUrl) {
+          <a
+            class="inline-flex min-h-11 w-fit items-center font-body text-sm font-semibold text-brand underline"
+            [href]="status().targetUrl"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Abrir la hoja en Google Sheets
+          </a>
+        }
+
+        @if (status().lastError) {
+          <p class="m-0 text-sm font-medium text-error" role="alert">{{ status().lastError }}</p>
+        }
+      </div>
+    </migo-card-body>
+
+    <migo-card-footer>
+      <button
+        migo-button
+        type="button"
+        variant="primary"
+        [disabled]="!session().connected"
+        [loading]="busy()"
+        (click)="syncAll()"
+      >
+        Sincronizar todo
+      </button>
+    </migo-card-footer>
+  </migo-card>
+
+  <p class="m-0 text-caption text-muted">
+    Cómo se monta el Apps Script y el proyecto de Google, paso a paso: <code>appscript.md</code> en
+    la raíz del repositorio.
+  </p>
+</div>

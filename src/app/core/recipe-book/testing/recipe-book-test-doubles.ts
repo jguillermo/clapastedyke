@@ -11,8 +11,8 @@
 import { Provider } from '@angular/core';
 import { EntityId } from '../../_common/entity-id';
 import { BaseUnit, Quantity } from '../../_common/quantity';
-import { DomainEvent } from '../../_common/domain-event';
-import { EventBus, EventHandler } from '../../_common/event-bus';
+import { DomainEvent } from '../../_common/eventbus/domain-event';
+import { EventBus, EventHandler } from '../../_common/eventbus/event-bus';
 import { Supply } from '../domain/entities/supply';
 import { Recipe } from '../domain/entities/recipe';
 import { RecipeCategory } from '../domain/entities/recipe-category';
@@ -124,7 +124,7 @@ export class RecordingEventBus extends EventBus {
   async publish(events: readonly DomainEvent[]): Promise<void> {
     this.published.push(...events);
   }
-  subscribe(_eventName: string, _handler: EventHandler): void {
+  subscribe(_subscriber: string, _eventName: string, _handler: EventHandler): void {
     // no hace nada en los tests
   }
   names(): string[] {

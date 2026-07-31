@@ -1,7 +1,7 @@
 import { inject, Injectable } from '@angular/core';
 import { UseCase } from '../../../_common/use-case';
 import { BaseUnit, Quantity } from '../../../_common/quantity';
-import { EventBus } from '../../../_common/event-bus';
+import { EventBus } from '../../../_common/eventbus/event-bus';
 import { EntityId } from '../../../_common/entity-id';
 import { PurchasePrice } from '../../domain/value-objects/purchase-price';
 import { SupplyRepository } from '../../domain/repositories/supply.repository';

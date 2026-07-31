@@ -1,7 +1,7 @@
 import { inject, Injectable } from '@angular/core';
 import { UseCase } from '../../../_common/use-case';
 import { EntityId } from '../../../_common/entity-id';
-import { EventBus } from '../../../_common/event-bus';
+import { EventBus } from '../../../_common/eventbus/event-bus';
 import { RecipeFlavor } from '../../domain/entities/recipe-flavor';
 import { CapacityGroup, RecipeCapacity } from '../../domain/entities/recipe-capacity';
 import { RecipeFlavorRepository } from '../../domain/repositories/recipe-flavor.repository';

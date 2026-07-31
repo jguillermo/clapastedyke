@@ -28,6 +28,43 @@ const AREA = {
 };
 
 /**
+ * Los bounded contexts de `core/`. **Ninguno puede importar de otro**: lo que se comparte se sube a
+ * `core/_common` (contratos y nombres de evento) y lo que se comunica va por el `EventBus`.
+ *
+ * Al añadir un contexto hay que añadirlo aquí, o su aislamiento no se comprueba.
+ */
+const CORE_CONTEXTS = ['auth', 'external-sync', 'recipe-book'];
+
+/**
+ * Bloque de reglas que aísla un contexto de sus hermanos. Los patrones llevan `**​/` delante para
+ * cazar tanto el alias (`@core/otro/...`) como una ruta relativa que se escape (`../../otro/...`).
+ */
+const isolate = (context) => ({
+  files: [`src/app/core/${context}/**/*.ts`],
+  rules: {
+    'no-restricted-imports': [
+      'error',
+      {
+        patterns: [
+          {
+            group: [...AREA.components, ...AREA.features, ...AREA.platform],
+            message: 'core/ no importa de ninguna otra capa. Ver core-conventions.md.',
+          },
+          {
+            group: CORE_CONTEXTS.filter((other) => other !== context).flatMap((other) => [
+              `**/${other}`,
+              `**/${other}/**`,
+            ]),
+            message:
+              'Un bounded context NO depende de otro. Lo compartido se sube a core/_common (contrato o nombre de evento) y la comunicación va por eventos. Ver core-conventions.md.',
+          },
+        ],
+      },
+    ],
+  },
+});
+
+/**
  * Los cerrojos que mantienen la suite E2E independiente de `src/`, como patrón reutilizable: las
  * reglas se sobrescriben por clave, así que el bloque de `specs/` tiene que repetir este patrón
  * al añadir el suyo (si no, lo perdería).
@@ -195,6 +232,10 @@ export default tseslint.config(
       ],
     },
   },
+
+  // Cada bounded context, aislado de sus hermanos. Va DESPUÉS del bloque de arriba porque las
+  // reglas se sobrescriben por clave: `isolate()` repite la prohibición de capas junto con la suya.
+  ...CORE_CONTEXTS.map(isolate),
   {
     files: ['src/app/features/**/*.ts'],
     ignores: ['src/app/features/_common/**/*.ts'],

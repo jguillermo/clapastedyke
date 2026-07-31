@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { EntityId } from '../../../../_common/entity-id';
-import { EventBus } from '../../../../_common/event-bus';
+import { EventBus } from '../../../../_common/eventbus/event-bus';
 import { makeRecipeBookFakes, RecordingEventBus } from '../../recipe-book-test-doubles';
 import { RecipeFlavorRepository } from '../../../domain/repositories/recipe-flavor.repository';
 import { RecipeCapacityRepository } from '../../../domain/repositories/recipe-capacity.repository';

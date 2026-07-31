@@ -24,7 +24,7 @@ The authoritative coding rules are in **`.claude/CLAUDE.md`** (always loaded) an
 ## Commands
 
 ```bash
-npm run check       # ⇦ THE one to run before a PR: fixes (lint + format) and then verifies EVERYTHING
+npm run check       # autofix (lint + format) and then verify EVERYTHING, in CI order
 npm run fix         # autofix only: eslint --fix + prettier --write
 npm run verify      # validate only, in CI order: lint · format · types · unit · stories · E2E
 
@@ -46,14 +46,17 @@ npm run typecheck   # tsc over app + stories, unit specs, and the E2E suite
 - **Lint = ESLint flat config** (`eslint.config.mjs`, `angular-eslint` + `typescript-eslint`): Angular rules (signals over decorators, native control flow, OnPush), template **a11y**, and the **layer boundaries** as `no-restricted-imports` (`components/` with no app imports, `core/` isolated, features without `infrastructure/`, the E2E suite without `src/`). Not type-aware on purpose — `ng build` and the `tsc -p …` steps already type-check. What is not AST-analysable (real mobile-first at 375px, arbitrary Tailwind values inside a class string, specs living in `core/<ctx>/testing/`, one `Playground` with `play` per component) is still code review.
 - Formatting is Prettier (`.prettierrc`: 100 cols, single quotes) via `npm run format` / `npm run format:check`.
 - **CI gate** — `.github/workflows/ci.yml` runs on every PR to `main`: format + lint + types, unit tests, production build (with budgets), the stories' `play`, and the E2E suite (desktop + mobile). The single job to require in branch protection is **`CI OK (required)`**; it fails if any other job fails, is cancelled or skipped.
-- **`npm run check` is the local mirror of that gate**: it autofixes first (`fix`) and then runs the same checks in the same order, cheapest first (`verify`), so the slow E2E run only happens once everything else is green. The production build is covered inside `test:e2e` (it builds before serving `dist/`). CI splits the same work into parallel jobs instead of one chain.
+- **Checks are run ON DEMAND, never automatically.** Do **not** run `check`, `verify`, the tests, the build or the linter after editing code — not to "confirm the change works", not before finishing a task, not at the end of a turn. Run them **only when explicitly asked to**. CI is the gate; it runs on every PR and it is what decides whether a change is green.
+- What `npm run check` does when you *are* asked for it: autofixes first (`fix`) and then runs the same checks as CI in the same order, cheapest first (`verify`), so the slow E2E run only happens once everything else is green. The production build is covered inside `test:e2e` (it builds before serving `dist/`). CI splits the same work into parallel jobs instead of one chain.
 - **E2E lives only in `e2e/`** — one Playwright config (`e2e/playwright.config.ts`), specs mirroring `src/app/features/`, page objects in `e2e/pages/`, fixtures in `e2e/fixtures/`. Tests run against the **compiled build** served by `e2e/support/static-server.mjs`, not `ng serve`. See `e2e-tests-conventions.md` — that shape is mandatory for every new E2E test.
 - Tests use Vitest **globals** (`describe`/`it`/`expect`) — no per-file imports. `tsconfig.spec.json` discovers all `src/**/*.spec.ts` wherever they sit.
 - TypeScript **6** + Angular **22**. Path aliases have **no `baseUrl`** and use relative targets (`./src/app/*`) — required by TS6 (see `path-aliases-conventions.md`).
 
 ## What this app is
 
-A 3D in-browser cooking game (`misaevol` / "clapastedyke"). The user navigates a three.js kitchen world (`/home`); the real data-entry forms are the screens reached from it. `/ui` is the living component showcase. State is persisted locally in IndexedDB — there is no backend HTTP API in the current contexts.
+A 3D in-browser cooking game (`misaevol` / "clapastedyke"). The user navigates a three.js kitchen world (`/home`); the real data-entry forms are the screens reached from it. `/ui` is the living component showcase. State is persisted locally in IndexedDB — **that is the source of truth and it has no backend**.
+
+The one network integration is **optional and additive**: from `/cuenta` a user can connect a Google account and mirror recipes and supplies into a spreadsheet in their own Drive. The app never calls the Sheets or Drive APIs — it posts to a Google Apps Script Web App (`apps-script/Code.gs`) that writes on the user's behalf. Setting it up is manual and documented end to end in [`appscript.md`](appscript.md). Nothing about local persistence changes when it is off (which is the default: `public/config.json` ships empty).
 
 ## Architecture: four layers under `src/app/`
 
@@ -68,9 +71,11 @@ platform/     Cross-cutting tech (currently three/ — the 3D engine). No domain
 
 The dependency rule is strict and asymmetric: `features/` → `components/` + `core/*/application` (use cases) + `platform/`; `components/` and `platform/` import from **no app layer**; `core/` imports from no other layer.
 
+⚠️ **And inside `core/`, no bounded context may import from another** — not an entity, not a use case, not even an event name. They collaborate only through `core/_common/` (an abstract contract, implemented by the owner and injected by the consumer) and through **events** on the `EventBus`, whose names live in `core/_common/events/integration-events.ts`. ESLint enforces it per context from the `CORE_CONTEXTS` list in `eslint.config.mjs` — add every new context there. Full rule in `core-conventions.md` → «Los contextos no se conocen entre sí».
+
 ### Core (DDD) — read `example-conventions.md` for the canonical shape
 
-Each bounded context (`core/recipe-book/`, `core/progression/`) is split by tactical pattern:
+Each bounded context (`core/recipe-book/`, `core/auth/`, `core/external-sync/`) is split by tactical pattern:
 
 ```
 domain/         entities/ value-objects/ repositories/(abstract) services/(abstract) events/
@@ -88,11 +93,22 @@ Key invariants the code already follows:
 
 ### Shared kernel — `core/_common/`
 
-Cross-context primitives, **not** a bounded context: `UseCase`, `AggregateRoot` (records domain events via `pullEvents()`), `EntityId`, `Quantity`, the `EventBus` port + `InMemoryEventBus`, and `infrastructure/indexeddb/` (single DB `clapastedyke`, one object store per aggregate, versioning only ever ADDS stores). New cross-cutting projections also go here.
+Cross-context primitives, **not** a bounded context: `UseCase`, `AggregateRoot` (records domain events via `pullEvents()`), `EntityId`, `Quantity`, the `EventBus` port + `InMemoryEventBus`, `config/` (the `AppConfig` port over `public/config.json`, read at bootstrap), and `infrastructure/indexeddb/` (single DB `clapastedyke`, one object store per aggregate, versioning only ever ADDS stores). New cross-cutting projections also go here.
+
+**`core/auth/` and `core/external-sync/` are technology-agnostic on purpose.** Their domain and application layers never name Google, Sheets or Apps Script — not even in a type. Each has exactly one port (`Authenticator`, `SyncGateway`) and one concrete adapter, bound in its `provide*()`:
+
+| Context | Port | Today's adapter | Swapping it |
+|---|---|---|---|
+| `auth` | `Authenticator` | `infrastructure/google-authenticator.ts` (all of Google Identity Services) | one line in `auth.providers.ts` |
+| `external-sync` | `SyncGateway` | `infrastructure/apps-script-sync.gateway.ts` + `apps-script-endpoint.ts` | one line in `external-sync.providers.ts` |
+
+The deployment config (`AppConfig` over `public/config.json`) lives under `_common/infrastructure/config/` for the same reason: its keys are technology (`appsScriptUrl`, `googleClientId`), so only adapters read it — never a use case.
 
 ### Domain events
 
-Aggregates record events; the use case pulls and publishes them through `EventBus` after persisting. Subscribers in another context react — e.g. `progression/infrastructure/cake-composed-progress.subscriber.ts` listens for a recipe-book event to advance player progress. This is how contexts stay decoupled (see `progression`'s integration spec).
+Aggregates record events; the use case pulls and publishes them through `EventBus` after persisting. Subscribers in another context react — e.g. `sheet-sync/infrastructure/recipe-book-changed.subscriber.ts` listens for `RecipeSaved`/`SupplySaved` and queues the change for the spreadsheet. This is how contexts stay decoupled.
+
+⚠️ **`InMemoryEventBus.publish()` awaits every handler, inside the saving use case.** A subscriber must therefore do only cheap synchronous work; anything slow (network) is scheduled and not awaited, or every save waits for it.
 
 ### DI composition
 

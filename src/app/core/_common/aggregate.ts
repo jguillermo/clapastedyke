@@ -1,4 +1,4 @@
-import { DomainEvent } from './domain-event';
+import { DomainEvent } from './eventbus/domain-event';
 
 /**
  * Aggregate root that records the domain events it produces during its own
