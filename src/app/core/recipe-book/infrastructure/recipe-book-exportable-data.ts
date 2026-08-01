@@ -142,11 +142,13 @@ export class RecipeBookExportableData extends ExportableData {
       moldCapacityLabel: recipe.moldCapacityId
         ? (capacityLabels.get(recipe.moldCapacityId.value) ?? null)
         : null,
-      lineCount: recipe.lines.length,
+      // `lineCount`/`RecipeLineRow` conservan el nombre: son columnas de la hoja del usuario, no del
+      // dominio. Renombrarlas le cambiaría la cabecera a quien ya está sincronizando.
+      lineCount: recipe.ingredients.length,
     }));
 
     const recipeLineRows: RecipeLineRow[] = wantedRecipes.flatMap((recipe) =>
-      recipe.lines.map((line) => ({
+      recipe.ingredients.map((line) => ({
         recipeId: recipe.id.value,
         recipeName: recipe.name,
         supplyId: line.supplyId.value,

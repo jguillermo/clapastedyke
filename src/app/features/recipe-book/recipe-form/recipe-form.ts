@@ -68,8 +68,8 @@ export interface RecipeFormResult {
  * ingredientes (grilla reutilizable {@link SupplyGrid}, que muestra el costo). Las tres
  * características —sabor, porciones y molde, que coexisten— se piden en UN solo campo estilo Select2
  * ({@link SelectTag}) con un tipo por característica: elige o crea una etiqueta, con su × para
- * quitarla. Al guardar, asegura cada insumo por nombre ({@link SaveSupply}, create-if-absent),
- * resuelve cada característica a su id ({@link SaveRecipeProperty}, creándola si es nueva) y
+ * quitarla. Al guardar, persiste cada insumo por nombre ({@link SaveSupply}, que resuelve la
+ * identidad y no lo duplica), resuelve cada característica a su id ({@link SaveRecipeProperty}) y
  * persiste la receta ({@link SaveRecipe}); la categoría es fija. Inyecta solo use cases.
  */
 @Component({
@@ -245,16 +245,15 @@ export class RecipeForm {
     this.saving.set(true);
     this.errorMessage.set('');
     try {
-      // Asegura cada insumo por nombre (create-if-absent) y resuelve su id.
-      const lines = [];
+      // Persiste cada insumo y toma su id (el use case resuelve la identidad por nombre).
+      const ingredients = [];
       for (const line of parsed) {
         const { id: supplyId } = await this.saveSupply.execute({
           name: line.name,
-          baseUnit: line.baseUnit,
           usage: 'recipe',
           purchasePrice: line.purchase,
         });
-        lines.push({ supplyId, quantity: line.quantity });
+        ingredients.push({ supplyId, quantity: line.quantity });
       }
 
       const flavorId = await this.resolveProperty('flavor', this.propertyValue()['flavor']);
@@ -268,7 +267,7 @@ export class RecipeForm {
         id: this.data.recipe?.id,
         categoryId: this.data.category.id,
         name,
-        lines,
+        ingredients,
         flavorId,
         portionsCapacityId,
         moldCapacityId,

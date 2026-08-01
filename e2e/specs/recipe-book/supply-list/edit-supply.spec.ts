@@ -3,8 +3,8 @@ import { SUPPLIES, SUPPLY_COUNT } from '../../../support/seed';
 
 /**
  * Edición en línea de los insumos existentes: cada renglón **se autoguarda al salir de él**
- * (focusout a otra fila) vía `UpdateSupply`. Se puede renombrar y re-tarifar; la familia de unidad
- * queda fija (masa no acepta `u`, conteo solo `u`).
+ * (focusout a otra fila), persistiendo sobre el id de la fila. Se puede renombrar y re-tarifar; la
+ * familia de unidad queda fija (masa no acepta `u`, conteo solo `u`).
  *
  * Estado terminal = el cambio releído del catálogo (reabriendo el diálogo) o su efecto en el costo
  * de una receta.

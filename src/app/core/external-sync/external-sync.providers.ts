@@ -5,10 +5,8 @@ import {
   provideAppInitializer,
 } from '@angular/core';
 import { provideEventHandlers } from '@core/_common/eventbus/event-bus.providers';
-import { NotifyRecipeCreated } from './application/use-cases/notify-recipe-created.use-case';
-import { NotifyRecipeUpdated } from './application/use-cases/notify-recipe-updated.use-case';
-import { NotifySupplyCreated } from './application/use-cases/notify-supply-created.use-case';
-import { NotifySupplyUpdated } from './application/use-cases/notify-supply-updated.use-case';
+import { NotifyRecipeSaved } from './application/use-cases/notify-recipe-saved.use-case';
+import { NotifySupplySaved } from './application/use-cases/notify-supply-saved.use-case';
 import { SyncGateway } from './domain/services/sync.gateway';
 import { SyncOutbox } from './domain/services/sync-outbox';
 import { SyncStatus } from './domain/services/sync-status';
@@ -39,12 +37,7 @@ import { RecipeBookChangedSubscriber } from './infrastructure/recipe-book-change
  * integración enganche **exactamente esta lista**: si alguien añade uno aquí y se olvida del test —o
  * al revés— el test deja de demostrar lo que dice demostrar.
  */
-export const EVENT_DRIVEN_USE_CASES = [
-  NotifyRecipeCreated,
-  NotifyRecipeUpdated,
-  NotifySupplyCreated,
-  NotifySupplyUpdated,
-];
+export const EVENT_DRIVEN_USE_CASES = [NotifyRecipeSaved, NotifySupplySaved];
 
 export function provideExternalSync(): EnvironmentProviders {
   return makeEnvironmentProviders([

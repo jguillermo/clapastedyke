@@ -7,7 +7,7 @@ import { RecipeFlavor } from '../../domain/entities/recipe-flavor';
 import { Supply } from '../../domain/entities/supply';
 import { Recipe } from '../../domain/entities/recipe';
 import { PurchasePrice } from '../../domain/value-objects/purchase-price';
-import { SupplyLine } from '../../domain/value-objects/supply-line';
+import { RecipeIngredient } from '../../domain/value-objects/recipe-ingredient';
 import { RecipeCategoryRepository } from '../../domain/repositories/recipe-category.repository';
 import { RecipeCapacityRepository } from '../../domain/repositories/recipe-capacity.repository';
 import { RecipeFlavorRepository } from '../../domain/repositories/recipe-flavor.repository';
@@ -32,6 +32,12 @@ const SEED_KEY = 'recipe-book';
  *
  * Desactivación: `"enabled": false` en el JSON (o fichero ausente) → se omite. Nunca rompe el
  * arranque: los fallos se registran y se continúa.
+ *
+ * Construye los agregados con **`restore`**, no con `create`: sembrar es rehidratar datos que vienen
+ * con la app, no un guardado del usuario, así que no debe grabar ni publicar ningún `*Saved` (si no,
+ * cada arranque nuevo encolaría una sincronización del catálogo entero). El precio de esto es que no
+ * se revalidan las invariantes de entidad del JSON — los VO (`Quantity`, `PurchasePrice`) sí siguen
+ * validando, y las recetas sin líneas resolubles se siguen descartando.
  */
 @Injectable({ providedIn: 'root' })
 export class RecipeBookSeed {
@@ -64,12 +70,17 @@ export class RecipeBookSeed {
     // Orden: primero lo que las recetas referencian (sabores/capacidades/categorías/insumos).
     for (const f of doc.flavors ?? []) {
       await this.createIfAbsent(f.id, this.flavors, () =>
-        RecipeFlavor.create(new EntityId(f.id), f.label),
+        RecipeFlavor.restore({ id: new EntityId(f.id), label: f.label }),
       );
     }
     for (const c of doc.recipeCapacities ?? []) {
       await this.createIfAbsent(c.id, this.capacities, () =>
-        RecipeCapacity.create(new EntityId(c.id), c.group, c.label, c.factor),
+        RecipeCapacity.restore({
+          id: new EntityId(c.id),
+          group: c.group,
+          label: c.label,
+          factor: c.factor,
+        }),
       );
     }
     for (const c of doc.categories ?? []) {
@@ -110,34 +121,50 @@ export class RecipeBookSeed {
   }
 
   private buildCategory(c: SeedCategory): RecipeCategory {
-    return RecipeCategory.create(new EntityId(c.id), c.name);
+    return RecipeCategory.restore({ id: new EntityId(c.id), name: c.name });
   }
 
   private buildSupply(s: SeedSupply): Supply {
     const per = Quantity.of(s.purchasePrice.per.value, s.purchasePrice.per.unit);
     const price = PurchasePrice.of(s.purchasePrice.amount, per, s.purchasePrice.currency);
-    return Supply.create(new EntityId(s.id), s.name, s.baseUnit, s.usage, price);
+    return Supply.restore({
+      id: new EntityId(s.id),
+      name: s.name,
+      baseUnit: s.baseUnit,
+      usage: s.usage,
+      purchasePrice: price,
+    });
   }
 
-  /** Construye una receta, resolviendo la unidad de cada línea desde su insumo. Devuelve null si no puede. */
+  /** Construye una receta, resolviendo la unidad de cada ingrediente desde su insumo. Devuelve null si no puede. */
   private async buildRecipe(r: SeedRecipe): Promise<Recipe | null> {
     try {
-      const lines: SupplyLine[] = [];
+      const ingredients: RecipeIngredient[] = [];
       for (const line of r.lines) {
         const supply = await this.supplies.byId(new EntityId(line.supplyId));
         if (!supply) {
           console.warn(
-            `[recipe-book-seed] receta "${r.id}": insumo "${line.supplyId}" no encontrado, se omite la línea`,
+            `[recipe-book-seed] receta "${r.id}": insumo "${line.supplyId}" no encontrado, se omite el ingrediente`,
           );
           continue;
         }
-        lines.push(SupplyLine.of(supply.id, Quantity.of(line.quantity, supply.baseUnit)));
+        ingredients.push(
+          RecipeIngredient.of(supply.id, Quantity.of(line.quantity, supply.baseUnit)),
+        );
       }
-      if (lines.length === 0) {
-        console.warn(`[recipe-book-seed] receta "${r.id}" sin líneas válidas, se omite`);
+      if (ingredients.length === 0) {
+        console.warn(`[recipe-book-seed] receta "${r.id}" sin ingredientes válidos, se omite`);
         return null;
       }
-      return Recipe.create(new EntityId(r.id), new EntityId(r.categoryId), r.name, lines);
+      return Recipe.restore({
+        id: new EntityId(r.id),
+        categoryId: new EntityId(r.categoryId),
+        name: r.name,
+        ingredients,
+        flavorId: null,
+        portionsCapacityId: null,
+        moldCapacityId: null,
+      });
     } catch (error) {
       console.warn(`[recipe-book-seed] no se pudo construir la receta "${r.id}":`, error);
       return null;

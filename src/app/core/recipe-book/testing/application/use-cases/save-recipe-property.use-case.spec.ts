@@ -33,6 +33,16 @@ describe('SaveRecipeProperty', () => {
       expect(await TestBed.inject(RecipeFlavorRepository).all()).toHaveLength(1);
     });
 
+    it('reencontrar un sabor también es guardarlo: publica FlavorSaved otra vez', async () => {
+      const uc = TestBed.inject(SaveRecipeProperty);
+      const bus = TestBed.inject(EventBus) as RecordingEventBus;
+      await uc.execute({ kind: 'flavor', label: 'Vainilla' });
+      await uc.execute({ kind: 'flavor', label: 'vainilla' });
+
+      // No hay diferencia entre crear y actualizar: cada llamada persiste y anuncia lo mismo.
+      expect(bus.names().filter((n) => n === 'FlavorSaved')).toHaveLength(2);
+    });
+
     it('renames an existing flavor by id', async () => {
       const repo = TestBed.inject(RecipeFlavorRepository);
       const uc = TestBed.inject(SaveRecipeProperty);
@@ -89,7 +99,7 @@ describe('SaveRecipeProperty', () => {
       expect(await TestBed.inject(RecipeCapacityRepository).byGroup('portions')).toHaveLength(1);
     });
 
-    it('defaults the factor to 1 when omitted', async () => {
+    it('defaults the factor to 1 when omitted on a NEW capacity', async () => {
       const { id } = await TestBed.inject(SaveRecipeProperty).execute({
         kind: 'portions',
         label: '12',
@@ -97,6 +107,17 @@ describe('SaveRecipeProperty', () => {
 
       const saved = await TestBed.inject(RecipeCapacityRepository).byId(new EntityId(id));
       expect(saved?.factor).toBe(1);
+    });
+
+    it('omitir el factor CONSERVA el de la capacidad que ya estaba, no lo pisa con 1', async () => {
+      // El formulario de receta no siempre manda el factor; persistir 1 a ciegas borraría el real.
+      const uc = TestBed.inject(SaveRecipeProperty);
+      const { id } = await uc.execute({ kind: 'mold', label: 'Doble', factor: 2 });
+
+      await uc.execute({ kind: 'mold', label: 'Doble' });
+
+      const saved = await TestBed.inject(RecipeCapacityRepository).byId(new EntityId(id));
+      expect(saved?.factor).toBe(2);
     });
 
     it('rejects a non-positive factor (domain invariant)', async () => {

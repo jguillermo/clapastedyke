@@ -22,6 +22,9 @@ import { EVENT_DRIVEN_USE_CASES } from '../../external-sync.providers';
  *
  * Así el test cubre los cuatro eslabones que pueden romperse en silencio: el nombre del evento, la
  * anotación `@OnEvent`, el registro en el `provide*()` y el reparto asíncrono posterior al publicado.
+ *
+ * Hay **un evento por agregado** (`*Saved`): quien publica no distingue el alta de la edición, así
+ * que aquí tampoco hay dos casos de uso por agregado.
  */
 
 /** La cola en un array: mismo contrato que `EventWriter`/`EventReader` sobre IndexedDB. */
@@ -110,7 +113,7 @@ describe('Casos de uso dirigidos por evento de external-sync', () => {
     return logged.find((entry) => entry[0] === `[external-sync] ${label}`);
   }
 
-  it('los cuatro casos de uso declaran su evento con @OnEvent', () => {
+  it('todos los casos de uso declaran su evento con @OnEvent', () => {
     // El decorador es la mitad del enganche: sin anotación, `provideEventHandlers` no suscribe nada
     // y el fallo sería mudo (ningún error, simplemente no pasa nada).
     for (const useCase of EVENT_DRIVEN_USE_CASES) {
@@ -118,13 +121,13 @@ describe('Casos de uso dirigidos por evento de external-sync', () => {
     }
   });
 
-  it('RecipeCreated → llega a NotifyRecipeCreated con el id y la categoría', async () => {
+  it('RecipeSaved → llega a NotifyRecipeSaved con el id y la categoría', async () => {
     await bus.publish([
-      domainEvent(IntegrationEventName.RECIPE_CREATED, 'RE-1', { categoryId: 'CAT-1' }),
+      domainEvent(IntegrationEventName.RECIPE_SAVED, 'RE-1', { categoryId: 'CAT-1' }),
     ]);
     await deliver();
 
-    expect(traceFor('Receta creada')?.[1]).toMatchObject({
+    expect(traceFor('Receta guardada')?.[1]).toMatchObject({
       recipeId: 'RE-1',
       categoryId: 'CAT-1',
     });
@@ -132,49 +135,24 @@ describe('Casos de uso dirigidos por evento de external-sync', () => {
     expect(queue.records).toHaveLength(0);
   });
 
-  it('RecipeUpdated → llega a NotifyRecipeUpdated, y no al de creación', async () => {
-    await bus.publish([
-      domainEvent(IntegrationEventName.RECIPE_UPDATED, 'RE-1', { categoryId: 'CAT-1' }),
-    ]);
+  it('SupplySaved → llega a NotifySupplySaved con el nombre del insumo', async () => {
+    await bus.publish([domainEvent(IntegrationEventName.SUPPLY_SAVED, 'SU-1', { name: 'Harina' })]);
     await deliver();
 
-    expect(traceFor('Receta editada')?.[1]).toMatchObject({ recipeId: 'RE-1' });
-    expect(traceFor('Receta creada')).toBeUndefined();
+    expect(traceFor('Insumo guardado')?.[1]).toMatchObject({ supplyId: 'SU-1', name: 'Harina' });
+    expect(traceFor('Receta guardada')).toBeUndefined();
   });
 
-  it('SupplyCreated → llega a NotifySupplyCreated con el nombre del insumo', async () => {
+  it('un evento sin caso de uso aquí no atasca la cola', async () => {
+    // `RecipeCategorySaved` solo lo escucha el suscriptor de la cola de sincronización, que este test
+    // no monta: se reparte a nadie y se borra igual, sin bloquear a los siguientes.
     await bus.publish([
-      domainEvent(IntegrationEventName.SUPPLY_CREATED, 'SU-1', { name: 'Harina' }),
+      domainEvent(IntegrationEventName.RECIPE_CATEGORY_SAVED, 'CAT-1'),
+      domainEvent(IntegrationEventName.SUPPLY_SAVED, 'SU-1', { name: 'Harina' }),
     ]);
     await deliver();
 
-    expect(traceFor('Insumo creado')?.[1]).toMatchObject({ supplyId: 'SU-1', name: 'Harina' });
-  });
-
-  it('SupplyUpdated → llega a NotifySupplyUpdated con qué cambió', async () => {
-    await bus.publish([
-      domainEvent(IntegrationEventName.SUPPLY_UPDATED, 'SU-1', { renamed: true, repriced: false }),
-    ]);
-    await deliver();
-
-    expect(traceFor('Insumo editado')?.[1]).toMatchObject({
-      supplyId: 'SU-1',
-      renamed: true,
-      repriced: false,
-    });
-  });
-
-  it('una ráfaga de un guardado real llega entera y en orden', async () => {
-    // Lo que publica `SaveSupply` al crear: el genérico y el específico, en la misma llamada.
-    await bus.publish([
-      domainEvent(IntegrationEventName.SUPPLY_SAVED, 'SU-1', { isNew: true }),
-      domainEvent(IntegrationEventName.SUPPLY_CREATED, 'SU-1', { name: 'Harina' }),
-    ]);
-    await deliver();
-
-    // `SupplySaved` no tiene caso de uso aquí (lo escucha el suscriptor de la cola de sincronización,
-    // que este test no monta): se reparte a nadie y se borra igual, sin atascar al siguiente.
-    expect(traceFor('Insumo creado')).toBeDefined();
+    expect(traceFor('Insumo guardado')).toBeDefined();
     expect(queue.records).toHaveLength(0);
   });
 });

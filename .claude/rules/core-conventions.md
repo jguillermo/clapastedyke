@@ -48,31 +48,108 @@ Cómo se cablea, sin que nadie conozca a nadie:
 3. El **consumidor** inyecta la clase abstracta. Angular resuelve la implementación; el consumidor
    nunca sabe cuál es.
 
-### Los eventos salen del caso de uso, siempre
+### El agregado graba el evento; el caso de uso lo saca y lo publica
 
-Un agregado cambia → **el caso de uso publica el evento por el `EventBus` después de persistir**, con
-la factoría de eventos de su contexto y un nombre tomado de
-`core/_common/events/integration-events.ts`. El `aggregateId` es el id del agregado que cambió.
+El hecho es del agregado —«esta receta se guardó» le pasó a la receta—, así que **lo graba el propio
+agregado** en su factoría `create(...)`, con la factoría de eventos de su contexto y un nombre tomado
+de `core/_common/events/integration-events.ts`. Para eso el agregado extiende `AggregateRoot`
+(`core/_common/aggregate.ts`). El caso de uso **solo orquesta**: persiste y después saca la cola con
+`pullEvents()` para publicarla por el `EventBus`. El `aggregateId` es el id del agregado que cambió.
 
 ```typescript
+// domain/entities/recipe.ts — el agregado cuenta lo que le pasó
+const recipe = new Recipe({ id, categoryId, … });
+recipe.recordEvent(RecipeBookEvents.recipeSaved(id.value, categoryId.value));
+
+// application/use-cases/save-recipe.use-case.ts — el caso de uso solo saca y publica
 await this.recipes.save(recipe);
-await this.bus.publish([RecipeBookEvents.recipeSaved(recipeId.value, !id, categoryId)]);
+await this.bus.publish(recipe.pullEvents());
 ```
 
-El payload es **solo de primitivos** y mínimo: quien reacciona no debe poder reconstruir el modelo
-del emisor a partir del evento. Si necesita datos, los pide por un contrato de `core/_common/`.
+El payload es **solo de primitivos** y lleva el **estado completo del agregado**, aplanado por el
+propio agregado en un `snapshot()` privado. El `aggregateId` no se repite dentro. Quien reacciona
+tiene ahí todo lo que necesita y no vuelve a preguntar.
+
+> **Esto tiene un precio, y se acepta a sabiendas.** Un suscriptor puede reconstruir el modelo del
+> emisor desde el evento, así que **el payload es contrato público**: quitar o cambiar un campo rompe
+> a quien lo consuma, igual que cambiar una firma. Los tipos del payload (`RecipeSavedData`, …) se
+> exportan para que el agregado los construya con el compilador de su lado, pero **un contexto
+> suscriptor no puede importarlos** (no se conocen entre sí): lee `event.data['campo']` contra el
+> contrato documentado en la factoría. Si un consumidor necesita algo que el evento **no** lleva, eso
+> sí se pide por un contrato de `core/_common/` — el evento no crece para casos particulares.
+
+#### Contrapartida obligatoria: `restore(data)`, la rehidratación muda
+
+Todo agregado que grabe eventos expone **también** una factoría de rehidratación que **no graba
+nada**, y es la que usan los **mapeadores**, el **seed** y los **builders de test**:
+
+```typescript
+/** Rehidrata desde almacenamiento: NO graba eventos (leer no es guardar). */
+static restore(data: RecipeData): Recipe {
+  return new Recipe(data);
+}
+```
+
+Leer no es guardar. Un mapeador que rehidrate llamando a `create` encolaría un evento falso **en cada
+lectura**, y el bus es persistente (`PersistentEventBus`, cola en IndexedDB): se encolarían de verdad,
+y un simple listado dispararía la sincronización del catálogo entero. Por la misma razón, un builder
+de test que use `create` deja un `*Saved` en la cola y contamina los asertos sobre lo que publica el
+caso de uso.
+
+Regla práctica: **`create` es la única puerta que graba**; `restore` es la única puerta de
+infraestructura. Si un fichero de `infrastructure/` o de `testing/` llama a `create`, está mal.
 
 > **Está en ESLint.** `eslint.config.mjs` genera un bloque `no-restricted-imports` por contexto a
 > partir de `CORE_CONTEXTS`. Importar de un hermano es un error de lint, no una convención que se
 > pueda olvidar. **Al crear un contexto nuevo hay que añadirlo a esa lista**, o su aislamiento no se
 > comprueba.
 
+## CRITICAL: no existe crear ni actualizar, solo persistir
+
+Si el agregado no está se inserta y si está se actualiza, **sin ninguna diferencia observable** — lo
+resuelve el upsert del repositorio (`save` por id). De ahí se siguen tres cosas, y las tres son regla:
+
+| Consecuencia | Detalle |
+|---|---|
+| **Un solo evento por agregado** | `*Saved`. No hay `*Created`/`*Updated`, ni `isNew`, ni «qué cambió» en el payload: obligaría a quien publica a mirar el estado anterior para contar algo que nadie necesita. |
+| **Sin verbos de «re-poner datos»** | Nada de `renamedTo`, `repricedTo`, `relabeledTo`: no son hechos de negocio, son el mismo guardado con otros valores. Se arma el agregado con los datos nuevos **sobre la misma identidad** y se persiste. (Además, al devolver una instancia nueva perderían la cola de eventos en silencio.) Esto **no** afecta a las transiciones de ciclo de vida —`license.activate(...)`, `order.place()`—, que sí son hechos propios con su invariante y su evento. |
+| **Un solo caso de uso por intención** | `SaveX`, no `SaveX` + `UpdateX`. El caso de uso **no ramifica** por «existe o no». |
+
+Lo que el caso de uso **sí** decide, porque necesita repositorios y no cabe en el dominio:
+
+- **Qué identidad** se usa: la del id recibido; si no, la del agregado que ya tiene ese nombre/label;
+  y si no, una nueva (`nextIdentity()`). Resolver por nombre es lo que evita duplicados cuando una
+  pantalla da de alta al vuelo.
+- Las **unicidades** («ya existe un insumo con ese nombre»).
+- Los **defectos de lo que no llega**, tomados del agregado resuelto (`usage ?? existing?.usage ?? …`).
+  Ojo: un defecto ciego (`factor ?? 1`) **pisa** el dato real del que ya estaba.
+
+```typescript
+// Un solo camino: resolver identidad → armar → persistir → publicar.
+const existing = id ? await this.supplies.byId(new EntityId(id)) : await this.supplies.byName(name);
+const supply = Supply.create(
+  existing?.id ?? (id ? new EntityId(id) : this.supplies.nextIdentity()),
+  name,
+  existing?.baseUnit ?? purchasePrice.per.unit, // la invariante de unidad la valida `create`
+  usage ?? existing?.usage ?? 'recipe',
+  price,
+);
+await this.supplies.save(supply);
+await this.bus.publish(supply.pullEvents());
+```
+
+**Las invariantes siguen viviendo en el dominio.** Al no haber verbo de «re-poner datos» hay que
+comprobar que su validación esté en `create` y darle el dato que la activa (arriba, `existing.baseUnit`
+es lo que mantiene vivo el «un insumo en `g` no puede pasar a `u`»). Quitar el verbo nunca puede quitar
+la regla.
+
 ## Folder structure
 
 ```
 core/<context>/domain/
-├── entities/            ← classes with identity by ID
+├── entities/            ← classes with identity by ID (aggregate roots extend AggregateRoot)
 ├── value-objects/       ← classes with identity by value
+├── events/              ← *-events.ts: the context's event factories, recorded BY the aggregate
 ├── repositories/        ← abstract Repository contracts (data access)
 │   └── *.repository.ts
 └── services/

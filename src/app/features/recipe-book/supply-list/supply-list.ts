@@ -22,7 +22,6 @@ import {
   type MeasureKind,
 } from '@core/recipe-book/domain/value-objects/measure-input';
 import { SaveSupply } from '@core/recipe-book/application/use-cases/save-supply.use-case';
-import { UpdateSupply } from '@core/recipe-book/application/use-cases/update-supply.use-case';
 import type { Supply } from '@core/recipe-book/domain/entities/supply';
 
 type LineGroup = FormGroup<{
@@ -48,9 +47,9 @@ interface RowPurchase {
  * Lista editable de insumos como una **hoja del libro**: cada renglón es un
  * insumo (nombre → empaque → precio) que se edita en línea y se guarda solo. El
  * renglón vacío para **agregar** va **arriba** (primera fila); debajo, los insumos
- * existentes ordenados alfabéticamente se editan/renombran/reprecian por id
- * ({@link UpdateSupply}); el renglón vacío crea uno nuevo al escribirlo
- * ({@link SaveSupply}). Reusa la grilla y los controles del design system.
+ * existentes ordenados alfabéticamente se editan/renombran/reprecian por id; el renglón vacío acuña
+ * uno nuevo al escribirlo. Ambos casos son la misma llamada ({@link SaveSupply}): lo único que
+ * cambia es si se manda el id de la fila. Reusa la grilla y los controles del design system.
  */
 @Component({
   selector: 'app-supply-list',
@@ -63,7 +62,6 @@ export class SupplyList implements OnInit {
   private readonly fb = inject(FormBuilder);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly saveSupply = inject(SaveSupply);
-  private readonly updateSupply = inject(UpdateSupply);
 
   /** Catálogo de insumos a mostrar/editar (lo pasa el hub ya cargado). */
   readonly supplies = input<readonly Supply[]>([]);
@@ -190,7 +188,6 @@ export class SupplyList implements OnInit {
       try {
         const { id: newId } = await this.saveSupply.execute({
           name,
-          baseUnit: purchase.per.unit,
           usage: 'recipe',
           purchasePrice: purchase,
         });
@@ -217,7 +214,7 @@ export class SupplyList implements OnInit {
       return;
     }
     try {
-      await this.updateSupply.execute({ id, name, purchasePrice: purchase });
+      await this.saveSupply.execute({ id, name, purchasePrice: purchase });
       this.snapshot(line);
       this.errorMessage.set('');
       this.changed.emit();

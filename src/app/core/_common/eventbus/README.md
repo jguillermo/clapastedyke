@@ -63,28 +63,30 @@ aplicación. Un cambio en los agregados no obliga a subir la versión de la cola
 
 ### 1. Publicar un evento
 
-Desde el **caso de uso**, después de persistir. La factoría del evento vive en el contexto que lo
+**Lo graba el agregado** al armarse en su `create(...)`; el caso de uso solo lo saca con
+`pullEvents()` después de persistir y lo publica. La factoría del evento vive en el contexto que lo
 publica (`core/<ctx>/domain/events/`), y el nombre en el catálogo compartido
 (`core/_common/events/integration-events.ts`).
 
 ```typescript
-@Injectable({ providedIn: 'root' })
-export class SaveSupply extends UseCase<SaveSupplyRequest, { id: string }> {
-  private readonly supplies = inject(SupplyRepository);
-  private readonly bus = inject(EventBus);
+// domain/entities/supply.ts — el agregado cuenta lo que le pasó, con su estado completo
+const supply = new Supply({ id, name, baseUnit, usage, purchasePrice });
+supply.recordEvent(RecipeBookEvents.supplySaved(id.value, supply.snapshot()));
 
-  async execute(request: SaveSupplyRequest): Promise<{ id: string }> {
-    // …
-    await this.supplies.save(supply);
-    await this.bus.publish([RecipeBookEvents.supplySaved(supply.id.value, !existing)]);
-    return { id: supply.id.value };
-  }
-}
+// application/use-cases/save-supply.use-case.ts — el caso de uso solo saca y publica
+await this.supplies.save(supply);
+await this.bus.publish(supply.pullEvents());
 ```
 
-Reglas del evento: **nombre en pasado**, `aggregateId` = el id del agregado que cambió, y `data`
-**solo con primitivos** y lo mínimo. Quien reacciona no debe poder reconstruir tu modelo a partir
-del evento; si necesita datos, los pide por un contrato de `core/_common/`.
+Reglas del evento: **nombre en pasado**, `aggregateId` = el id del agregado que cambió (no se repite
+dentro del payload), y `data` **solo con primitivos**, con el **estado completo** del agregado. Eso
+convierte al payload en contrato público: quitar o cambiar un campo rompe a quien lo consuma. Si un
+consumidor necesita algo que el evento no lleva, lo pide por un contrato de `core/_common/`; el
+evento no crece para casos particulares.
+
+La contrapartida es que la **rehidratación no graba**: todo agregado expone un `restore(data)` mudo,
+y es el que usan mapeadores, seed y builders de test. Leer no es guardar — si el mapeador pasara por
+`create`, cada lectura encolaría un evento falso aquí dentro.
 
 ### 2. Reaccionar a un evento — un caso de uso con `@OnEvent`
 

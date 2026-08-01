@@ -1,72 +1,76 @@
 import { inject, Injectable } from '@angular/core';
 import { UseCase } from '../../../_common/use-case';
 import { BaseUnit, Quantity } from '../../../_common/quantity';
+import { EntityId } from '../../../_common/entity-id';
 import { EventBus } from '../../../_common/eventbus/event-bus';
 import { Supply } from '../../domain/entities/supply';
 import { PurchasePrice } from '../../domain/value-objects/purchase-price';
 import { SupplyUsage } from '../../domain/value-objects/supply-usage';
 import { SupplyRepository } from '../../domain/repositories/supply.repository';
-import { RecipeBookEvents } from '../../domain/events/recipe-book-events';
 
-/** Entrada de {@link SaveSupply}: los datos del insumo a guardar (incluye su precio de compra). */
+/** Entrada de {@link SaveSupply}: sobre qué identidad persistir y los datos del insumo. */
 export interface SaveSupplyRequest {
+  /**
+   * Identidad sobre la que persistir. Con id, renombrar la conserva (las recetas referencian el
+   * insumo por id). Sin id, se resuelve por nombre.
+   */
+  id?: string;
   name: string;
-  baseUnit: BaseUnit;
-  usage: SupplyUsage;
-  /** Cómo se compra: presentación (en unidad base) + precio + moneda. */
+  /** Para qué se usa. Omitido: se conserva el del insumo resuelto; si es nuevo, `recipe`. */
+  usage?: SupplyUsage;
+  /**
+   * Cómo se compra: presentación (en unidad base) + precio + moneda. La unidad de la presentación
+   * **es** la unidad base del insumo, así que no se manda por separado.
+   */
   purchasePrice: { amount: number; per: { value: number; unit: BaseUnit }; currency?: string };
 }
 
 /**
- * Guarda un insumo (cualquier uso). Upsert por nombre (case-insensitive): un nombre nuevo acuña una
- * identidad vía `Supply.create` (registra el precio inicial); uno existente se re-tarifa vía
- * `repricedTo` solo cuando el precio cambió. La invocan las pantallas de alta de insumo del
- * recetario.
+ * **Persiste** un insumo (de cualquier uso). La invocan la lista de insumos y el formulario de
+ * receta. No hay crear ni editar: se resuelve la identidad, se arma el insumo con los datos que
+ * llegan y se persiste — si no estaba se inserta, si estaba se actualiza, sin ninguna diferencia.
  *
- * Orquesta SupplyRepository y arma el precio con el VO PurchasePrice (uso vía SupplyUsage). Publica
- * `SupplySaved` vía EventBus, y además `SupplyCreated` si el nombre era nuevo o `SupplyUpdated` si
- * re-tarifó uno existente (si el insumo llega idéntico no publica ningún específico: no cambió nada).
+ * Lo que decide aquí, porque necesita el repositorio y no cabe en el dominio:
+ * - **Qué identidad** se usa: la del `id` recibido; si no, la del insumo que ya tiene ese nombre; y
+ *   si no, una nueva. Resolver por nombre es lo que evita duplicar insumos cuando el formulario de
+ *   receta los da de alta al vuelo.
+ * - Que el nombre **no lo tenga otro** insumo (unicidad case-insensitive).
+ * - Los defectos de lo que no llega (`usage`, moneda) y la **unidad base**, que se toma del insumo
+ *   resuelto: así `Supply.create` sigue rechazando que un insumo en `g` pase a medirse en `u`.
+ *
+ * El evento `SupplySaved` **lo graba el propio agregado**; aquí solo se saca la cola con
+ * `pullEvents()` tras persistir y se publica por el `EventBus`.
  */
 @Injectable({ providedIn: 'root' })
 export class SaveSupply extends UseCase<SaveSupplyRequest, { id: string }> {
   private readonly supplies = inject(SupplyRepository);
   private readonly bus = inject(EventBus);
 
-  async execute({
-    name,
-    baseUnit,
-    usage,
-    purchasePrice,
-  }: SaveSupplyRequest): Promise<{ id: string }> {
+  async execute({ id, name, usage, purchasePrice }: SaveSupplyRequest): Promise<{ id: string }> {
+    const sameName = await this.supplies.byName(name);
+    const existing = id ? await this.supplies.byId(new EntityId(id)) : sameName;
+    // El nombre solo puede estar tomado por el insumo sobre el que estamos persistiendo.
+    if (sameName && !(existing && sameName.id.equals(existing.id))) {
+      throw new Error('Ya existe un insumo con ese nombre');
+    }
+
     const price = PurchasePrice.of(
       purchasePrice.amount,
       Quantity.of(purchasePrice.per.value, purchasePrice.per.unit),
-      purchasePrice.currency ?? 'PEN',
+      purchasePrice.currency ?? existing?.purchasePrice.currency ?? 'PEN',
     );
-    const existing = await this.supplies.byName(name);
-
-    let supply: Supply;
-    let repriced = false;
-    if (!existing) {
-      supply = Supply.create(this.supplies.nextIdentity(), name, baseUnit, usage, price);
-    } else if (!existing.purchasePrice.equals(price)) {
-      supply = existing.repricedTo(price);
-      repriced = true;
-    } else {
-      supply = existing;
-    }
+    const supply = Supply.create(
+      existing?.id ?? (id ? new EntityId(id) : this.supplies.nextIdentity()),
+      name,
+      // La unidad base la fija el insumo que ya estaba; cambiar de familia (g ↔ u) lo rechaza
+      // `Supply.create`, que es donde vive la invariante.
+      existing?.baseUnit ?? purchasePrice.per.unit,
+      usage ?? existing?.usage ?? 'recipe',
+      price,
+    );
 
     await this.supplies.save(supply);
-    await this.bus.publish([
-      RecipeBookEvents.supplySaved(supply.id.value, !existing),
-      // El específico solo cuando de verdad pasó algo: reencontrar un insumo idéntico no es una
-      // edición, y anunciarla haría reaccionar a quien no debe.
-      ...(!existing
-        ? [RecipeBookEvents.supplyCreated(supply.id.value, supply.name)]
-        : repriced
-          ? [RecipeBookEvents.supplyUpdated(supply.id.value, { renamed: false, repriced: true })]
-          : []),
-    ]);
+    await this.bus.publish(supply.pullEvents());
     return { id: supply.id.value };
   }
 }

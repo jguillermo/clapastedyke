@@ -622,7 +622,7 @@ export class RecipeBook3d implements AfterViewInit, OnDestroy {
 
   private prefillLines(recipe: Recipe): InitialLine[] {
     const byId = this.suppliesById();
-    return recipe.lines.map((line) => {
+    return recipe.ingredients.map((line) => {
       const supply = byId.get(line.supplyId.value);
       return {
         name: supply?.name ?? '—',

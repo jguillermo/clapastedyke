@@ -106,7 +106,11 @@ The deployment config (`AppConfig` over `public/config.json`) lives under `_comm
 
 ### Domain events
 
-Aggregates record events; the use case pulls and publishes them through `EventBus` after persisting. Subscribers in another context react — e.g. `sheet-sync/infrastructure/recipe-book-changed.subscriber.ts` listens for `RecipeSaved`/`SupplySaved` and queues the change for the spreadsheet. This is how contexts stay decoupled.
+Aggregates record events **in their `create(...)` factory** (`extends AggregateRoot`); the use case pulls them with `pullEvents()` and publishes them through `EventBus` after persisting. Subscribers in another context react — e.g. `external-sync/infrastructure/recipe-book-changed.subscriber.ts` listens for `RecipeSaved`/`SupplySaved` and queues the change for the spreadsheet. This is how contexts stay decoupled.
+
+⚠️ **There is no create-vs-update anywhere: only persist.** If the aggregate isn't there it is inserted, if it is there it is updated, with no observable difference (`save` is an upsert). Hence **one event per aggregate** (`*Saved`, no `isNew`, no "what changed") and **no mutation verbs** (`renamedTo`, `repricedTo`) — you rebuild the aggregate with the new data on the **same identity**. The use case only resolves *which* identity (by id, by name/label, or a new one) and the uniqueness rules, because that needs repositories.
+
+⚠️ **Every aggregate also has `restore(data)`, which records nothing** — used by mappers, the seed and test builders. Reading is not saving: rehydrating through `create` would queue a spurious event on every IndexedDB read.
 
 ⚠️ **`InMemoryEventBus.publish()` awaits every handler, inside the saving use case.** A subscriber must therefore do only cheap synchronous work; anything slow (network) is scheduled and not awaited, or every save waits for it.
 

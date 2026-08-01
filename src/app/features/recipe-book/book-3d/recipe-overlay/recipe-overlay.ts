@@ -299,10 +299,10 @@ export class RecipeOverlay {
     return id ? (this.capacitiesById().get(id.value)?.label ?? null) : null;
   });
 
-  /** Líneas a costear, en el mismo orden que `recipe().lines` — el use case las devuelve alineadas. */
+  /** Líneas a costear, en el orden de `recipe().ingredients` — el use case las devuelve alineadas. */
   private readonly costRequestLines = computed(() => {
     const byId = this.suppliesById();
-    return this.recipe().lines.map((line) => {
+    return this.recipe().ingredients.map((line) => {
       const supply = byId.get(line.supplyId.value);
       return {
         purchasePrice: supply
@@ -323,7 +323,7 @@ export class RecipeOverlay {
   protected readonly lines = computed<LineView[]>(() => {
     const names = this.suppliesById();
     const costItems = this.costResult().items;
-    return this.recipe().lines.map((line, i) => ({
+    return this.recipe().ingredients.map((line, i) => ({
       name: names.get(line.supplyId.value)?.name ?? '—',
       quantity: formatQuantity(line.quantity.value, line.quantity.unit),
       price: costItems[i]?.cost || '—',

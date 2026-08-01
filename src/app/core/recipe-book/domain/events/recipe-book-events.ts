@@ -1,52 +1,79 @@
 import { DomainEvent, domainEvent } from '@core/_common/eventbus/domain-event';
 import { IntegrationEventName } from '@core/_common/events/integration-events';
+import { BaseUnit } from '@core/_common/quantity';
+import type { CapacityGroup } from '../entities/recipe-capacity';
+import { SupplyUsage } from '../value-objects/supply-usage';
 
 /**
- * Catálogo de eventos de dominio del contexto recipe-book (§6.2). Nombres en pasado y payloads
- * mínimos de primitivos (Published Language).
+ * Catálogo de eventos de dominio del contexto recipe-book (§6.2). Nombres en pasado y payload de
+ * **solo primitivos** (Published Language).
  *
- * Se publican desde los **casos de uso**, por el `EventBus`, después de persistir el agregado. El
- * `aggregateId` es el id del agregado que cambió, y el nombre del agregado es el que declara
- * `RECIPE_BOOK_AGGREGATES`, así que un suscriptor puede pedir esos datos sin conocer este contexto.
+ * **Los graba el propio agregado** en su factoría `create(...)`, no el caso de uso: el hecho «esta
+ * receta se guardó» es del agregado, así que es él quien lo cuenta. El caso de uso solo persiste y
+ * después saca la cola con `pullEvents()` para publicarla por el `EventBus`. La vía muda de
+ * rehidratación es `restore(...)`, que **no** graba nada — por eso los mapeadores usan `restore` y
+ * nunca `create` (si no, cada lectura de IndexedDB encolaría un evento falso).
+ *
+ * Hay **un solo evento por agregado**: `*Saved`. No existe crear-vs-actualizar (ver
+ * `integration-events.ts`), así que tampoco existe `isNew` en el payload.
+ *
+ * **El payload lleva el estado completo del agregado**, aplanado a primitivos: quien reacciona tiene
+ * ahí todo lo que necesita y no tiene que volver a preguntar. Es una decisión deliberada y tiene un
+ * precio: un suscriptor puede reconstruir el modelo del recetario desde el evento, así que este
+ * payload **es contrato público** — cambiar o quitar un campo rompe a quien lo consuma, igual que
+ * cambiar una firma. El `aggregateId` sigue siendo el id del agregado que cambió y no se repite
+ * dentro del payload.
+ *
+ * Los tipos de payload se exportan para que el agregado los construya con el compilador de su lado;
+ * **un suscriptor de otro contexto no puede importarlos** (ver `core-conventions.md` → «Los contextos
+ * no se conocen»), lee `event.data['campo']` contra este contrato documentado.
  *
  * Los nombres viven en el shared kernel porque **cruzan la frontera**: quien se suscribe no puede
- * importar de aquí (ver `core-conventions.md` → «Los contextos no se conocen»).
+ * importar de aquí.
  */
-/** Qué cambió en un insumo al editarlo. Ambos pueden ser `true` en el mismo guardado. */
-export interface SupplyChanges {
-  renamed: boolean;
-  repriced: boolean;
-}
+
+/** Un ingrediente tal y como viaja en el evento: insumo por id y cuánto, en su unidad base. */
+export type RecipeIngredientData = {
+  supplyId: string;
+  quantity: number;
+  unit: BaseUnit;
+};
+
+export type RecipeSavedData = {
+  categoryId: string;
+  name: string;
+  ingredients: readonly RecipeIngredientData[];
+  flavorId: string | null;
+  portionsCapacityId: string | null;
+  moldCapacityId: string | null;
+};
+
+export type SupplySavedData = {
+  name: string;
+  baseUnit: BaseUnit;
+  usage: SupplyUsage;
+  purchasePrice: {
+    amount: number;
+    currency: string;
+    per: { value: number; unit: BaseUnit };
+  };
+};
+
+export type RecipeCategorySavedData = { name: string };
+
+export type FlavorSavedData = { label: string };
+
+export type RecipeCapacitySavedData = { group: CapacityGroup; label: string; factor: number };
 
 export const RecipeBookEvents = {
-  supplySaved: (supplyId: string, isNew: boolean): DomainEvent =>
-    domainEvent(IntegrationEventName.SUPPLY_SAVED, supplyId, { isNew }),
-  recipeSaved: (recipeId: string, isNew: boolean, categoryId: string): DomainEvent =>
-    domainEvent(IntegrationEventName.RECIPE_SAVED, recipeId, { isNew, categoryId }),
-
-  /**
-   * El alta y la edición como hechos distintos, para quien reacciona distinto a cada uno.
-   *
-   * Van **además** de `supplySaved`/`recipeSaved`, no en su lugar: quien solo necesita saber que el
-   * dato cambió (la sincronización) sigue escuchando el genérico y no se entera de esta distinción.
-   * Por eso un guardado publica los dos eventos en la misma llamada a `publish`.
-   *
-   * El payload sigue siendo mínimo: `isNew` sobra —lo dice el nombre— y de la edición solo se
-   * cuenta **qué** cambió, nunca a qué valor. Quien quiera el dato lo pide por un contrato del
-   * shared kernel.
-   */
-  supplyCreated: (supplyId: string, name: string): DomainEvent =>
-    domainEvent(IntegrationEventName.SUPPLY_CREATED, supplyId, { name }),
-  supplyUpdated: (supplyId: string, changes: SupplyChanges): DomainEvent =>
-    domainEvent(IntegrationEventName.SUPPLY_UPDATED, supplyId, { ...changes }),
-  recipeCreated: (recipeId: string, categoryId: string): DomainEvent =>
-    domainEvent(IntegrationEventName.RECIPE_CREATED, recipeId, { categoryId }),
-  recipeUpdated: (recipeId: string, categoryId: string): DomainEvent =>
-    domainEvent(IntegrationEventName.RECIPE_UPDATED, recipeId, { categoryId }),
-  recipeCategorySaved: (categoryId: string, isNew: boolean): DomainEvent =>
-    domainEvent(IntegrationEventName.RECIPE_CATEGORY_SAVED, categoryId, { isNew }),
-  flavorSaved: (flavorId: string, isNew: boolean): DomainEvent =>
-    domainEvent(IntegrationEventName.FLAVOR_SAVED, flavorId, { isNew }),
-  recipeCapacitySaved: (capacityId: string, isNew: boolean): DomainEvent =>
-    domainEvent(IntegrationEventName.RECIPE_CAPACITY_SAVED, capacityId, { isNew }),
+  supplySaved: (supplyId: string, data: SupplySavedData): DomainEvent =>
+    domainEvent(IntegrationEventName.SUPPLY_SAVED, supplyId, data),
+  recipeSaved: (recipeId: string, data: RecipeSavedData): DomainEvent =>
+    domainEvent(IntegrationEventName.RECIPE_SAVED, recipeId, data),
+  recipeCategorySaved: (categoryId: string, data: RecipeCategorySavedData): DomainEvent =>
+    domainEvent(IntegrationEventName.RECIPE_CATEGORY_SAVED, categoryId, data),
+  flavorSaved: (flavorId: string, data: FlavorSavedData): DomainEvent =>
+    domainEvent(IntegrationEventName.FLAVOR_SAVED, flavorId, data),
+  recipeCapacitySaved: (capacityId: string, data: RecipeCapacitySavedData): DomainEvent =>
+    domainEvent(IntegrationEventName.RECIPE_CAPACITY_SAVED, capacityId, data),
 };

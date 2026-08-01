@@ -5,6 +5,8 @@ import { RecipeFlavorRecord } from '../records';
 /**
  * ACL de persistencia: traduce `RecipeFlavor` ⇄ `RecipeFlavorRecord` (primitivos de IndexedDB).
  * Usado por `IndexedDbRecipeFlavorRepository`. Mapea el `EntityId` y el `label`.
+ *
+ * `toDomain` usa **`restore`**, nunca `create`: `create` graba un `FlavorSaved`.
  */
 export const RecipeFlavorMapper = {
   toRecord(flavor: RecipeFlavor): RecipeFlavorRecord {
@@ -12,6 +14,6 @@ export const RecipeFlavorMapper = {
   },
 
   toDomain(record: RecipeFlavorRecord): RecipeFlavor {
-    return RecipeFlavor.create(new EntityId(record.id), record.label);
+    return RecipeFlavor.restore({ id: new EntityId(record.id), label: record.label });
   },
 };
