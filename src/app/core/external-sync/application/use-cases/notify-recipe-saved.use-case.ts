@@ -28,7 +28,9 @@ export class NotifyRecipeSaved extends UseCase<DomainEvent, void> {
     // eslint-disable-next-line no-console -- traza provisional: el sitio donde irá el envío remoto.
     console.log('[external-sync] Receta guardada', {
       recipeId: event.aggregateId,
-      categoryId: event.data['categoryId'],
+      // El payload trae el estado completo de la receta (nombre, ingredientes, sabor, capacidades):
+      // se vuelca entero, que es justo lo que necesitará el envío remoto.
+      ...event.data,
       occurredOn: event.occurredOn.toISOString(),
     });
   }

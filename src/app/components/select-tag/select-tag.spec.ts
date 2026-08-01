@@ -194,7 +194,7 @@ class ExtraFieldHost {
     },
   ];
   last: Record<string, string> = {};
-  createdEvents: { typeKey: string; value: string; extra: number }[] = [];
+  createdEvents: { typeKey: string; value: string; extra?: number }[] = [];
 }
 
 describe('SelectTag (extraField / factor capture)', () => {
@@ -446,5 +446,53 @@ describe('SelectTag (extraField / factor capture)', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+@Component({
+  imports: [SelectTag],
+  template: `<migo-select-tag
+    [types]="types"
+    (valueChange)="last = $event"
+    (created)="createdEvents.push($event)"
+  />`,
+})
+class PlainCreateHost {
+  /** Un solo tipo, SIN `extraField`: se crea directo, sin pedir nada. */
+  readonly types: SelectTagType[] = [
+    { key: 'flavor', label: 'Sabor', values: ['Vainilla'], allowCreate: true },
+  ];
+  last: Record<string, string> = {};
+  createdEvents: { typeKey: string; value: string; extra?: number }[] = [];
+}
+
+describe('SelectTag (creación sin extraField)', () => {
+  let fixture: ComponentFixture<PlainCreateHost>;
+
+  afterEach(() => fixture?.destroy());
+
+  it('anuncia la creación igualmente, con el evento sin `extra`', () => {
+    // Sin esto, el consumidor no se entera de que hay un valor nuevo que persistir y se pierde.
+    fixture = TestBed.createComponent(PlainCreateHost);
+    fixture.detectChanges();
+    const input = fixture.nativeElement.querySelector('input') as HTMLInputElement;
+
+    input.value = 'Chocolate';
+    input.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    const options = () => [...document.querySelectorAll('[role="option"]')] as HTMLElement[];
+    options()
+      .find((o) => o.textContent?.includes('Añadir «Chocolate»'))!
+      .click();
+    fixture.detectChanges();
+    options()
+      .find((o) => o.textContent?.trim() === 'Sabor')!
+      .click();
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.last).toEqual({ flavor: 'Chocolate' });
+    expect(fixture.componentInstance.createdEvents).toEqual([
+      { typeKey: 'flavor', value: 'Chocolate' },
+    ]);
   });
 });

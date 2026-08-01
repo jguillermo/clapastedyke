@@ -143,6 +143,17 @@ comprobar que su validación esté en `create` y darle el dato que la activa (ar
 es lo que mantiene vivo el «un insumo en `g` no puede pasar a `u`»). Quitar el verbo nunca puede quitar
 la regla.
 
+#### Un caso de uso de guardado NO se usa para resolver ids
+
+Si una pantalla llama a `SaveX` solo para averiguar el id de algo que ya existe, cada guardado anuncia
+un hecho que no ocurrió (y quien escucha se pone a sincronizar de mentira). La salida no es añadir una
+comparación «¿cambió algo?» dentro del caso de uso: es **no llamarlo**. Cada agregado se guarda desde
+su propia pantalla, con su propio caso de uso, y quien necesite un id lo trae ya resuelto.
+
+Por eso un caso de uso de guardado **toca un solo repositorio, el suyo**, y recibe los ids de los
+demás agregados ya resueltos, sin comprobar que existan: comprobarlo añade lecturas y acoplamiento sin
+impedir nada de verdad (entre la comprobación y el guardado el dato puede desaparecer igual).
+
 ## Folder structure
 
 ```

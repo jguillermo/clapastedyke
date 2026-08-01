@@ -33,22 +33,22 @@ import { SupplyUsage } from '../value-objects/supply-usage';
  */
 
 /** Un ingrediente tal y como viaja en el evento: insumo por id y cuánto, en su unidad base. */
-export type RecipeIngredientData = {
+export interface RecipeIngredientData {
   supplyId: string;
   quantity: number;
   unit: BaseUnit;
-};
+}
 
-export type RecipeSavedData = {
+export interface RecipeSavedData {
   categoryId: string;
   name: string;
   ingredients: readonly RecipeIngredientData[];
   flavorId: string | null;
   portionsCapacityId: string | null;
   moldCapacityId: string | null;
-};
+}
 
-export type SupplySavedData = {
+export interface SupplySavedData {
   name: string;
   baseUnit: BaseUnit;
   usage: SupplyUsage;
@@ -57,13 +57,21 @@ export type SupplySavedData = {
     currency: string;
     per: { value: number; unit: BaseUnit };
   };
-};
+}
 
-export type RecipeCategorySavedData = { name: string };
+export interface RecipeCategorySavedData {
+  name: string;
+}
 
-export type FlavorSavedData = { label: string };
+export interface FlavorSavedData {
+  label: string;
+}
 
-export type RecipeCapacitySavedData = { group: CapacityGroup; label: string; factor: number };
+export interface RecipeCapacitySavedData {
+  group: CapacityGroup;
+  label: string;
+  factor: number;
+}
 
 export const RecipeBookEvents = {
   supplySaved: (supplyId: string, data: SupplySavedData): DomainEvent =>

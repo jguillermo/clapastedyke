@@ -83,9 +83,7 @@ describe('Supply', () => {
     // `create` sigue impidiendo que un insumo por conteo pase a medirse en gramos.
     const eggs = Supply.create(new EntityId('IN-1'), 'Huevos', 'u', 'recipe', countPrice(12));
 
-    expect(() =>
-      Supply.create(eggs.id, eggs.name, eggs.baseUnit, eggs.usage, price(5)),
-    ).toThrow();
+    expect(() => Supply.create(eggs.id, eggs.name, eggs.baseUnit, eggs.usage, price(5))).toThrow();
     expect(() =>
       Supply.create(eggs.id, eggs.name, eggs.baseUnit, eggs.usage, countPrice(15, 30)),
     ).not.toThrow();

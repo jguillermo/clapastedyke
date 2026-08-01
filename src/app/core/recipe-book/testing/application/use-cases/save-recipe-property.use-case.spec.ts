@@ -33,14 +33,17 @@ describe('SaveRecipeProperty', () => {
       expect(await TestBed.inject(RecipeFlavorRepository).all()).toHaveLength(1);
     });
 
-    it('reencontrar un sabor también es guardarlo: publica FlavorSaved otra vez', async () => {
+    it('guardar es guardar: reencontrar el mismo sabor publica igual, sin comparar estados', async () => {
+      // Solo se llama cuando el usuario crea o edita una característica de verdad; el formulario de
+      // receta no lo usa para resolver ids, así que no hay que decidir si «pasó algo».
       const uc = TestBed.inject(SaveRecipeProperty);
       const bus = TestBed.inject(EventBus) as RecordingEventBus;
       await uc.execute({ kind: 'flavor', label: 'Vainilla' });
-      await uc.execute({ kind: 'flavor', label: 'vainilla' });
+      bus.published.length = 0;
 
-      // No hay diferencia entre crear y actualizar: cada llamada persiste y anuncia lo mismo.
-      expect(bus.names().filter((n) => n === 'FlavorSaved')).toHaveLength(2);
+      await uc.execute({ kind: 'flavor', label: 'Vainilla' });
+
+      expect(bus.published.map((e) => e.name)).toEqual(['FlavorSaved']);
     });
 
     it('renames an existing flavor by id', async () => {

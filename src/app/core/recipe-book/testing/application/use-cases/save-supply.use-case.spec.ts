@@ -53,13 +53,28 @@ describe('SaveSupply', () => {
     expect(await repo.all()).toHaveLength(1);
   });
 
-  it('guardar sin cambios también publica: no hay diferencia entre crear y actualizar', async () => {
+  it('guardar es guardar: llamarlo otra vez publica igual, sin comparar estados', async () => {
+    // Este caso de uso solo se invoca cuando el usuario guarda un insumo de verdad (su pantalla, o
+    // fijar su precio en la grilla). Nadie lo usa para resolver ids, así que no hay que decidir si
+    // «pasó algo»: si te llaman, pasó.
     const uc = TestBed.inject(SaveSupply);
     const { id } = await uc.execute({ name: 'Harina', purchasePrice: aPurchase('g', 5) });
     const bus = TestBed.inject(EventBus) as RecordingEventBus;
     bus.published.length = 0;
 
-    await uc.execute({ id, name: 'Harina', purchasePrice: aPurchase('g', 5) });
+    const again = await uc.execute({ id, name: 'Harina', purchasePrice: aPurchase('g', 5) });
+
+    expect(again.id).toBe(id); // la identidad no cambia
+    expect(bus.published.map((e) => e.name)).toEqual(['SupplySaved']);
+  });
+
+  it('cambiar el precio sí publica', async () => {
+    const uc = TestBed.inject(SaveSupply);
+    const { id } = await uc.execute({ name: 'Harina', purchasePrice: aPurchase('g', 5) });
+    const bus = TestBed.inject(EventBus) as RecordingEventBus;
+    bus.published.length = 0;
+
+    await uc.execute({ id, name: 'Harina', purchasePrice: aPurchase('g', 9) });
 
     expect(bus.published.map((e) => e.name)).toEqual(['SupplySaved']);
   });

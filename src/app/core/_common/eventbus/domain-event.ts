@@ -10,16 +10,22 @@ export interface DomainEvent {
   readonly data: Readonly<Record<string, unknown>>;
 }
 
-export function domainEvent(
-  name: string,
-  aggregateId: string,
-  data: Record<string, unknown> = {},
-): DomainEvent {
+/**
+ * Crea un evento sellando la hora en que ocurrió.
+ *
+ * `data` acepta **cualquier objeto plano** —normalmente el tipo de payload que declara el contexto
+ * que publica— y se guarda como registro de primitivos. Se pide `object` y no
+ * `Record<string, unknown>` a propósito: TypeScript no le da índice implícito a una `interface`
+ * (puede ampliarse por *declaration merging*), así que exigir el `Record` obligaría a cada contexto a
+ * declarar su payload como `type`, y quien lo escribiera como `interface` —lo normal en este repo—
+ * chocaría con un error críptico.
+ */
+export function domainEvent(name: string, aggregateId: string, data: object = {}): DomainEvent {
   return Object.freeze({
     name,
     aggregateId,
     occurredOn: new Date(),
-    data: Object.freeze({ ...data }),
+    data: Object.freeze({ ...data }) as Readonly<Record<string, unknown>>,
   });
 }
 

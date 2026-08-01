@@ -60,7 +60,6 @@ export class SaveRecipeProperty extends UseCase<SaveRecipePropertyRequest, { id:
       existing?.id ?? (id ? new EntityId(id) : this.flavors.nextIdentity()),
       label,
     );
-
     await this.flavors.save(flavor);
     await this.bus.publish(flavor.pullEvents());
     return { id: flavor.id.value };
@@ -81,7 +80,6 @@ export class SaveRecipeProperty extends UseCase<SaveRecipePropertyRequest, { id:
       label,
       factor ?? existing?.factor ?? 1,
     );
-
     await this.capacities.save(capacity);
     await this.bus.publish(capacity.pullEvents());
     return { id: capacity.id.value };

@@ -23,6 +23,7 @@ import {
   type MeasureKind,
 } from '@core/recipe-book/domain/value-objects/measure-input';
 import { PreviewRecipeCost } from '@core/recipe-book/application/use-cases/preview-recipe-cost.use-case';
+import { SaveSupply } from '@core/recipe-book/application/use-cases/save-supply.use-case';
 import { PriceCapture, type PurchaseValue } from '../price-capture/price-capture';
 import type { SupplyOption, ParsedLine } from './types';
 
@@ -30,12 +31,15 @@ export type { SupplyOption, ParsedLine, PurchaseValue };
 
 /** Línea inicial para precargar la grilla al editar una receta (cantidad en unidad base). */
 export interface InitialLine {
+  supplyId: string;
   name: string;
   quantity: number;
   baseUnit: BaseUnit;
 }
 
 type LineGroup = FormGroup<{
+  /** Identidad del insumo de la fila; vacía hasta que se resuelve del catálogo o se guarda. */
+  supplyId: FormControl<string>;
   name: FormControl<string>;
   quantity: FormControl<string>;
   unit: FormControl<string>;
@@ -52,8 +56,12 @@ interface CostView {
  * líneas **nombre → cantidad → costo**: el costo de la cantidad de la receta
  * (regla de tres) y el ghost de la compra se muestran en la 3ª columna; si el
  * insumo ya existe se jala su precio, y si es nuevo un popover en línea
- * ({@link PriceCapture}) pide cómo se compra. No persiste nada: el form padre
- * llama a {@link collect} para obtener las líneas válidas y guardarlas.
+ * ({@link PriceCapture}) pide cómo se compra.
+ *
+ * **Fijar el precio guarda el insumo** ahí mismo ({@link SaveSupply}): el insumo es un agregado con
+ * su propio guardado, y ese es el momento en que el usuario decide su precio. Así, al guardar la
+ * receta, todos los insumos ya existen y {@link collect} devuelve solo sus ids — el form padre no
+ * vuelve a guardar ninguno.
  */
 @Component({
   selector: 'app-supply-grid',
@@ -74,6 +82,7 @@ interface CostView {
 export class SupplyGrid implements OnInit {
   private readonly fb = inject(FormBuilder);
   private readonly previewCost = inject(PreviewRecipeCost);
+  private readonly saveSupply = inject(SaveSupply);
 
   /** Catálogo de insumos existentes (con precio) para autocompletar y jalar el precio. */
   readonly supplies = input<SupplyOption[]>([]);
@@ -222,9 +231,9 @@ export class SupplyGrid implements OnInit {
   }
 
   /**
-   * Valida las líneas y devuelve las parseadas listas para persistir, o `null`
-   * mostrando el error dentro de la grilla. No persiste insumos: eso lo hace el
-   * form padre con el resultado.
+   * Valida las líneas y devuelve las parseadas, con el insumo **ya resuelto a su id**, o `null`
+   * mostrando el error dentro de la grilla. No guarda nada aquí: el insumo se guardó antes, al
+   * confirmar su precio ({@link onPriceConfirmed}); el form padre solo manda la receta.
    */
   collect(): ParsedLine[] | null {
     this.errorMessage.set('');
@@ -255,7 +264,15 @@ export class SupplyGrid implements OnInit {
         this.errorMessage.set(`La unidad de "${name}" no coincide con cómo lo compras.`);
         return null;
       }
+      // Red de seguridad: el insumo se guarda al fijar su precio, así que a estas alturas siempre
+      // debería tener id. Si no lo tiene, ese guardado falló y no hay nada que referenciar.
+      const supplyId = this.supplyIdOf(line);
+      if (!supplyId) {
+        this.errorMessage.set(`No se pudo guardar el insumo "${name}". Vuelve a fijar su precio.`);
+        return null;
+      }
       parsed.push({
+        supplyId,
         name,
         baseUnit: purchase.per.unit,
         quantity: measure.quantity.value,
@@ -295,13 +312,38 @@ export class SupplyGrid implements OnInit {
     setTimeout(() => origin?.focus());
   }
 
-  protected onPriceConfirmed(purchase: PurchaseValue): void {
+  /**
+   * Fijar cómo se compra un insumo **es guardarlo**: se persiste aquí mismo, en el momento en que el
+   * usuario lo decide, y la fila se queda con su id. Así, cuando se guarde la receta, el insumo ya
+   * existe y solo hay que mandar su id — el formulario no vuelve a guardarlo.
+   */
+  protected async onPriceConfirmed(purchase: PurchaseValue): Promise<void> {
     const r = this.activeRow();
-    if (r !== null) {
-      this.lines.at(r)?.controls.purchase.setValue(purchase);
-      this.activeRow.set(null);
-      this.activeOrigin.set(null);
-      setTimeout(() => this.tableRef()?.focusCell(r + 1, 0));
+    const line = r === null ? null : this.lines.at(r);
+    if (r === null || !line) {
+      return;
+    }
+    line.controls.purchase.setValue(purchase);
+    this.activeRow.set(null);
+    this.activeOrigin.set(null);
+    setTimeout(() => this.tableRef()?.focusCell(r + 1, 0));
+
+    const name = line.controls.name.value.trim();
+    if (!name) {
+      return;
+    }
+    try {
+      const { id } = await this.saveSupply.execute({
+        id: this.supplyIdOf(line) || undefined,
+        name,
+        usage: 'recipe',
+        purchasePrice: purchase,
+      });
+      line.controls.supplyId.setValue(id);
+    } catch (error) {
+      this.errorMessage.set(
+        error instanceof Error ? error.message : 'No se pudo guardar el insumo.',
+      );
     }
   }
 
@@ -310,6 +352,13 @@ export class SupplyGrid implements OnInit {
   }
 
   // --- Helpers ---
+
+  /** Id del insumo de la fila: el que ya tenía o el del catálogo que coincide por nombre. */
+  private supplyIdOf(line: LineGroup): string {
+    const known = line.controls.supplyId.value;
+    if (known) return known;
+    return this.optionsByName().get(line.controls.name.value.trim().toLowerCase())?.id ?? '';
+  }
 
   /** Precio de la fila: el fijado en el popover o el jalado del catálogo por nombre. */
   private purchaseFor(line: LineGroup): PurchaseValue | null {
@@ -369,6 +418,7 @@ export class SupplyGrid implements OnInit {
 
   private newLine(): LineGroup {
     return this.fb.nonNullable.group({
+      supplyId: [''],
       name: [''],
       quantity: [''],
       unit: [''],
@@ -380,6 +430,7 @@ export class SupplyGrid implements OnInit {
   private seededLine(seed: InitialLine): LineGroup {
     const display = displayQuantity(seed.quantity, seed.baseUnit);
     return this.fb.nonNullable.group({
+      supplyId: [seed.supplyId],
       name: [seed.name],
       quantity: [display.value],
       unit: [display.unit],

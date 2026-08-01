@@ -22,7 +22,8 @@ export class NotifySupplySaved extends UseCase<DomainEvent, void> {
     // eslint-disable-next-line no-console -- traza provisional: el sitio donde irá el envío remoto.
     console.log('[external-sync] Insumo guardado', {
       supplyId: event.aggregateId,
-      name: event.data['name'],
+      // El payload trae el estado completo del insumo (nombre, unidad, uso, precio de compra).
+      ...event.data,
       occurredOn: event.occurredOn.toISOString(),
     });
   }
