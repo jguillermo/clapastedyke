@@ -158,18 +158,42 @@ export class RecipeBookChangedSubscriber {
 provideAppInitializer(() => inject(RecipeBookChangedSubscriber).register()),
 ```
 
-### 4. Ver qué eventos están ocurriendo
+### 4. Ver qué eventos están ocurriendo (modo depuración)
 
 Un evento sin suscriptor es **invisible**: se publica, se encola y se entrega a nadie, así que desde
-fuera «no se publicó» y «no lo escucha nadie» se ven igual. `provideEventTracing()` engancha
-`TraceEvents`, que deja en consola **todos** los nombres del catálogo según se reparten:
+fuera «no se publicó» y «no lo escucha nadie» se ven igual.
+
+`provideEventTracing()` (ya está en `app.config.ts`) engancha `TraceEvents`, que registra **todos**
+los nombres del catálogo según se reparten. Registra en nivel **`debug`**, así que **hay que encender
+el modo depuración** — desde la consola del navegador:
+
+```js
+migoLog.on(); // debug + info + warn + error. Se recuerda entre recargas.
+```
+
+Y a partir de ahí, usando la app:
 
 ```
-[events] RecipeCapacitySaved { aggregateId: 'RC-1', occurredOn: '…', data: { group: 'portions', … } }
+[events] SupplySaved          { aggregateId: 'ing-manjar', occurredOn: '…', data: { name: 'Manjar blanco', … } }
+[events] RecipeSaved          { aggregateId: 'rec-bano-manjar', occurredOn: '…', data: { name: 'Baño de Manjar', … } }
+[events] RecipeCapacitySaved  { aggregateId: 'RC-1', occurredOn: '…', data: { group: 'portions', label: '33', factor: 33 } }
 ```
 
-Se suscribe sobre `Object.values(IntegrationEventName)` —un nombre nuevo queda trazado solo— y por eso
-va a mano y no por `@OnEvent`. Está en `app.config.ts`; quitar esa línea lo apaga del todo.
+Cómo leerlo:
+
+| Lo que ves | Lo que significa |
+|---|---|
+| El evento **no** aparece | No se publicó: el caso de uso no llegó a guardar, o guardó otra cosa |
+| Aparece, pero no pasa nada más | Se publicó y no lo escucha nadie: falta el `@OnEvent` (o el suscriptor a mano) |
+| Aparece y su suscriptor tampoco registra | El handler falló: mira el `error` del `[eventbus]` justo después |
+
+`TraceEvents` se suscribe sobre `Object.values(IntegrationEventName)` —un nombre nuevo queda trazado
+solo— y por eso va a mano y no por `@OnEvent`, que solo admite un evento. Para apagarlo del todo,
+quita `provideEventTracing()` de `app.config.ts`; para silenciarlo sin tocar código, `migoLog.off()`.
+
+> El resto del registro va por el mismo interruptor: el `Logger` de `core/_common/logger/` es el
+> **único** sitio autorizado a usar `console` (ESLint lo impone). Ver la sección «Registro y modo
+> depuración» de [`CLAUDE.md`](../../../../../CLAUDE.md).
 
 ---
 
@@ -277,9 +301,12 @@ lógica, y se ejercitan desde los E2E (ver
 1. Añade el nombre a `core/_common/events/integration-events.ts` **si cruza la frontera** de un
    bounded context. Si es interno, déjalo en el `domain/events/` de su contexto.
 2. Añade la factoría en `core/<ctx>/domain/events/<ctx>-events.ts`.
-3. Publícalo desde el caso de uso, **después** de persistir.
+3. **Grábalo en el agregado**, en su `create(...)`; el caso de uso lo saca con `pullEvents()`
+   **después** de persistir y lo publica.
 4. Si alguien reacciona: `@OnEvent(nombre)` en un caso de uso +
    `provideEventHandlers(...)` en el `provide*()` de su contexto.
+5. Compruébalo: `migoLog.on()` y usa la app — si el nombre está en el catálogo del shared kernel, el
+   trazador lo muestra **sin tocar nada más**.
 
 > Los contextos **no se conocen entre sí**: quien reacciona toma el nombre del evento del shared
 > kernel, nunca del contexto que lo publica. Regla completa en

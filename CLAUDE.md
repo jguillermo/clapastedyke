@@ -112,11 +112,65 @@ Aggregates record events **in their `create(...)` factory** (`extends AggregateR
 
 ⚠️ **Every aggregate also has `restore(data)`, which records nothing** — used by mappers, the seed and test builders. Reading is not saving: rehydrating through `create` would queue a spurious event on every IndexedDB read.
 
-⚠️ **`InMemoryEventBus.publish()` awaits every handler, inside the saving use case.** A subscriber must therefore do only cheap synchronous work; anything slow (network) is scheduled and not awaited, or every save waits for it.
+⚠️ **The bus is `PersistentEventBus`: it queues to IndexedDB and delivers later, on its own tick** — `publish()` does *not* await the subscribers, so a slow handler never blocks the save, and a pending event survives a reload. Delivery is at-least-once per subscriber, so **handlers must tolerate running twice**. Full spec: [`core/_common/eventbus/README.md`](src/app/core/_common/eventbus/README.md).
 
 ### DI composition
 
 `app.config.ts` only **aggregates** `provide*()` functions (`provideEventBus()`, `provideRecipeBook()`, `provideProgression()`) — it never decides implementations. Each context owns its bindings in its `*.providers.ts`. Routes are lazy-loaded standalone components in `app.routes.ts`.
+
+## Registro y modo depuración — `console.*` PROHIBIDO (hard rule)
+
+**Nada en el proyecto llama a `console`.** Se registra por el puerto `Logger`
+(`core/_common/logger/logger.ts`), con cuatro niveles: `debug` · `info` · `warn` · `error`. Lo impone
+ESLint: `no-console` es **error** en todo el repo, con **una única excepción declarada por ruta** —el
+adaptador `core/_common/logger/console-logger.ts`—, así que no se puede saltar con un
+`eslint-disable` suelto. (En specs y stories la regla está apagada.)
+
+Un `console.log` suelto no se puede apagar, ni filtrar por nivel, ni llevar a otro destino. Con un
+puerto, el modo depuración es un interruptor y cambiar a dónde van los logs —un panel dentro del
+juego, un fichero— es escribir otro adaptador y tocar `provideLogger()`.
+
+```typescript
+private readonly log = inject(Logger).scoped('recipe-book-seed'); // prefija todo con [recipe-book-seed]
+
+this.log.warn(`no se pudo sembrar "${id}"`, error); // el dato va aparte, no interpolado
+```
+
+Vive en `core/_common/` —junto al `EventBus`— y no en `platform/` porque **`core/` también registra y
+no puede importar de `platform/`**.
+
+### Cómo encender el modo depuración
+
+**Está callado por defecto, y solo funciona en desarrollo** (en un build de producción no escribe
+nunca). Se enciende **a pedido**, desde la consola del navegador:
+
+```js
+migoLog.on()        // todo: debug, info, warn y error
+migoLog.on('warn')  // solo warn y error
+migoLog.off()       // silencio
+migoLog.level()     // qué hay puesto ahora
+```
+
+El nivel se recuerda en `localStorage`, así que **sobrevive a la recarga**: lo enciendes una vez y
+sigues viendo el arranque, el seed y los eventos en las siguientes.
+
+### Comprobar que los eventos están llegando
+
+Un evento sin suscriptor es invisible: se publica, se encola y se entrega a nadie, así que «no se
+publicó» y «no lo escucha nadie» se ven igual. Para distinguirlos, `provideEventTracing()`
+(`app.config.ts`) engancha `TraceEvents`, que registra en **`debug`** *todos* los nombres del
+Published Language:
+
+```js
+migoLog.on()   // y ahora usa la app
+// [events] SupplySaved          { aggregateId: 'ing-manjar', occurredOn: '…', data: { name: 'Manjar blanco', … } }
+// [events] RecipeSaved          { aggregateId: 'rec-bano-manjar', occurredOn: '…', data: { name: 'Baño de Manjar', ingredients: […], … } }
+// [events] RecipeCapacitySaved  { aggregateId: 'RC-1', occurredOn: '…', data: { group: 'portions', label: '33', factor: 33 } }
+```
+
+Si un evento **no** aparece ahí, no se publicó (mira si el caso de uso llegó a guardar). Si aparece
+pero no pasa lo que esperabas, el que falta es el suscriptor. Quitar `provideEventTracing()` de
+`app.config.ts` lo apaga del todo.
 
 ## Styling — SOLO Tailwind del tema Migo (hard rule)
 
