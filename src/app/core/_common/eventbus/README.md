@@ -120,11 +120,14 @@ export function provideRecipeBook(): EnvironmentProviders {
 }
 ```
 
-El decorador se puede **apilar** para escuchar varios eventos con el mismo caso de uso:
+**Un evento y solo uno por caso de uso.** El decorador **no se apila**: decorar dos veces lanza al
+cargar el módulo. Un caso de uso es *una* intención, y escuchar dos hechos distintos con el mismo
+código obliga a ramificar por `event.name` dentro — justo el `switch` que un caso de uso por evento
+evita. Si dos eventos deben provocar lo mismo, se escriben dos casos de uso que llamen a lo mismo.
 
 ```typescript
 @OnEvent(IntegrationEventName.RECIPE_SAVED)
-@OnEvent(IntegrationEventName.SUPPLY_SAVED)
+@OnEvent(IntegrationEventName.SUPPLY_SAVED) // ← Error: RewardTheChef ya escucha "RecipeSaved"
 @Injectable({ providedIn: 'root' })
 export class RewardTheChef extends UseCase<DomainEvent, void> { … }
 ```
@@ -135,8 +138,9 @@ nunca, no se instancia nunca.
 ### 3. Suscribirse a mano
 
 Para lo que **no es un caso de uso**: adaptadores con estado propio, agrupación (debounce) o que
-reaccionan a varios eventos con lógica distinta. Hoy lo usan
-`external-sync/infrastructure/recipe-book-changed.subscriber.ts` y `auth-changed.subscriber.ts`.
+reaccionan a **varios** eventos —que es justo lo que `@OnEvent` no permite—. Hoy lo usan
+`external-sync/infrastructure/recipe-book-changed.subscriber.ts`, `auth-changed.subscriber.ts` y el
+trazador (`provideEventTracing()`, ver abajo).
 
 ```typescript
 @Injectable({ providedIn: 'root' })
@@ -153,6 +157,19 @@ export class RecipeBookChangedSubscriber {
 // en el *.providers.ts del contexto
 provideAppInitializer(() => inject(RecipeBookChangedSubscriber).register()),
 ```
+
+### 4. Ver qué eventos están ocurriendo
+
+Un evento sin suscriptor es **invisible**: se publica, se encola y se entrega a nadie, así que desde
+fuera «no se publicó» y «no lo escucha nadie» se ven igual. `provideEventTracing()` engancha
+`TraceEvents`, que deja en consola **todos** los nombres del catálogo según se reparten:
+
+```
+[events] RecipeCapacitySaved { aggregateId: 'RC-1', occurredOn: '…', data: { group: 'portions', … } }
+```
+
+Se suscribe sobre `Object.values(IntegrationEventName)` —un nombre nuevo queda trazado solo— y por eso
+va a mano y no por `@OnEvent`. Está en `app.config.ts`; quitar esa línea lo apaga del todo.
 
 ---
 
@@ -238,14 +255,16 @@ siguiente tick. Si ves registros acumulados, hay un suscriptor fallando.
 
 ## Tests
 
-Dos specs, dentro del propio paquete:
+Tres specs, dentro del propio paquete:
 
 - `persistent-event-bus.spec.ts` — los cuatro pasos, el orden, el objeto compartido, los reintentos
   por suscriptor y la supervivencia a un reinicio. Corre contra una **cola falsa declarada en el
   propio fichero**, no contra IndexedDB: lo que se verifica es el reparto, y eso no depende de dónde
   esté guardada la cola.
-- `on-event.spec.ts` — el decorador: qué anota, que dispara el caso de uso, que se puede apilar, que
-  una subclase no hereda suscripciones y que una excepción sube al bus.
+- `on-event.spec.ts` — el decorador: qué anota, que dispara el caso de uso, que **apilarlo lanza**,
+  que una subclase no hereda la suscripción y que una excepción sube al bus.
+- `trace-events.use-case.spec.ts` — que el trazador cubre el catálogo **entero** (si alguien lo
+  cambia por una lista escrita a mano, falla) y qué deja en consola.
 
 `EventDatabase`, `EventWriter` y `EventReader` no tienen test unitario: son CRUD de IndexedDB sin
 lógica, y se ejercitan desde los E2E (ver

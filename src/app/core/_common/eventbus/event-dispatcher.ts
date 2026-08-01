@@ -1,6 +1,7 @@
-import { Injectable } from '@angular/core';
+import { inject, Injectable } from '@angular/core';
 import { DomainEvent } from './domain-event';
 import { EventHandler } from './event-bus';
+import { Logger } from '../logger/logger';
 
 /**
  * Enviar el evento a todos los suscriptores.
@@ -17,6 +18,8 @@ import { EventHandler } from './event-bus';
  */
 @Injectable()
 export class EventDispatcher {
+  private readonly log = inject(Logger).scoped('eventbus');
+
   /** nombre de evento → (id de suscriptor → handler). */
   private readonly handlers = new Map<string, Map<string, EventHandler>>();
 
@@ -45,7 +48,7 @@ export class EventDispatcher {
         delivered.add(subscriber);
       } catch (error) {
         failed = true;
-        console.error(`El suscriptor ${subscriber} ha fallado con ${event.name}:`, error);
+        this.log.error(`El suscriptor ${subscriber} ha fallado con ${event.name}`, error);
       }
     }
     return failed ? [...delivered] : null;

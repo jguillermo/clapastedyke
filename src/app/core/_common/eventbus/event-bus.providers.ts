@@ -11,8 +11,9 @@ import { EventDatabase } from './event-database';
 import { EventDispatcher } from './event-dispatcher';
 import { EventReader } from './event-reader';
 import { EventWriter } from './event-writer';
-import { EventDrivenUseCase, subscribedEventsOf } from './on-event';
+import { EventDrivenUseCase, subscribedEventOf } from './on-event';
 import { PersistentEventBus } from './persistent-event-bus';
+import { TraceEvents } from './trace-events.use-case';
 
 /**
  * Enlaza el bus de eventos: su base de datos, quien escribe, quien lee, quien reparte, y el bus que
@@ -31,6 +32,30 @@ export function provideEventBus(): EnvironmentProviders {
     PersistentEventBus,
     { provide: EventBus, useExisting: PersistentEventBus },
     provideAppInitializer(() => inject(PersistentEventBus).start()),
+  ]);
+}
+
+/**
+ * Engancha el trazador: **deja en consola todos los eventos** del Published Language según se
+ * reparten. Es una herramienta de diagnóstico, no parte del funcionamiento; se declara aparte de
+ * `provideEventBus()` justamente para que apagarla sea quitar una línea de `app.config.ts`.
+ *
+ * No pasa por `provideEventHandlers`: eso lee `@OnEvent`, que declara **un** evento por caso de uso.
+ * El trazador no reacciona a un hecho concreto, escucha el catálogo entero, así que se suscribe a
+ * mano — una vez por nombre, con el mismo id de suscriptor.
+ */
+export function provideEventTracing(): EnvironmentProviders {
+  return makeEnvironmentProviders([
+    provideAppInitializer(() => {
+      const dispatcher = inject(EventDispatcher);
+      const injector = inject(EnvironmentInjector);
+
+      for (const eventName of TraceEvents.traced) {
+        dispatcher.subscribe(TraceEvents.name, eventName, async (event) => {
+          await injector.get(TraceEvents).execute(event);
+        });
+      }
+    }),
   ]);
 }
 
@@ -67,13 +92,15 @@ export function provideEventHandlers(
       for (const useCase of useCases) {
         // Sin `@OnEvent` no hay nada que enganchar, y eso no es un error: simplemente no se
         // suscribe a nada.
-        for (const eventName of subscribedEventsOf(useCase)) {
-          // Se espera al caso de uso: si lanza, el bus lo cuenta como entrega fallida y lo
-          // reintentará. Descartar la promesa aquí rompería esa garantía.
-          dispatcher.subscribe(useCase.name, eventName, async (event) => {
-            await injector.get(useCase).execute(event);
-          });
+        const eventName = subscribedEventOf(useCase);
+        if (!eventName) {
+          continue;
         }
+        // Se espera al caso de uso: si lanza, el bus lo cuenta como entrega fallida y lo
+        // reintentará. Descartar la promesa aquí rompería esa garantía.
+        dispatcher.subscribe(useCase.name, eventName, async (event) => {
+          await injector.get(useCase).execute(event);
+        });
       }
     }),
   ]);

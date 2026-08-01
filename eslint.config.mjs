@@ -154,9 +154,19 @@ export default tseslint.config(
       // repo y se lee mejor que un if/else de una línea. El corto-circuito (`a && b()`) no.
       '@typescript-eslint/no-unused-expressions': ['error', { allowTernary: true }],
 
-      // Sin trazas de depuración en el bundle (warn/error sí: el seed los usa para datos legacy).
-      'no-console': ['error', { allow: ['warn', 'error'] }],
+      // La consola se usa a través del `Logger` (`core/_common/logger/`), NUNCA directamente —ni
+      // siquiera `warn`/`error`—. Un `console.*` suelto no se puede apagar, ni filtrar por nivel, ni
+      // llevar a otro destino. El único fichero autorizado es el adaptador, exceptuado más abajo.
+      'no-console': 'error',
     },
+  },
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // El adaptador de consola: el ÚNICO sitio del proyecto que puede usar `console`
+  // ───────────────────────────────────────────────────────────────────────────
+  {
+    files: ['src/app/core/_common/logger/console-logger.ts'],
+    rules: { 'no-console': 'off' },
   },
 
   // ───────────────────────────────────────────────────────────────────────────

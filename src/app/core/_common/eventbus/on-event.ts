@@ -16,13 +16,13 @@ export interface EventDrivenUseCase {
 const SUBSCRIBED_TO = Symbol('eventbus:subscribedTo');
 
 interface Decorated {
-  [SUBSCRIBED_TO]?: readonly string[];
+  [SUBSCRIBED_TO]?: string;
 }
 
 /** Lo propio de la clase, sin heredar lo del padre. */
-function own(useCase: Type<EventDrivenUseCase>): readonly string[] {
+function own(useCase: Type<EventDrivenUseCase>): string | null {
   const decorated = useCase as Type<EventDrivenUseCase> & Decorated;
-  return Object.hasOwn(decorated, SUBSCRIBED_TO) ? (decorated[SUBSCRIBED_TO] ?? []) : [];
+  return Object.hasOwn(decorated, SUBSCRIBED_TO) ? (decorated[SUBSCRIBED_TO] ?? null) : null;
 }
 
 /**
@@ -38,7 +38,11 @@ function own(useCase: Type<EventDrivenUseCase>): readonly string[] {
  * }
  * ```
  *
- * Se puede apilar para escuchar varios eventos con el mismo caso de uso.
+ * **Un evento y solo uno por caso de uso.** No se apila: un caso de uso es *una* intención, y
+ * escuchar dos hechos distintos con el mismo código obliga a ramificar por `event.name` dentro —que
+ * es exactamente el `switch` que un caso de uso por evento evita—. Si dos eventos deben provocar lo
+ * mismo, se escriben dos casos de uso que llamen a lo mismo. Decorar dos veces **lanza** al cargar el
+ * módulo: en silencio, el segundo pisaría al primero y una suscripción desaparecería sin ruido.
  *
  * **El decorador solo anota, no suscribe.** Suscribir al importar el fichero haría que un caso de uso
  * que nadie inyecta —y que por tanto el bundler puede tirar— no llegara nunca a engancharse, y que el
@@ -47,14 +51,17 @@ function own(useCase: Type<EventDrivenUseCase>): readonly string[] {
  */
 export function OnEvent(eventName: string) {
   return (useCase: Type<EventDrivenUseCase>): void => {
-    Object.defineProperty(useCase, SUBSCRIBED_TO, {
-      value: Object.freeze([...own(useCase), eventName]),
-      configurable: true,
-    });
+    const already = own(useCase);
+    if (already) {
+      throw new Error(
+        `@OnEvent solo admite un evento por caso de uso: ${useCase.name} ya escucha "${already}" y se intentó añadir "${eventName}".`,
+      );
+    }
+    Object.defineProperty(useCase, SUBSCRIBED_TO, { value: eventName, configurable: true });
   };
 }
 
-/** Los eventos que un caso de uso declaró con {@link OnEvent}. Vacío si no declaró ninguno. */
-export function subscribedEventsOf(useCase: Type<EventDrivenUseCase>): readonly string[] {
+/** El evento que un caso de uso declaró con {@link OnEvent}, o `null` si no declaró ninguno. */
+export function subscribedEventOf(useCase: Type<EventDrivenUseCase>): string | null {
   return own(useCase);
 }

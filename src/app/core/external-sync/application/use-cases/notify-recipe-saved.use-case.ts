@@ -1,7 +1,8 @@
-import { Injectable } from '@angular/core';
+import { inject, Injectable } from '@angular/core';
 import { DomainEvent } from '@core/_common/eventbus/domain-event';
 import { OnEvent } from '@core/_common/eventbus/on-event';
 import { IntegrationEventName } from '@core/_common/events/integration-events';
+import { Logger } from '@core/_common/logger/logger';
 import { UseCase } from '@core/_common/use-case';
 
 /**
@@ -24,9 +25,10 @@ import { UseCase } from '@core/_common/use-case';
 @OnEvent(IntegrationEventName.RECIPE_SAVED)
 @Injectable({ providedIn: 'root' })
 export class NotifyRecipeSaved extends UseCase<DomainEvent, void> {
+  private readonly log = inject(Logger).scoped('external-sync');
+
   async execute(event: DomainEvent): Promise<void> {
-    // eslint-disable-next-line no-console -- traza provisional: el sitio donde irá el envío remoto.
-    console.log('[external-sync] Receta guardada', {
+    this.log.info('Receta guardada', {
       recipeId: event.aggregateId,
       // El payload trae el estado completo de la receta (nombre, ingredientes, sabor, capacidades):
       // se vuelca entero, que es justo lo que necesitará el envío remoto.

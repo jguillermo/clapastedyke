@@ -1,5 +1,6 @@
 import { inject, Injectable } from '@angular/core';
 import { EntityId } from '../../../_common/entity-id';
+import { Logger } from '../../../_common/logger/logger';
 import { Quantity } from '../../../_common/quantity';
 import { RecipeCategory } from '../../domain/entities/recipe-category';
 import { RecipeCapacity } from '../../domain/entities/recipe-capacity';
@@ -48,6 +49,7 @@ export class RecipeBookSeed {
   private readonly recipes = inject(RecipeRepository);
   private readonly source = inject(SeedDataSource);
   private readonly seedState = inject(SeedState);
+  private readonly log = inject(Logger).scoped('recipe-book-seed');
 
   /** ¿Ya se insertó la data seed alguna vez? (marcador persistido en IndexedDB). */
   async hasSeeded(): Promise<boolean> {
@@ -116,7 +118,7 @@ export class RecipeBookSeed {
     try {
       await repo.save(build());
     } catch (error) {
-      console.warn(`[recipe-book-seed] no se pudo sembrar "${id}":`, error);
+      this.log.warn(`no se pudo sembrar "${id}"`, error);
     }
   }
 
@@ -143,8 +145,8 @@ export class RecipeBookSeed {
       for (const line of r.lines) {
         const supply = await this.supplies.byId(new EntityId(line.supplyId));
         if (!supply) {
-          console.warn(
-            `[recipe-book-seed] receta "${r.id}": insumo "${line.supplyId}" no encontrado, se omite el ingrediente`,
+          this.log.warn(
+            `receta "${r.id}": insumo "${line.supplyId}" no encontrado, se omite el ingrediente`,
           );
           continue;
         }
@@ -153,7 +155,7 @@ export class RecipeBookSeed {
         );
       }
       if (ingredients.length === 0) {
-        console.warn(`[recipe-book-seed] receta "${r.id}" sin ingredientes válidos, se omite`);
+        this.log.warn(`receta "${r.id}" sin ingredientes válidos, se omite`);
         return null;
       }
       return Recipe.restore({
@@ -166,7 +168,7 @@ export class RecipeBookSeed {
         moldCapacityId: null,
       });
     } catch (error) {
-      console.warn(`[recipe-book-seed] no se pudo construir la receta "${r.id}":`, error);
+      this.log.warn(`no se pudo construir la receta "${r.id}"`, error);
       return null;
     }
   }

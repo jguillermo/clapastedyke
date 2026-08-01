@@ -4,6 +4,7 @@ import { EventBus, EventHandler } from './event-bus';
 import { EventDispatcher } from './event-dispatcher';
 import { EventReader } from './event-reader';
 import { EventWriter } from './event-writer';
+import { Logger } from '../logger/logger';
 
 /** Cada cuánto avisa el tick de que puede haber trabajo. */
 const TICK_MS = 200;
@@ -43,6 +44,7 @@ export class PersistentEventBus extends EventBus {
   private readonly writer = inject(EventWriter);
   private readonly reader = inject(EventReader);
   private readonly dispatcher = inject(EventDispatcher);
+  private readonly log = inject(Logger).scoped('eventbus');
 
   /** El tick permanente. Su existencia es también el «estoy arrancado». */
   private ticker: ReturnType<typeof setInterval> | null = null;
@@ -127,7 +129,7 @@ export class PersistentEventBus extends EventBus {
     try {
       await this.drain();
     } catch (error) {
-      console.error('El reparto de eventos ha fallado:', error);
+      this.log.error('El reparto de eventos ha fallado', error);
     }
   }
 

@@ -7,9 +7,11 @@ import { QueuedEvent } from '@core/_common/eventbus/event-database';
 import { EventDispatcher } from '@core/_common/eventbus/event-dispatcher';
 import { EventReader } from '@core/_common/eventbus/event-reader';
 import { EventWriter } from '@core/_common/eventbus/event-writer';
-import { subscribedEventsOf } from '@core/_common/eventbus/on-event';
+import { subscribedEventOf } from '@core/_common/eventbus/on-event';
 import { PersistentEventBus } from '@core/_common/eventbus/persistent-event-bus';
 import { IntegrationEventName } from '@core/_common/events/integration-events';
+import { Logger } from '@core/_common/logger/logger';
+import { provideTestLogger, RecordingLogger } from '@core/_common/testing/logger-test-doubles';
 import { EVENT_DRIVEN_USE_CASES } from '../../external-sync.providers';
 
 /**
@@ -69,7 +71,7 @@ class FakeQueue {
 describe('Casos de uso dirigidos por evento de external-sync', () => {
   let bus: PersistentEventBus;
   let queue: FakeQueue;
-  let logged: unknown[][];
+  let log: RecordingLogger;
 
   /** Deja correr al repartidor: agota temporizadores y las promesas que encadenan. */
   async function deliver(): Promise<void> {
@@ -80,12 +82,10 @@ describe('Casos de uso dirigidos por evento de external-sync', () => {
 
   beforeEach(async () => {
     vi.useFakeTimers();
-    logged = [];
-    vi.spyOn(console, 'log').mockImplementation((...args: unknown[]) => void logged.push(args));
-
     queue = new FakeQueue();
     TestBed.configureTestingModule({
       providers: [
+        ...provideTestLogger(),
         EventDispatcher,
         PersistentEventBus,
         { provide: EventBus, useExisting: PersistentEventBus },
@@ -99,6 +99,7 @@ describe('Casos de uso dirigidos por evento de external-sync', () => {
     await TestBed.inject(ApplicationInitStatus).donePromise;
 
     bus = TestBed.inject(PersistentEventBus);
+    log = TestBed.inject(Logger) as RecordingLogger;
     bus.start();
   });
 
@@ -108,16 +109,16 @@ describe('Casos de uso dirigidos por evento de external-sync', () => {
     vi.restoreAllMocks();
   });
 
-  /** Lo que se registró para un evento, o `undefined` si no llegó a nadie. */
-  function traceFor(label: string): unknown[] | undefined {
-    return logged.find((entry) => entry[0] === `[external-sync] ${label}`);
+  /** El contexto que se registró para un caso de uso, o `undefined` si no llegó a nadie. */
+  function traceFor(label: string): unknown {
+    return log.entries.find((entry) => entry.message === `[external-sync] ${label}`)?.context;
   }
 
   it('todos los casos de uso declaran su evento con @OnEvent', () => {
     // El decorador es la mitad del enganche: sin anotación, `provideEventHandlers` no suscribe nada
     // y el fallo sería mudo (ningún error, simplemente no pasa nada).
     for (const useCase of EVENT_DRIVEN_USE_CASES) {
-      expect(subscribedEventsOf(useCase).length).toBeGreaterThan(0);
+      expect(subscribedEventOf(useCase)).toBeTruthy();
     }
   });
 
@@ -127,7 +128,7 @@ describe('Casos de uso dirigidos por evento de external-sync', () => {
     ]);
     await deliver();
 
-    expect(traceFor('Receta guardada')?.[1]).toMatchObject({
+    expect(traceFor('Receta guardada')).toMatchObject({
       recipeId: 'RE-1',
       categoryId: 'CAT-1',
     });
@@ -139,7 +140,7 @@ describe('Casos de uso dirigidos por evento de external-sync', () => {
     await bus.publish([domainEvent(IntegrationEventName.SUPPLY_SAVED, 'SU-1', { name: 'Harina' })]);
     await deliver();
 
-    expect(traceFor('Insumo guardado')?.[1]).toMatchObject({ supplyId: 'SU-1', name: 'Harina' });
+    expect(traceFor('Insumo guardado')).toMatchObject({ supplyId: 'SU-1', name: 'Harina' });
     expect(traceFor('Receta guardada')).toBeUndefined();
   });
 

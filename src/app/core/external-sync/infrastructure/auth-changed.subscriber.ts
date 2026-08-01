@@ -1,6 +1,7 @@
 import { inject, Injectable } from '@angular/core';
 import { EventBus } from '@core/_common/eventbus/event-bus';
 import { IntegrationEventName } from '@core/_common/events/integration-events';
+import { Logger } from '@core/_common/logger/logger';
 import { Synchronize } from '../application/use-cases/synchronize.use-case';
 import { SyncOutbox } from '../domain/services/sync-outbox';
 import { SyncStatus } from '../domain/services/sync-status';
@@ -39,6 +40,7 @@ export class AuthChangedSubscriber {
   private readonly outbox = inject(SyncOutbox);
   private readonly status = inject(SyncStatus);
   private readonly sync = inject(Synchronize);
+  private readonly log = inject(Logger).scoped('external-sync');
 
   /** Desde cuándo escucha. Todo lo anterior pertenece a una sesión que ya no existe. */
   private since = 0;
@@ -56,7 +58,7 @@ export class AuthChangedSubscriber {
       this.status.markConnected();
       this.sync
         .execute({ scope: 'all' })
-        .catch((error: unknown) => console.error('Sincronización inicial fallida:', error));
+        .catch((error: unknown) => this.log.error('Sincronización inicial fallida', error));
     });
 
     for (const eventName of [

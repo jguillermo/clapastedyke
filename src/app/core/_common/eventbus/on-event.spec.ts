@@ -2,7 +2,8 @@ import { Injectable, Type } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { DomainEvent, domainEvent } from './domain-event';
 import { EventDispatcher } from './event-dispatcher';
-import { EventDrivenUseCase, OnEvent, subscribedEventsOf } from './on-event';
+import { EventDrivenUseCase, OnEvent, subscribedEventOf } from './on-event';
+import { provideTestLogger } from '../testing/logger-test-doubles';
 
 const recibidos: string[] = [];
 
@@ -15,7 +16,6 @@ class QueueRecipe implements EventDrivenUseCase {
 }
 
 @OnEvent('RecipeSaved')
-@OnEvent('SupplySaved')
 @Injectable()
 class TouchCatalog implements EventDrivenUseCase {
   async execute(event: DomainEvent): Promise<void> {
@@ -36,20 +36,24 @@ describe('@OnEvent', () => {
   /** Engancha los casos de uso igual que hace `provideEventHandlers`. */
   function wire(...useCases: Type<EventDrivenUseCase>[]): void {
     recibidos.length = 0;
-    TestBed.configureTestingModule({ providers: [EventDispatcher, ...useCases] });
+    TestBed.configureTestingModule({
+      providers: [...provideTestLogger(), EventDispatcher, ...useCases],
+    });
     dispatcher = TestBed.inject(EventDispatcher);
 
     for (const useCase of useCases) {
-      for (const eventName of subscribedEventsOf(useCase)) {
-        dispatcher.subscribe(useCase.name, eventName, async (event) => {
-          await TestBed.inject(useCase).execute(event);
-        });
+      const eventName = subscribedEventOf(useCase);
+      if (!eventName) {
+        continue;
       }
+      dispatcher.subscribe(useCase.name, eventName, async (event) => {
+        await TestBed.inject(useCase).execute(event);
+      });
     }
   }
 
   it('el decorador anota el evento en la clase', () => {
-    expect(subscribedEventsOf(QueueRecipe)).toEqual(['RecipeSaved']);
+    expect(subscribedEventOf(QueueRecipe)).toBe('RecipeSaved');
   });
 
   it('un caso de uso decorado se ejecuta cuando llega su evento, con su data', async () => {
@@ -68,14 +72,20 @@ describe('@OnEvent', () => {
     expect(recibidos).toEqual([]);
   });
 
-  it('el decorador se puede apilar: un caso de uso escucha varios eventos', async () => {
-    wire(TouchCatalog);
-    expect([...subscribedEventsOf(TouchCatalog)].sort()).toEqual(['RecipeSaved', 'SupplySaved']);
-
-    await dispatcher.deliver(domainEvent('SupplySaved', 'S-1'), []);
-    await dispatcher.deliver(domainEvent('RecipeSaved', 'R-1'), []);
-
-    expect(recibidos).toEqual(['touch:SupplySaved', 'touch:RecipeSaved']);
+  it('un evento y solo uno: apilar el decorador es un error, no una suscripción de más', () => {
+    // En silencio, el segundo pisaría al primero y una suscripción desaparecería sin ruido. Un caso
+    // de uso es UNA intención; si dos eventos deben provocar lo mismo, son dos casos de uso.
+    expect(() => {
+      @OnEvent('SupplySaved')
+      @OnEvent('RecipeSaved')
+      @Injectable()
+      class DosEventos implements EventDrivenUseCase {
+        async execute(): Promise<void> {
+          throw new Error('no debería llegar a ejecutarse');
+        }
+      }
+      return DosEventos;
+    }).toThrow(/solo admite un evento/);
   });
 
   it('varios casos de uso sobre el mismo evento se ejecutan todos, en secuencia', async () => {
@@ -105,13 +115,13 @@ describe('@OnEvent', () => {
   });
 
   it('un caso de uso sin decorar no declara ningún evento', () => {
-    expect(subscribedEventsOf(SinDecorar)).toEqual([]);
+    expect(subscribedEventOf(SinDecorar)).toBeNull();
   });
 
-  it('una subclase no hereda las suscripciones de su padre', () => {
+  it('una subclase no hereda la suscripción de su padre', () => {
     class HijaSinDecorar extends QueueRecipe {}
 
-    expect(subscribedEventsOf(HijaSinDecorar)).toEqual([]);
+    expect(subscribedEventOf(HijaSinDecorar)).toBeNull();
   });
 
   it('si el caso de uso lanza, el fallo llega al bus como entrega pendiente', async () => {

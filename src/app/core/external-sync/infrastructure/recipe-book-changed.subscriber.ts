@@ -1,6 +1,7 @@
 import { inject, Injectable } from '@angular/core';
 import { EventBus } from '@core/_common/eventbus/event-bus';
 import { IntegrationEventName } from '@core/_common/events/integration-events';
+import { Logger } from '@core/_common/logger/logger';
 import { Synchronize } from '../application/use-cases/synchronize.use-case';
 import { SyncOutbox } from '../domain/services/sync-outbox';
 import { SyncStatus } from '../domain/services/sync-status';
@@ -55,6 +56,7 @@ export class RecipeBookChangedSubscriber {
   private readonly outbox = inject(SyncOutbox);
   private readonly status = inject(SyncStatus);
   private readonly sync = inject(Synchronize);
+  private readonly log = inject(Logger).scoped('external-sync');
 
   private timer: ReturnType<typeof setTimeout> | null = null;
 
@@ -84,7 +86,7 @@ export class RecipeBookChangedSubscriber {
       this.timer = null;
       this.sync
         .execute({ scope: 'pending' })
-        .catch((error: unknown) => console.error('Sincronización pendiente fallida:', error));
+        .catch((error: unknown) => this.log.error('Sincronización pendiente fallida', error));
     }, DEBOUNCE_MS);
   }
 }
