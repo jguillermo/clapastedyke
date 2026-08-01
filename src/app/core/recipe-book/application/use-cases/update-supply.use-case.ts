@@ -24,7 +24,8 @@ export interface UpdateSupplyRequest {
  * en vez de acuñar un insumo nuevo. Rechaza un renombrado que choque con el nombre de otro insumo
  * (case-insensitive). El dominio decide: `renamedTo`/`repricedTo` construyen la instancia nueva; este
  * use case solo orquesta cargar → mutar → persistir sobre SupplyRepository (arma el precio con el VO
- * PurchasePrice) y publica `SupplySaved` vía EventBus.
+ * PurchasePrice) y publica `SupplySaved` + `SupplyUpdated` vía EventBus. Este es el único sitio que
+ * sabe **qué** se tocó (nombre, precio o ambos), así que es el que lo cuenta en el evento.
  */
 @Injectable({ providedIn: 'root' })
 export class UpdateSupply extends UseCase<UpdateSupplyRequest, { id: string }> {
@@ -38,7 +39,8 @@ export class UpdateSupply extends UseCase<UpdateSupplyRequest, { id: string }> {
     }
 
     let supply = existing;
-    if (name.trim().toLowerCase() !== existing.name.toLowerCase()) {
+    const renamed = name.trim().toLowerCase() !== existing.name.toLowerCase();
+    if (renamed) {
       const clash = await this.supplies.byName(name);
       if (clash && !clash.id.equals(existing.id)) {
         throw new Error('Ya existe un insumo con ese nombre');
@@ -51,12 +53,20 @@ export class UpdateSupply extends UseCase<UpdateSupplyRequest, { id: string }> {
       Quantity.of(purchasePrice.per.value, purchasePrice.per.unit),
       purchasePrice.currency ?? existing.purchasePrice.currency,
     );
-    if (!existing.purchasePrice.equals(price)) {
+    const repriced = !existing.purchasePrice.equals(price);
+    if (repriced) {
       supply = supply.repricedTo(price);
     }
 
     await this.supplies.save(supply);
-    await this.bus.publish([RecipeBookEvents.supplySaved(supply.id.value, false)]);
+    await this.bus.publish([
+      RecipeBookEvents.supplySaved(supply.id.value, false),
+      // Solo si de verdad se tocó algo: guardar el mismo insumo sin cambiarlo no es una edición, y
+      // anunciarla haría trabajar a quien escucha para nada.
+      ...(renamed || repriced
+        ? [RecipeBookEvents.supplyUpdated(supply.id.value, { renamed, repriced })]
+        : []),
+    ]);
     return { id: supply.id.value };
   }
 }

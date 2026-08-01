@@ -17,6 +17,17 @@ export const IntegrationEventName = {
   // ── Publica: recipe-book ─────────────────────────────────────────────────────
   SUPPLY_SAVED: 'SupplySaved',
   RECIPE_SAVED: 'RecipeSaved',
+  /**
+   * El alta y la edición, por separado. `SupplySaved`/`RecipeSaved` siguen anunciando «esto cambió,
+   * da igual cómo» —es lo que necesita quien solo tiene que volver a copiar el dato—; estos dos
+   * distinguen **crear** de **editar** para quien sí reacciona distinto (dar la bienvenida a un
+   * insumo nuevo no es lo mismo que enterarse de que subió de precio). Un guardado publica los dos:
+   * el genérico y el específico.
+   */
+  SUPPLY_CREATED: 'SupplyCreated',
+  SUPPLY_UPDATED: 'SupplyUpdated',
+  RECIPE_CREATED: 'RecipeCreated',
+  RECIPE_UPDATED: 'RecipeUpdated',
   RECIPE_CATEGORY_SAVED: 'RecipeCategorySaved',
   FLAVOR_SAVED: 'FlavorSaved',
   RECIPE_CAPACITY_SAVED: 'RecipeCapacitySaved',

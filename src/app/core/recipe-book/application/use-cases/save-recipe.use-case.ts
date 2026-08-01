@@ -34,7 +34,8 @@ export interface SaveRecipeRequest {
  * regla "al menos una línea" vive en `Recipe`. Si se dan `flavorId`/`portionsCapacityId`/
  * `moldCapacityId`, valida que existan (igual que hace con los insumos). El use case orquesta:
  * construye el agregado y lo persiste — **no decide crear-vs-editar**, eso es responsabilidad de la
- * infraestructura (`RecipeRepository.save` es un upsert por id). Publica `RecipeSaved` vía EventBus.
+ * infraestructura (`RecipeRepository.save` es un upsert por id). Publica `RecipeSaved` vía EventBus,
+ * más `RecipeCreated` o `RecipeUpdated` según viniera o no un id.
  */
 @Injectable({ providedIn: 'root' })
 export class SaveRecipe extends UseCase<SaveRecipeRequest, { id: string }> {
@@ -68,7 +69,15 @@ export class SaveRecipe extends UseCase<SaveRecipeRequest, { id: string }> {
       resolvedMoldCapacityId,
     );
     await this.recipes.save(recipe);
-    await this.bus.publish([RecipeBookEvents.recipeSaved(recipeId.value, !id, categoryId)]);
+    // Dos eventos, un solo hecho: el genérico («la receta cambió») para quien solo tiene que volver
+    // a copiarla, y el específico (creada / editada) para quien reacciona distinto a cada uno.
+    const isNew = !id;
+    await this.bus.publish([
+      RecipeBookEvents.recipeSaved(recipeId.value, isNew, categoryId),
+      isNew
+        ? RecipeBookEvents.recipeCreated(recipeId.value, categoryId)
+        : RecipeBookEvents.recipeUpdated(recipeId.value, categoryId),
+    ]);
     return { id: recipeId.value };
   }
 
