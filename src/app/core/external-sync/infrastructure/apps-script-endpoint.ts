@@ -43,10 +43,11 @@ export async function postToAppsScript<Result>(endpoint: string, body: unknown):
       body: JSON.stringify(body),
       redirect: 'follow', // el script responde con un 302 a script.googleusercontent.com
     });
-  } catch {
+  } catch (error) {
     throw new SyncError(
       'NETWORK',
       'No se ha podido contactar con el Apps Script. Revisa tu conexión y la URL configurada.',
+      { cause: error },
     );
   }
 
@@ -60,10 +61,11 @@ export async function postToAppsScript<Result>(endpoint: string, body: unknown):
   let parsed: unknown;
   try {
     parsed = await response.json();
-  } catch {
+  } catch (error) {
     throw new SyncError(
       'INTERNAL',
       'La respuesta del Apps Script no es JSON. Suele significar que la URL apunta a /dev o a un despliegue que pide iniciar sesión.',
+      { cause: error },
     );
   }
 

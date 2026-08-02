@@ -211,15 +211,30 @@ export default tseslint.config(
         {
           patterns: [
             {
-              // Excepción documentada en platform-conventions.md: el contrato `DomainError`.
+              // Dos excepciones documentadas en platform-conventions.md, y solo dos. Ambas son
+              // contratos de `core/_common/` sin dominio dentro: el shared kernel es la única parte
+              // de `core/` que `platform/` puede tocar, porque la dependencia inversa es imposible
+              // (`core/` no puede importar de `platform/`).
               group: [
                 ...AREA.core,
+                // Los patrones son estilo .gitignore y se evalúan en orden: para rescatar algo hay
+                // que re-incluir ANTES su contenedor, porque no se puede desexcluir un hijo si su
+                // padre sigue excluido. De ahí este vaivén: se rescata `_common`, se vuelve a
+                // prohibir su contenido, y solo entonces se rescatan los dos contratos permitidos.
+                '!@core/_common',
+                '@core/_common/*',
+                '@core/_common/*/**',
+                // 1. El contrato `DomainError`, para leer su `code` al renderizar.
                 '!@core/_common/error',
                 '!@core/_common/error/**',
+                // 2. El puerto `Logger`: platform/ también registra, y el puerto vive en
+                //    core/_common porque core/ también registra y no puede importar de platform/.
+                '!@core/_common/logger',
+                '!@core/_common/logger/**',
                 ...AREA.features,
               ],
               message:
-                'platform/ no conoce el dominio ni las páginas: sin imports de core/ (salvo el contrato DomainError) ni de features/. Ver platform-conventions.md.',
+                'platform/ no conoce el dominio ni las páginas: sin imports de core/ (salvo los contratos DomainError y Logger de core/_common) ni de features/. Ver platform-conventions.md.',
             },
           ],
         },

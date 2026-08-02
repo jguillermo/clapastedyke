@@ -5,6 +5,7 @@ import {
   ExportQuery,
   ExportRef,
 } from '@core/_common/export/exportable-data';
+import { Logger } from '@core/_common/logger/logger';
 import { BaseUnit } from '@core/_common/quantity';
 import { ListRecipeBook } from '../application/use-cases/list-recipe-book.use-case';
 import { CapacityGroup } from '../domain/entities/recipe-capacity';
@@ -100,8 +101,20 @@ interface CapacityRow {
 @Injectable()
 export class RecipeBookExportableData extends ExportableData {
   private readonly catalog = inject(ListRecipeBook);
+  private readonly log = inject(Logger).scoped('recipe-book/export');
 
   async export({ all, refs, aggregate }: ExportQuery): Promise<ExportedRows> {
+    this.log.debug('exportando', { all, aggregate: aggregate ?? null, refs: refs.length });
+
+    // Otro contexto pidió un agregado que este no publica: se devuelven cero tablas y desde fuera
+    // parece que no había datos. Con esto se distingue «no hay» de «no te entiendo».
+    if (aggregate !== undefined && tablesOf(aggregate).length === 0) {
+      this.log.warn('agregado desconocido: no se exporta ninguna tabla', undefined, {
+        aggregate,
+        conocidos: Object.keys(RECIPE_BOOK_AGGREGATES),
+      });
+    }
+
     const { supplies, categories, recipes, flavors, recipeCapacities } =
       await this.catalog.execute();
 
@@ -188,7 +201,13 @@ export class RecipeBookExportableData extends ExportableData {
       capacities: capacityRows,
     };
 
-    return aggregate === undefined ? tables : only(tables, tablesOf(aggregate));
+    const exported = aggregate === undefined ? tables : only(tables, tablesOf(aggregate));
+    this.log.debug('exportado', {
+      tablas: Object.fromEntries(
+        Object.entries(exported).map(([name, rows]) => [name, rows.length]),
+      ),
+    });
+    return exported;
   }
 }
 

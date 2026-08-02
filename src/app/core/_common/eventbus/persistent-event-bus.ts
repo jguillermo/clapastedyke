@@ -44,7 +44,7 @@ export class PersistentEventBus extends EventBus {
   private readonly writer = inject(EventWriter);
   private readonly reader = inject(EventReader);
   private readonly dispatcher = inject(EventDispatcher);
-  private readonly log = inject(Logger).scoped('eventbus');
+  private readonly log = inject(Logger).scoped('eventbus/bus');
 
   /** El tick permanente. Su existencia es también el «estoy arrancado». */
   private ticker: ReturnType<typeof setInterval> | null = null;
@@ -69,6 +69,7 @@ export class PersistentEventBus extends EventBus {
       return;
     }
     await this.writer.append(events);
+    this.log.debug('encolados', { names: events.map((event) => event.name) });
     this.wake();
   }
 
@@ -78,6 +79,7 @@ export class PersistentEventBus extends EventBus {
       return;
     }
     this.ticker = setInterval(() => void this.pump(), TICK_MS);
+    this.log.debug('arrancado', { tickMs: TICK_MS });
     // Puede haber cola de la sesión anterior: se mira ya, en el siguiente macrotask.
     this.wake();
   }
@@ -146,12 +148,18 @@ export class PersistentEventBus extends EventBus {
 
       if (delivered === null) {
         await this.writer.remove(queued.id);
+        this.log.debug('entregado a todos, fuera de la cola', { id: queued.id });
         continue;
       }
 
       // Alguno falló: se anota a quién le llegó ya y se deja para la siguiente tanda, que
       // reintentará solo con los que faltan.
       await this.writer.update({ ...queued, delivered, attempts: queued.attempts + 1 });
+      this.log.debug('reintentará en la siguiente tanda', {
+        id: queued.id,
+        delivered,
+        attempts: queued.attempts + 1,
+      });
       return;
     }
   }

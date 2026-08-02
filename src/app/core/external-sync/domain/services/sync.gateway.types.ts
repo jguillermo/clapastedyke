@@ -30,8 +30,14 @@ export class SyncError extends Error {
   constructor(
     readonly code: SyncErrorCode,
     message: string,
+    /**
+     * El fallo original, cuando lo hay (`{ cause }`). El `message` está escrito para leerse en
+     * pantalla y por eso pierde el detalle técnico; la causa lo conserva para que el registro
+     * pueda enseñar la cadena entera. Ver logging-conventions.md → «un dueño por fallo».
+     */
+    options?: ErrorOptions,
   ) {
-    super(message);
+    super(message, options);
     this.name = 'SyncError';
   }
 

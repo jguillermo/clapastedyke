@@ -1,4 +1,5 @@
-import { Injectable } from '@angular/core';
+import { inject, Injectable } from '@angular/core';
+import { Logger } from '@core/_common/logger/logger';
 import { Account } from '../domain/entities/account';
 import { Authentication, Authenticator } from '../domain/services/authenticator';
 import { Credential } from '../domain/value-objects/credential';
@@ -60,21 +61,30 @@ interface UserInfoResponse {
 
 @Injectable()
 export class GoogleAuthenticator extends Authenticator {
+  private readonly log = inject(Logger).scoped('auth/google');
+
   private loading: Promise<GoogleIdentityApi> | null = null;
 
   async authenticate(clientId: string): Promise<Authentication> {
+    // NUNCA el token ni el clientId: son secretos y no van a un registro.
+    this.log.debug('pidiendo token al proveedor');
     const credential = await this.requestToken(clientId);
     if (!credential.allows(DRIVE_FILE_PERMISSION)) {
+      this.log.debug('token concedido pero sin el permiso de Drive');
       throw new Error(
         'No has concedido el permiso para crear la hoja en tu Drive. Vuelve a conectar y acepta la casilla.',
       );
     }
-    return { account: await this.readProfile(credential), credential };
+    this.log.debug('token concedido con el permiso de Drive, leyendo el perfil');
+    const account = await this.readProfile(credential);
+    this.log.debug('perfil leído', { accountId: account.id.value });
+    return { account, credential };
   }
 
   async revoke(credential: Credential): Promise<void> {
     const google = await this.load();
     await new Promise<void>((resolve) => google.accounts.oauth2.revoke(credential.token, resolve));
+    this.log.debug('token revocado en el proveedor');
   }
 
   private async requestToken(clientId: string): Promise<Credential> {
@@ -134,10 +144,12 @@ export class GoogleAuthenticator extends Authenticator {
     return new Promise<GoogleIdentityApi>((resolve, reject) => {
       const existing = readApi();
       if (existing) {
+        this.log.debug('el script de Google ya estaba cargado');
         resolve(existing);
         return;
       }
 
+      this.log.debug('inyectando el script de Google', { url: GIS_SCRIPT_URL });
       const script = document.createElement('script');
       script.src = GIS_SCRIPT_URL;
       script.async = true;
@@ -145,6 +157,7 @@ export class GoogleAuthenticator extends Authenticator {
       script.onload = () => {
         const api = readApi();
         if (api) {
+          this.log.debug('script de Google cargado');
           resolve(api);
         } else {
           reject(new Error('El script de Google se ha cargado pero no expone su API de OAuth.'));
@@ -158,7 +171,9 @@ export class GoogleAuthenticator extends Authenticator {
         );
       document.head.appendChild(script);
     }).catch((error: unknown) => {
-      // Un fallo de carga no se memoriza: el siguiente intento vuelve a probar.
+      // Un fallo de carga no se memoriza: el siguiente intento vuelve a probar. No se registra
+      // como fallo —se relanza— pero sí queda constancia de que se olvidó el intento.
+      this.log.debug('carga del script fallida, se olvida para poder reintentar');
       this.loading = null;
       throw error;
     });

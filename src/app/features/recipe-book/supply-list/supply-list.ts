@@ -16,6 +16,7 @@ import { Autocomplete } from '@components/autocomplete/autocomplete';
 import { UnitInput, type UnitToken } from '@components/unit-input/unit-input';
 import { CurrencyInput } from '@components/currency-input/currency-input';
 import { Icon } from '@components/icon/icon';
+import { Logger } from '@core/_common/logger/logger';
 import { BaseUnit } from '@core/_common/quantity';
 import {
   MeasureInput,
@@ -62,6 +63,7 @@ export class SupplyList implements OnInit {
   private readonly fb = inject(FormBuilder);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly saveSupply = inject(SaveSupply);
+  private readonly log = inject(Logger).scoped('ui/supply-list');
 
   /** Catálogo de insumos a mostrar/editar (lo pasa el hub ya cargado). */
   readonly supplies = input<readonly Supply[]>([]);
@@ -141,7 +143,9 @@ export class SupplyList implements OnInit {
     }
     event.preventDefault();
     event.stopPropagation();
-    void this.trySaveRow(index).then(() => setTimeout(() => this.focusNew()));
+    this.trySaveRow(index)
+      .then(() => setTimeout(() => this.focusNew()))
+      .catch((error: unknown) => this.log.error('el guardado del renglón ha fallado', error));
   }
 
   /** Lleva el foco al renglón vacío de arriba (para "Agregar insumo"). */
@@ -170,7 +174,9 @@ export class SupplyList implements OnInit {
     const fromRow = rowIndexOf(event.target);
     const toRow = rowIndexOf(event.relatedTarget);
     if (fromRow !== null && fromRow !== toRow) {
-      void this.trySaveRow(fromRow);
+      this.trySaveRow(fromRow).catch((error: unknown) =>
+        this.log.error('el guardado del renglón ha fallado', error),
+      );
     }
   }
 
@@ -184,7 +190,15 @@ export class SupplyList implements OnInit {
 
     // Renglón nuevo: solo crea cuando está completo (nombre + empaque + precio).
     if (id === null) {
-      if (!name || !purchase) return;
+      if (!name || !purchase) {
+        this.log.debug('renglón nuevo incompleto, todavía no se guarda', {
+          index,
+          conNombre: !!name,
+          conPrecio: !!purchase,
+        });
+        return;
+      }
+      this.log.debug('crear insumo ▶', { index });
       try {
         const { id: newId } = await this.saveSupply.execute({
           name,
@@ -199,7 +213,9 @@ export class SupplyList implements OnInit {
         // Deja un renglón vacío arriba para seguir agregando (el recién creado baja una fila).
         this.lines.insert(0, this.newLine());
         this.changed.emit();
+        this.log.debug('crear insumo ✔', { id: newId });
       } catch (error) {
+        this.log.warn('no se pudo crear el insumo', error, { index });
         this.errorMessage.set(messageOf(error));
       }
       return;
@@ -207,18 +223,24 @@ export class SupplyList implements OnInit {
 
     // Renglón existente: nada que guardar si está incompleto o sin cambios.
     if (!name) {
+      this.log.debug('renglón existente sin nombre, no se guarda', { id });
       this.errorMessage.set('El nombre del insumo no puede quedar vacío.');
       return;
     }
     if (!purchase || this.snapshotKey(line) === this.savedSnapshots.get(id)) {
+      // «Sin cambios» es la respuesta a «lo edité y no se guardó», así que se cuenta.
+      this.log.debug(purchase ? 'sin cambios, no se guarda' : 'sin precio, no se guarda', { id });
       return;
     }
+    this.log.debug('actualizar insumo ▶', { id });
     try {
       await this.saveSupply.execute({ id, name, purchasePrice: purchase });
       this.snapshot(line);
       this.errorMessage.set('');
       this.changed.emit();
+      this.log.debug('actualizar insumo ✔', { id });
     } catch (error) {
+      this.log.warn('no se pudo actualizar el insumo', error, { id });
       this.errorMessage.set(messageOf(error));
     }
   }

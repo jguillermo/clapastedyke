@@ -20,6 +20,7 @@ import { FormField } from '@components/form-field/form-field';
 import { InputField } from '@components/input/input';
 import { SelectTag, type SelectTagType } from '@components/select-tag/select-tag';
 import { MIGO_DIALOG_DATA, MigoDialogRef } from '@components/dialog/dialog.service';
+import { Logger } from '@core/_common/logger/logger';
 import type { Supply } from '@core/recipe-book/domain/entities/supply';
 import type { RecipeFlavor } from '@core/recipe-book/domain/entities/recipe-flavor';
 import type { RecipeCapacity } from '@core/recipe-book/domain/entities/recipe-capacity';
@@ -151,6 +152,7 @@ export class RecipeForm {
   protected readonly data = inject<RecipeFormData>(MIGO_DIALOG_DATA);
   private readonly saveRecipe = inject(SaveRecipe);
   private readonly saveProperty = inject(SaveRecipeProperty);
+  private readonly log = inject(Logger).scoped('ui/recipe-form');
 
   private readonly grid = viewChild.required(SupplyGrid);
 
@@ -245,10 +247,14 @@ export class RecipeForm {
   }): Promise<void> {
     const kind = event.typeKey as RecipePropertyKind;
     const label = event.value.trim();
+    this.log.debug('crear característica ▶', { kind, conFactor: event.extra !== undefined });
     try {
       const { id } = await this.saveProperty.execute({ kind, label, factor: event.extra });
       this.createdPropertyIds.update((current) => ({ ...current, [propertyKey(kind, label)]: id }));
+      this.log.debug('crear característica ✔', { kind, id });
     } catch (error) {
+      // El texto en pantalla no sustituye al registro: aquí queda la causa con su pila.
+      this.log.warn('no se pudo guardar la característica', error, { kind });
       this.errorMessage.set(
         error instanceof Error ? error.message : 'No se pudo guardar la característica.',
       );
@@ -258,12 +264,18 @@ export class RecipeForm {
   protected async save(): Promise<void> {
     const name = this.name.value.trim();
     if (!name) {
+      this.log.debug('guardar receta: sin nombre, no se guarda');
       return;
     }
     const parsed = this.grid().collect();
     if (!parsed) {
+      this.log.debug('guardar receta: la grilla rechazó las líneas, no se guarda');
       return; // la grilla muestra su propio error
     }
+    this.log.debug('guardar receta ▶', {
+      editando: this.data.recipe?.id !== undefined,
+      lineas: parsed.length,
+    });
     this.saving.set(true);
     this.errorMessage.set('');
     try {
@@ -282,8 +294,10 @@ export class RecipeForm {
         portionsCapacityId: this.propertyId('portions'),
         moldCapacityId: this.propertyId('mold'),
       });
+      this.log.debug('guardar receta ✔', { id });
       this.ref.close({ id, categoryId: this.data.category.id, name });
     } catch (error) {
+      this.log.warn('no se pudo guardar la receta', error, { editando: !!this.data.recipe?.id });
       this.errorMessage.set(
         error instanceof Error ? error.message : 'No se pudo guardar la receta.',
       );

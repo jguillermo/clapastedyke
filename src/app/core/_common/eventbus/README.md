@@ -164,36 +164,38 @@ Un evento sin suscriptor es **invisible**: se publica, se encola y se entrega a 
 fuera «no se publicó» y «no lo escucha nadie» se ven igual.
 
 `provideEventTracing()` (ya está en `app.config.ts`) engancha `TraceEvents`, que registra **todos**
-los nombres del catálogo según se reparten. Registra en nivel **`debug`**, así que **hay que encender
-el modo depuración** — desde la consola del navegador:
+los nombres del catálogo según se reparten. Registra en nivel **`debug`**, así que se ve con
+`"debug": true` en `public/config.json` (como viene en el repo).
 
-```js
-migoLog.on(); // debug + info + warn + error. Se recuerda entre recargas.
-```
-
-Y a partir de ahí, usando la app:
+Usando la app:
 
 ```
-[events] SupplySaved          { aggregateId: 'ing-manjar', occurredOn: '…', data: { name: 'Manjar blanco', … } }
-[events] RecipeSaved          { aggregateId: 'rec-bano-manjar', occurredOn: '…', data: { name: 'Baño de Manjar', … } }
-[events] RecipeCapacitySaved  { aggregateId: 'RC-1', occurredOn: '…', data: { group: 'portions', label: '33', factor: 33 } }
+[events] SupplySaved                                { aggregateId: 'ing-manjar', occurredOn: '…', data: { … } }
+[eventbus/dispatcher] SupplySaved → external-sync   { aggregateId: 'ing-manjar' }
+[events] RecipeSaved                                { aggregateId: 'rec-bano-manjar', occurredOn: '…', data: { … } }
+[eventbus/dispatcher] RecipeSaved no lo escucha nadie
 ```
+
+**Son dos mitades y hay que mirar las dos**: `[events]` dice que se publicó; `[eventbus/dispatcher]`
+dice a quién le llegó — o que no le llegó a nadie, que es justo el caso que antes era invisible.
 
 Cómo leerlo:
 
 | Lo que ves | Lo que significa |
 |---|---|
-| El evento **no** aparece | No se publicó: el caso de uso no llegó a guardar, o guardó otra cosa |
-| Aparece, pero no pasa nada más | Se publicó y no lo escucha nadie: falta el `@OnEvent` (o el suscriptor a mano) |
-| Aparece y su suscriptor tampoco registra | El handler falló: mira el `error` del `[eventbus]` justo después |
+| El evento **no** aparece en `[events]` | No se publicó: el caso de uso no llegó a guardar, o guardó otra cosa |
+| Aparece, y después `no lo escucha nadie` | Se publicó pero falta el `@OnEvent` (o el suscriptor a mano) |
+| Aparece un `→ suscriptor` y no pasa nada más | Le llegó: el problema está dentro del handler |
+| Aparece un `error` de `[eventbus/dispatcher]` | El handler lanzó; el bus reintentará solo con los que faltan |
 
 `TraceEvents` se suscribe sobre `Object.values(IntegrationEventName)` —un nombre nuevo queda trazado
 solo— y por eso va a mano y no por `@OnEvent`, que solo admite un evento. Para apagarlo del todo,
-quita `provideEventTracing()` de `app.config.ts`; para silenciarlo sin tocar código, `migoLog.off()`.
+quita `provideEventTracing()` de `app.config.ts`; en el build publicado ya está callado, porque
+`debug` no se emite.
 
-> El resto del registro va por el mismo interruptor: el `Logger` de `core/_common/logger/` es el
-> **único** sitio autorizado a usar `console` (ESLint lo impone). Ver la sección «Registro y modo
-> depuración» de [`CLAUDE.md`](../../../../../CLAUDE.md).
+> El resto del registro va por la misma llave. Cómo funciona el puerto:
+> [`../logger/README.md`](../logger/README.md). Qué hay que registrar y qué no:
+> [`logging-conventions.md`](../../../../../.claude/rules/logging-conventions.md).
 
 ---
 
@@ -305,7 +307,7 @@ lógica, y se ejercitan desde los E2E (ver
    **después** de persistir y lo publica.
 4. Si alguien reacciona: `@OnEvent(nombre)` en un caso de uso +
    `provideEventHandlers(...)` en el `provide*()` de su contexto.
-5. Compruébalo: `migoLog.on()` y usa la app — si el nombre está en el catálogo del shared kernel, el
+5. Compruébalo: usa la app con `ng serve` — si el nombre está en el catálogo del shared kernel, el
    trazador lo muestra **sin tocar nada más**.
 
 > Los contextos **no se conocen entre sí**: quien reacciona toma el nombre del evento del shared

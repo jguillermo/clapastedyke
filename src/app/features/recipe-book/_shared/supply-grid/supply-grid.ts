@@ -12,6 +12,7 @@ import {
 import { FormBuilder, FormGroup, ReactiveFormsModule, type FormControl } from '@angular/forms';
 import { toSignal, takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { OverlayModule } from '@angular/cdk/overlay';
+import { Logger } from '@core/_common/logger/logger';
 import { BaseUnit } from '@core/_common/quantity';
 import { UnitInput, type UnitToken } from '@components/unit-input/unit-input';
 import { Combobox } from '@components/combobox/combobox';
@@ -83,6 +84,7 @@ export class SupplyGrid implements OnInit {
   private readonly fb = inject(FormBuilder);
   private readonly previewCost = inject(PreviewRecipeCost);
   private readonly saveSupply = inject(SaveSupply);
+  private readonly log = inject(Logger).scoped('ui/supply-grid');
 
   /** Catálogo de insumos existentes (con precio) para autocompletar y jalar el precio. */
   readonly supplies = input<SupplyOption[]>([]);
@@ -330,8 +332,10 @@ export class SupplyGrid implements OnInit {
 
     const name = line.controls.name.value.trim();
     if (!name) {
+      this.log.debug('línea sin nombre, no se guarda el insumo');
       return;
     }
+    this.log.debug('guardar insumo desde la grilla ▶', { nuevo: !this.supplyIdOf(line) });
     try {
       const { id } = await this.saveSupply.execute({
         id: this.supplyIdOf(line) || undefined,
@@ -340,7 +344,9 @@ export class SupplyGrid implements OnInit {
         purchasePrice: purchase,
       });
       line.controls.supplyId.setValue(id);
+      this.log.debug('guardar insumo desde la grilla ✔', { id });
     } catch (error) {
+      this.log.warn('no se pudo guardar el insumo desde la grilla', error);
       this.errorMessage.set(
         error instanceof Error ? error.message : 'No se pudo guardar el insumo.',
       );
@@ -388,7 +394,23 @@ export class SupplyGrid implements OnInit {
     return MeasureInput.parse(raw, kind);
   }
 
+  /**
+   * Recalcula los costos de referencia.
+   *
+   * **Sin `debug`, a propósito**: esto corre en CADA pulsación de tecla (`lines.valueChanges`), y la
+   * regla prohíbe registrar ahí — ahogaría la consola y taparía lo importante. Solo se registra si
+   * falla, que es raro y sí hay que verlo. Absorbe su propio error para que los dos `void` de
+   * arriba no sean promesas flotantes.
+   */
   private async recomputeCosts(): Promise<void> {
+    try {
+      await this.computeCosts();
+    } catch (error) {
+      this.log.error('no se pudieron recalcular los costos', error);
+    }
+  }
+
+  private async computeCosts(): Promise<void> {
     const purchases = this.lines.controls.map((line) =>
       line.controls.name.value.trim() ? this.purchaseFor(line) : null,
     );

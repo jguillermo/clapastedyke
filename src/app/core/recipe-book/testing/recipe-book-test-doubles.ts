@@ -28,7 +28,8 @@ import { RecipeFlavorRepository } from '../domain/repositories/recipe-flavor.rep
 import { RecipeCapacityRepository } from '../domain/repositories/recipe-capacity.repository';
 import { SeedDataSource } from '../infrastructure/seed/seed-data-source';
 import { SeedState } from '../infrastructure/seed/seed-state';
-import { provideTestLogger } from '../../_common/testing/logger-test-doubles';
+import { ConsoleLogger } from '../../_common/logger/console-logger';
+import { Logger } from '../../_common/logger/logger';
 import { RecipeBookSeedDocument } from '../infrastructure/seed/recipe-book-seed-document';
 
 /** Almacén in-memory compartido que respalda los repositorios falsos. */
@@ -136,7 +137,7 @@ export class RecordingEventBus extends EventBus {
 /** Bindings de los repositorios de agregados a los dobles in-memory (sin EventBus). */
 export const recipeBookRepositoryProviders: Provider[] = [
   // El seed registra avisos; sin logger el TestBed no puede ni construirlo.
-  ...provideTestLogger(),
+  { provide: Logger, useClass: ConsoleLogger },
   { provide: SupplyRepository, useClass: InMemorySupplyRepository },
   { provide: RecipeRepository, useClass: InMemoryRecipeRepository },
   { provide: RecipeCategoryRepository, useClass: InMemoryRecipeCategoryRepository },

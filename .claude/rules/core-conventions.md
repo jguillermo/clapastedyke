@@ -154,6 +154,26 @@ Por eso un caso de uso de guardado **toca un solo repositorio, el suyo**, y reci
 demás agregados ya resueltos, sin comprobar que existan: comprobarlo añade lecturas y acoplamiento sin
 impedir nada de verdad (entre la comprobación y el guardado el dato puede desaparecer igual).
 
+## Registro (regla dura)
+
+Todo `core/` registra por el puerto `Logger` de `core/_common/logger/`. Regla completa en
+[logging-conventions.md](logging-conventions.md); lo que muerde en esta capa:
+
+| Pieza | Qué deja escrito | Scope |
+|---|---|---|
+| **Caso de uso** | Un `debug` de entrada con los discriminantes, y **uno por cada `return`**, nombrando la rama | `<contexto>/<caso-de-uso>` |
+| **Repositorio** | Escritura siempre; `all()` con su `count`. **`byId()` NO** — el seed lo llama una vez por ingrediente | `<contexto>/<agregado>-repo` |
+| **Mapper, VO, entidad, función pura** | **Nada.** No registran | — |
+| **Adaptador de salida** (gateway, transporte) | El límite y el resultado; nunca el cuerpo ni el token | `<contexto>/<adaptador>` |
+
+Dos reglas que se olvidan y duelen:
+
+- **Un dueño por fallo.** La capa que traduce y relanza (mappers, transportes, `IndexedDbStore`) **no
+  registra**: conserva el original en `{ cause }` del error que lanza. La que decide el resultado
+  visible lo registra **una sola vez**, con la cadena entera.
+- **Nunca datos personales ni secretos**: ni el token, ni el correo, ni el `clientId`. Se registra el
+  id (`account.id.value`) y booleanos (`{ oauth: true }`).
+
 ## Folder structure
 
 ```

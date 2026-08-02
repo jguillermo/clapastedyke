@@ -1,6 +1,7 @@
-import { Injectable } from '@angular/core';
+import { inject, Injectable } from '@angular/core';
 import { EntityId } from '../../../_common/entity-id';
 import { IndexedDbStore } from '../../../_common/infrastructure/indexeddb/store';
+import { Logger } from '../../../_common/logger/logger';
 import { Recipe } from '../../domain/entities/recipe';
 import { RecipeRepository } from '../../domain/repositories/recipe.repository';
 import { RecipeMapper } from './recipe.mapper';
@@ -13,6 +14,7 @@ import { RecipeRecord } from '../records';
 @Injectable()
 export class IndexedDbRecipeRepository extends RecipeRepository {
   private readonly store = new IndexedDbStore<RecipeRecord>('recipes');
+  private readonly log = inject(Logger).scoped('recipe-book/recipe-repo');
 
   nextIdentity(): EntityId {
     return new EntityId(crypto.randomUUID());
@@ -39,9 +41,12 @@ export class IndexedDbRecipeRepository extends RecipeRepository {
 
   async save(recipe: Recipe): Promise<void> {
     await this.store.put(RecipeMapper.toRecord(recipe));
+    this.log.debug('receta guardada', { id: recipe.id.value });
   }
 
   async all(): Promise<Recipe[]> {
-    return (await this.store.all()).map(RecipeMapper.toDomain);
+    const recipes = (await this.store.all()).map(RecipeMapper.toDomain);
+    this.log.debug('recetas leídas', { count: recipes.length });
+    return recipes;
   }
 }

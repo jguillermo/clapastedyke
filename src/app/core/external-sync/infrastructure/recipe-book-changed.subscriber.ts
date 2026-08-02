@@ -56,7 +56,7 @@ export class RecipeBookChangedSubscriber {
   private readonly outbox = inject(SyncOutbox);
   private readonly status = inject(SyncStatus);
   private readonly sync = inject(Synchronize);
-  private readonly log = inject(Logger).scoped('external-sync');
+  private readonly log = inject(Logger).scoped('external-sync/on-book-changed');
 
   private timer: ReturnType<typeof setTimeout> | null = null;
 
@@ -72,9 +72,12 @@ export class RecipeBookChangedSubscriber {
     // Sin sesión no se encola nada: una cola huérfana podría acabar en el destino de otra cuenta.
     // Lo que se cree mientras no hay cuenta lo recoge la sincronización completa al conectar.
     if (this.status.snapshot().phase === 'disconnected') {
+      // Sin esta línea, «guardé algo y no se sincronizó» no tiene explicación visible.
+      this.log.debug('sin cuenta conectada, no se encola', { aggregate, id });
       return;
     }
     await this.outbox.enqueue(SyncItem.of(aggregate, id));
+    this.log.debug('encolado para sincronizar', { aggregate, id });
     this.schedule();
   }
 
@@ -84,6 +87,7 @@ export class RecipeBookChangedSubscriber {
     }
     this.timer = setTimeout(() => {
       this.timer = null;
+      this.log.debug('se acabó la espera, se sincroniza lo pendiente');
       this.sync
         .execute({ scope: 'pending' })
         .catch((error: unknown) => this.log.error('Sincronización pendiente fallida', error));

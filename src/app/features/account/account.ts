@@ -12,6 +12,7 @@ import { InputField } from '@components/input/input';
 import { Button } from '@components/button/button';
 import { Badge } from '@components/badge/badge';
 import { Icon } from '@components/icon/icon';
+import { Logger } from '@core/_common/logger/logger';
 import { GetAuthSettings } from '@core/auth/application/use-cases/get-auth-settings.use-case';
 import { SaveAuthSettings } from '@core/auth/application/use-cases/save-auth-settings.use-case';
 import { SignIn } from '@core/auth/application/use-cases/sign-in.use-case';
@@ -61,6 +62,7 @@ export class Account implements OnInit {
   private readonly readSettings = inject(GetAuthSettings);
   private readonly writeSettings = inject(SaveAuthSettings);
   private readonly sync = inject(Synchronize);
+  private readonly log = inject(Logger).scoped('ui/account');
 
   /** Estado de la sesión y de la sincronización, tal como los publica cada caso de uso. */
   protected readonly session = this.watchSession.state;
@@ -74,13 +76,22 @@ export class Account implements OnInit {
   protected readonly form = inject(FormBuilder).nonNullable.group({ clientId: '' });
 
   async ngOnInit(): Promise<void> {
-    const settings = await this.readSettings.execute();
-    this.form.patchValue({ clientId: settings.clientId });
+    // Angular no espera este hook: sin `catch` un fallo sería un rechazo no capturado y el
+    // formulario se quedaría vacío sin explicación.
+    try {
+      const settings = await this.readSettings.execute();
+      this.form.patchValue({ clientId: settings.clientId });
+      this.log.debug('ajustes cargados en el formulario', {
+        isConfigured: settings.isConfigured,
+      });
+    } catch (error) {
+      this.log.warn('no se pudieron leer los ajustes: el formulario arranca vacío', error);
+    }
   }
 
   /** Guarda la configuración de este navegador sin conectar todavía. */
   protected async saveSettings(): Promise<void> {
-    await this.run(async () => {
+    await this.run('guardar ajustes', async () => {
       await this.writeSettings.execute(this.form.getRawValue());
       this.settingsSaved.set(true);
     });
@@ -91,31 +102,39 @@ export class Account implements OnInit {
    * pegar su Client ID y pulsar «Conectar» directamente.
    */
   protected async connect(): Promise<void> {
-    await this.run(async () => {
+    await this.run('conectar cuenta', async () => {
       await this.writeSettings.execute(this.form.getRawValue());
       await this.signIn.execute();
     });
   }
 
   protected async disconnect(): Promise<void> {
-    await this.run(() => this.signOut.execute());
+    await this.run('desconectar cuenta', () => this.signOut.execute());
   }
 
   /** Empuja el recetario completo. Idempotente: repetirlo no duplica nada en la hoja. */
   protected async syncAll(): Promise<void> {
-    await this.run(async () => {
+    await this.run('sincronizar todo', async () => {
       await this.sync.execute({ scope: 'all' });
     });
   }
 
-  /** Envuelve una acción del usuario: un solo sitio para el «ocupado» y el mensaje de error. */
-  private async run(action: () => Promise<unknown>): Promise<void> {
+  /**
+   * Envuelve una acción del usuario: un solo sitio para el «ocupado», el mensaje de error **y el
+   * registro**. Por eso lleva `label`: es lo que hace que la traza diga *qué* se intentó.
+   */
+  private async run(label: string, action: () => Promise<unknown>): Promise<void> {
+    this.log.debug(`${label} ▶`);
     this.busy.set(true);
     this.actionError.set('');
     this.settingsSaved.set(false);
     try {
       await action();
+      this.log.debug(`${label} ✔`);
     } catch (error) {
+      // El mensaje en pantalla NO sustituye al registro: el usuario ve una frase amable y aquí
+      // queda la cadena de errores entera con su pila.
+      this.log.warn(`${label} ✘`, error);
       this.actionError.set(
         error instanceof Error ? error.message : 'La acción no se ha podido completar.',
       );

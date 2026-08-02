@@ -16,6 +16,7 @@ The authoritative coding rules are in **`.claude/CLAUDE.md`** (always loaded) an
 - `path-aliases-conventions.md` — `@app/@components/@core/@features/@platform`
 - `mobile-first-conventions.md` — **hard rule**: toda la UI DOM es mobile-first (diálogos/formularios full-bleed en móvil, grillas que no se aplastan, targets ≥44px, viewport sin zoom). Cada componente y feature debe cumplirla y verificarse a 375px.
 - `unit-tests-conventions.md` — **hard rule**: unit tests cover **only** `core/<context>/domain/` and `core/<context>/application/use-cases/`, and live in `core/<context>/testing/` mirroring the source path exactly. Features are covered by E2E, design-system components by their story's `play`.
+- `logging-conventions.md` — **hard rule**: nada llama a `console`; se registra por el puerto `Logger` y **registrar es obligatorio** (un `debug` en cada paso importante, ningún `catch` mudo). `warn`/`error` se ven **siempre, también en producción**, con la traza del error; `debug` se ve según `"debug"` en `public/config.json` (un solo build; se cambia el fichero, no se recompila). `components/` no registra nunca.
 - `assets-conventions.md`
 - `e2e-tests-conventions.md` — **hard rule**: todos los E2E viven en `e2e/` (config, specs, page objects, fixtures) y prueban las vistas de `src/app/features/` con flujos completos. Cualquier petición de "crear tests E2E" se resuelve con esa forma.
 
@@ -56,7 +57,7 @@ npm run typecheck   # tsc over app + stories, unit specs, and the E2E suite
 
 A 3D in-browser cooking game (`misaevol` / "clapastedyke"). The user navigates a three.js kitchen world (`/home`); the real data-entry forms are the screens reached from it. `/ui` is the living component showcase. State is persisted locally in IndexedDB — **that is the source of truth and it has no backend**.
 
-The one network integration is **optional and additive**: from `/cuenta` a user can connect a Google account and mirror recipes and supplies into a spreadsheet in their own Drive. The app never calls the Sheets or Drive APIs — it posts to a Google Apps Script Web App (`apps-script/Code.gs`) that writes on the user's behalf. Setting it up is manual and documented end to end in [`appscript.md`](appscript.md). Nothing about local persistence changes when it is off (which is the default: `public/config.json` ships empty).
+The one network integration is **optional and additive**: from `/cuenta` a user can connect a Google account and mirror recipes and supplies into a spreadsheet in their own Drive. The app never calls the Sheets or Drive APIs — it posts to a Google Apps Script Web App (`apps-script/Code.gs`) that writes on the user's behalf. Setting it up is manual and documented end to end in [`appscript.md`](appscript.md). Nothing about local persistence changes when it is off (which is the default: `public/config.json` ships with both Google keys empty).
 
 ## Architecture: four layers under `src/app/`
 
@@ -93,7 +94,7 @@ Key invariants the code already follows:
 
 ### Shared kernel — `core/_common/`
 
-Cross-context primitives, **not** a bounded context: `UseCase`, `AggregateRoot` (records domain events via `pullEvents()`), `EntityId`, `Quantity`, the `EventBus` port + `InMemoryEventBus`, `config/` (the `AppConfig` port over `public/config.json`, read at bootstrap), and `infrastructure/indexeddb/` (single DB `clapastedyke`, one object store per aggregate, versioning only ever ADDS stores). New cross-cutting projections also go here.
+Cross-context primitives, **not** a bounded context: `UseCase`, `AggregateRoot` (records domain events via `pullEvents()`), `EntityId`, `Quantity`, the `EventBus` port + `InMemoryEventBus`, `config/` (the `AppConfig` port over `public/config.json`, read in `main.ts` **before** bootstrap so it is synchronous everywhere), and `infrastructure/indexeddb/` (single DB `clapastedyke`, one object store per aggregate, versioning only ever ADDS stores). New cross-cutting projections also go here.
 
 **`core/auth/` and `core/external-sync/` are technology-agnostic on purpose.** Their domain and application layers never name Google, Sheets or Apps Script — not even in a type. Each has exactly one port (`Authenticator`, `SyncGateway`) and one concrete adapter, bound in its `provide*()`:
 
@@ -102,7 +103,7 @@ Cross-context primitives, **not** a bounded context: `UseCase`, `AggregateRoot` 
 | `auth` | `Authenticator` | `infrastructure/google-authenticator.ts` (all of Google Identity Services) | one line in `auth.providers.ts` |
 | `external-sync` | `SyncGateway` | `infrastructure/apps-script-sync.gateway.ts` + `apps-script-endpoint.ts` | one line in `external-sync.providers.ts` |
 
-The deployment config (`AppConfig` over `public/config.json`) lives under `_common/infrastructure/config/` for the same reason: its keys are technology (`appsScriptUrl`, `googleClientId`), so only adapters read it — never a use case.
+The deployment config (`AppConfig` over `public/config.json`) lives under `_common/infrastructure/config/` for the same reason: its keys are technology (`debug`, `appsScriptUrl`, `googleClientId`), so only adapters read it — never a use case. **There is one build for every environment**: no `src/environments/`, no `fileReplacements` — what changes per deployment is that served file.
 
 ### Domain events
 
@@ -118,41 +119,76 @@ Aggregates record events **in their `create(...)` factory** (`extends AggregateR
 
 `app.config.ts` only **aggregates** `provide*()` functions (`provideEventBus()`, `provideRecipeBook()`, `provideProgression()`) — it never decides implementations. Each context owns its bindings in its `*.providers.ts`. Routes are lazy-loaded standalone components in `app.routes.ts`.
 
-## Registro y modo depuración — `console.*` PROHIBIDO (hard rule)
+## Registro — obligatorio y `console.*` PROHIBIDO (hard rule)
+
+Regla completa en **[`logging-conventions.md`](.claude/rules/logging-conventions.md)**. Lo que hay
+que saber sin abrirla:
 
 **Nada en el proyecto llama a `console`.** Se registra por el puerto `Logger`
-(`core/_common/logger/logger.ts`), con cuatro niveles: `debug` · `info` · `warn` · `error`. Lo impone
-ESLint: `no-console` es **error** en todo el repo, con **una única excepción declarada por ruta** —el
+(`core/_common/logger/logger.ts`), con cuatro niveles: `debug` · `info` · `warn` · `error`. Lo impone ESLint:
+`no-console` es **error** en todo el repo, con **una única excepción declarada por ruta** —el
 adaptador `core/_common/logger/console-logger.ts`—, así que no se puede saltar con un
 `eslint-disable` suelto. (En specs y stories la regla está apagada.)
 
-Un `console.log` suelto no se puede apagar, ni filtrar por nivel, ni llevar a otro destino. Con un
-puerto, el modo depuración es un interruptor y cambiar a dónde van los logs —un panel dentro del
-juego, un fichero— es escribir otro adaptador y tocar `provideLogger()`.
+**Registrar no es opcional.** Cada paso importante de un flujo lleva su `debug`; cada `catch`
+registra o relanza; cada `void promesa` tiene dueño de su fallo. Registran `core/`, `features/` y
+`platform/`; **`components/` no registra nunca** (el design system no importa nada de la app).
 
 ```typescript
-private readonly log = inject(Logger).scoped('recipe-book-seed'); // prefija todo con [recipe-book-seed]
+private readonly log = inject(Logger).scoped('recipe-book/save-recipe'); // → [recipe-book/save-recipe]
 
-this.log.warn(`no se pudo sembrar "${id}"`, error); // el dato va aparte, no interpolado
+this.log.debug('guardando receta', { id, ingredientes: lines.length });
+this.log.warn('no se pudo sembrar la receta', error, { id }); // el error va en SU ranura
 ```
+
+**La firma es asimétrica a propósito**: `debug(msg, context?)` lleva datos; `warn`/`error(msg, cause?,
+context?)` llevan *la cosa que falló*, en ranura propia, para que la consola pinte la pila y la
+cadena `cause`. Anidar el error dentro del contexto pierde los frames pinchables. `info` está
+**prohibido** (sigue en el puerto `@deprecated`, se emite como `debug`).
 
 Vive en `core/_common/` —junto al `EventBus`— y no en `platform/` porque **`core/` también registra y
-no puede importar de `platform/`**.
+no puede importar de `platform/`**; la dependencia inversa sí vale, y por eso `eslint.config.mjs`
+abre una grieta explícita para `@core/_common/logger` en el bloque de `platform/`.
 
-### Cómo encender el modo depuración
+### Qué se ve y cuándo
 
-**Está callado por defecto, y solo funciona en desarrollo** (en un build de producción no escribe
-nunca). Se enciende **a pedido**, desde la consola del navegador:
+| Nivel | Se ve |
+|---|---|
+| `error` · `warn` · `info` | **siempre**, en cualquier despliegue |
+| `debug` | si `public/config.json` dice `"debug": true` |
 
-```js
-migoLog.on()        // todo: debug, info, warn y error
-migoLog.on('warn')  // solo warn y error
-migoLog.off()       // silencio
-migoLog.level()     // qué hay puesto ahora
+**`info`, `warn` y `error` no se pueden apagar**: no hay configuración que los toque, así que si algo
+falla en la máquina de alguien deja rastro con su pila. **`debug`** viene encendido en el repo, así
+que `ng serve` y ya se ve todo.
+
+Todo lo que nadie captura acaba en `GlobalErrorHandler` (`platform/error/`), que lo saca por el
+puerto con scope `[uncaught]` y su traza completa. El fallo de arranque, que ocurre antes de que
+exista el inyector, lo recoge `logBootstrapFailure` en `main.ts`.
+
+### La única configuración: `public/config.json`
+
+Un booleano en el fichero de configuración que ya existe, y **nada más**: ni `environment.ts`, ni
+umbral de nivel, ni interruptor en `window`, ni estado en `localStorage`.
+
+```jsonc
+// public/config.json — el MISMO build lo lee en todos los entornos
+{
+  "debug": true,          // ¿se ve el detalle del flujo? Ausente = false
+  "appsScriptUrl": "",
+  "googleClientId": ""
+}
 ```
 
-El nivel se recuerda en `localStorage`, así que **sobrevive a la recarga**: lo enciendes una vez y
-sigues viendo el arranque, el seed y los eventos en las siguientes.
+**El build es uno solo**: no hay `src/environments/` ni `fileReplacements`. Compilar dos veces la
+misma app para cambiarle un booleano obliga a republicar por cada ajuste y hace que lo que corre en
+producción no sea el artefacto que se probó. Para callar el detalle en un despliegue se edita **su**
+`config.json` y se recarga.
+
+`main.ts` lo lee con `readConfigDocument()` **antes** de `bootstrapApplication` y se lo pasa a
+`appConfig(document)`. Ese orden importa: como app-initializer habría corrido en paralelo con los
+demás, y el bus, el seed y el mundo 3D podían registrar antes de saber si `debug` estaba encendido —
+perdiendo justo las trazas del arranque. Si el fichero falta o es ilegible, `document` es `null`: la
+app arranca en local-only con un `warn` y `debug` apagado.
 
 ### Comprobar que los eventos están llegando
 
@@ -162,7 +198,7 @@ publicó» y «no lo escucha nadie» se ven igual. Para distinguirlos, `provideE
 Published Language:
 
 ```js
-migoLog.on()   // y ahora usa la app
+// con `ng serve` ya salen; solo hay que usar la app
 // [events] SupplySaved          { aggregateId: 'ing-manjar', occurredOn: '…', data: { name: 'Manjar blanco', … } }
 // [events] RecipeSaved          { aggregateId: 'rec-bano-manjar', occurredOn: '…', data: { name: 'Baño de Manjar', ingredients: […], … } }
 // [events] RecipeCapacitySaved  { aggregateId: 'RC-1', occurredOn: '…', data: { group: 'portions', label: '33', factor: 33 } }

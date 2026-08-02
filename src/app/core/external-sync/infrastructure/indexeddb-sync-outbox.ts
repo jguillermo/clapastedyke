@@ -1,5 +1,6 @@
-import { Injectable, signal, Signal } from '@angular/core';
+import { inject, Injectable, signal, Signal } from '@angular/core';
 import { ask, openDatabase } from '@core/_common/infrastructure/indexeddb/database';
+import { Logger } from '@core/_common/logger/logger';
 import { SyncOutbox } from '../domain/services/sync-outbox';
 import { SyncItem } from '../domain/value-objects/sync-item';
 
@@ -42,6 +43,8 @@ interface SyncOutboxRecord {
  */
 @Injectable()
 export class IndexeddbSyncOutbox extends SyncOutbox {
+  private readonly log = inject(Logger).scoped('external-sync/outbox');
+
   private readonly count = signal(0);
 
   readonly pending: Signal<number> = this.count.asReadonly();
@@ -108,6 +111,7 @@ export class IndexeddbSyncOutbox extends SyncOutbox {
     const db = await openDatabase();
     await ask(db.transaction(STORE, 'readwrite').objectStore(STORE).clear());
     this.count.set(0);
+    this.log.debug('cola vaciada');
   }
 
   /** Aplica una transición a los registros de `items` que sigan existiendo, en una transacción. */
@@ -147,13 +151,21 @@ export class IndexeddbSyncOutbox extends SyncOutbox {
     const all = await ask<SyncOutboxRecord[]>(store.getAll());
 
     this.seq = all.reduce((max, record) => Math.max(max, record.seq), 0);
+    let rescued = 0;
     for (const record of all) {
       if (record.inFlight) {
         await ask(store.put({ ...record, inFlight: false }));
+        rescued++;
       }
     }
     // Tras recuperar no queda nada en vuelo: todo lo guardado está esperando turno.
     this.count.set(all.length);
+    // Lo rescatado explica un envío duplicado: salió, no se supo si llegó y se reintenta.
+    this.log.debug('cola recuperada del arranque', {
+      pendientes: all.length,
+      rescatados: rescued,
+      ultimoTurno: this.seq,
+    });
   }
 
   private async recount(): Promise<void> {

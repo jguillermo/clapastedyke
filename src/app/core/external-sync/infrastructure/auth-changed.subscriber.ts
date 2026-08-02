@@ -40,7 +40,7 @@ export class AuthChangedSubscriber {
   private readonly outbox = inject(SyncOutbox);
   private readonly status = inject(SyncStatus);
   private readonly sync = inject(Synchronize);
-  private readonly log = inject(Logger).scoped('external-sync');
+  private readonly log = inject(Logger).scoped('external-sync/on-auth-changed');
 
   /** Desde cuándo escucha. Todo lo anterior pertenece a una sesión que ya no existe. */
   private since = 0;
@@ -50,8 +50,10 @@ export class AuthChangedSubscriber {
 
     this.bus.subscribe(SUBSCRIBER, IntegrationEventName.AUTHENTICATION_SUCCEEDED, async (event) => {
       if (this.isStale(event.occurredOn)) {
+        this.log.debug('evento de una sesión anterior, se ignora', { event: event.name });
         return;
       }
+      this.log.debug('cuenta conectada: se vacía la cola y se sincroniza todo');
       // Se espera al vaciado —no a la red— para que la cola de la cuenta anterior esté fuera del
       // disco ANTES de marcar conectado: si no, el envío completo podría arrastrarla.
       await this.outbox.clear();
@@ -67,10 +69,12 @@ export class AuthChangedSubscriber {
     ]) {
       this.bus.subscribe(SUBSCRIBER, eventName, async (event) => {
         if (this.isStale(event.occurredOn)) {
+          this.log.debug('evento de una sesión anterior, se ignora', { event: event.name });
           return;
         }
         await this.outbox.clear();
         this.status.markDisconnected();
+        this.log.debug('cuenta desconectada: cola vaciada', { event: event.name });
       });
     }
   }

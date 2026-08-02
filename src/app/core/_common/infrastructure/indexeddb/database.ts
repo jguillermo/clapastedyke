@@ -86,7 +86,15 @@ export function openDatabase(): Promise<IDBDatabase> {
     };
 
     request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error ?? new Error('Could not open IndexedDB.'));
+    // El `DOMException` de IndexedDB no trae pila útil, así que va como `cause` de un error creado
+    // aquí. Esta capa NO registra: traduce y relanza, y quien decide qué ve el usuario lo registra
+    // una sola vez con la cadena entera. Ver logging-conventions.md → «un dueño por fallo».
+    request.onerror = () =>
+      reject(
+        new Error(`No se pudo abrir IndexedDB "${DB_NAME}" v${DB_VERSION}`, {
+          cause: request.error,
+        }),
+      );
   });
   return connection;
 }
@@ -100,6 +108,23 @@ export function resetConnectionForTests(): void {
 export function ask<T>(request: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
     request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error ?? new Error('IndexedDB operation failed.'));
+    request.onerror = () =>
+      reject(
+        new Error(`Falló una operación de IndexedDB sobre "${sourceName(request)}"`, {
+          cause: request.error,
+        }),
+      );
   });
+}
+
+/** Sobre qué store iba la petición, para que el error diga algo sin tener que adivinarlo. */
+function sourceName(request: IDBRequest): string {
+  const source: unknown = request.source;
+  if (source instanceof IDBObjectStore) {
+    return source.name;
+  }
+  if (source instanceof IDBIndex) {
+    return `${source.objectStore.name}.${source.name}`;
+  }
+  return 'desconocido';
 }

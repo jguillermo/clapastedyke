@@ -1,4 +1,13 @@
-import { AfterViewInit, Component, ElementRef, OnDestroy, signal, viewChild } from '@angular/core';
+import {
+  AfterViewInit,
+  Component,
+  ElementRef,
+  inject,
+  OnDestroy,
+  signal,
+  viewChild,
+} from '@angular/core';
+import { Logger } from '@core/_common/logger/logger';
 // DEUDA (features-conventions.md · «las features son independientes): la cocina monta el libro 3D
 // importando otra feature. Se retira abriendo el libro desde la ruta/host — el libro emite
 // `(closed)` y quien decide qué se muestra debería ser el contenedor, no esta vista.
@@ -57,12 +66,18 @@ export class Home3d implements AfterViewInit, OnDestroy {
     { station: KitchenStation.OVEN, label: 'Horno', active: false },
   ];
 
+  private readonly log = inject(Logger).scoped('ui/home');
+
   private engine: KitchenEngine | null = null;
   private readonly reducedMotion =
     window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 
   constructor() {
-    this.webglSupported.set(detectWebgl());
+    const webgl = detectWebgl();
+    this.webglSupported.set(webgl);
+    this.log.debug(webgl ? 'hay WebGL: se monta el mundo 3D' : 'sin WebGL: ruta accesible DOM', {
+      reducedMotion: this.reducedMotion,
+    });
   }
 
   ngAfterViewInit(): void {
@@ -71,18 +86,24 @@ export class Home3d implements AfterViewInit, OnDestroy {
     }
     const canvas = this.canvasRef()?.nativeElement;
     if (!canvas) {
+      this.log.debug('todavía no hay canvas, no se monta el motor');
       return;
     }
     try {
-      this.engine = new KitchenEngine(canvas, this.reducedMotion);
+      this.engine = new KitchenEngine(canvas, this.reducedMotion, this.log.scoped('3d/kitchen'));
       this.engine.onStationClick((station) => this.handleStation(station));
-      void this.engine.flyIn().then(() => {
-        if (!this.bookOpen()) {
-          this.coachVisible.set(true);
-        }
-      });
-    } catch {
-      // El contexto WebGL pudo fallar al crearse: caemos a la ruta accesible.
+      this.engine
+        .flyIn()
+        .then(() => {
+          if (!this.bookOpen()) {
+            this.coachVisible.set(true);
+          }
+        })
+        .catch((error: unknown) => this.log.error('la entrada de cámara ha fallado', error));
+    } catch (error) {
+      // El contexto WebGL pudo fallar al crearse: caemos a la ruta accesible. Nadie más se entera
+      // —la vista sigue funcionando— así que la degradación se cuenta aquí o no se cuenta.
+      this.log.warn('no se pudo crear el motor 3D: se cae a la ruta accesible', error);
       this.engine = null;
       this.webglSupported.set(false);
     }
@@ -95,6 +116,7 @@ export class Home3d implements AfterViewInit, OnDestroy {
   /** Punto único: clic de estación (desde el 3D o desde el dock accesible). */
   protected handleStation(station: KitchenStation): void {
     if (station !== KitchenStation.RECIPE_BOARD) {
+      this.log.debug('estación inerte en la Fase 0, no se hace nada', { station });
       return; // PANTRY / OVEN inertes en la Fase 0
     }
     this.openRecipeBook();
@@ -104,17 +126,23 @@ export class Home3d implements AfterViewInit, OnDestroy {
     if (this.bookOpen()) {
       return;
     }
+    this.log.debug('abriendo el libro de recetas');
     this.coachVisible.set(false);
-    void this.engine?.focusStation(KitchenStation.RECIPE_BOARD);
+    this.engine
+      ?.focusStation(KitchenStation.RECIPE_BOARD)
+      .catch((error: unknown) => this.log.error('no se pudo enfocar la estación', error));
     this.engine?.pause(); // libera GPU mientras el libro está a pantalla completa
     this.bookOpen.set(true);
   }
 
   /** El libro se cerró: reanuda la cocina y vuelve a la vista general. */
   protected onRecipeBookClosed(): void {
+    this.log.debug('libro cerrado, vuelve la cocina');
     this.bookOpen.set(false);
     this.engine?.resume();
-    void this.engine?.resetView();
+    this.engine
+      ?.resetView()
+      .catch((error: unknown) => this.log.error('no se pudo volver a la vista general', error));
     if (this.webglSupported()) {
       this.coachVisible.set(true);
     }

@@ -3,6 +3,7 @@ import { UseCase } from '../../../_common/use-case';
 import { BaseUnit, Quantity } from '../../../_common/quantity';
 import { EntityId } from '../../../_common/entity-id';
 import { EventBus } from '../../../_common/eventbus/event-bus';
+import { Logger } from '../../../_common/logger/logger';
 import { Supply } from '../../domain/entities/supply';
 import { PurchasePrice } from '../../domain/value-objects/purchase-price';
 import { SupplyUsage } from '../../domain/value-objects/supply-usage';
@@ -45,14 +46,26 @@ export interface SaveSupplyRequest {
 export class SaveSupply extends UseCase<SaveSupplyRequest, { id: string }> {
   private readonly supplies = inject(SupplyRepository);
   private readonly bus = inject(EventBus);
+  private readonly log = inject(Logger).scoped('recipe-book/save-supply');
 
   async execute({ id, name, usage, purchasePrice }: SaveSupplyRequest): Promise<{ id: string }> {
+    this.log.debug('ejecutando', { sobreId: id ?? null, usage: usage ?? null });
+
     const sameName = await this.supplies.byName(name);
     const existing = id ? await this.supplies.byId(new EntityId(id)) : sameName;
     // El nombre solo puede estar tomado por el insumo sobre el que estamos persistiendo.
     if (sameName && !(existing && sameName.id.equals(existing.id))) {
+      // No se registra el fallo aquí: se lanza y lo registra quien decide qué ve el usuario.
+      // Esta línea solo cuenta POR QUÉ se rechazó, para poder seguir el flujo.
+      this.log.debug('nombre ya tomado por otro insumo, se rechaza', {
+        tomadoPor: sameName.id.value,
+      });
       throw new Error('Ya existe un insumo con ese nombre');
     }
+    this.log.debug(
+      existing ? 'insumo existente, se reutiliza su identidad' : 'insumo nuevo',
+      existing ? { id: existing.id.value, baseUnit: existing.baseUnit } : undefined,
+    );
 
     const price = PurchasePrice.of(
       purchasePrice.amount,
@@ -71,6 +84,7 @@ export class SaveSupply extends UseCase<SaveSupplyRequest, { id: string }> {
 
     await this.supplies.save(supply);
     await this.bus.publish(supply.pullEvents());
+    this.log.debug('hecho', { id: supply.id.value, baseUnit: supply.baseUnit });
     return { id: supply.id.value };
   }
 }

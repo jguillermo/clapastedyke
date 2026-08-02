@@ -96,6 +96,12 @@ Convenciones específicas por área. Consulta la regla correspondiente antes de 
 - [platform-conventions.md](rules/platform-conventions.md) — mecanismos técnicos transversales en `platform/`.
 - [providers-conventions.md](rules/providers-conventions.md) — DI por contexto con `provide*()` y `makeEnvironmentProviders`.
 - [assets-conventions.md](rules/assets-conventions.md) — recursos estáticos en `src/assets/`.
+- [logging-conventions.md](rules/logging-conventions.md) — **regla dura**: nada llama a `console`; se
+  registra por el puerto `Logger` y **registrar es obligatorio** (un `debug` en cada paso importante,
+  ningún `catch` mudo, ningún `void promesa` sin dueño de su fallo). `warn`/`error` **siempre
+  visibles, también en producción**, con la traza; `debug` solo en dev, y allí **encendido por
+  defecto**.
+  `components/` **no registra nunca**. Firma asimétrica: el error va en su propia ranura.
 - [unit-tests-conventions.md](rules/unit-tests-conventions.md) — **regla dura**: los únicos tests unitarios son los de **dominio** y **casos de uso** de `src/app/core/<contexto>/`, y viven en `core/<contexto>/testing/` **replicando tal cual** la ruta de `domain/` y `application/` (nunca junto al fuente). Features → E2E; componentes del DS → el `play` de su story.
 - [e2e-tests-conventions.md](rules/e2e-tests-conventions.md) — **regla dura**: TODOS los tests E2E viven en la carpeta **`e2e/`** (config, `specs/` espejando `src/app/features/`, `pages/`, `fixtures/`, `support/`) y prueban las **vistas de `features/`** con **flujos completos** hasta un estado terminal, nunca estados intermedios. Se usan siempre los page objects y el fixture `app-fixture`; los estados/variantes de los componentes del DS se cubren en el `play` de su story, no aquí. **Cualquier petición de "crear tests E2E" se resuelve con esta forma.**
 - [main-process-conventions.md](rules/main-process-conventions.md) — proceso principal de Electron en `app/src/`.

@@ -3,7 +3,8 @@ import { TestBed } from '@angular/core/testing';
 import { DomainEvent, domainEvent } from './domain-event';
 import { EventDispatcher } from './event-dispatcher';
 import { EventDrivenUseCase, OnEvent, subscribedEventOf } from './on-event';
-import { provideTestLogger } from '../testing/logger-test-doubles';
+import { ConsoleLogger } from '../logger/console-logger';
+import { Logger } from '../logger/logger';
 
 const recibidos: string[] = [];
 
@@ -37,7 +38,7 @@ describe('@OnEvent', () => {
   function wire(...useCases: Type<EventDrivenUseCase>[]): void {
     recibidos.length = 0;
     TestBed.configureTestingModule({
-      providers: [...provideTestLogger(), EventDispatcher, ...useCases],
+      providers: [{ provide: Logger, useClass: ConsoleLogger }, EventDispatcher, ...useCases],
     });
     dispatcher = TestBed.inject(EventDispatcher);
 

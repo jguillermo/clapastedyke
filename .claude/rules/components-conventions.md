@@ -46,6 +46,22 @@ va aquí.
 
 > Esto es más estricto que las reglas de capas habituales: `components/` no importa de **ninguna**
 > capa de la app, solo de Angular, CDK, **librerías de UI agnósticas aprobadas** y de sí misma.
+
+> ### Corolario: el design system NO registra
+>
+> El proyecto tiene una regla dura de registro obligatorio
+> ([logging-conventions.md](logging-conventions.md)): en `core/`, `features/` y `platform/` hay que
+> poner un `debug` en cada paso importante. **`components/` queda fuera, y no es un olvido.**
+>
+> El puerto `Logger` vive en `@core/_common/logger/`, o sea en la app, y esta librería no importa de
+> la app — ni siquiera un contrato. La grieta que se abrió en ESLint para que `platform/` pueda
+> registrar **no se abre aquí**: `@core/**` sigue prohibido entero.
+>
+> Tampoco hace falta. Un `migo-button` no tiene nada que contar que no se vea mejor desde la feature
+> que lo usa: «se pulsó Guardar» es un hecho de la vista, no del botón. Un componente que sí tuviera
+> algo que registrar estaría haciendo lógica de negocio, que es justo lo que esta regla prohíbe.
+>
+> Los estados y variantes del componente se cubren en el `play` de su story, no con trazas.
 >
 > **Librerías de UI externas aprobadas.** Además del CDK, `components/` puede envolver librerías de
 > UI **agnósticas** (sin lógica de negocio) que aporten comportamiento/estilo encapsulado, igual que

@@ -1,4 +1,5 @@
-import { Injectable } from '@angular/core';
+import { inject, Injectable } from '@angular/core';
+import { Logger } from '@core/_common/logger/logger';
 
 /**
  * Sincroniza el **visual viewport** (el área realmente visible, que SÍ encoge cuando aparece el
@@ -14,12 +15,16 @@ import { Injectable } from '@angular/core';
  */
 @Injectable({ providedIn: 'root' })
 export class ViewportService {
+  private readonly log = inject(Logger).scoped('viewport');
+
   private frame = 0;
 
   /** Arranca el seguimiento. Idempotente y seguro si no existe `visualViewport` (jsdom/SSR). */
   start(): void {
     const vv = typeof window !== 'undefined' ? window.visualViewport : null;
     if (!vv) {
+      // Sin esto, «el diálogo se desplaza al abrir el teclado» no tiene ninguna pista.
+      this.log.debug('sin visualViewport: los diálogos no se ajustarán al teclado');
       return;
     }
     const sync = (): void => {
@@ -31,8 +36,10 @@ export class ViewportService {
         root.setProperty('--vvt', `${vv.offsetTop}px`);
       });
     };
+    // `sync` corre por frame mientras se anima el teclado: ahí NO se registra nada.
     sync();
     vv.addEventListener('resize', sync);
     vv.addEventListener('scroll', sync);
+    this.log.debug('siguiendo el visual viewport', { height: vv.height });
   }
 }

@@ -18,17 +18,41 @@ Each bounded context in `core/` already has its own `infrastructure/` folder for
 
 | Rule | Detail |
 |---|---|
-| Must NOT import from `core/` | Platform has no knowledge of business domains |
+| Must NOT import from `core/` | Platform has no knowledge of business domains — **two narrow exceptions below** |
 | Must NOT import from `features/` | Platform has no knowledge of pages or routes, including `features/_common/` |
 | May import from Angular and external libraries | Framework APIs, third-party packages |
 
 Features, `features/_common/`, and layout may import from `platform/`.
 
-### Exception — `DomainError` contract
+### Las dos excepciones — contratos de `core/_common/`
 
-`GlobalErrorHandler` imports the `DomainError` abstract class from `core/_common/error/domain-error.ts` to read `error.code` from any domain error that bubbles up. `DomainError` itself is a domain concept: it encodes the product rule that every error surfaced to the user must carry a deterministic triage code for validation and support. It belongs in `core/` for that reason. The exception here is narrow — platform only reads the contract to render and log the code, never to enact business logic.
+Están escritas como globs negativos en `eslint.config.mjs` (bloque de `src/app/platform/**`). Son las
+**únicas**, y las dos apuntan al shared kernel, que no tiene dominio dentro:
 
-A future refactor may eliminate this exception by modelling errors as a use case that encapsulates the domain entity — at that point platform would consume the use case's output without touching `core/` directly.
+```js
+group: [
+  ...AREA.core,
+  '!@core/_common/error',  '!@core/_common/error/**',
+  '!@core/_common/logger', '!@core/_common/logger/**',
+  ...AREA.features,
+],
+```
+
+**1. El puerto `Logger`** (`@core/_common/logger/logger`) — **la única viva hoy**. `platform/` también
+registra: lo usan `GlobalErrorHandler` y `ViewportService`, y los motores 3D lo reciben por
+constructor desde la feature. El puerto vive en `core/_common/` y no aquí porque **`core/` también
+registra y no puede importar de `platform/`**; la dependencia inversa sí es posible, así que la
+grieta se abre en este lado. Regla completa en
+[logging-conventions.md](logging-conventions.md).
+
+**2. El contrato `DomainError`** (`@core/_common/error/…`) — **aspiracional: ese directorio todavía no
+existe** en este repo. Cuando exista, `GlobalErrorHandler` leerá su `code` para poder mostrarlo y
+registrarlo, nunca para ejecutar lógica de negocio. `DomainError` es un concepto de dominio (codifica
+la regla de producto de que todo error mostrado lleve un código de triaje determinista), y por eso
+vive en `core/`.
+
+Ninguna de las dos autoriza a importar nada más de `core/`: ni una entidad, ni un caso de uso, ni un
+contexto.
 
 ## Internal structure
 
@@ -36,28 +60,30 @@ Platform modules use a **flat structure** — no DDD layers (`domain/`, `infrast
 
 The only justified subdirectory is `ui/` for visual components (e.g., error dialogs).
 
+Lo que hay hoy en el repo:
+
 ```
 platform/
-├── platform.providers.ts       # Aggregates all platform providers
+├── platform.providers.ts       # Agrega los providers de la capa
 ├── error/
-│   ├── error.providers.ts
-│   ├── error.exception.ts
-│   ├── error-factory.ts
-│   ├── error-handler.ts        # Angular ErrorHandler
-│   ├── error.messages.ts
-│   ├── error-types.ts
-│   ├── error-zone.service.ts
-│   └── ui/                     # Only subdirectory — contains visual components
-│       └── error-dialog.ts
-├── http/
-│   ├── http.providers.ts
-│   └── auth.interceptor.ts     # HTTP interceptor (documented core/ exception)
-└── translation/
-    ├── translation.providers.ts
-    ├── translation.config.ts
-    ├── translation.http-loader.ts
-    └── translation.missing-handler.ts
+│   ├── error-handler.ts        # GlobalErrorHandler → Logger, scope [uncaught]
+│   └── error.providers.ts      # provideErrorHandling()
+├── viewport/
+│   ├── viewport.providers.ts
+│   └── viewport.service.ts
+└── three/                      # El motor 3D (no es DOM: fuera de las reglas de estilo)
+    ├── kitchen-engine.ts  camera-rig.ts  chef-engine.ts  …
+    └── book/
+        └── book-engine.ts  page-turn.ts  …
 ```
+
+El módulo `error/` es el **último recinto**: `provideBrowserGlobalErrorListeners()` (en
+`app.config.ts`) engancha `window.error` y `unhandledrejection` y los enruta al `ErrorHandler` de la
+app, así que **no hacen falta listeners propios** — añadirlos duplicaría cada reporte. Sin este
+módulo, Angular usaría su handler por defecto, que escribe con un `console.error` crudo y se salta el
+puerto.
+
+Un módulo con UI añadiría un `ui/` (p. ej. `error/ui/error-dialog.ts`); hoy no hay ninguno.
 
 ## Subdirectory rule
 

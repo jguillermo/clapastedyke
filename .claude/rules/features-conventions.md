@@ -29,6 +29,21 @@ rejillas apilan o scrollean (no se aplastan) y los formularios abiertos como di�
 aplica esta regla. (El **HUD DOM** superpuesto al canvas sí usa utilidades Tailwind; solo el render
 3D queda fuera.)
 
+## Registro (regla dura)
+
+Una feature es donde **empieza y acaba** lo que hizo el usuario, así que es donde la traza vale más.
+Regla completa en [logging-conventions.md](logging-conventions.md); lo que muerde aquí:
+
+- `private readonly log = inject(Logger).scoped('ui/<vista>');` — el scope es el selector sin `app-`.
+- **Un `debug` al empezar y otro al terminar** cada acción que invoque un caso de uso o cambie estado
+  persistido. Nunca por abrir/cerrar un diálogo, foco, scroll o swipe.
+- **Ningún `catch` mudo.** Poner el mensaje en pantalla **no** sustituye al registro: el usuario ve
+  una frase amable y el registro conserva la causa con su pila (`this.log.warn('…', error, { id })`).
+- **Ningún `void promesa` huérfano.** O el método absorbe su propio fallo, o la llamada lleva
+  `.catch()`.
+- **Nada dentro de `computed()` / `effect()`** ni en handlers de `valueChanges`: se reevalúan solos y
+  ahogarían la consola. Solo el fallo.
+
 ## Import rules
 
 Features may import from:

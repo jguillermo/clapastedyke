@@ -18,7 +18,7 @@ import { Logger } from '../logger/logger';
  */
 @Injectable()
 export class EventDispatcher {
-  private readonly log = inject(Logger).scoped('eventbus');
+  private readonly log = inject(Logger).scoped('eventbus/dispatcher');
 
   /** nombre de evento → (id de suscriptor → handler). */
   private readonly handlers = new Map<string, Map<string, EventHandler>>();
@@ -27,6 +27,7 @@ export class EventDispatcher {
     const forEvent = this.handlers.get(eventName) ?? new Map<string, EventHandler>();
     forEvent.set(subscriber, handler);
     this.handlers.set(eventName, forEvent);
+    this.log.debug('suscrito', { subscriber, event: eventName });
   }
 
   /**
@@ -36,19 +37,31 @@ export class EventDispatcher {
    * lo tienen hasta ahora cuando alguno falló (para poder reintentar solo con el resto).
    */
   async deliver(event: DomainEvent, alreadyDelivered: readonly string[]): Promise<string[] | null> {
+    const forEvent = this.handlers.get(event.name);
+
+    // El caso que de otro modo es invisible: el evento se publicó, se encoló y se entregó A NADIE.
+    // Desde fuera «no se publicó» y «no lo escucha nadie» se ven igual; esta línea los distingue.
+    if (forEvent === undefined || forEvent.size === 0) {
+      this.log.debug(`${event.name} no lo escucha nadie`, { aggregateId: event.aggregateId });
+      return null;
+    }
+
     const delivered = new Set(alreadyDelivered);
     let failed = false;
 
-    for (const [subscriber, handler] of this.handlers.get(event.name) ?? []) {
+    for (const [subscriber, handler] of forEvent) {
       if (delivered.has(subscriber)) {
         continue;
       }
       try {
         await handler(event);
         delivered.add(subscriber);
+        this.log.debug(`${event.name} → ${subscriber}`, { aggregateId: event.aggregateId });
       } catch (error) {
         failed = true;
-        this.log.error(`El suscriptor ${subscriber} ha fallado con ${event.name}`, error);
+        this.log.error(`El suscriptor ${subscriber} ha fallado con ${event.name}`, error, {
+          aggregateId: event.aggregateId,
+        });
       }
     }
     return failed ? [...delivered] : null;

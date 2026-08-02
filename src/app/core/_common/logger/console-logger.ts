@@ -1,140 +1,120 @@
 // ESTE es el único fichero del proyecto autorizado a usar `console`: la excepción a `no-console`
 // está declarada por ruta en `eslint.config.mjs`, para que no se pueda copiar con un disable suelto.
-import { Injectable, isDevMode } from '@angular/core';
-import { Logger, LOG_LEVELS, LogLevel, LogSetting } from './logger';
+import { Injectable, inject } from '@angular/core';
+import { LOG_DEBUG, Logger, LogContext, LogLevel } from './logger';
 
-/** Dónde se recuerda el nivel entre recargas. */
-const STORAGE_KEY = 'migo:log';
-
-/** El interruptor que se publica en `window` durante el desarrollo. */
-const GLOBAL_KEY = 'migoLog';
-
-/** Qué método de consola usa cada nivel. */
-const CONSOLE_METHOD: Record<LogLevel, 'debug' | 'info' | 'warn' | 'error'> = {
-  debug: 'debug',
+/**
+ * Qué método de consola usa cada nivel. **`debug` sale por `console.log`, no por `console.debug`**:
+ * Chrome clasifica `console.debug` como nivel *Verbose* y lo **oculta por defecto** en devtools, así
+ * que las trazas no se veían aunque el logger las emitiera. Un segundo interruptor escondido en el
+ * navegador es justo lo que este diseño quiere evitar.
+ */
+const CONSOLE_METHOD: Record<LogLevel, 'log' | 'info' | 'warn' | 'error'> = {
+  debug: 'log',
   info: 'info',
   warn: 'warn',
   error: 'error',
 };
 
-function isLogSetting(value: string | null): value is LogSetting {
-  return value === 'silent' || (LOG_LEVELS as readonly string[]).includes(value ?? '');
-}
-
-/** Lee el nivel recordado. El almacenamiento puede fallar (modo privado): entonces, silencio. */
-function storedLevel(): LogSetting | null {
+/** Un texto corto para lo que se lanzó y no era un `Error`. */
+function describe(value: unknown): string {
+  if (typeof value === 'string') {
+    return value;
+  }
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    return isLogSetting(stored) ? stored : null;
+    return JSON.stringify(value) ?? String(value);
   } catch {
-    return null;
+    return String(value);
   }
 }
 
-function remember(level: LogSetting): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, level);
-  } catch {
-    // Sin almacenamiento el nivel dura lo que la sesión; no es motivo para romper nada.
+/**
+ * **Garantiza que siempre haya una pila.** Lo que no es un `Error` se envuelve en uno conservando el
+ * valor original en `cause`: la pila apunta aquí y no al `throw`, pero es infinitamente mejor que un
+ * `[object Object]` sin nada. Pasa de verdad: `provideBrowserGlobalErrorListeners()` entrega el
+ * `reason` de una promesa rechazada tal cual, y eso puede ser cualquier cosa.
+ */
+function toError(thrown: unknown): Error {
+  if (thrown instanceof Error) {
+    return thrown;
   }
+  return new Error(`Se lanzó algo que no es un Error: ${describe(thrown)}`, { cause: thrown });
 }
 
 /**
  * Adaptador de {@link Logger} sobre la consola del navegador. **Único fichero con `console.*`.**
  *
- * **Callado por defecto y solo en desarrollo.** En un build de producción no escribe nunca, hagas lo
- * que hagas; en desarrollo arranca en `silent` y se enciende **a pedido**, desde la consola del
- * navegador:
+ * ## Hay una sola decisión, y está en el fichero de configuración
  *
- * ```js
- * migoLog.on()        // todo: debug, info, warn y error
- * migoLog.on('warn')  // solo warn y error
- * migoLog.off()       // silencio
- * migoLog.level()     // qué hay puesto ahora
- * ```
+ * | Nivel | Se ve |
+ * |---|---|
+ * | `error` · `warn` · `info` | **siempre** |
+ * | `debug` | si `public/config.json` dice `"debug": true` ({@link LOG_DEBUG}) |
  *
- * El nivel se recuerda en `localStorage`, así que sobrevive a la recarga: enciendes el modo
- * depuración una vez y sigues viendo el arranque, el seed y los eventos en las siguientes.
+ * Eso es todo. **No hay niveles configurables, ni interruptor de runtime, ni estado guardado en el
+ * navegador.** Y el **build es uno solo**: para dejar de ver el detalle del flujo en un despliegue se
+ * edita su `config.json` y se recarga — sin recompilar, sin republicar y sin que el artefacto que
+ * corre deje de ser el que se probó.
+ *
+ * `debug` es la única llave porque es el único nivel que sobra fuera de desarrollo: es el detalle
+ * del flujo. Los otros tres cuentan algo que hay que saber igual en la máquina de un usuario, así
+ * que no se apagan.
+ *
+ * ## Por qué no un interruptor en la consola
+ *
+ * Hubo una versión con un `migoLog` en `window` y la posición guardada en `localStorage`. Con eso, el
+ * registro que ves depende del navegador en el que estás: uno lo tiene encendido, otro no, y el que
+ * acaba de clonar el proyecto no ve ninguna de las trazas que la regla obliga a poner. «Esto no
+ * registra» y «no lo he encendido» se ven exactamente igual — que es justo lo que el registro venía a
+ * evitar. Ahora la respuesta a «¿por qué no veo trazas?» es un fichero que se abre y se lee.
  */
 @Injectable()
 export class ConsoleLogger extends Logger {
-  /** En producción nunca registra: el interruptor solo existe en desarrollo. */
-  private readonly enabled = isDevMode();
-  private current: LogSetting = this.enabled ? (storedLevel() ?? 'silent') : 'silent';
+  /** Lo que dijo `config.json`. Se resuelve una vez: cambiarlo en caliente no es un caso de uso. */
+  private readonly debugVisible = inject(LOG_DEBUG);
 
-  constructor() {
-    super();
-    if (this.enabled) {
-      this.installGlobalSwitch();
-    }
+  debug(message: string, context?: LogContext): void {
+    this.write('debug', message, undefined, context);
   }
 
-  get level(): LogSetting {
-    return this.current;
+  info(message: string, context?: LogContext): void {
+    this.write('info', message, undefined, context);
   }
 
-  setLevel(level: LogSetting): void {
-    this.current = level;
-    remember(level);
+  warn(message: string, cause?: unknown, context?: LogContext): void {
+    this.write('warn', message, cause, context);
   }
 
-  debug(message: string, context?: unknown): void {
-    this.write('debug', message, context);
-  }
-
-  info(message: string, context?: unknown): void {
-    this.write('info', message, context);
-  }
-
-  warn(message: string, context?: unknown): void {
-    this.write('warn', message, context);
-  }
-
-  error(message: string, context?: unknown): void {
-    this.write('error', message, context);
+  error(message: string, cause?: unknown, context?: LogContext): void {
+    // Sin causa no habría pila y el mensaje quedaría huérfano: se sintetiza una para localizar
+    // la llamada.
+    this.write('error', message, cause ?? new Error(message), context);
   }
 
   scoped(scope: string): Logger {
     return new ScopedLogger(this, `[${scope}]`);
   }
 
-  /** Escribe si el nivel lo permite. `context` va como argumento aparte para que se pueda expandir. */
-  write(level: LogLevel, message: string, context?: unknown): void {
-    if (!this.allows(level)) {
+  /**
+   * Escribe. **Aquí está la única compuerta del registro** —`debug`, si la configuración lo apaga—,
+   * y está en un solo sitio para que el logger con prefijo no tenga que repetirla.
+   *
+   * El `Error` va como argumento propio —no dentro del contexto— para que devtools lo pinte con la
+   * pila desplegable y la cadena `cause`. La cadena **no se aplana**: el navegador ya la muestra al
+   * expandir, y aplanarla perdería los frames pinchables.
+   */
+  write(level: LogLevel, message: string, cause?: unknown, context?: LogContext): void {
+    if (level === 'debug' && !this.debugVisible) {
       return;
     }
-    const method = CONSOLE_METHOD[level];
-    if (context === undefined) {
-      console[method](message);
-    } else {
-      console[method](message, context);
+    const args: unknown[] = [message];
+    if (cause !== undefined) {
+      args.push(toError(cause));
     }
-  }
-
-  private allows(level: LogLevel): boolean {
-    if (!this.enabled || this.current === 'silent') {
-      return false;
+    if (context !== undefined) {
+      args.push(context);
     }
-    return LOG_LEVELS.indexOf(level) >= LOG_LEVELS.indexOf(this.current);
-  }
-
-  /**
-   * Publica `window.migoLog` para poder encender el modo depuración sin recompilar. Solo en
-   * desarrollo: en producción esta rama no se ejecuta.
-   */
-  private installGlobalSwitch(): void {
-    const target = globalThis as unknown as Record<string, unknown>;
-    target[GLOBAL_KEY] = {
-      on: (level: LogSetting = 'debug') => {
-        this.setLevel(level);
-        console.info(`[logger] nivel: ${level}`);
-      },
-      off: () => {
-        console.info('[logger] silenciado');
-        this.setLevel('silent');
-      },
-      level: () => this.current,
-    };
+    console[CONSOLE_METHOD[level]](...args);
   }
 }
 
@@ -147,28 +127,20 @@ class ScopedLogger extends Logger {
     super();
   }
 
-  get level(): LogSetting {
-    return this.parent.level;
+  debug(message: string, context?: LogContext): void {
+    this.parent.write('debug', `${this.prefix} ${message}`, undefined, context);
   }
 
-  setLevel(level: LogSetting): void {
-    this.parent.setLevel(level);
+  info(message: string, context?: LogContext): void {
+    this.parent.write('info', `${this.prefix} ${message}`, undefined, context);
   }
 
-  debug(message: string, context?: unknown): void {
-    this.parent.write('debug', `${this.prefix} ${message}`, context);
+  warn(message: string, cause?: unknown, context?: LogContext): void {
+    this.parent.write('warn', `${this.prefix} ${message}`, cause, context);
   }
 
-  info(message: string, context?: unknown): void {
-    this.parent.write('info', `${this.prefix} ${message}`, context);
-  }
-
-  warn(message: string, context?: unknown): void {
-    this.parent.write('warn', `${this.prefix} ${message}`, context);
-  }
-
-  error(message: string, context?: unknown): void {
-    this.parent.write('error', `${this.prefix} ${message}`, context);
+  error(message: string, cause?: unknown, context?: LogContext): void {
+    this.parent.write('error', `${this.prefix} ${message}`, cause ?? new Error(message), context);
   }
 
   scoped(scope: string): Logger {
@@ -181,5 +153,5 @@ class ScopedLogger extends Logger {
  * ningún `Logger`. Se registra siempre, también en producción: si esto pasa, no hay aplicación.
  */
 export function logBootstrapFailure(error: unknown): void {
-  console.error('[bootstrap] la aplicación no pudo arrancar', error);
+  console.error('[bootstrap] la aplicación no pudo arrancar', toError(error));
 }

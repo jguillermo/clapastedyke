@@ -5,7 +5,8 @@ import { EventDispatcher } from './event-dispatcher';
 import { EventReader } from './event-reader';
 import { EventWriter } from './event-writer';
 import { PersistentEventBus } from './persistent-event-bus';
-import { provideTestLogger } from '../testing/logger-test-doubles';
+import { ConsoleLogger } from '../logger/console-logger';
+import { Logger } from '../logger/logger';
 
 /**
  * La cola de mentira: lo mismo que hacen `EventWriter` y `EventReader` sobre IndexedDB, pero en un
@@ -65,7 +66,7 @@ describe('PersistentEventBus', () => {
     queue = new FakeQueue();
     TestBed.configureTestingModule({
       providers: [
-        ...provideTestLogger(),
+        { provide: Logger, useClass: ConsoleLogger },
         EventDispatcher,
         PersistentEventBus,
         { provide: EventWriter, useValue: queue as unknown as EventWriter },
@@ -329,7 +330,7 @@ describe('PersistentEventBus', () => {
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
       providers: [
-        ...provideTestLogger(),
+        { provide: Logger, useClass: ConsoleLogger },
         EventDispatcher,
         PersistentEventBus,
         { provide: EventWriter, useValue: survivingQueue as unknown as EventWriter },

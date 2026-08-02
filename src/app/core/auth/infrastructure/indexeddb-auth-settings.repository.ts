@@ -1,6 +1,7 @@
 import { inject, Injectable } from '@angular/core';
 import { AppConfig } from '@core/_common/infrastructure/config/app-config';
 import { IndexedDbStore } from '@core/_common/infrastructure/indexeddb/store';
+import { Logger } from '@core/_common/logger/logger';
 import { AuthSettingsRepository } from '../domain/repositories/auth-settings.repository';
 
 /**
@@ -27,14 +28,25 @@ const RECORD_ID = 'auth';
 export class IndexedDbAuthSettingsRepository extends AuthSettingsRepository {
   private readonly store = new IndexedDbStore<AuthSettingsRecord>('auth_settings');
   private readonly config = inject(AppConfig);
+  private readonly log = inject(Logger).scoped('auth/settings-repo');
 
   async clientId(): Promise<string | null> {
     const record = await this.store.get(RECORD_ID);
     const stored = (record?.clientId ?? '').trim();
-    return stored.length > 0 ? stored : this.config.integration.googleClientId;
+    if (stored.length > 0) {
+      this.log.debug('usando el ajuste guardado en este navegador');
+      return stored;
+    }
+    // Qué fuente ganó es justo lo que hay que saber cuando «no conecta y no sé por qué».
+    const fromDeployment = this.config.integration.googleClientId;
+    this.log.debug('sin ajuste local, se cae al del despliegue', {
+      configurado: fromDeployment !== null,
+    });
+    return fromDeployment;
   }
 
   async saveClientId(clientId: string | null): Promise<void> {
     await this.store.put({ id: RECORD_ID, clientId });
+    this.log.debug('ajuste persistido', { local: clientId !== null });
   }
 }

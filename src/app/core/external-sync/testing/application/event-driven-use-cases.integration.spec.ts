@@ -10,8 +10,7 @@ import { EventWriter } from '@core/_common/eventbus/event-writer';
 import { subscribedEventOf } from '@core/_common/eventbus/on-event';
 import { PersistentEventBus } from '@core/_common/eventbus/persistent-event-bus';
 import { IntegrationEventName } from '@core/_common/events/integration-events';
-import { Logger } from '@core/_common/logger/logger';
-import { provideTestLogger, RecordingLogger } from '@core/_common/testing/logger-test-doubles';
+import { LogContext, Logger } from '@core/_common/logger/logger';
 import { EVENT_DRIVEN_USE_CASES } from '../../external-sync.providers';
 
 /**
@@ -68,10 +67,41 @@ class FakeQueue {
   };
 }
 
+/**
+ * El logger de **este** fichero. Los casos de uso que se prueban aquí no hacen nada más que
+ * registrar —hoy son el sitio donde entrará el envío remoto—, así que lo que escribieron es el único
+ * efecto observable que tienen.
+ *
+ * Local a propósito: el proyecto **no** tiene un logger que grabe. El de verdad escribe en consola
+ * cuando lo llaman y nada más.
+ */
+class LogSpy extends Logger {
+  constructor(
+    /** Contexto registrado por cada scope, en orden de llegada. */
+    readonly byScope = new Map<string, LogContext[]>(),
+    private readonly scope = '',
+  ) {
+    super();
+  }
+
+  debug(_message: string, context?: LogContext): void {
+    const previous = this.byScope.get(this.scope) ?? [];
+    this.byScope.set(this.scope, [...previous, context ?? {}]);
+  }
+
+  info(): void {}
+  warn(): void {}
+  error(): void {}
+
+  scoped(scope: string): Logger {
+    return new LogSpy(this.byScope, scope);
+  }
+}
+
 describe('Casos de uso dirigidos por evento de external-sync', () => {
   let bus: PersistentEventBus;
   let queue: FakeQueue;
-  let log: RecordingLogger;
+  let log: LogSpy;
 
   /** Deja correr al repartidor: agota temporizadores y las promesas que encadenan. */
   async function deliver(): Promise<void> {
@@ -83,9 +113,10 @@ describe('Casos de uso dirigidos por evento de external-sync', () => {
   beforeEach(async () => {
     vi.useFakeTimers();
     queue = new FakeQueue();
+    log = new LogSpy();
     TestBed.configureTestingModule({
       providers: [
-        ...provideTestLogger(),
+        { provide: Logger, useValue: log },
         EventDispatcher,
         PersistentEventBus,
         { provide: EventBus, useExisting: PersistentEventBus },
@@ -99,7 +130,6 @@ describe('Casos de uso dirigidos por evento de external-sync', () => {
     await TestBed.inject(ApplicationInitStatus).donePromise;
 
     bus = TestBed.inject(PersistentEventBus);
-    log = TestBed.inject(Logger) as RecordingLogger;
     bus.start();
   });
 
@@ -109,9 +139,14 @@ describe('Casos de uso dirigidos por evento de external-sync', () => {
     vi.restoreAllMocks();
   });
 
-  /** El contexto que se registró para un caso de uso, o `undefined` si no llegó a nadie. */
-  function traceFor(label: string): unknown {
-    return log.entries.find((entry) => entry.message === `[external-sync] ${label}`)?.context;
+  /**
+   * El contexto que registró un caso de uso, o `undefined` si el evento no le llegó.
+   *
+   * Se busca por **scope**, no por el texto del mensaje: lo que este test comprueba es a QUIÉN llegó
+   * el evento, y el scope es quién. Así reescribir la prosa de un registro no rompe el test.
+   */
+  function traceFor(useCase: string): unknown {
+    return log.byScope.get(`external-sync/${useCase}`)?.[0];
   }
 
   it('todos los casos de uso declaran su evento con @OnEvent', () => {
@@ -128,7 +163,7 @@ describe('Casos de uso dirigidos por evento de external-sync', () => {
     ]);
     await deliver();
 
-    expect(traceFor('Receta guardada')).toMatchObject({
+    expect(traceFor('notify-recipe-saved')).toMatchObject({
       recipeId: 'RE-1',
       categoryId: 'CAT-1',
     });
@@ -140,8 +175,8 @@ describe('Casos de uso dirigidos por evento de external-sync', () => {
     await bus.publish([domainEvent(IntegrationEventName.SUPPLY_SAVED, 'SU-1', { name: 'Harina' })]);
     await deliver();
 
-    expect(traceFor('Insumo guardado')).toMatchObject({ supplyId: 'SU-1', name: 'Harina' });
-    expect(traceFor('Receta guardada')).toBeUndefined();
+    expect(traceFor('notify-supply-saved')).toMatchObject({ supplyId: 'SU-1', name: 'Harina' });
+    expect(traceFor('notify-recipe-saved')).toBeUndefined();
   });
 
   it('un evento sin caso de uso aquí no atasca la cola', async () => {
@@ -153,7 +188,7 @@ describe('Casos de uso dirigidos por evento de external-sync', () => {
     ]);
     await deliver();
 
-    expect(traceFor('Insumo guardado')).toBeDefined();
+    expect(traceFor('notify-supply-saved')).toBeDefined();
     expect(queue.records).toHaveLength(0);
   });
 });

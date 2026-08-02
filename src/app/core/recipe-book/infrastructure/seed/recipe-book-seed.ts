@@ -49,7 +49,7 @@ export class RecipeBookSeed {
   private readonly recipes = inject(RecipeRepository);
   private readonly source = inject(SeedDataSource);
   private readonly seedState = inject(SeedState);
-  private readonly log = inject(Logger).scoped('recipe-book-seed');
+  private readonly log = inject(Logger).scoped('recipe-book/seed');
 
   /** ¿Ya se insertó la data seed alguna vez? (marcador persistido en IndexedDB). */
   async hasSeeded(): Promise<boolean> {
@@ -59,6 +59,10 @@ export class RecipeBookSeed {
   async run(): Promise<void> {
     const doc = await this.source.load();
     if (!doc || doc.enabled === false) {
+      // El «no hay documento» ya lo avisó la fuente; aquí solo queda contar la otra rama.
+      this.log.debug(
+        doc ? 'seed desactivado en el documento' : 'sin documento de seed, no se siembra',
+      );
       return;
     }
 
@@ -66,8 +70,18 @@ export class RecipeBookSeed {
     const applied = await this.seedState.appliedVersion(SEED_KEY);
     const version = doc.version ?? 1;
     if (applied !== null && applied >= version) {
+      this.log.debug('ya sembrado, no se repite', { applied, version });
       return;
     }
+    this.log.debug('sembrando', {
+      version,
+      applied,
+      flavors: doc.flavors?.length ?? 0,
+      recipeCapacities: doc.recipeCapacities?.length ?? 0,
+      categories: doc.categories?.length ?? 0,
+      supplies: doc.supplies?.length ?? 0,
+      recipes: doc.recipes?.length ?? 0,
+    });
 
     // Orden: primero lo que las recetas referencian (sabores/capacidades/categorías/insumos).
     for (const f of doc.flavors ?? []) {
@@ -91,18 +105,22 @@ export class RecipeBookSeed {
     for (const s of doc.supplies ?? []) {
       await this.createIfAbsent(s.id, this.supplies, () => this.buildSupply(s));
     }
+    let sown = 0;
     for (const r of doc.recipes ?? []) {
       if (await this.recipes.byId(new EntityId(r.id))) {
+        this.log.debug('receta ya existe, no se toca', { id: r.id });
         continue; // ya existe → no se modifica
       }
       const recipe = await this.buildRecipe(r);
       if (recipe) {
         await this.recipes.save(recipe);
+        sown++;
       }
     }
 
     // Marca la siembra como aplicada: no se repetirá salvo que suba la versión del JSON.
     await this.seedState.markApplied(SEED_KEY, version);
+    this.log.debug('sembrado', { version, recetasNuevas: sown });
   }
 
   /** Guarda el agregado que produce `build` solo si su id no existe ya (create-if-absent). */
@@ -113,12 +131,13 @@ export class RecipeBookSeed {
   ): Promise<void> {
     const entityId = new EntityId(id);
     if (await repo.byId(entityId)) {
+      this.log.debug('ya existe, no se toca', { id });
       return;
     }
     try {
       await repo.save(build());
     } catch (error) {
-      this.log.warn(`no se pudo sembrar "${id}"`, error);
+      this.log.warn('no se pudo sembrar', error, { id });
     }
   }
 
@@ -145,9 +164,10 @@ export class RecipeBookSeed {
       for (const line of r.lines) {
         const supply = await this.supplies.byId(new EntityId(line.supplyId));
         if (!supply) {
-          this.log.warn(
-            `receta "${r.id}": insumo "${line.supplyId}" no encontrado, se omite el ingrediente`,
-          );
+          this.log.warn('insumo no encontrado, se omite el ingrediente', undefined, {
+            recipeId: r.id,
+            supplyId: line.supplyId,
+          });
           continue;
         }
         ingredients.push(
@@ -155,7 +175,7 @@ export class RecipeBookSeed {
         );
       }
       if (ingredients.length === 0) {
-        this.log.warn(`receta "${r.id}" sin ingredientes válidos, se omite`);
+        this.log.warn('receta sin ingredientes válidos, se omite', undefined, { recipeId: r.id });
         return null;
       }
       return Recipe.restore({
@@ -168,7 +188,7 @@ export class RecipeBookSeed {
         moldCapacityId: null,
       });
     } catch (error) {
-      this.log.warn(`no se pudo construir la receta "${r.id}"`, error);
+      this.log.warn('no se pudo construir la receta', error, { recipeId: r.id });
       return null;
     }
   }

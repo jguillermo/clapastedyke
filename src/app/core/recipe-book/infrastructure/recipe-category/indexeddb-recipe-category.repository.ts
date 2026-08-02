@@ -1,6 +1,7 @@
-import { Injectable } from '@angular/core';
+import { inject, Injectable } from '@angular/core';
 import { EntityId } from '../../../_common/entity-id';
 import { IndexedDbStore } from '../../../_common/infrastructure/indexeddb/store';
+import { Logger } from '../../../_common/logger/logger';
 import { RecipeCategory } from '../../domain/entities/recipe-category';
 import { RecipeCategoryRepository } from '../../domain/repositories/recipe-category.repository';
 import { RecipeCategoryMapper } from './recipe-category.mapper';
@@ -13,6 +14,7 @@ import { RecipeCategoryRecord } from '../records';
 @Injectable()
 export class IndexedDbRecipeCategoryRepository extends RecipeCategoryRepository {
   private readonly store = new IndexedDbStore<RecipeCategoryRecord>('recipe_categories');
+  private readonly log = inject(Logger).scoped('recipe-book/category-repo');
 
   nextIdentity(): EntityId {
     return new EntityId(crypto.randomUUID());
@@ -31,9 +33,12 @@ export class IndexedDbRecipeCategoryRepository extends RecipeCategoryRepository 
 
   async save(category: RecipeCategory): Promise<void> {
     await this.store.put(RecipeCategoryMapper.toRecord(category));
+    this.log.debug('categoría guardada', { id: category.id.value });
   }
 
   async all(): Promise<RecipeCategory[]> {
-    return (await this.store.all()).map(RecipeCategoryMapper.toDomain);
+    const categories = (await this.store.all()).map(RecipeCategoryMapper.toDomain);
+    this.log.debug('categorías leídas', { count: categories.length });
+    return categories;
   }
 }

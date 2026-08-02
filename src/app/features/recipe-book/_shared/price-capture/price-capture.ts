@@ -12,6 +12,7 @@ import {
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { CdkTrapFocus } from '@angular/cdk/a11y';
+import { Logger } from '@core/_common/logger/logger';
 import { BaseUnit } from '@core/_common/quantity';
 import { Card } from '@components/card/card';
 import { CardBody } from '@components/card/card-body';
@@ -118,6 +119,7 @@ export interface PurchaseValue {
 export class PriceCapture implements OnInit {
   private readonly fb = inject(FormBuilder);
   private readonly preview = inject(PreviewSupplyCost);
+  private readonly log = inject(Logger).scoped('ui/price-capture');
 
   readonly name = input('');
   readonly initial = input<PurchaseValue | null>(null);
@@ -206,13 +208,22 @@ export class PriceCapture implements OnInit {
     };
   }
 
+  /**
+   * **Sin `debug`, a propósito**: corre en cada pulsación (`form.valueChanges`), y la regla prohíbe
+   * registrar ahí. Solo se registra el fallo, y se absorbe aquí para que el `void` del constructor
+   * no sea una promesa flotante.
+   */
   private async recompute(): Promise<void> {
     const purchase = this.purchase();
     if (!purchase) {
       this.perBaseUnitLabel.set('');
       return;
     }
-    const { perBaseUnitLabel } = await this.preview.execute({ purchasePrice: purchase });
-    this.perBaseUnitLabel.set(perBaseUnitLabel);
+    try {
+      const { perBaseUnitLabel } = await this.preview.execute({ purchasePrice: purchase });
+      this.perBaseUnitLabel.set(perBaseUnitLabel);
+    } catch (error) {
+      this.log.error('no se pudo calcular el costo por unidad base', error);
+    }
   }
 }

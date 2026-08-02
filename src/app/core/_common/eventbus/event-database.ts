@@ -64,7 +64,14 @@ export class EventDatabase {
         }
       };
       request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error ?? new Error('No se pudo abrir la cola.'));
+      // El `DOMException` va como `cause`: aquí se traduce y se relanza, no se registra. Quien
+      // decide el resultado visible lo registra una vez, con la cadena entera.
+      request.onerror = () =>
+        reject(
+          new Error(`No se pudo abrir la cola de eventos "${DB_NAME}" v${DB_VERSION}`, {
+            cause: request.error,
+          }),
+        );
     });
     return this.connection;
   }
@@ -74,6 +81,7 @@ export class EventDatabase {
 export function ask<T>(request: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
     request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error ?? new Error('Operación de la cola fallida.'));
+    request.onerror = () =>
+      reject(new Error('Falló una operación sobre la cola de eventos', { cause: request.error }));
   });
 }

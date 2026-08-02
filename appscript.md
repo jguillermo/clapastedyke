@@ -210,13 +210,19 @@ Dos datos, en dos sitios distintos a propósito:
 
 ```json
 {
+  "debug": false,
   "appsScriptUrl": "https://script.google.com/macros/s/AKfycb…/exec",
   "googleClientId": ""
 }
 ```
 
 Se lee en runtime, así que **se puede cambiar sin recompilar**: basta editar el fichero dentro de
-`dist/misaevol/browser/` en el servidor. Al desplegarse en GitHub Pages con
+`dist/misaevol/browser/` en el servidor.
+
+`"debug"` es lo que controla el registro en consola. El repo lo trae en `true` (para desarrollar); en
+un despliegue publicado ponlo en **`false`** para no volcar el detalle del flujo en la consola del
+usuario. Los `warn` y los `error` se ven igual: eso no se puede apagar. Ver
+[logging-conventions.md](.claude/rules/logging-conventions.md). Al desplegarse en GitHub Pages con
 `--base-href /clapastedyke/`, la app lo pide como `config.json` relativo y resuelve solo.
 
 **El Client ID → la pantalla `/cuenta`** de la app: se pega en el campo *Client ID de OAuth* y se

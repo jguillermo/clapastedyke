@@ -13,6 +13,7 @@ import {
   Vector3,
   WebGLRenderer,
 } from 'three';
+import { Logger } from '@core/_common/logger/logger';
 import { CameraRig } from './camera-rig';
 import { ChefEngine } from './chef-engine';
 import { buildKitchenScenery } from './kitchen-scenery';
@@ -49,9 +50,16 @@ export class KitchenEngine {
   constructor(
     private readonly canvas: HTMLCanvasElement,
     reducedMotion: boolean,
+    /**
+     * El registro entra por constructor y no con `inject()`: esto es una clase plana que la feature
+     * instancia con `new`, fuera de todo contexto de inyección. Es obligatorio a propósito — así el
+     * compilador garantiza que ningún motor futuro se quede mudo.
+     */
+    private readonly log: Logger,
   ) {
     const { clientWidth: w, clientHeight: h } = canvas;
     const aspect = h > 0 ? w / h : 1;
+    this.log.debug('creando el motor', { w, h, reducedMotion });
 
     this.renderer = new WebGLRenderer({ canvas, antialias: true });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -98,6 +106,7 @@ export class KitchenEngine {
     this.canvas.addEventListener('pointerdown', this.onPointerDown);
     this.canvas.addEventListener('pointermove', this.onPointerMove);
 
+    this.log.debug('motor listo, arranca el loop', { estaciones: this.stationHotspots.length });
     this.loop();
   }
 
@@ -134,6 +143,7 @@ export class KitchenEngine {
     }
     this.paused = true;
     cancelAnimationFrame(this.frameId);
+    this.log.debug('loop en pausa');
   }
 
   /** Reanuda el loop de render tras un {@link pause}. */
@@ -143,6 +153,7 @@ export class KitchenEngine {
     }
     this.paused = false;
     this.clock.getDelta(); // descarta el dt acumulado durante la pausa
+    this.log.debug('loop reanudado');
     this.loop();
   }
 
@@ -172,6 +183,7 @@ export class KitchenEngine {
       }
     });
     this.renderer.dispose();
+    this.log.debug('motor liberado');
   }
 
   private readonly loop = (): void => {

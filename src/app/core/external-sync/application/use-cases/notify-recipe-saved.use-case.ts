@@ -25,10 +25,10 @@ import { UseCase } from '@core/_common/use-case';
 @OnEvent(IntegrationEventName.RECIPE_SAVED)
 @Injectable({ providedIn: 'root' })
 export class NotifyRecipeSaved extends UseCase<DomainEvent, void> {
-  private readonly log = inject(Logger).scoped('external-sync');
+  private readonly log = inject(Logger).scoped('external-sync/notify-recipe-saved');
 
   async execute(event: DomainEvent): Promise<void> {
-    this.log.info('Receta guardada', {
+    this.log.debug('Receta guardada', {
       recipeId: event.aggregateId,
       // El payload trae el estado completo de la receta (nombre, ingredientes, sabor, capacidades):
       // se vuelca entero, que es justo lo que necesitará el envío remoto.

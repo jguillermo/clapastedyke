@@ -10,8 +10,8 @@ import { Logger } from '../logger/logger';
  * y desde fuera no hay forma de distinguir «no se publicó» de «no lo escucha nadie». Con esto,
  * cualquier hecho del sistema queda registrado en cuanto ocurre.
  *
- * Registra en nivel **debug**, así que se ve con el modo depuración encendido (`migoLog.on()` en la
- * consola del navegador); ver {@link Logger}.
+ * Registra en nivel **debug**, así que se ve cuando `public/config.json` dice `"debug": true`;
+ * ver {@link Logger}.
  *
  * **No lleva `@OnEvent`**, y no es un descuido: ese decorador declara *el* evento al que reacciona un
  * caso de uso, uno y solo uno. Esto no reacciona a un hecho concreto — escucha el Published Language

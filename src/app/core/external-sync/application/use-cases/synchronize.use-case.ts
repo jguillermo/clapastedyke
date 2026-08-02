@@ -3,6 +3,7 @@ import { UseCase } from '@core/_common/use-case';
 import { EventBus } from '@core/_common/eventbus/event-bus';
 import { CredentialsProvider } from '@core/_common/credentials/credentials-provider';
 import { ExportableData } from '@core/_common/export/exportable-data';
+import { Logger } from '@core/_common/logger/logger';
 import { SyncEvents } from '../../domain/events/sync-events';
 import { SyncGateway } from '../../domain/services/sync.gateway';
 import { SyncError } from '../../domain/services/sync.gateway.types';
@@ -60,19 +61,25 @@ export class Synchronize extends UseCase<SynchronizeRequest, SynchronizeResult> 
   private readonly outbox = inject(SyncOutbox);
   private readonly status = inject(SyncStatus);
   private readonly bus = inject(EventBus);
+  private readonly log = inject(Logger).scoped('external-sync/synchronize');
 
   async execute({ scope, aggregate }: SynchronizeRequest): Promise<SynchronizeResult> {
+    this.log.debug('ejecutando', { scope, aggregate: aggregate ?? null });
+
     const credentials = await this.credentials.current();
     if (!credentials) {
       this.status.markDisconnected();
+      this.log.debug('sin credenciales → desconectado');
       return { synced: false, rows: 0, reason: 'disconnected' };
     }
 
     const items = scope === 'pending' ? await this.dequeue(aggregate) : [];
     if (scope === 'pending' && items.length === 0) {
+      this.log.debug('nada pendiente en la cola');
       return { synced: false, rows: 0, reason: 'nothing-pending' };
     }
 
+    this.log.debug('sincronizando', { pendientes: items.length, epoch: credentials.epoch });
     this.status.markSyncing();
 
     try {
@@ -84,12 +91,16 @@ export class Synchronize extends UseCase<SynchronizeRequest, SynchronizeResult> 
         // hay nada que enviar y tampoco nada que reintentar, así que quedan resueltos.
         await this.outbox.ack(items);
         this.status.markConnected();
+        this.log.debug('el origen no proyectó ninguna fila: nada que enviar, cola resuelta');
         return { synced: true, rows: 0 };
       }
 
       const outcome = await this.gateway.send({ credential: credentials.token, batch });
 
       if (await this.sessionChanged(credentials.epoch)) {
+        this.log.debug('la sesión cambió durante el envío, los cambios vuelven a la cola', {
+          epoch: credentials.epoch,
+        });
         // El envío salió, pero con la credencial de una sesión que ya no es la actual. Los cambios
         // vuelven a la cola: si hay otra cuenta, le pertenecen a ella; si se cerró sesión, el
         // suscriptor de salida vacía la cola de todos modos.
@@ -100,12 +111,22 @@ export class Synchronize extends UseCase<SynchronizeRequest, SynchronizeResult> 
       await this.outbox.ack(items);
       this.status.markSynced(outcome.target, batch.syncedAt);
       await this.bus.publish([SyncEvents.succeeded(outcome.target.id, batch.total)]);
+      this.log.debug('sincronizado', { filas: batch.total, aplicadas: outcome.applied });
       return { synced: true, rows: batch.total };
     } catch (error) {
       await this.outbox.requeue(items);
       if (await this.sessionChanged(credentials.epoch)) {
+        this.log.debug('falló, pero la sesión ya había cambiado: se reencola y no se marca fallo');
         return { synced: false, rows: 0, reason: 'stale-session' };
       }
+      // AQUÍ se registra el fallo, y solo aquí: es quien decide el resultado visible (marca el
+      // estado y publica `SyncFailed`). El transporte se limitó a conservar la causa en el
+      // `SyncError`, así que la cadena completa sale en esta única línea.
+      this.log.warn('sincronización fallida, los cambios vuelven a la cola', error, {
+        pendientes: items.length,
+        code: error instanceof SyncError ? error.code : 'INTERNAL',
+        reintentable: error instanceof SyncError ? error.isTransient : false,
+      });
       this.status.markFailed(describe(error));
       await this.bus.publish([
         SyncEvents.failed(

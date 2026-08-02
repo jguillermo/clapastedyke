@@ -3,6 +3,7 @@ import { UseCase } from '../../../_common/use-case';
 import { EntityId } from '../../../_common/entity-id';
 import { BaseUnit, Quantity } from '../../../_common/quantity';
 import { EventBus } from '../../../_common/eventbus/event-bus';
+import { Logger } from '../../../_common/logger/logger';
 import { Recipe } from '../../domain/entities/recipe';
 import { RecipeIngredient } from '../../domain/value-objects/recipe-ingredient';
 import { RecipeRepository } from '../../domain/repositories/recipe.repository';
@@ -41,6 +42,7 @@ export interface SaveRecipeRequest {
 export class SaveRecipe extends UseCase<SaveRecipeRequest, { id: string }> {
   private readonly recipes = inject(RecipeRepository);
   private readonly bus = inject(EventBus);
+  private readonly log = inject(Logger).scoped('recipe-book/save-recipe');
 
   async execute({
     id,
@@ -51,7 +53,19 @@ export class SaveRecipe extends UseCase<SaveRecipeRequest, { id: string }> {
     portionsCapacityId,
     moldCapacityId,
   }: SaveRecipeRequest): Promise<{ id: string }> {
+    this.log.debug('ejecutando', {
+      sobreId: id ?? null,
+      categoryId,
+      ingredientes: ingredients.length,
+      conSabor: flavorId != null,
+      conCapacidades: portionsCapacityId != null || moldCapacityId != null,
+    });
+
     const recipeId = id ? new EntityId(id) : this.recipes.nextIdentity();
+    this.log.debug(id ? 'sobre la identidad recibida' : 'identidad nueva acuñada', {
+      id: recipeId.value,
+    });
+
     const recipe = Recipe.create(
       recipeId,
       new EntityId(categoryId),
@@ -69,6 +83,7 @@ export class SaveRecipe extends UseCase<SaveRecipeRequest, { id: string }> {
 
     await this.recipes.save(recipe);
     await this.bus.publish(recipe.pullEvents());
+    this.log.debug('hecho', { id: recipeId.value });
     return { id: recipeId.value };
   }
 }

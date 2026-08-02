@@ -21,7 +21,8 @@ import { SyncStatus } from '../domain/services/sync-status';
 import { SyncItem } from '../domain/value-objects/sync-item';
 import { SyncTarget } from '../domain/value-objects/sync-target';
 import { InMemorySyncStatus } from '../infrastructure/in-memory-sync-status';
-import { provideTestLogger } from '@core/_common/testing/logger-test-doubles';
+import { ConsoleLogger } from '@core/_common/logger/console-logger';
+import { Logger } from '@core/_common/logger/logger';
 
 /**
  * Cola en memoria que replica la máquina de estados de la real (en cola → en vuelo → fuera),
@@ -170,7 +171,7 @@ export class FakeExportableData extends ExportableData {
 export function makeExternalSyncFakes(): { providers: Provider[] } {
   return {
     providers: [
-      ...provideTestLogger(),
+      { provide: Logger, useClass: ConsoleLogger },
       FakeSyncOutbox,
       FakeSyncGateway,
       FakeCredentialsProvider,

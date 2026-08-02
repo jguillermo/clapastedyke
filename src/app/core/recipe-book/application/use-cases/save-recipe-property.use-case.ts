@@ -2,6 +2,7 @@ import { inject, Injectable } from '@angular/core';
 import { UseCase } from '../../../_common/use-case';
 import { EntityId } from '../../../_common/entity-id';
 import { EventBus } from '../../../_common/eventbus/event-bus';
+import { Logger } from '../../../_common/logger/logger';
 import { RecipeFlavor } from '../../domain/entities/recipe-flavor';
 import { CapacityGroup, RecipeCapacity } from '../../domain/entities/recipe-capacity';
 import { RecipeFlavorRepository } from '../../domain/repositories/recipe-flavor.repository';
@@ -45,8 +46,10 @@ export class SaveRecipeProperty extends UseCase<SaveRecipePropertyRequest, { id:
   private readonly flavors = inject(RecipeFlavorRepository);
   private readonly capacities = inject(RecipeCapacityRepository);
   private readonly bus = inject(EventBus);
+  private readonly log = inject(Logger).scoped('recipe-book/save-property');
 
   async execute({ kind, id, label, factor }: SaveRecipePropertyRequest): Promise<{ id: string }> {
+    this.log.debug('ejecutando', { kind, sobreId: id ?? null, conFactor: factor !== undefined });
     return kind === 'flavor'
       ? this.saveFlavor(id, label)
       : this.saveCapacity(kind, id, label, factor);
@@ -56,12 +59,17 @@ export class SaveRecipeProperty extends UseCase<SaveRecipePropertyRequest, { id:
     const existing = id
       ? await this.flavors.byId(new EntityId(id))
       : this.byLabel(await this.flavors.all(), label);
+    this.log.debug(existing ? 'sabor existente, se reutiliza' : 'sabor nuevo', {
+      id: existing?.id.value ?? null,
+    });
+
     const flavor = RecipeFlavor.create(
       existing?.id ?? (id ? new EntityId(id) : this.flavors.nextIdentity()),
       label,
     );
     await this.flavors.save(flavor);
     await this.bus.publish(flavor.pullEvents());
+    this.log.debug('sabor guardado', { id: flavor.id.value });
     return { id: flavor.id.value };
   }
 
@@ -74,6 +82,13 @@ export class SaveRecipeProperty extends UseCase<SaveRecipePropertyRequest, { id:
     const existing = id
       ? await this.capacities.byId(new EntityId(id))
       : this.byLabel(await this.capacities.byGroup(group), label);
+    this.log.debug(existing ? 'capacidad existente, se reutiliza' : 'capacidad nueva', {
+      group,
+      id: existing?.id.value ?? null,
+      // Cuál factor gana importa: un `factor` omitido conserva el del catálogo, no pone 1.
+      factorHeredado: factor === undefined && existing !== null,
+    });
+
     const capacity = RecipeCapacity.create(
       existing?.id ?? (id ? new EntityId(id) : this.capacities.nextIdentity()),
       group,
@@ -82,6 +97,11 @@ export class SaveRecipeProperty extends UseCase<SaveRecipePropertyRequest, { id:
     );
     await this.capacities.save(capacity);
     await this.bus.publish(capacity.pullEvents());
+    this.log.debug('capacidad guardada', {
+      id: capacity.id.value,
+      group,
+      factor: capacity.factor,
+    });
     return { id: capacity.id.value };
   }
 

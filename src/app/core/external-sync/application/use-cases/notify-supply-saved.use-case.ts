@@ -19,10 +19,10 @@ import { UseCase } from '@core/_common/use-case';
 @OnEvent(IntegrationEventName.SUPPLY_SAVED)
 @Injectable({ providedIn: 'root' })
 export class NotifySupplySaved extends UseCase<DomainEvent, void> {
-  private readonly log = inject(Logger).scoped('external-sync');
+  private readonly log = inject(Logger).scoped('external-sync/notify-supply-saved');
 
   async execute(event: DomainEvent): Promise<void> {
-    this.log.info('Insumo guardado', {
+    this.log.debug('Insumo guardado', {
       supplyId: event.aggregateId,
       // El payload trae el estado completo del insumo (nombre, unidad, uso, precio de compra).
       ...event.data,
