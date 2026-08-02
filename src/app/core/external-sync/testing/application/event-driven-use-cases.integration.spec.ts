@@ -85,16 +85,29 @@ class LogSpy extends Logger {
   }
 
   debug(_message: string, context?: LogContext): void {
-    const previous = this.byScope.get(this.scope) ?? [];
-    this.byScope.set(this.scope, [...previous, context ?? {}]);
+    this.record(context);
   }
 
-  info(): void {}
-  warn(): void {}
-  error(): void {}
+  info(_message: string, context?: LogContext): void {
+    this.record(context);
+  }
+
+  warn(_message: string, _cause?: unknown, context?: LogContext): void {
+    this.record(context);
+  }
+
+  error(_message: string, _cause?: unknown, context?: LogContext): void {
+    this.record(context);
+  }
 
   scoped(scope: string): Logger {
     return new LogSpy(this.byScope, scope);
+  }
+
+  /** Apunta el contexto bajo el scope de este logger. El nivel no importa: lo que se juzga es quién. */
+  private record(context?: LogContext): void {
+    const previous = this.byScope.get(this.scope) ?? [];
+    this.byScope.set(this.scope, [...previous, context ?? {}]);
   }
 }
 
