@@ -87,6 +87,9 @@ test.describe('Grilla de ingredientes', () => {
     await form.waitReady();
     await form.name.fill('Costo de materiales E2E');
 
+    // La grilla explica que el costo se toca para ver o cambiar la compra del insumo.
+    await expect(grid.hint).toBeVisible();
+
     // 250 g de harina a S/ 0.0045/g = S/ 1.125 → se muestra redondeado.
     await grid.fillExistingLine(0, SUPPLIES.harina.name, '250');
     await expect(grid.costButton(0)).toHaveText('S/ 1.13');

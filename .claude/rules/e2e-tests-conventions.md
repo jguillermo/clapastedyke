@@ -238,6 +238,31 @@ export class RecipeFormPage {
 
 - Expone **locators** (`readonly`) y **acciones compuestas** (`fillExistingLine`, `setPurchase`),
   no aserciones de negocio — esas van en el spec.
+
+> ### CRITICAL: el nombre de una acción se exige `exact`
+>
+> `getByRole`/`getByLabel`/`getByText` coinciden por **subcadena**. En una vista donde el usuario
+> teclea nombres —el libro es exactamente eso— cualquier acción cuyo rótulo aparezca dentro de un
+> dato tecleado deja de ser única, y el locator resuelve a dos elementos:
+>
+> ```typescript
+> // MAL — la fila de la receta «Con insumo nuevo» también se llama así
+> getByRole('button', { name: 'Nuevo' })
+> // BIEN
+> getByRole('button', { name: 'Nuevo', exact: true })
+> ```
+>
+> Es un fallo que **no aparece con tests aislados** (nadie había creado esa receta todavía) y sí
+> en cuanto un journey encadena crear y volver a listar — y en producción lo dispararía un
+> usuario llamando «Nuevo bizcocho» a una receta. Regla: **toda acción de la vista se localiza
+> con `exact: true`**; se deja sin `exact` solo cuando el rótulo no puede colisionar dentro de su
+> raíz y está justificado en un comentario.
+>
+> El reverso también importa: **no escondas `.first()` dentro de un locator de consulta.** Con
+> recetas homónimas (`Crema Chantilly` está en Rellenos y en Coberturas), un `.first()` en el page
+> object hace que `expect(...).toBeVisible()` pase aunque falte una de las dos. El locator
+> devuelve las que haya —así el spec puede contar— y quien necesite pulsar una elige `.first()`
+> en el sitio de la llamada.
 - Documenta con JSDoc **qué vista** representa y las trampas del control (p.ej. el
   `migo-unit-input` lee la unidad en `keydown`, así que se pulsa la tecla, no se escribe).
 - Se registra en `fixtures/app-fixture.ts` para llegar por destructuring a cada test.

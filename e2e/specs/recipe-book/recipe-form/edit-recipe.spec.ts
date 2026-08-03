@@ -97,4 +97,62 @@ test.describe('Formulario de receta · editar', () => {
 
     await expect(catalog.recipeBadges('Queques', 'Vainilla Clásica')).toHaveCount(0);
   });
+
+  test('característica que no existe → «Añadir» pregunta a qué grupo → un molde nuevo pide su factor de escalado → guardar → los badges aparecen → otra receta ya ofrece las etiquetas nuevas del catálogo', async ({
+    openCatalog,
+    catalog,
+    form,
+  }) => {
+    await openCatalog();
+
+    /*
+     * Los tres tipos son `allowCreate`, así que teclear un valor que no está ofrece «Añadir
+     * «X»…» y pregunta a qué grupo va. Un sabor se crea con eso solo; un molde declara además
+     * `extraField`, así que pide el **factor de escalado** antes de confirmar. Cada creación
+     * dispara `SaveProperty`, que lo persiste en el catálogo — eso es lo que cierra el flujo.
+     */
+    await catalog.recipe('Queques', 'Torta Húmeda de Chocolate').click();
+    await form.waitReady();
+
+    await form.properties.create('Maracuyá E2E', { group: 'Sabor' });
+    await expect(form.properties.chip('Sabor', 'Maracuyá E2E')).toBeVisible();
+
+    await form.properties.create('Molde jumbo E2E', { group: 'Molde', factor: '3' });
+    await expect(form.properties.chip('Molde', 'Molde jumbo E2E')).toBeVisible();
+
+    // Unas porciones nuevas NO preguntan el factor: el número tecleado ya lo es (por eso no se le
+    // pasa `factor` y el chip tiene que salir igual).
+    await form.properties.create('33', { group: 'Porciones' });
+    await expect(form.properties.chip('Porciones', '33')).toBeVisible();
+
+    await form.save.click();
+    await form.waitClosed();
+
+    const torta = catalog.recipe('Queques', 'Torta Húmeda de Chocolate');
+    await expect(catalog.recipeBadges('Queques', 'Torta Húmeda de Chocolate')).toHaveCount(3);
+    await expect(torta).toContainText('Sabor: Maracuyá E2E');
+    await expect(torta).toContainText('Molde: Molde jumbo E2E');
+    await expect(torta).toContainText('Porciones: 33');
+
+    /*
+     * Estado terminal: las etiquetas nuevas no se quedaron en esa receta, están en el catálogo.
+     * Otra receta cualquiera ya las ofrece como valores existentes del desplegable — que es lo
+     * único que demuestra que `SaveProperty` persistió y no solo pintó un chip.
+     */
+    await catalog.recipe('Queques', 'Bizcocho de Vainilla').click();
+    await form.waitReady();
+    await form.properties.open();
+    await expect(form.properties.option('Sabor', 'Maracuyá E2E')).toBeVisible();
+    await expect(form.properties.option('Molde', 'Molde jumbo E2E')).toBeVisible();
+    await expect(form.properties.option('Porciones', '33')).toBeVisible();
+
+    await form.properties.option('Sabor', 'Maracuyá E2E').click();
+    await expect(form.properties.chip('Sabor', 'Maracuyá E2E')).toBeVisible();
+    await form.save.click();
+    await form.waitClosed();
+
+    await expect(catalog.recipe('Queques', 'Bizcocho de Vainilla')).toContainText(
+      'Sabor: Maracuyá E2E',
+    );
+  });
 });

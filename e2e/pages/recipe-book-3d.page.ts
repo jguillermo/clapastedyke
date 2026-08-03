@@ -13,24 +13,32 @@ export class RecipeBook3dPage {
 
   readonly root = this.page.locator('app-recipe-book-3d');
   readonly canvas = this.root.locator('canvas');
-  readonly back = this.root.getByRole('button', { name: 'Volver' });
+  /*
+   * Las acciones se exigen con `exact: true`: los overlays de receta viven bajo esta misma raíz
+   * y `getByRole` coincide por SUBCADENA, así que una receta llamada «Volver a empezar» o
+   * «Gestionar insumos del taller» haría que el locator resolviera a dos elementos.
+   */
+  readonly back = this.root.getByRole('button', { name: 'Volver', exact: true });
   readonly title = this.root.getByText('Mi libro de recetas');
 
   /** Región `aria-live`: el único texto accesible de lo que se ve en la hoja 3D. */
   readonly announce = this.root.locator('[role="status"][aria-live="polite"]');
 
   readonly pager = this.root.locator('nav[aria-label="Páginas del libro"]');
-  readonly prev = this.pager.getByRole('button', { name: 'Página anterior' });
-  readonly next = this.pager.getByRole('button', { name: 'Página siguiente' });
-  readonly indexToggle = this.pager.getByRole('button', { name: 'Índice' });
+  readonly prev = this.pager.getByRole('button', { name: 'Página anterior', exact: true });
+  readonly next = this.pager.getByRole('button', { name: 'Página siguiente', exact: true });
+  readonly indexToggle = this.pager.getByRole('button', { name: 'Índice', exact: true });
 
   /** Botón flotante primario: `Nuevo «Categoría»` en páginas de categoría. */
   readonly newRecipe = this.root.locator('button[aria-label^="Nuevo "]');
   /** Botón flotante primario: `Insumos` en la sección de Insumos. */
-  readonly manageSupplies = this.root.getByRole('button', { name: 'Gestionar insumos' });
+  readonly manageSupplies = this.root.getByRole('button', {
+    name: 'Gestionar insumos',
+    exact: true,
+  });
 
   readonly indexPanel = this.page.locator('nav[aria-label="Índice de recetas"]');
-  readonly indexClose = this.indexPanel.getByRole('button', { name: 'Cerrar índice' });
+  readonly indexClose = this.indexPanel.getByRole('button', { name: 'Cerrar índice', exact: true });
   /**
    * Entradas navegables del índice: los botones **con rótulo** del panel (las categorías son
    * rótulos `<p>`, no botones). El filtro por texto excluye la × de cerrar de la cabecera, que
@@ -43,9 +51,17 @@ export class RecipeBook3dPage {
     return this.indexPanel.getByText(name, { exact: true });
   }
 
-  /** Entrada de receta del índice → salta a su página. */
+  /**
+   * Entradas del índice con ese nombre **exacto** → saltan a su página.
+   *
+   * Devuelve un locator que puede resolver a **más de una**, y es a propósito: hay recetas
+   * homónimas en categorías distintas («Crema Chantilly» y «Ganache de Chocolate» están en
+   * Rellenos y en Coberturas), así que un `.first()` escondido aquí haría que un test de
+   * cobertura del índice pasara aunque faltara una de las dos. Quien necesite pulsar una
+   * concreta elige cuál (ver {@link jumpToRecipe}); quien cuente, cuenta de verdad.
+   */
   indexRecipe(name: string): Locator {
-    return this.indexRecipes.filter({ hasText: name }).first();
+    return this.indexPanel.getByRole('button', { name, exact: true });
   }
 
   /** Espera a que el libro esté montado y con el primer spread asentado (portada). */
@@ -118,7 +134,10 @@ export class RecipeBook3dPage {
   async jumpToRecipe(name: string): Promise<void> {
     await this.indexToggle.click();
     await expect(this.indexPanel).toBeVisible();
-    await this.indexRecipe(name).click();
+    // `.first()` explícito: con recetas homónimas hay dos entradas y cualquiera vale para llegar
+    // a una página de esa receta. Que la elección esté aquí y no escondida en el locator es lo
+    // que permite que `indexRecipe` siga contando las dos (ver su JSDoc).
+    await this.indexRecipe(name).first().click();
     await expect(this.indexPanel).toHaveCount(0);
     const target = this.page
       .locator('app-recipe-overlay')
@@ -127,17 +146,16 @@ export class RecipeBook3dPage {
   }
 
   /**
-   * Avanza hasta la sección de **Insumos** (la última del libro), detectable por su
-   * botón flotante propio. Los volteos se encolan, así que se pulsa seguido.
+   * Va a la sección de **Insumos**, que es la **última** del libro: `End` salta ahí de una vez.
+   *
+   * Antes esto encolaba ~20 volteos con un `waitForTimeout(300)` entre pulsación y pulsación —
+   * una espera fija, que es justo lo que las convenciones prohíben como sincronización: en una
+   * máquina cargada el motor no había asentado en 300 ms y el bucle se pasaba de largo o se
+   * quedaba corto. `End` es un solo salto y la espera es la aserción web-first de que el botón
+   * flotante de la sección está ahí.
    */
   async goToSuppliesSection(): Promise<void> {
-    for (let turn = 0; turn < 25 && (await this.manageSupplies.count()) === 0; turn++) {
-      if (await this.next.isDisabled()) {
-        break;
-      }
-      await this.next.click();
-      await this.page.waitForTimeout(300); // el motor acelera los volteos encolados
-    }
+    await this.page.keyboard.press('End');
     await expect(this.manageSupplies).toBeVisible();
   }
 }

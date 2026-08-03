@@ -100,8 +100,18 @@ test.describe('Libro 3D', () => {
     }
     // Un salto por receta del catálogo, ni uno más: los insumos no son recetas y no se listan.
     await expect(book.indexRecipes).toHaveCount(allRecipes.length);
+    /*
+     * Se cuenta cada nombre, no solo que «esté». Hay recetas homónimas en categorías distintas
+     * («Crema Chantilly» y «Ganache de Chocolate» están en Rellenos y en Coberturas): con una
+     * aserción de visibilidad, si el índice se dejara una de las dos, el test seguiría pasando
+     * porque la otra la satisface. Contando, no.
+     */
+    const expectedPerName = new Map<string, number>();
     for (const recipe of allRecipes) {
-      await expect(book.indexRecipe(recipe)).toBeVisible();
+      expectedPerName.set(recipe, (expectedPerName.get(recipe) ?? 0) + 1);
+    }
+    for (const [recipe, times] of expectedPerName) {
+      await expect(book.indexRecipe(recipe)).toHaveCount(times);
     }
     await expect(book.indexSection('Insumos')).toHaveCount(0);
 
@@ -117,7 +127,7 @@ test.describe('Libro 3D', () => {
     // Elegir una receta cierra el panel y salta a su página.
     await book.indexToggle.click();
     await expect(book.indexPanel).toBeVisible();
-    await book.indexRecipe(GLASEADO.name).click();
+    await book.indexRecipe(GLASEADO.name).click(); // nombre único: una sola entrada
     await expect(book.indexPanel).toHaveCount(0);
     await expect(overlay.byName(GLASEADO.name).first()).toBeVisible();
 

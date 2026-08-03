@@ -13,7 +13,8 @@ export class SuppliesDialogPage {
 
   readonly root = this.page.locator('app-supplies-dialog');
   readonly title = this.root.locator('migo-card-title');
-  readonly close = this.root.getByRole('button', { name: 'Cerrar' });
+  /** Exacto: bajo esta raíz vive la hoja de insumos, cuyos nombres los teclea el usuario. */
+  readonly close = this.root.getByRole('button', { name: 'Cerrar', exact: true });
 
   /** Panel del overlay de CDK que lo hospeda (full-bleed en móvil). */
   readonly panel = this.page.locator('.migo-dialog__panel.cdk-overlay-pane');

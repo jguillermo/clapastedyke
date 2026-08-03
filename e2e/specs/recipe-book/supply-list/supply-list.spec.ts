@@ -32,7 +32,8 @@ test.describe('Lista de insumos · agregar', () => {
     // pero lo que dice que aterrizó es el renglón de agregar vacío otra vez.
     await supplies.list.priceInput(add).fill('4');
     await supplies.list.priceInput(add).press('Enter');
-    await expect(supplies.list.addedMark.first()).toBeVisible();
+    // Es el primer alta del journey: hay exactamente una marca, así que se exige sin `.first()`.
+    await expect(supplies.list.addedMark).toBeVisible();
     await supplies.list.waitAdded();
 
     // Varios seguidos sin cerrar el diálogo.

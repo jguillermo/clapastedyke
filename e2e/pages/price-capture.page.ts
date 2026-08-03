@@ -14,10 +14,16 @@ export class PriceCapturePage {
 
   readonly root = this.page.locator('app-price-capture');
   readonly heading = this.root.getByText('¿Cómo compras');
+  /*
+   * `Compras` y `Precio` van sin `exact` a propósito: el control lleva además su propio
+   * `ariaLabel` («Presentación de compra», «Precio de la compra»), así que exigir el rótulo
+   * exacto dependería de cuál de los dos gane como nombre accesible. No hace falta: el popover
+   * tiene exactamente estos dos campos y ninguno de los dos rótulos es subcadena del otro.
+   */
   readonly packaging = this.root.getByLabel('Compras');
   readonly price = this.root.getByLabel('Precio');
-  readonly confirm = this.root.getByRole('button', { name: 'Listo' });
-  readonly cancel = this.root.getByRole('button', { name: 'Cancelar' });
+  readonly confirm = this.root.getByRole('button', { name: 'Listo', exact: true });
+  readonly cancel = this.root.getByRole('button', { name: 'Cancelar', exact: true });
 
   /** Línea `aria-live` con el costo por unidad base («Te cuesta S/ 0.0160 por g»). */
   readonly perBaseUnit = this.root.locator('[aria-live="polite"]');
