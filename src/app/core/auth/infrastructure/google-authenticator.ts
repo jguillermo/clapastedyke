@@ -194,10 +194,10 @@ function describe(type: string | undefined, detail: string | undefined): string 
     case 'access_denied':
       return 'Has denegado el permiso. Sin él la app no puede crear la hoja en tu Drive.';
     case 'idpiframe_initialization_failed':
-      return 'Google no acepta este origen. Añade la URL de la app a «Orígenes de JavaScript autorizados» del Client ID (ver appscript.md, paso 4).';
+      return 'Google no acepta este origen. Añade la URL de la app a «Orígenes de JavaScript autorizados» del Client ID (ver manual/appscript.md, paso 4).';
     default:
       return detail
         ? `Google ha rechazado la autorización: ${detail}`
-        : 'Google ha rechazado la autorización. Comprueba el Client ID y sus orígenes autorizados (ver appscript.md, paso 4).';
+        : 'Google ha rechazado la autorización. Comprueba el Client ID y sus orígenes autorizados (ver manual/appscript.md, paso 4).';
   }
 }

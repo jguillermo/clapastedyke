@@ -32,7 +32,7 @@ import { WatchSyncStatus } from '@core/external-sync/application/use-cases/watch
  *
  * Solo inyecta casos de uso. El estado reactivo llega por las signals que exponen `WatchSession` y
  * `WatchSyncStatus`, así que la vista no toca ni la sesión ni la cola. La guía de puesta en marcha
- * está en `appscript.md`.
+ * está en `manual/appscript.md`.
  */
 @Component({
   selector: 'app-account',

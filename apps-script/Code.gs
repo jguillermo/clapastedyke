@@ -30,7 +30,7 @@
  *   3. Cada tabla se reescribe por clave (upsert por `id`; las líneas de receta se reemplazan por
  *      receta entera) → mandar datos equivalentes converge siempre al mismo estado.
  *
- * Guía de despliegue y puesta en marcha: `appscript.md` en la raíz del repositorio.
+ * Guía de despliegue y puesta en marcha: `manual/appscript.md`.
  */
 
 /** Versión del esquema de la hoja. Se escribe en la pestaña `_meta`. */
@@ -258,7 +258,7 @@ function authenticate_(accessToken) {
   if (allowed.length === 0) {
     throw fail_(
       'CLIENT_MISMATCH',
-      'El script no tiene ALLOWED_CLIENT_IDS configurado, así que rechaza todas las peticiones. Ver appscript.md, paso 6.',
+      'El script no tiene ALLOWED_CLIENT_IDS configurado, así que rechaza todas las peticiones. Ver manual/appscript.md, paso 6.',
     );
   }
 
@@ -912,7 +912,7 @@ function json_(body) {
 }
 
 // ───────────────────────────────────────────────────────────────────────────────
-// Prueba manual desde el editor (ver appscript.md, paso 11)
+// Prueba manual desde el editor (ver manual/appscript.md, paso 11)
 // ───────────────────────────────────────────────────────────────────────────────
 
 /**

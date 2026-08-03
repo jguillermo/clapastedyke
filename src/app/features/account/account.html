@@ -27,7 +27,7 @@
       <form class="flex flex-col gap-4" [formGroup]="form" (ngSubmit)="saveSettings()">
         <migo-form-field
           label="Client ID de OAuth"
-          hint="Acaba en .apps.googleusercontent.com. Se crea en Google Cloud (appscript.md, paso 4)."
+          hint="Acaba en .apps.googleusercontent.com. Se crea en Google Cloud (manual/appscript.md, paso 4)."
         >
           <migo-input
             formControlName="clientId"
@@ -154,7 +154,7 @@
   </migo-card>
 
   <p class="m-0 text-caption text-muted">
-    Cómo se monta el Apps Script y el proyecto de Google, paso a paso: <code>appscript.md</code> en
-    la raíz del repositorio.
+    Cómo se monta el Apps Script y el proyecto de Google, paso a paso:
+    <code>manual/appscript.md</code> en el repositorio.
   </p>
 </div>

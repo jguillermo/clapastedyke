@@ -67,8 +67,13 @@ never talks to the Sheets or Drive APIs: it posts to a **Google Apps Script Web 
 (`apps-script/Code.gs`), which validates the user's token and writes the sheet on their behalf.
 
 Setting it up needs a one-time manual pass through Google Cloud and Apps Script. Every step is in
-[`appscript.md`](appscript.md) — start there. Once configured, users connect from the `/cuenta`
+[`manual/appscript.md`](manual/appscript.md) — start there. Once configured, users connect from the `/cuenta`
 screen; without it the app keeps working exactly as before, fully local.
+
+The reasoning behind that design — why a Google login is unavoidable, why the token travels in the
+POST body, why reloading the page forces a reconnect, and which alternatives were measured and
+rejected — is in [`manual/google-integration.md`](manual/google-integration.md). All technical
+documentation lives in [`manual/`](manual/).
 
 ## Additional Resources
 

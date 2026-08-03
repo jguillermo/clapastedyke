@@ -22,6 +22,19 @@ The authoritative coding rules are in **`.claude/CLAUDE.md`** (always loaded) an
 
 > Note: `main-process-conventions.md` and `asset-protocol-conventions.md` describe an Electron main process (`app/src/`) that does **not** exist in this repo. This is a **browser** Angular app — persistence is **IndexedDB**, not Electron IPC. Treat those two rules as inapplicable here unless an `app/` directory is added.
 
+## Technical docs live in `manual/`
+
+Standalone technical documentation — how something works, why it is built that way, how to operate
+it — goes in **[`manual/`](manual/)**, indexed by [`manual/README.md`](manual/README.md). Product and
+business material (brand, story, game chapters) stays in `.claude/doc/`; coding **rules** stay in
+`.claude/rules/`.
+
+Docs that describe one concrete piece of code stay **next to it** and are listed from the manual's
+index — `src/app/components/README.md` (the living component catalog),
+`src/app/core/_common/eventbus/README.md` (delivery semantics) and
+`src/app/core/_common/logger/README.md`. Co-location is deliberate: a doc nobody sees while editing
+the file beside it goes stale.
+
 ## Commands
 
 ```bash
@@ -57,7 +70,7 @@ npm run typecheck   # tsc over app + stories, unit specs, and the E2E suite
 
 A 3D in-browser cooking game (`misaevol` / "clapastedyke"). The user navigates a three.js kitchen world (`/home`); the real data-entry forms are the screens reached from it. `/ui` is the living component showcase. State is persisted locally in IndexedDB — **that is the source of truth and it has no backend**.
 
-The one network integration is **optional and additive**: from `/cuenta` a user can connect a Google account and mirror recipes and supplies into a spreadsheet in their own Drive. The app never calls the Sheets or Drive APIs — it posts to a Google Apps Script Web App (`apps-script/Code.gs`) that writes on the user's behalf. Setting it up is manual and documented end to end in [`appscript.md`](appscript.md). Nothing about local persistence changes when it is off (which is the default: `public/config.json` ships with both Google keys empty).
+The one network integration is **optional and additive**: from `/cuenta` a user can connect a Google account and mirror recipes and supplies into a spreadsheet in their own Drive. The app never calls the Sheets or Drive APIs — it posts to a Google Apps Script Web App (`apps-script/Code.gs`) that writes on the user's behalf. Setting it up is manual and documented end to end in [`manual/appscript.md`](manual/appscript.md); the design reasoning, the constraints that force it (no refresh token in a browser, the CORS preflight Apps Script never answers, the two identities a script can write with) and the alternatives that were measured and rejected are in [`manual/google-integration.md`](manual/google-integration.md). Nothing about local persistence changes when it is off (which is the default: `public/config.json` ships with both Google keys empty).
 
 ## Architecture: four layers under `src/app/`
 

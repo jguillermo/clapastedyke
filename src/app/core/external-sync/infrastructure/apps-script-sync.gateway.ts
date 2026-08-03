@@ -41,7 +41,7 @@ export class AppsScriptSyncGateway extends SyncGateway {
       this.log.debug('sin URL de Apps Script configurada, no se envía nada');
       throw new SyncError(
         'NOT_CONFIGURED',
-        'Falta la URL del Apps Script en la configuración del despliegue (ver appscript.md, paso 8).',
+        'Falta la URL del Apps Script en la configuración del despliegue (ver manual/appscript.md, paso 8).',
       );
     }
 

@@ -31,7 +31,7 @@ const ERROR_CODES: Readonly<Record<string, SyncErrorCode>> = {
  * OPTIONS previo, nadie lo contesta y la llamada falla antes de salir. Con `text/plain` y sin
  * cabeceras propias es una petición simple: no hay preflight. El token viaja, por eso, en el JSON.
  *
- * No tocar sin leer `appscript.md` → «Solución de problemas».
+ * No tocar sin leer `manual/appscript.md` → «Solución de problemas».
  */
 export async function postToAppsScript<Result>(endpoint: string, body: unknown): Promise<Result> {
   let response: Response;

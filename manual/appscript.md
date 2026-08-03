@@ -6,9 +6,16 @@ usuario. El código de la app ya está listo; sin estos pasos, la pantalla `/cue
 
 Se hace una sola vez por despliegue. Tiempo aproximado: **20 minutos**.
 
-> El código del Web App vive en este mismo repositorio: [`apps-script/Code.gs`](apps-script/Code.gs)
-> y [`apps-script/appsscript.json`](apps-script/appsscript.json). No hay que escribir nada: se copia
+> El código del Web App vive en este mismo repositorio:
+> [`apps-script/Code.gs`](../apps-script/Code.gs) y
+> [`apps-script/appsscript.json`](../apps-script/appsscript.json). No hay que escribir nada: se copia
 > y se pega.
+
+> **Este documento es el «cómo». El «por qué» está en
+> [`google-integration.md`](google-integration.md)**: por qué hace falta el login de Google, por qué
+> el token va en el cuerpo del POST, por qué recargar la página obliga a reconectar, qué
+> arquitecturas se descartaron y con qué datos. Si algo de aquí te parece arbitrario, la respuesta
+> está allí.
 
 ---
 
@@ -167,10 +174,10 @@ Credenciales → Crear credenciales*).
 
 1. Entra en [script.google.com](https://script.google.com/) y crea un **proyecto nuevo**. Ponle un
    nombre reconocible: `Clapastedyke · sincronización`.
-2. Borra el contenido de `Código.gs` y pega **todo** [`apps-script/Code.gs`](apps-script/Code.gs).
+2. Borra el contenido de `Código.gs` y pega **todo** [`apps-script/Code.gs`](../apps-script/Code.gs).
 3. Muestra el manifiesto: **⚙ Configuración del proyecto → Mostrar el archivo de manifiesto
    "appsscript.json"**. Abre el fichero que aparece en el editor y sustituye su contenido por
-   [`apps-script/appsscript.json`](apps-script/appsscript.json):
+   [`apps-script/appsscript.json`](../apps-script/appsscript.json):
 
    ```json
    {
