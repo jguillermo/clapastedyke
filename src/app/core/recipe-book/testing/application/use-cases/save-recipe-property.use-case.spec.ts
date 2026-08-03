@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { EntityId } from '../../../../_common/entity-id';
-import { EventBus } from '../../../../_common/event-bus';
+import { EventBus } from '../../../../_common/eventbus/event-bus';
 import { makeRecipeBookFakes, RecordingEventBus } from '../../recipe-book-test-doubles';
 import { RecipeFlavorRepository } from '../../../domain/repositories/recipe-flavor.repository';
 import { RecipeCapacityRepository } from '../../../domain/repositories/recipe-capacity.repository';
@@ -31,6 +31,19 @@ describe('SaveRecipeProperty', () => {
       const b = await uc.execute({ kind: 'flavor', label: 'vainilla' });
       expect(b.id).toBe(a.id);
       expect(await TestBed.inject(RecipeFlavorRepository).all()).toHaveLength(1);
+    });
+
+    it('guardar es guardar: reencontrar el mismo sabor publica igual, sin comparar estados', async () => {
+      // Solo se llama cuando el usuario crea o edita una característica de verdad; el formulario de
+      // receta no lo usa para resolver ids, así que no hay que decidir si «pasó algo».
+      const uc = TestBed.inject(SaveRecipeProperty);
+      const bus = TestBed.inject(EventBus) as RecordingEventBus;
+      await uc.execute({ kind: 'flavor', label: 'Vainilla' });
+      bus.published.length = 0;
+
+      await uc.execute({ kind: 'flavor', label: 'Vainilla' });
+
+      expect(bus.published.map((e) => e.name)).toEqual(['FlavorSaved']);
     });
 
     it('renames an existing flavor by id', async () => {
@@ -89,7 +102,7 @@ describe('SaveRecipeProperty', () => {
       expect(await TestBed.inject(RecipeCapacityRepository).byGroup('portions')).toHaveLength(1);
     });
 
-    it('defaults the factor to 1 when omitted', async () => {
+    it('defaults the factor to 1 when omitted on a NEW capacity', async () => {
       const { id } = await TestBed.inject(SaveRecipeProperty).execute({
         kind: 'portions',
         label: '12',
@@ -97,6 +110,17 @@ describe('SaveRecipeProperty', () => {
 
       const saved = await TestBed.inject(RecipeCapacityRepository).byId(new EntityId(id));
       expect(saved?.factor).toBe(1);
+    });
+
+    it('omitir el factor CONSERVA el de la capacidad que ya estaba, no lo pisa con 1', async () => {
+      // El formulario de receta no siempre manda el factor; persistir 1 a ciegas borraría el real.
+      const uc = TestBed.inject(SaveRecipeProperty);
+      const { id } = await uc.execute({ kind: 'mold', label: 'Doble', factor: 2 });
+
+      await uc.execute({ kind: 'mold', label: 'Doble' });
+
+      const saved = await TestBed.inject(RecipeCapacityRepository).byId(new EntityId(id));
+      expect(saved?.factor).toBe(2);
     });
 
     it('rejects a non-positive factor (domain invariant)', async () => {

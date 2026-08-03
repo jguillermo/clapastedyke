@@ -9,7 +9,12 @@ import type { AppOptions } from './fixtures/app-fixture';
  * (`specs/`, una carpeta por ruta/vista y un fichero por tipo de test).
  *
  * ### Velocidad
- * - `fullyParallel` + workers al 75 % de la CPU: los specs son cortos y aislados.
+ * - **Pocos tests, largos.** Cada test es un *journey completo* que encadena varios casos en
+ *   una sola sesión. Lo caro de un E2E aquí no es la interacción: es el **arranque** (contexto
+ *   de navegador nuevo + bootstrap de Angular + seed en IndexedDB + navegar a la vista), y eso
+ *   se paga **una vez por test**, no una vez por aserción. Partir un flujo en tests pequeños
+ *   multiplica arranques sin añadir cobertura — ver `e2e-tests-conventions.md`.
+ * - `fullyParallel` + workers al 75 % de la CPU.
  * - **Por defecto los tests corren SIN WebGL** (`webgl: false`): la vista cae a su
  *   ruta accesible en DOM, que es determinista y arranca en milisegundos. Los specs
  *   que sí prueban el mundo/libro 3D declaran `test.use({ webgl: true })` y quedan
@@ -38,7 +43,10 @@ export default defineConfig<AppOptions>({
   retries: CI ? 2 : 0,
   workers: CI ? 2 : '75%',
 
-  timeout: 60_000,
+  // Los tests son journeys completos (muchos pasos por test), no comprobaciones sueltas: el
+  // presupuesto por test es alto a propósito. Lo que NO se relaja es `expect`, que es lo que
+  // detecta de verdad que algo se colgó.
+  timeout: 180_000,
   expect: { timeout: 10_000 },
 
   reporter: CI

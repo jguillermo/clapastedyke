@@ -125,7 +125,7 @@ describe('RecipeBookSeed · contenido desde JSON', () => {
     expect(recipe.name).toBe('Bizcocho de Vainilla');
     expect(recipe.categoryId.value).toBe('sys-queques');
     // La línea de huevos toma la unidad base del ingrediente ('u'), no gramos.
-    const huevos = recipe.lines.find((l) => l.supplyId.value === 'ing-huevos');
+    const huevos = recipe.ingredients.find((l) => l.supplyId.value === 'ing-huevos');
     expect(huevos?.quantity.equals(Quantity.of(8, 'u'))).toBe(true);
   });
 
@@ -233,7 +233,7 @@ describe('RecipeBookSeed · contenido desde JSON', () => {
     await seed.run();
     // El usuario renombra un sabor sembrado DESPUÉS del primer run.
     const seeded = (await flavors.all())[0];
-    await flavors.save(seeded.relabeledTo('Vainilla editada'));
+    await flavors.save(RecipeFlavor.create(seeded.id, 'Vainilla editada'));
 
     await seed.run(); // segundo arranque: no debe volver a sembrar
     const reloaded = await flavors.byId(new EntityId('flv-vainilla'));

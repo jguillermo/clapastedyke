@@ -1,7 +1,9 @@
+import { AggregateRoot } from '../../../_common/aggregate';
 import { BaseUnit } from '../../../_common/quantity';
 import { EntityId } from '../../../_common/entity-id';
 import { PurchasePrice } from '../value-objects/purchase-price';
 import { SupplyUsage } from '../value-objects/supply-usage';
+import { RecipeBookEvents, SupplySavedData } from '../events/recipe-book-events';
 
 interface SupplyData {
   id: EntityId;
@@ -14,10 +16,15 @@ interface SupplyData {
 /**
  * Todo lo que se compra para preparar el pastel es un Supply (insumo de receta,
  * topper, caja o base — se distinguen solo por `usage`). Guarda su precio de
- * compra. Entidad con identidad por id; los cambios de estado (renombrar,
- * re-tarifar) devuelven una nueva instancia.
+ * compra. Entidad con identidad por id.
+ *
+ * Graba su propio evento: `create` deja un `SupplySaved` en la cola, que el caso de uso saca con
+ * `pullEvents()` tras persistir. Renombrar y re-tarifar no son verbos aparte: se arma el insumo con
+ * los datos nuevos sobre la **misma identidad** y se persiste. La invariante que protege la familia
+ * de unidad (`baseUnit` debe coincidir con la presentación de compra) vive en `create`, así que
+ * pasarle el `baseUnit` del insumo que ya estaba sigue impidiendo que un insumo en `g` pase a `u`.
  */
-export class Supply {
+export class Supply extends AggregateRoot {
   readonly id: EntityId; // Nivel 1: identidad única del insumo
   readonly name: string; // Nivel 1: nombre del insumo (único, ver §11.2)
   readonly baseUnit: BaseUnit; // Nivel 1: unidad en la que se mide (g | u)
@@ -25,6 +32,7 @@ export class Supply {
   readonly usage: SupplyUsage; // Nivel 1: para qué se usa (recipe/topper/box/base)
 
   private constructor(data: SupplyData) {
+    super();
     this.id = data.id;
     this.name = data.name;
     this.baseUnit = data.baseUnit;
@@ -32,7 +40,7 @@ export class Supply {
     this.usage = data.usage;
   }
 
-  /** Insumo nuevo con su precio de compra. */
+  /** Arma el insumo con su precio de compra y graba que se guardó. */
   static create(
     id: EntityId,
     name: string,
@@ -48,43 +56,34 @@ export class Supply {
         `Supply base unit (${baseUnit}) must match its purchase presentation unit (${purchasePrice.per.unit})`,
       );
     }
-    return new Supply({ id, name: name.trim(), baseUnit, usage, purchasePrice });
+    const supply = new Supply({ id, name: name.trim(), baseUnit, usage, purchasePrice });
+    supply.recordEvent(RecipeBookEvents.supplySaved(id.value, supply.snapshot()));
+    return supply;
   }
 
-  /** Rehidrata desde almacenamiento. */
+  /** Rehidrata desde almacenamiento: NO graba eventos (leer no es guardar). */
   static restore(data: SupplyData): Supply {
     return new Supply(data);
-  }
-
-  /** Renombra el insumo; devuelve una nueva instancia conservando la misma identidad. */
-  renamedTo(newName: string): Supply {
-    if (!newName.trim()) {
-      throw new Error('Supply name is required');
-    }
-    return new Supply({ ...this.data(), name: newName.trim() });
-  }
-
-  /** Cambia el precio de compra; devuelve una nueva instancia. */
-  repricedTo(newPrice: PurchasePrice): Supply {
-    if (newPrice.per.unit !== this.baseUnit) {
-      throw new Error(
-        `Cannot reprice a ${this.baseUnit} supply with a ${newPrice.per.unit} purchase presentation`,
-      );
-    }
-    return new Supply({ ...this.data(), purchasePrice: newPrice });
   }
 
   equals(other: Supply): boolean {
     return this.id.equals(other.id);
   }
 
-  private data(): SupplyData {
+  /**
+   * El estado completo del insumo aplanado a primitivos: lo que viaja en `SupplySaved`. El id no va
+   * dentro — es el `aggregateId` del evento.
+   */
+  private snapshot(): SupplySavedData {
     return {
-      id: this.id,
       name: this.name,
       baseUnit: this.baseUnit,
-      purchasePrice: this.purchasePrice,
       usage: this.usage,
+      purchasePrice: {
+        amount: this.purchasePrice.amount,
+        currency: this.purchasePrice.currency,
+        per: { value: this.purchasePrice.per.value, unit: this.purchasePrice.per.unit },
+      },
     };
   }
 }

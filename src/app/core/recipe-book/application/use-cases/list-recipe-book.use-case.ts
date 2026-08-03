@@ -1,5 +1,6 @@
 import { inject, Injectable } from '@angular/core';
 import { UseCase } from '../../../_common/use-case';
+import { Logger } from '../../../_common/logger/logger';
 import { Supply } from '../../domain/entities/supply';
 import { Recipe } from '../../domain/entities/recipe';
 import { RecipeCategory } from '../../domain/entities/recipe-category';
@@ -38,8 +39,10 @@ export class ListRecipeBook extends UseCase<void, RecipeBookCatalog> {
   private readonly categories = inject(RecipeCategoryRepository);
   private readonly flavors = inject(RecipeFlavorRepository);
   private readonly recipeCapacities = inject(RecipeCapacityRepository);
+  private readonly log = inject(Logger).scoped('recipe-book/list');
 
   async execute(): Promise<RecipeBookCatalog> {
+    this.log.debug('leyendo el catálogo');
     const [supplies, categories, recipes, flavors, recipeCapacities] = await Promise.all([
       this.supplies.all(),
       this.categories.all(),
@@ -48,6 +51,14 @@ export class ListRecipeBook extends UseCase<void, RecipeBookCatalog> {
       this.recipeCapacities.all(),
     ]);
     categories.sort((a, b) => a.name.localeCompare(b.name, 'es'));
+    // Cuentas, nunca el contenido: un catálogo entero en consola no lo lee nadie.
+    this.log.debug('catálogo leído', {
+      supplies: supplies.length,
+      categories: categories.length,
+      recipes: recipes.length,
+      flavors: flavors.length,
+      recipeCapacities: recipeCapacities.length,
+    });
     return { supplies, categories, recipes, flavors, recipeCapacities };
   }
 }

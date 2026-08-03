@@ -11,8 +11,8 @@
 import { Provider } from '@angular/core';
 import { EntityId } from '../../_common/entity-id';
 import { BaseUnit, Quantity } from '../../_common/quantity';
-import { DomainEvent } from '../../_common/domain-event';
-import { EventBus, EventHandler } from '../../_common/event-bus';
+import { DomainEvent } from '../../_common/eventbus/domain-event';
+import { EventBus, EventHandler } from '../../_common/eventbus/event-bus';
 import { Supply } from '../domain/entities/supply';
 import { Recipe } from '../domain/entities/recipe';
 import { RecipeCategory } from '../domain/entities/recipe-category';
@@ -20,7 +20,7 @@ import { RecipeFlavor } from '../domain/entities/recipe-flavor';
 import { CapacityGroup, RecipeCapacity } from '../domain/entities/recipe-capacity';
 import { PurchasePrice } from '../domain/value-objects/purchase-price';
 import { SupplyUsage } from '../domain/value-objects/supply-usage';
-import { SupplyLine } from '../domain/value-objects/supply-line';
+import { RecipeIngredient } from '../domain/value-objects/recipe-ingredient';
 import { SupplyRepository } from '../domain/repositories/supply.repository';
 import { RecipeRepository } from '../domain/repositories/recipe.repository';
 import { RecipeCategoryRepository } from '../domain/repositories/recipe-category.repository';
@@ -28,6 +28,8 @@ import { RecipeFlavorRepository } from '../domain/repositories/recipe-flavor.rep
 import { RecipeCapacityRepository } from '../domain/repositories/recipe-capacity.repository';
 import { SeedDataSource } from '../infrastructure/seed/seed-data-source';
 import { SeedState } from '../infrastructure/seed/seed-state';
+import { ConsoleLogger } from '../../_common/logger/console-logger';
+import { Logger } from '../../_common/logger/logger';
 import { RecipeBookSeedDocument } from '../infrastructure/seed/recipe-book-seed-document';
 
 /** Almacén in-memory compartido que respalda los repositorios falsos. */
@@ -124,7 +126,7 @@ export class RecordingEventBus extends EventBus {
   async publish(events: readonly DomainEvent[]): Promise<void> {
     this.published.push(...events);
   }
-  subscribe(_eventName: string, _handler: EventHandler): void {
+  subscribe(_subscriber: string, _eventName: string, _handler: EventHandler): void {
     // no hace nada en los tests
   }
   names(): string[] {
@@ -134,6 +136,8 @@ export class RecordingEventBus extends EventBus {
 
 /** Bindings de los repositorios de agregados a los dobles in-memory (sin EventBus). */
 export const recipeBookRepositoryProviders: Provider[] = [
+  // El seed registra avisos; sin logger el TestBed no puede ni construirlo.
+  { provide: Logger, useClass: ConsoleLogger },
   { provide: SupplyRepository, useClass: InMemorySupplyRepository },
   { provide: RecipeRepository, useClass: InMemoryRecipeRepository },
   { provide: RecipeCategoryRepository, useClass: InMemoryRecipeCategoryRepository },
@@ -191,35 +195,40 @@ export function aPurchase(
   return { amount, per: { value: unit === 'u' ? 10 : 1000, unit } };
 }
 
+/**
+ * Los builders montan el estado de partida de un test, y montar el escenario no es guardar: todos
+ * usan **`restore`** para no grabar eventos. Con `create` cada fixture dejaría un `*Saved` en la cola
+ * y los asertos sobre lo que publica el caso de uso saldrían contaminados.
+ */
 /** Test helper: una categoría de catálogo (id + nombre). */
 export function makeCategory(id: string, name: string): RecipeCategory {
-  return RecipeCategory.create(new EntityId(id), name);
+  return RecipeCategory.restore({ id: new EntityId(id), name });
 }
 
-/** Test helper: una receta con sus líneas de insumo, sabor y capacidades opcionales. */
+/** Test helper: una receta con sus ingredientes, sabor y capacidades opcionales. */
 export function makeRecipe(
   id: string,
   categoryId: string,
   name: string,
-  lines: SupplyLine[],
+  ingredients: RecipeIngredient[],
   flavorId: string | null = null,
   portionsCapacityId: string | null = null,
   moldCapacityId: string | null = null,
 ): Recipe {
-  return Recipe.create(
-    new EntityId(id),
-    new EntityId(categoryId),
+  return Recipe.restore({
+    id: new EntityId(id),
+    categoryId: new EntityId(categoryId),
     name,
-    lines,
-    flavorId ? new EntityId(flavorId) : null,
-    portionsCapacityId ? new EntityId(portionsCapacityId) : null,
-    moldCapacityId ? new EntityId(moldCapacityId) : null,
-  );
+    ingredients,
+    flavorId: flavorId ? new EntityId(flavorId) : null,
+    portionsCapacityId: portionsCapacityId ? new EntityId(portionsCapacityId) : null,
+    moldCapacityId: moldCapacityId ? new EntityId(moldCapacityId) : null,
+  });
 }
 
 /** Test helper: un sabor de catálogo (id + label). */
 export function makeFlavor(id: string, label: string): RecipeFlavor {
-  return RecipeFlavor.create(new EntityId(id), label);
+  return RecipeFlavor.restore({ id: new EntityId(id), label });
 }
 
 /** Test helper: una capacidad de catálogo (id + grupo + label + factor). */
@@ -229,10 +238,10 @@ export function makeCapacity(
   label: string,
   factor = 1,
 ): RecipeCapacity {
-  return RecipeCapacity.create(new EntityId(id), group, label, factor);
+  return RecipeCapacity.restore({ id: new EntityId(id), group, label, factor });
 }
 
-/** Helper de test: un insumo con precio (usa `restore` para no grabar eventos). */
+/** Helper de test: un insumo con precio. */
 export function makeSupply(
   id: string,
   name: string,

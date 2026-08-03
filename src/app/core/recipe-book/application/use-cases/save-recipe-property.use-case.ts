@@ -1,12 +1,12 @@
 import { inject, Injectable } from '@angular/core';
 import { UseCase } from '../../../_common/use-case';
 import { EntityId } from '../../../_common/entity-id';
-import { EventBus } from '../../../_common/event-bus';
+import { EventBus } from '../../../_common/eventbus/event-bus';
+import { Logger } from '../../../_common/logger/logger';
 import { RecipeFlavor } from '../../domain/entities/recipe-flavor';
 import { CapacityGroup, RecipeCapacity } from '../../domain/entities/recipe-capacity';
 import { RecipeFlavorRepository } from '../../domain/repositories/recipe-flavor.repository';
 import { RecipeCapacityRepository } from '../../domain/repositories/recipe-capacity.repository';
-import { RecipeBookEvents } from '../../domain/events/recipe-book-events';
 
 /**
  * Las características que puede llevar una receta: su sabor y sus dos dimensiones de tamaño
@@ -14,78 +14,100 @@ import { RecipeBookEvents } from '../../domain/events/recipe-book-events';
  */
 export type RecipePropertyKind = 'flavor' | CapacityGroup;
 
-/** Entrada de {@link SaveRecipeProperty}: con id edita el existente; sin id crea (con dedup por label). */
+/** Entrada de {@link SaveRecipeProperty}: sobre qué identidad persistir (o el label) y los datos. */
 export interface SaveRecipePropertyRequest {
   kind: RecipePropertyKind;
+  /** Identidad sobre la que persistir; ausente, se resuelve por label. */
   id?: string;
   label: string;
-  /** Factor de escalado; solo para `portions`/`mold`. Por defecto 1. Se ignora en `flavor`. */
+  /** Factor de escalado; solo para `portions`/`mold`. Omitido, se conserva el que ya tenía. */
   factor?: number;
 }
 
 /**
- * Guarda una CARACTERÍSTICA de receta del catálogo: el sabor o una de las dos capacidades
+ * **Persiste** una CARACTERÍSTICA de receta del catálogo: el sabor o una de las dos capacidades
  * (porciones/molde). Punto de entrada único del campo «Características» del formulario de receta.
- * Despacha por `kind` al catálogo que corresponde; en ambos casos, con id edita el existente y sin id
- * crea con dedup por label (por (grupo, label) en las capacidades), devolviendo el id existente si ya
- * estaba. Las invariantes viven en `RecipeFlavor`/`RecipeCapacity`; el use case orquesta. Publica
- * `FlavorSaved` o `RecipeCapacitySaved` vía EventBus.
+ * Despacha por `kind` al catálogo que corresponde y en ambos casos hace lo mismo: resolver la
+ * identidad, armar el agregado y persistirlo — no hay crear ni editar.
+ *
+ * La identidad sale del `id` recibido; si no llega, de la característica que ya tiene ese label (por
+ * `(grupo, label)` en las capacidades), y si tampoco, de una nueva. Esa resolución por label es lo
+ * que evita duplicar «Chocolate» cada vez que se escribe.
+ *
+ * El `factor` omitido **conserva el de la capacidad resuelta** (y solo es 1 en una nueva): el
+ * formulario no siempre lo manda, y persistir 1 a ciegas borraría el factor real del catálogo.
+ *
+ * Las invariantes viven en `RecipeFlavor`/`RecipeCapacity`, que también **graban su propio evento**
+ * (`FlavorSaved` / `RecipeCapacitySaved`); aquí solo se saca la cola con `pullEvents()` tras
+ * persistir y se publica por el `EventBus`.
  */
 @Injectable({ providedIn: 'root' })
 export class SaveRecipeProperty extends UseCase<SaveRecipePropertyRequest, { id: string }> {
   private readonly flavors = inject(RecipeFlavorRepository);
   private readonly capacities = inject(RecipeCapacityRepository);
   private readonly bus = inject(EventBus);
+  private readonly log = inject(Logger).scoped('recipe-book/save-property');
 
   async execute({ kind, id, label, factor }: SaveRecipePropertyRequest): Promise<{ id: string }> {
+    this.log.debug('ejecutando', { kind, sobreId: id ?? null, conFactor: factor !== undefined });
     return kind === 'flavor'
       ? this.saveFlavor(id, label)
-      : this.saveCapacity(kind, id, label, factor ?? 1);
+      : this.saveCapacity(kind, id, label, factor);
   }
 
-  /** Crea o renombra un sabor. Sin id, dedup por label (reutiliza el del mismo nombre). */
   private async saveFlavor(id: string | undefined, label: string): Promise<{ id: string }> {
-    if (id) {
-      const existing = await this.flavors.byId(new EntityId(id));
-      if (!existing) {
-        throw new Error(`Flavor ${id} not found`);
-      }
-      await this.flavors.save(existing.relabeledTo(label));
-      await this.bus.publish([RecipeBookEvents.flavorSaved(id, false)]);
-      return { id };
-    }
-    // Dedup por label: crear un sabor que ya existe (mismo nombre) reutiliza el existente.
-    const target = label.trim().toLowerCase();
-    const existing = (await this.flavors.all()).find((f) => f.label.toLowerCase() === target);
-    if (existing) {
-      return { id: existing.id.value };
-    }
-    const newId = this.flavors.nextIdentity();
-    await this.flavors.save(RecipeFlavor.create(newId, label));
-    await this.bus.publish([RecipeBookEvents.flavorSaved(newId.value, true)]);
-    return { id: newId.value };
+    const existing = id
+      ? await this.flavors.byId(new EntityId(id))
+      : this.byLabel(await this.flavors.all(), label);
+    this.log.debug(existing ? 'sabor existente, se reutiliza' : 'sabor nuevo', {
+      id: existing?.id.value ?? null,
+    });
+
+    const flavor = RecipeFlavor.create(
+      existing?.id ?? (id ? new EntityId(id) : this.flavors.nextIdentity()),
+      label,
+    );
+    await this.flavors.save(flavor);
+    await this.bus.publish(flavor.pullEvents());
+    this.log.debug('sabor guardado', { id: flavor.id.value });
+    return { id: flavor.id.value };
   }
 
-  /** Crea o edita una capacidad del grupo dado. Sin id, dedup por (grupo, label). */
   private async saveCapacity(
     group: CapacityGroup,
     id: string | undefined,
     label: string,
-    factor: number,
+    factor: number | undefined,
   ): Promise<{ id: string }> {
-    // Dedup por (grupo, label) al crear: una capacidad nueva con un label ya existente lo reutiliza.
-    if (!id) {
-      const target = label.trim().toLowerCase();
-      const existing = (await this.capacities.byGroup(group)).find(
-        (c) => c.label.toLowerCase() === target,
-      );
-      if (existing) {
-        return { id: existing.id.value };
-      }
-    }
-    const capacityId = id ? new EntityId(id) : this.capacities.nextIdentity();
-    await this.capacities.save(RecipeCapacity.create(capacityId, group, label, factor));
-    await this.bus.publish([RecipeBookEvents.recipeCapacitySaved(capacityId.value, !id)]);
-    return { id: capacityId.value };
+    const existing = id
+      ? await this.capacities.byId(new EntityId(id))
+      : this.byLabel(await this.capacities.byGroup(group), label);
+    this.log.debug(existing ? 'capacidad existente, se reutiliza' : 'capacidad nueva', {
+      group,
+      id: existing?.id.value ?? null,
+      // Cuál factor gana importa: un `factor` omitido conserva el del catálogo, no pone 1.
+      factorHeredado: factor === undefined && existing !== null,
+    });
+
+    const capacity = RecipeCapacity.create(
+      existing?.id ?? (id ? new EntityId(id) : this.capacities.nextIdentity()),
+      group,
+      label,
+      factor ?? existing?.factor ?? 1,
+    );
+    await this.capacities.save(capacity);
+    await this.bus.publish(capacity.pullEvents());
+    this.log.debug('capacidad guardada', {
+      id: capacity.id.value,
+      group,
+      factor: capacity.factor,
+    });
+    return { id: capacity.id.value };
+  }
+
+  /** Busca por label (case-insensitive) dentro de un catálogo ya cargado. */
+  private byLabel<T extends { label: string }>(catalog: readonly T[], label: string): T | null {
+    const target = label.trim().toLowerCase();
+    return catalog.find((item) => item.label.toLowerCase() === target) ?? null;
   }
 }

@@ -20,11 +20,11 @@ import { FormField } from '@components/form-field/form-field';
 import { InputField } from '@components/input/input';
 import { SelectTag, type SelectTagType } from '@components/select-tag/select-tag';
 import { MIGO_DIALOG_DATA, MigoDialogRef } from '@components/dialog/dialog.service';
+import { Logger } from '@core/_common/logger/logger';
 import type { Supply } from '@core/recipe-book/domain/entities/supply';
 import type { RecipeFlavor } from '@core/recipe-book/domain/entities/recipe-flavor';
 import type { RecipeCapacity } from '@core/recipe-book/domain/entities/recipe-capacity';
 import { SaveRecipe } from '@core/recipe-book/application/use-cases/save-recipe.use-case';
-import { SaveSupply } from '@core/recipe-book/application/use-cases/save-supply.use-case';
 import {
   SaveRecipeProperty,
   type RecipePropertyKind,
@@ -68,9 +68,12 @@ export interface RecipeFormResult {
  * ingredientes (grilla reutilizable {@link SupplyGrid}, que muestra el costo). Las tres
  * características —sabor, porciones y molde, que coexisten— se piden en UN solo campo estilo Select2
  * ({@link SelectTag}) con un tipo por característica: elige o crea una etiqueta, con su × para
- * quitarla. Al guardar, asegura cada insumo por nombre ({@link SaveSupply}, create-if-absent),
- * resuelve cada característica a su id ({@link SaveRecipeProperty}, creándola si es nueva) y
- * persiste la receta ({@link SaveRecipe}); la categoría es fija. Inyecta solo use cases.
+ * quitarla.
+ *
+ * **Guardar escribe una sola cosa: la receta** ({@link SaveRecipe}). Los insumos y las características
+ * son agregados aparte, con su propio guardado, y para cuando se pulsa Guardar **ya están
+ * persistidos**: el insumo al fijar su precio en la grilla y la característica al crearla
+ * ({@link onPropertyCreated}). Aquí solo viajan sus ids. La categoría es fija.
  */
 @Component({
   selector: 'app-recipe-form',
@@ -148,8 +151,8 @@ export class RecipeForm {
   protected readonly ref = inject<MigoDialogRef<RecipeFormResult>>(MigoDialogRef);
   protected readonly data = inject<RecipeFormData>(MIGO_DIALOG_DATA);
   private readonly saveRecipe = inject(SaveRecipe);
-  private readonly saveSupply = inject(SaveSupply);
   private readonly saveProperty = inject(SaveRecipeProperty);
+  private readonly log = inject(Logger).scoped('ui/recipe-form');
 
   private readonly grid = viewChild.required(SupplyGrid);
 
@@ -203,8 +206,11 @@ export class RecipeForm {
     ...(this.data.recipe?.portionsLabel ? { portions: this.data.recipe.portionsLabel } : {}),
     ...(this.data.recipe?.moldLabel ? { mold: this.data.recipe.moldLabel } : {}),
   });
-  /** Factor capturado al crear una capacidad nueva (por tipo), pendiente de persistir en `save()`. */
-  private readonly pendingFactors = signal<Partial<Record<RecipePropertyKind, number>>>({});
+  /**
+   * Ids de las características **creadas en esta sesión del formulario**, indexadas por
+   * `tipo:label`. Se llenan en el momento de crearlas ({@link onPropertyCreated}), no al guardar.
+   */
+  private readonly createdPropertyIds = signal<Record<string, string>>({});
 
   protected readonly saving = signal(false);
   protected readonly errorMessage = signal('');
@@ -213,6 +219,7 @@ export class RecipeForm {
 
   protected readonly supplyOptions = computed<SupplyOption[]>(() =>
     this.data.supplies.map((s) => ({
+      id: s.id.value,
       name: s.name,
       baseUnit: s.baseUnit,
       purchase: {
@@ -229,52 +236,68 @@ export class RecipeForm {
     this.ref.close();
   }
 
-  protected onPropertyCreated(event: { typeKey: string; value: string; extra: number }): void {
-    this.pendingFactors.update((current) => ({ ...current, [event.typeKey]: event.extra }));
+  /**
+   * Crear una característica **es guardarla**: se persiste aquí mismo, cuando el usuario la añade, y
+   * su id queda anotado. Al guardar la receta ya existe y solo se manda ese id.
+   */
+  protected async onPropertyCreated(event: {
+    typeKey: string;
+    value: string;
+    extra?: number;
+  }): Promise<void> {
+    const kind = event.typeKey as RecipePropertyKind;
+    const label = event.value.trim();
+    this.log.debug('crear característica ▶', { kind, conFactor: event.extra !== undefined });
+    try {
+      const { id } = await this.saveProperty.execute({ kind, label, factor: event.extra });
+      this.createdPropertyIds.update((current) => ({ ...current, [propertyKey(kind, label)]: id }));
+      this.log.debug('crear característica ✔', { kind, id });
+    } catch (error) {
+      // El texto en pantalla no sustituye al registro: aquí queda la causa con su pila.
+      this.log.warn('no se pudo guardar la característica', error, { kind });
+      this.errorMessage.set(
+        error instanceof Error ? error.message : 'No se pudo guardar la característica.',
+      );
+    }
   }
 
   protected async save(): Promise<void> {
     const name = this.name.value.trim();
     if (!name) {
+      this.log.debug('guardar receta: sin nombre, no se guarda');
       return;
     }
     const parsed = this.grid().collect();
     if (!parsed) {
+      this.log.debug('guardar receta: la grilla rechazó las líneas, no se guarda');
       return; // la grilla muestra su propio error
     }
+    this.log.debug('guardar receta ▶', {
+      editando: this.data.recipe?.id !== undefined,
+      lineas: parsed.length,
+    });
     this.saving.set(true);
     this.errorMessage.set('');
     try {
-      // Asegura cada insumo por nombre (create-if-absent) y resuelve su id.
-      const lines = [];
-      for (const line of parsed) {
-        const { id: supplyId } = await this.saveSupply.execute({
-          name: line.name,
-          baseUnit: line.baseUnit,
-          usage: 'recipe',
-          purchasePrice: line.purchase,
-        });
-        lines.push({ supplyId, quantity: line.quantity });
-      }
-
-      const flavorId = await this.resolveProperty('flavor', this.propertyValue()['flavor']);
-      const portionsCapacityId = await this.resolveProperty(
-        'portions',
-        this.propertyValue()['portions'],
-      );
-      const moldCapacityId = await this.resolveProperty('mold', this.propertyValue()['mold']);
-
+      // Insumos y características ya están guardados (al fijar su precio / al crearlos): aquí solo
+      // viajan sus ids. Un único caso de uso, una única escritura.
       const { id } = await this.saveRecipe.execute({
         id: this.data.recipe?.id,
         categoryId: this.data.category.id,
         name,
-        lines,
-        flavorId,
-        portionsCapacityId,
-        moldCapacityId,
+        ingredients: parsed.map((line) => ({
+          supplyId: line.supplyId,
+          quantity: line.quantity,
+          unit: line.baseUnit,
+        })),
+        flavorId: this.propertyId('flavor'),
+        portionsCapacityId: this.propertyId('portions'),
+        moldCapacityId: this.propertyId('mold'),
       });
+      this.log.debug('guardar receta ✔', { id });
       this.ref.close({ id, categoryId: this.data.category.id, name });
     } catch (error) {
+      this.log.warn('no se pudo guardar la receta', error, { editando: !!this.data.recipe?.id });
       this.errorMessage.set(
         error instanceof Error ? error.message : 'No se pudo guardar la receta.',
       );
@@ -284,23 +307,31 @@ export class RecipeForm {
   }
 
   /**
-   * Resuelve a un id el label elegido para una característica. El dedup por label lo hace
-   * {@link SaveRecipeProperty} (devuelve el id del que ya existe, sin tocar su factor); si es nuevo,
-   * lo crea con el factor capturado al añadirlo (`onPropertyCreated`).
+   * El id de la característica elegida para un tipo: la que se acaba de crear o la del catálogo que
+   * coincide por label. Es una búsqueda en memoria — el catálogo llega como data del diálogo—, no una
+   * escritura.
    */
-  private async resolveProperty(
-    kind: RecipePropertyKind,
-    label: string | undefined,
-  ): Promise<string | null> {
-    const trimmed = label?.trim() ?? '';
-    if (!trimmed) {
+  private propertyId(kind: RecipePropertyKind): string | null {
+    const label = this.propertyValue()[kind]?.trim() ?? '';
+    if (!label) {
       return null;
     }
-    const { id } = await this.saveProperty.execute({
-      kind,
-      label: trimmed,
-      factor: this.pendingFactors()[kind],
-    });
-    return id;
+    const created = this.createdPropertyIds()[propertyKey(kind, label)];
+    if (created) {
+      return created;
+    }
+    const target = label.toLowerCase();
+    if (kind === 'flavor') {
+      return this.data.flavors.find((f) => f.label.toLowerCase() === target)?.id.value ?? null;
+    }
+    return (
+      this.data.capacities.find((c) => c.group === kind && c.label.toLowerCase() === target)?.id
+        .value ?? null
+    );
   }
+}
+
+/** Clave de una característica creada en esta sesión: tipo + label, insensible a mayúsculas. */
+function propertyKey(kind: RecipePropertyKind, label: string): string {
+  return `${kind}:${label.toLowerCase()}`;
 }

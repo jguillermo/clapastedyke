@@ -140,21 +140,35 @@ const SUPPLY_BY_ID = new Map(SEED.supplies.map((supply) => [supply.id, supply]))
  */
 const SUPPLY_REFS = {
   /** Masa comprada por kilo: 1 kg por S/ 4.50 → S/ 0.0045 por g. */
-  harina: { id: 'ing-harina', per: { value: 1000, unit: 'g' }, packaging: '1', unit: 'kg' },
+  harina: {
+    id: 'ing-harina',
+    amount: 4.5,
+    per: { value: 1000, unit: 'g' },
+    packaging: '1',
+    unit: 'kg',
+  },
   /** Conteo: 1 unidad por S/ 0.50. */
-  huevos: { id: 'ing-huevos', per: { value: 1, unit: 'u' }, packaging: '1', unit: 'u' },
+  huevos: {
+    id: 'ing-huevos',
+    amount: 0.5,
+    per: { value: 1, unit: 'u' },
+    packaging: '1',
+    unit: 'u',
+  },
   /** Masa comprada por bolsa de 500 g. */
   azucarImpalpable: {
     id: 'ing-azucar-impalpable',
+    amount: 5.5,
     per: { value: 500, unit: 'g' },
     packaging: '500',
     unit: 'g',
   },
   /** Masa por kilo, el insumo más barato (buen candidato a reprecio). */
-  sal: { id: 'ing-sal', per: { value: 1000, unit: 'g' }, packaging: '1', unit: 'kg' },
+  sal: { id: 'ing-sal', amount: 1.5, per: { value: 1000, unit: 'g' }, packaging: '1', unit: 'kg' },
   /** Comparte prefijo con otros dos: fuerza el desplegable del combobox. */
   azucarBlanca: {
     id: 'ing-azucar-blanca',
+    amount: 4.2,
     per: { value: 1000, unit: 'g' },
     packaging: '1',
     unit: 'kg',
@@ -178,6 +192,19 @@ export const SUPPLIES: Record<keyof typeof SUPPLY_REFS, SeededSupply> = Object.f
       per.value === ref.per.value && per.unit === ref.per.unit,
       `«${ref.id}» se compra ahora por ${per.value} ${per.unit} y no por ` +
         `${ref.per.value} ${ref.per.unit}: revisa packaging/unit de ${key}`,
+    );
+    /*
+     * El **importe** también se pincha, y no es redundante con exportarlo derivado: los specs
+     * escriben costos literales calculados a partir de él («250 g de harina = S/ 1.13»), porque
+     * recalcularlos aquí sería duplicar `PreviewRecipeCost` —la lógica bajo prueba— y el test
+     * acabaría asertando su propia aritmética. Sin esta guarda, cambiar un precio del seed dejaría
+     * media docena de aserciones de importe rojas sin decir por qué; con ella, el módulo falla al
+     * importarse y dice exactamente qué actualizar.
+     */
+    assertSeed(
+      amount === ref.amount,
+      `«${ref.id}» cuesta ahora ${amount} y no ${ref.amount}: los specs esperan costos ` +
+        `calculados con el precio viejo — actualiza ${key} y los importes literales que lo usan`,
     );
     return [
       key,

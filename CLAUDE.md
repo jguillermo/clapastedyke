@@ -16,6 +16,7 @@ The authoritative coding rules are in **`.claude/CLAUDE.md`** (always loaded) an
 - `path-aliases-conventions.md` — `@app/@components/@core/@features/@platform`
 - `mobile-first-conventions.md` — **hard rule**: toda la UI DOM es mobile-first (diálogos/formularios full-bleed en móvil, grillas que no se aplastan, targets ≥44px, viewport sin zoom). Cada componente y feature debe cumplirla y verificarse a 375px.
 - `unit-tests-conventions.md` — **hard rule**: unit tests cover **only** `core/<context>/domain/` and `core/<context>/application/use-cases/`, and live in `core/<context>/testing/` mirroring the source path exactly. Features are covered by E2E, design-system components by their story's `play`.
+- `logging-conventions.md` — **hard rule**: nada llama a `console`; se registra por el puerto `Logger` y **registrar es obligatorio** (un `debug` en cada paso importante, ningún `catch` mudo). `warn`/`error` se ven **siempre, también en producción**, con la traza del error; `debug` se ve según `"debug"` en `public/config.json` (un solo build; se cambia el fichero, no se recompila). `components/` no registra nunca.
 - `assets-conventions.md`
 - `e2e-tests-conventions.md` — **hard rule**: todos los E2E viven en `e2e/` (config, specs, page objects, fixtures) y prueban las vistas de `src/app/features/` con flujos completos. Cualquier petición de "crear tests E2E" se resuelve con esa forma.
 
@@ -24,7 +25,7 @@ The authoritative coding rules are in **`.claude/CLAUDE.md`** (always loaded) an
 ## Commands
 
 ```bash
-npm run check       # ⇦ THE one to run before a PR: fixes (lint + format) and then verifies EVERYTHING
+npm run check       # autofix (lint + format) and then verify EVERYTHING, in CI order
 npm run fix         # autofix only: eslint --fix + prettier --write
 npm run verify      # validate only, in CI order: lint · format · types · unit · stories · E2E
 
@@ -46,14 +47,17 @@ npm run typecheck   # tsc over app + stories, unit specs, and the E2E suite
 - **Lint = ESLint flat config** (`eslint.config.mjs`, `angular-eslint` + `typescript-eslint`): Angular rules (signals over decorators, native control flow, OnPush), template **a11y**, and the **layer boundaries** as `no-restricted-imports` (`components/` with no app imports, `core/` isolated, features without `infrastructure/`, the E2E suite without `src/`). Not type-aware on purpose — `ng build` and the `tsc -p …` steps already type-check. What is not AST-analysable (real mobile-first at 375px, arbitrary Tailwind values inside a class string, specs living in `core/<ctx>/testing/`, one `Playground` with `play` per component) is still code review.
 - Formatting is Prettier (`.prettierrc`: 100 cols, single quotes) via `npm run format` / `npm run format:check`.
 - **CI gate** — `.github/workflows/ci.yml` runs on every PR to `main`: format + lint + types, unit tests, production build (with budgets), the stories' `play`, and the E2E suite (desktop + mobile). The single job to require in branch protection is **`CI OK (required)`**; it fails if any other job fails, is cancelled or skipped.
-- **`npm run check` is the local mirror of that gate**: it autofixes first (`fix`) and then runs the same checks in the same order, cheapest first (`verify`), so the slow E2E run only happens once everything else is green. The production build is covered inside `test:e2e` (it builds before serving `dist/`). CI splits the same work into parallel jobs instead of one chain.
+- **Checks are run ON DEMAND, never automatically.** Do **not** run `check`, `verify`, the tests, the build or the linter after editing code — not to "confirm the change works", not before finishing a task, not at the end of a turn. Run them **only when explicitly asked to**. CI is the gate; it runs on every PR and it is what decides whether a change is green.
+- What `npm run check` does when you *are* asked for it: autofixes first (`fix`) and then runs the same checks as CI in the same order, cheapest first (`verify`), so the slow E2E run only happens once everything else is green. The production build is covered inside `test:e2e` (it builds before serving `dist/`). CI splits the same work into parallel jobs instead of one chain.
 - **E2E lives only in `e2e/`** — one Playwright config (`e2e/playwright.config.ts`), specs mirroring `src/app/features/`, page objects in `e2e/pages/`, fixtures in `e2e/fixtures/`. Tests run against the **compiled build** served by `e2e/support/static-server.mjs`, not `ng serve`. See `e2e-tests-conventions.md` — that shape is mandatory for every new E2E test.
 - Tests use Vitest **globals** (`describe`/`it`/`expect`) — no per-file imports. `tsconfig.spec.json` discovers all `src/**/*.spec.ts` wherever they sit.
 - TypeScript **6** + Angular **22**. Path aliases have **no `baseUrl`** and use relative targets (`./src/app/*`) — required by TS6 (see `path-aliases-conventions.md`).
 
 ## What this app is
 
-A 3D in-browser cooking game (`misaevol` / "clapastedyke"). The user navigates a three.js kitchen world (`/home`); the real data-entry forms are the screens reached from it. `/ui` is the living component showcase. State is persisted locally in IndexedDB — there is no backend HTTP API in the current contexts.
+A 3D in-browser cooking game (`misaevol` / "clapastedyke"). The user navigates a three.js kitchen world (`/home`); the real data-entry forms are the screens reached from it. `/ui` is the living component showcase. State is persisted locally in IndexedDB — **that is the source of truth and it has no backend**.
+
+The one network integration is **optional and additive**: from `/cuenta` a user can connect a Google account and mirror recipes and supplies into a spreadsheet in their own Drive. The app never calls the Sheets or Drive APIs — it posts to a Google Apps Script Web App (`apps-script/Code.gs`) that writes on the user's behalf. Setting it up is manual and documented end to end in [`appscript.md`](appscript.md). Nothing about local persistence changes when it is off (which is the default: `public/config.json` ships with both Google keys empty).
 
 ## Architecture: four layers under `src/app/`
 
@@ -68,9 +72,11 @@ platform/     Cross-cutting tech (currently three/ — the 3D engine). No domain
 
 The dependency rule is strict and asymmetric: `features/` → `components/` + `core/*/application` (use cases) + `platform/`; `components/` and `platform/` import from **no app layer**; `core/` imports from no other layer.
 
+⚠️ **And inside `core/`, no bounded context may import from another** — not an entity, not a use case, not even an event name. They collaborate only through `core/_common/` (an abstract contract, implemented by the owner and injected by the consumer) and through **events** on the `EventBus`, whose names live in `core/_common/events/integration-events.ts`. ESLint enforces it per context from the `CORE_CONTEXTS` list in `eslint.config.mjs` — add every new context there. Full rule in `core-conventions.md` → «Los contextos no se conocen entre sí».
+
 ### Core (DDD) — read `example-conventions.md` for the canonical shape
 
-Each bounded context (`core/recipe-book/`, `core/progression/`) is split by tactical pattern:
+Each bounded context (`core/recipe-book/`, `core/auth/`, `core/external-sync/`) is split by tactical pattern:
 
 ```
 domain/         entities/ value-objects/ repositories/(abstract) services/(abstract) events/
@@ -88,15 +94,119 @@ Key invariants the code already follows:
 
 ### Shared kernel — `core/_common/`
 
-Cross-context primitives, **not** a bounded context: `UseCase`, `AggregateRoot` (records domain events via `pullEvents()`), `EntityId`, `Quantity`, the `EventBus` port + `InMemoryEventBus`, and `infrastructure/indexeddb/` (single DB `clapastedyke`, one object store per aggregate, versioning only ever ADDS stores). New cross-cutting projections also go here.
+Cross-context primitives, **not** a bounded context: `UseCase`, `AggregateRoot` (records domain events via `pullEvents()`), `EntityId`, `Quantity`, the `EventBus` port + `InMemoryEventBus`, `config/` (the `AppConfig` port over `public/config.json`, read in `main.ts` **before** bootstrap so it is synchronous everywhere), and `infrastructure/indexeddb/` (single DB `clapastedyke`, one object store per aggregate, versioning only ever ADDS stores). New cross-cutting projections also go here.
+
+**`core/auth/` and `core/external-sync/` are technology-agnostic on purpose.** Their domain and application layers never name Google, Sheets or Apps Script — not even in a type. Each has exactly one port (`Authenticator`, `SyncGateway`) and one concrete adapter, bound in its `provide*()`:
+
+| Context | Port | Today's adapter | Swapping it |
+|---|---|---|---|
+| `auth` | `Authenticator` | `infrastructure/google-authenticator.ts` (all of Google Identity Services) | one line in `auth.providers.ts` |
+| `external-sync` | `SyncGateway` | `infrastructure/apps-script-sync.gateway.ts` + `apps-script-endpoint.ts` | one line in `external-sync.providers.ts` |
+
+The deployment config (`AppConfig` over `public/config.json`) lives under `_common/infrastructure/config/` for the same reason: its keys are technology (`debug`, `appsScriptUrl`, `googleClientId`), so only adapters read it — never a use case. **There is one build for every environment**: no `src/environments/`, no `fileReplacements` — what changes per deployment is that served file.
 
 ### Domain events
 
-Aggregates record events; the use case pulls and publishes them through `EventBus` after persisting. Subscribers in another context react — e.g. `progression/infrastructure/cake-composed-progress.subscriber.ts` listens for a recipe-book event to advance player progress. This is how contexts stay decoupled (see `progression`'s integration spec).
+Aggregates record events **in their `create(...)` factory** (`extends AggregateRoot`); the use case pulls them with `pullEvents()` and publishes them through `EventBus` after persisting. Subscribers in another context react — e.g. `external-sync/infrastructure/recipe-book-changed.subscriber.ts` listens for `RecipeSaved`/`SupplySaved` and queues the change for the spreadsheet. This is how contexts stay decoupled.
+
+⚠️ **There is no create-vs-update anywhere: only persist.** If the aggregate isn't there it is inserted, if it is there it is updated, with no observable difference (`save` is an upsert). Hence **one event per aggregate** (`*Saved`, no `isNew`, no "what changed") and **no mutation verbs** (`renamedTo`, `repricedTo`) — you rebuild the aggregate with the new data on the **same identity**. The use case only resolves *which* identity (by id, by name/label, or a new one) and the uniqueness rules, because that needs repositories.
+
+⚠️ **Every aggregate also has `restore(data)`, which records nothing** — used by mappers, the seed and test builders. Reading is not saving: rehydrating through `create` would queue a spurious event on every IndexedDB read.
+
+⚠️ **The bus is `PersistentEventBus`: it queues to IndexedDB and delivers later, on its own tick** — `publish()` does *not* await the subscribers, so a slow handler never blocks the save, and a pending event survives a reload. Delivery is at-least-once per subscriber, so **handlers must tolerate running twice**. Full spec: [`core/_common/eventbus/README.md`](src/app/core/_common/eventbus/README.md).
 
 ### DI composition
 
 `app.config.ts` only **aggregates** `provide*()` functions (`provideEventBus()`, `provideRecipeBook()`, `provideProgression()`) — it never decides implementations. Each context owns its bindings in its `*.providers.ts`. Routes are lazy-loaded standalone components in `app.routes.ts`.
+
+## Registro — obligatorio y `console.*` PROHIBIDO (hard rule)
+
+Regla completa en **[`logging-conventions.md`](.claude/rules/logging-conventions.md)**. Lo que hay
+que saber sin abrirla:
+
+**Nada en el proyecto llama a `console`.** Se registra por el puerto `Logger`
+(`core/_common/logger/logger.ts`), con cuatro niveles: `debug` · `info` · `warn` · `error`. Lo impone ESLint:
+`no-console` es **error** en todo el repo, con **una única excepción declarada por ruta** —el
+adaptador `core/_common/logger/console-logger.ts`—, así que no se puede saltar con un
+`eslint-disable` suelto. (En specs y stories la regla está apagada.)
+
+**Registrar no es opcional.** Cada paso importante de un flujo lleva su `debug`; cada `catch`
+registra o relanza; cada `void promesa` tiene dueño de su fallo. Registran `core/`, `features/` y
+`platform/`; **`components/` no registra nunca** (el design system no importa nada de la app).
+
+```typescript
+private readonly log = inject(Logger).scoped('recipe-book/save-recipe'); // → [recipe-book/save-recipe]
+
+this.log.debug('guardando receta', { id, ingredientes: lines.length });
+this.log.warn('no se pudo sembrar la receta', error, { id }); // el error va en SU ranura
+```
+
+**La firma es asimétrica a propósito**: `debug(msg, context?)` lleva datos; `warn`/`error(msg, cause?,
+context?)` llevan *la cosa que falló*, en ranura propia, para que la consola pinte la pila y la
+cadena `cause`. Anidar el error dentro del contexto pierde los frames pinchables. `info` está
+**prohibido** (sigue en el puerto `@deprecated`, se emite como `debug`).
+
+Vive en `core/_common/` —junto al `EventBus`— y no en `platform/` porque **`core/` también registra y
+no puede importar de `platform/`**; la dependencia inversa sí vale, y por eso `eslint.config.mjs`
+abre una grieta explícita para `@core/_common/logger` en el bloque de `platform/`.
+
+### Qué se ve y cuándo
+
+| Nivel | Se ve |
+|---|---|
+| `error` · `warn` · `info` | **siempre**, en cualquier despliegue |
+| `debug` | si `public/config.json` dice `"debug": true` |
+
+**`info`, `warn` y `error` no se pueden apagar**: no hay configuración que los toque, así que si algo
+falla en la máquina de alguien deja rastro con su pila. **`debug`** viene encendido en el repo, así
+que `ng serve` y ya se ve todo.
+
+Todo lo que nadie captura acaba en `GlobalErrorHandler` (`platform/error/`), que lo saca por el
+puerto con scope `[uncaught]` y su traza completa. El fallo de arranque, que ocurre antes de que
+exista el inyector, lo recoge `logBootstrapFailure` en `main.ts`.
+
+### La única configuración: `public/config.json`
+
+Un booleano en el fichero de configuración que ya existe, y **nada más**: ni `environment.ts`, ni
+umbral de nivel, ni interruptor en `window`, ni estado en `localStorage`.
+
+```jsonc
+// public/config.json — el MISMO build lo lee en todos los entornos
+{
+  "debug": true,          // ¿se ve el detalle del flujo? Ausente = false
+  "appsScriptUrl": "",
+  "googleClientId": ""
+}
+```
+
+**El build es uno solo**: no hay `src/environments/` ni `fileReplacements`. Compilar dos veces la
+misma app para cambiarle un booleano obliga a republicar por cada ajuste y hace que lo que corre en
+producción no sea el artefacto que se probó. Para callar el detalle en un despliegue se edita **su**
+`config.json` y se recarga.
+
+`main.ts` lo lee con `readConfigDocument()` **antes** de `bootstrapApplication` y se lo pasa a
+`appConfig(document)`. Ese orden importa: como app-initializer habría corrido en paralelo con los
+demás, y el bus, el seed y el mundo 3D podían registrar antes de saber si `debug` estaba encendido —
+perdiendo justo las trazas del arranque. Si el fichero falta o es ilegible, `document` es `null`: la
+app arranca en local-only con un `warn` y `debug` apagado.
+
+### Comprobar que los eventos están llegando
+
+Un evento sin suscriptor es invisible: se publica, se encola y se entrega a nadie, así que «no se
+publicó» y «no lo escucha nadie» se ven igual. Para distinguirlos, `provideEventTracing()`
+(`app.config.ts`) engancha `TraceEvents`, que registra en **`debug`** *todos* los nombres del
+Published Language:
+
+```js
+// con `ng serve` ya salen; solo hay que usar la app
+// [events] SupplySaved          { aggregateId: 'ing-manjar', occurredOn: '…', data: { name: 'Manjar blanco', … } }
+// [events] RecipeSaved          { aggregateId: 'rec-bano-manjar', occurredOn: '…', data: { name: 'Baño de Manjar', ingredients: […], … } }
+// [events] RecipeCapacitySaved  { aggregateId: 'RC-1', occurredOn: '…', data: { group: 'portions', label: '33', factor: 33 } }
+```
+
+Si un evento **no** aparece ahí, no se publicó (mira si el caso de uso llegó a guardar). Si aparece
+pero no pasa lo que esperabas, el que falta es el suscriptor. Quitar `provideEventTracing()` de
+`app.config.ts` lo apaga del todo.
 
 ## Styling — SOLO Tailwind del tema Migo (hard rule)
 

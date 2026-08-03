@@ -28,6 +28,43 @@ const AREA = {
 };
 
 /**
+ * Los bounded contexts de `core/`. **Ninguno puede importar de otro**: lo que se comparte se sube a
+ * `core/_common` (contratos y nombres de evento) y lo que se comunica va por el `EventBus`.
+ *
+ * Al añadir un contexto hay que añadirlo aquí, o su aislamiento no se comprueba.
+ */
+const CORE_CONTEXTS = ['auth', 'external-sync', 'recipe-book'];
+
+/**
+ * Bloque de reglas que aísla un contexto de sus hermanos. Los patrones llevan `**​/` delante para
+ * cazar tanto el alias (`@core/otro/...`) como una ruta relativa que se escape (`../../otro/...`).
+ */
+const isolate = (context) => ({
+  files: [`src/app/core/${context}/**/*.ts`],
+  rules: {
+    'no-restricted-imports': [
+      'error',
+      {
+        patterns: [
+          {
+            group: [...AREA.components, ...AREA.features, ...AREA.platform],
+            message: 'core/ no importa de ninguna otra capa. Ver core-conventions.md.',
+          },
+          {
+            group: CORE_CONTEXTS.filter((other) => other !== context).flatMap((other) => [
+              `**/${other}`,
+              `**/${other}/**`,
+            ]),
+            message:
+              'Un bounded context NO depende de otro. Lo compartido se sube a core/_common (contrato o nombre de evento) y la comunicación va por eventos. Ver core-conventions.md.',
+          },
+        ],
+      },
+    ],
+  },
+});
+
+/**
  * Los cerrojos que mantienen la suite E2E independiente de `src/`, como patrón reutilizable: las
  * reglas se sobrescriben por clave, así que el bloque de `specs/` tiene que repetir este patrón
  * al añadir el suyo (si no, lo perdería).
@@ -117,9 +154,19 @@ export default tseslint.config(
       // repo y se lee mejor que un if/else de una línea. El corto-circuito (`a && b()`) no.
       '@typescript-eslint/no-unused-expressions': ['error', { allowTernary: true }],
 
-      // Sin trazas de depuración en el bundle (warn/error sí: el seed los usa para datos legacy).
-      'no-console': ['error', { allow: ['warn', 'error'] }],
+      // La consola se usa a través del `Logger` (`core/_common/logger/`), NUNCA directamente —ni
+      // siquiera `warn`/`error`—. Un `console.*` suelto no se puede apagar, ni filtrar por nivel, ni
+      // llevar a otro destino. El único fichero autorizado es el adaptador, exceptuado más abajo.
+      'no-console': 'error',
     },
+  },
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // El adaptador de consola: el ÚNICO sitio del proyecto que puede usar `console`
+  // ───────────────────────────────────────────────────────────────────────────
+  {
+    files: ['src/app/core/_common/logger/console-logger.ts'],
+    rules: { 'no-console': 'off' },
   },
 
   // ───────────────────────────────────────────────────────────────────────────
@@ -164,15 +211,30 @@ export default tseslint.config(
         {
           patterns: [
             {
-              // Excepción documentada en platform-conventions.md: el contrato `DomainError`.
+              // Dos excepciones documentadas en platform-conventions.md, y solo dos. Ambas son
+              // contratos de `core/_common/` sin dominio dentro: el shared kernel es la única parte
+              // de `core/` que `platform/` puede tocar, porque la dependencia inversa es imposible
+              // (`core/` no puede importar de `platform/`).
               group: [
                 ...AREA.core,
+                // Los patrones son estilo .gitignore y se evalúan en orden: para rescatar algo hay
+                // que re-incluir ANTES su contenedor, porque no se puede desexcluir un hijo si su
+                // padre sigue excluido. De ahí este vaivén: se rescata `_common`, se vuelve a
+                // prohibir su contenido, y solo entonces se rescatan los dos contratos permitidos.
+                '!@core/_common',
+                '@core/_common/*',
+                '@core/_common/*/**',
+                // 1. El contrato `DomainError`, para leer su `code` al renderizar.
                 '!@core/_common/error',
                 '!@core/_common/error/**',
+                // 2. El puerto `Logger`: platform/ también registra, y el puerto vive en
+                //    core/_common porque core/ también registra y no puede importar de platform/.
+                '!@core/_common/logger',
+                '!@core/_common/logger/**',
                 ...AREA.features,
               ],
               message:
-                'platform/ no conoce el dominio ni las páginas: sin imports de core/ (salvo el contrato DomainError) ni de features/. Ver platform-conventions.md.',
+                'platform/ no conoce el dominio ni las páginas: sin imports de core/ (salvo los contratos DomainError y Logger de core/_common) ni de features/. Ver platform-conventions.md.',
             },
           ],
         },
@@ -195,6 +257,10 @@ export default tseslint.config(
       ],
     },
   },
+
+  // Cada bounded context, aislado de sus hermanos. Va DESPUÉS del bloque de arriba porque las
+  // reglas se sobrescriben por clave: `isolate()` repite la prohibición de capas junto con la suya.
+  ...CORE_CONTEXTS.map(isolate),
   {
     files: ['src/app/features/**/*.ts'],
     ignores: ['src/app/features/_common/**/*.ts'],

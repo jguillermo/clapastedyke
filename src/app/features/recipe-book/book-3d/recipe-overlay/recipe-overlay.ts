@@ -17,6 +17,7 @@ import {
   PreviewRecipeCost,
   type PreviewRecipeCostResult,
 } from '@core/recipe-book/application/use-cases/preview-recipe-cost.use-case';
+import { Logger } from '@core/_common/logger/logger';
 import type { Recipe } from '@core/recipe-book/domain/entities/recipe';
 import type { Supply } from '@core/recipe-book/domain/entities/supply';
 import type { RecipeFlavor } from '@core/recipe-book/domain/entities/recipe-flavor';
@@ -176,6 +177,7 @@ export class RecipeOverlay {
   readonly swipe = output<'next' | 'prev'>();
 
   private readonly previewCost = inject(PreviewRecipeCost);
+  private readonly log = inject(Logger).scoped('ui/recipe-overlay');
 
   private static readonly SWIPE_THRESHOLD = 40;
   private start: { x: number; y: number } | null = null;
@@ -203,9 +205,15 @@ export class RecipeOverlay {
   constructor() {
     // El costo/total se calcula en el negocio (PreviewRecipeCost), nunca aquí — ver memoria
     // `calculos-solo-en-negocio`. Se recalcula cada vez que cambia la receta o el catálogo.
+    // Dentro de un `effect()` NO se registra el camino feliz (la regla lo prohíbe: se reevalúa con
+    // cada cambio de señal). El fallo sí, porque si no el rechazo se pierde y el costo se queda en
+    // blanco sin motivo visible.
     effect(() => {
       const lines = this.costRequestLines();
-      void this.previewCost.execute({ lines }).then((result) => this.costResult.set(result));
+      this.previewCost
+        .execute({ lines })
+        .then((result) => this.costResult.set(result))
+        .catch((error: unknown) => this.log.error('no se pudo calcular el costo', error));
     });
 
     // Nueva receta → arranca scrolleada arriba (nueva página, no donde quedó la anterior).
@@ -299,10 +307,10 @@ export class RecipeOverlay {
     return id ? (this.capacitiesById().get(id.value)?.label ?? null) : null;
   });
 
-  /** Líneas a costear, en el mismo orden que `recipe().lines` — el use case las devuelve alineadas. */
+  /** Líneas a costear, en el orden de `recipe().ingredients` — el use case las devuelve alineadas. */
   private readonly costRequestLines = computed(() => {
     const byId = this.suppliesById();
-    return this.recipe().lines.map((line) => {
+    return this.recipe().ingredients.map((line) => {
       const supply = byId.get(line.supplyId.value);
       return {
         purchasePrice: supply
@@ -323,7 +331,7 @@ export class RecipeOverlay {
   protected readonly lines = computed<LineView[]>(() => {
     const names = this.suppliesById();
     const costItems = this.costResult().items;
-    return this.recipe().lines.map((line, i) => ({
+    return this.recipe().ingredients.map((line, i) => ({
       name: names.get(line.supplyId.value)?.name ?? '—',
       quantity: formatQuantity(line.quantity.value, line.quantity.unit),
       price: costItems[i]?.cost || '—',

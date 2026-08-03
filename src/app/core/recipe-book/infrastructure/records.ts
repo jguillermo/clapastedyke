@@ -19,9 +19,9 @@ export interface PurchasePriceRecord {
   currency?: string; // opcional por retrocompatibilidad con records escritos antes de añadir la moneda
 }
 
-export interface SupplyLineRecord {
+export interface RecipeIngredientRecord {
   // Clave persistida legacy: se conserva `ingredientId` (renombrarla orfanaría recetas guardadas);
-  // el dominio la mapea a `SupplyLine.supplyId`.
+  // el dominio la mapea a `RecipeIngredient.supplyId`.
   ingredientId: string;
   quantity: QuantityRecord;
 }
@@ -55,7 +55,8 @@ export interface RecipeRecord {
   id: string;
   categoryId: string;
   name: string;
-  lines: SupplyLineRecord[];
+  // Clave persistida legacy `lines`; el dominio la expone como `Recipe.ingredients`.
+  lines: RecipeIngredientRecord[];
   flavorId?: string | null; // opcional por retrocompatibilidad con records escritos antes del sabor
   portionsCapacityId?: string | null; // opcional por retrocompatibilidad con records escritos antes de la capacidad
   moldCapacityId?: string | null; // opcional por retrocompatibilidad con records escritos antes de la capacidad

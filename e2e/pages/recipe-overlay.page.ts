@@ -18,9 +18,16 @@ export class RecipeOverlayPage {
     return this.all.nth(index);
   }
 
-  /** Overlay de una receta concreta por su título. */
+  /**
+   * Overlay de una receta concreta por su título, exigido **exacto**: el nombre accesible
+   * coincide por subcadena, así que sin `exact` el overlay de «Ganache de Chocolate» también
+   * satisfaría una consulta por «Ganache», y una receta renombrada a «X ampliada» seguiría
+   * satisfaciendo una consulta por «X» — justo lo que un test de renombrado necesita distinguir.
+   */
   byName(name: string): Locator {
-    return this.all.filter({ has: this.page.getByRole('heading', { level: 2, name }) });
+    return this.all.filter({
+      has: this.page.getByRole('heading', { level: 2, name, exact: true }),
+    });
   }
 
   title(index = 0): Locator {
@@ -28,7 +35,7 @@ export class RecipeOverlayPage {
   }
 
   editButton(index = 0): Locator {
-    return this.at(index).getByRole('button', { name: 'Editar receta' });
+    return this.at(index).getByRole('button', { name: 'Editar receta', exact: true });
   }
 
   /**

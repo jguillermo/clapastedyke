@@ -11,6 +11,10 @@ coverage/
 documentation.json
 package-lock.json
 
+# Google Apps Script: `.gs` no es una extensión que Prettier entienda y el fichero se copia y pega
+# tal cual en el editor de Apps Script (ver appscript.md).
+apps-script/*.gs
+
 # Snapshots y salidas generadas
 __screenshots__/
 *.log

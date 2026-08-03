@@ -19,19 +19,16 @@ describe('ListRecipeBook', () => {
     const ing = TestBed.inject(SaveSupply);
     await ing.execute({
       name: 'Harina',
-      baseUnit: 'g',
       usage: 'recipe',
       purchasePrice: aPurchase('g'),
     });
     await ing.execute({
       name: 'Huevos',
-      baseUnit: 'u',
       usage: 'recipe',
       purchasePrice: aPurchase('u'),
     });
     await ing.execute({
       name: 'Feliz cumpleaños',
-      baseUnit: 'u',
       usage: 'topper',
       purchasePrice: aPurchase('u'),
     });

@@ -37,7 +37,14 @@ export class SupplyGridPage {
    * `app-supply-grid`, así que estos locators cuelgan de la página y no de `root`.
    */
 
-  /** Panel del desplegable (existe solo mientras está abierto). */
+  /**
+   * Panel del desplegable (existe solo mientras está abierto).
+   *
+   * Cuelga de la página y no de `root` porque el CDK lo monta fuera del componente. Eso obliga a
+   * una condición al usarlo: **solo puede haber un desplegable abierto a la vez**. El del
+   * `migo-select-tag` de características es otro `[role="listbox"]`, así que no se pueden
+   * intercalar ambos sin cerrar el primero (en la app tampoco se puede: son dos overlays).
+   */
   readonly listbox = this.page.getByRole('listbox');
   /** Todas las opciones ofrecidas. */
   readonly options = this.page.getByRole('option');
@@ -85,7 +92,7 @@ export class SupplyGridPage {
   }
 
   removeRowButton(row: number): Locator {
-    return this.cell(row, 3).getByRole('button', { name: 'Quitar fila' });
+    return this.cell(row, 3).getByRole('button', { name: 'Quitar fila', exact: true });
   }
 
   /**

@@ -25,6 +25,9 @@ export interface AppFixtures {
   /** Errores no capturados de la página; el test falla si hay alguno. */
   pageErrors: Error[];
 
+  /** Lo que la app registró como `error`; el test falla si hay algo. */
+  consoleErrors: string[];
+
   home: HomePage;
   /** El libro de recetas en modo 3D (requiere `webgl: true`). */
   book: RecipeBook3dPage;
@@ -63,6 +66,32 @@ export const test = base.extend<AppOptions & AppFixtures>({
         errors.map((error) => error.message),
         'la vista no debe lanzar errores no capturados',
       ).toEqual([]);
+    },
+    { auto: true },
+  ],
+
+  /**
+   * Falla el test si la app registró un `error`.
+   *
+   * Es la guarda que de verdad muerde. `pageErrors` escucha `pageerror`, pero
+   * `provideBrowserGlobalErrorListeners()` llama a `preventDefault()` sobre los errores que captura,
+   * así que todo lo que pasa por Angular **no llega** a ese evento: acaba en el `GlobalErrorHandler`,
+   * que lo saca por consola con scope `[uncaught]`. Sin esto, un error tragado no rompería nada.
+   *
+   * Funciona porque el registro está encendido también en el build de producción que sirven los E2E:
+   * `warn` y `error` se ven siempre. **Los `warn` se ignoran a propósito** — son degradaciones
+   * esperadas en algunos flujos (un insumo legacy, un fallback), no fallos.
+   */
+  consoleErrors: [
+    async ({ page }, use) => {
+      const errors: string[] = [];
+      page.on('console', (message) => {
+        if (message.type() === 'error') {
+          errors.push(message.text());
+        }
+      });
+      await use(errors);
+      expect(errors, 'la app no debe registrar ningún error en consola').toEqual([]);
     },
     { auto: true },
   ],

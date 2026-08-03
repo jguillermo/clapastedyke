@@ -16,6 +16,7 @@ import { Spacer } from '@components/spacer/spacer';
 import { Badge } from '@components/badge/badge';
 import { MigoDialog } from '@components/dialog/dialog.service';
 import type { EntityId } from '@core/_common/entity-id';
+import { Logger } from '@core/_common/logger/logger';
 import {
   ListRecipeBook,
   type RecipeBookCatalog,
@@ -295,6 +296,7 @@ export class RecipeBook3d implements AfterViewInit, OnDestroy {
   private readonly canvasRef = viewChild<ElementRef<HTMLCanvasElement>>('canvas');
   private readonly listRecipeBook = inject(ListRecipeBook);
   private readonly dialog = inject(MigoDialog);
+  private readonly log = inject(Logger).scoped('ui/book');
 
   protected readonly webglSupported = signal(detectWebgl());
   protected readonly indexOpen = signal(false);
@@ -422,18 +424,22 @@ export class RecipeBook3d implements AfterViewInit, OnDestroy {
 
   ngAfterViewInit(): void {
     if (!this.webglSupported()) {
+      this.log.debug('sin WebGL: el libro se pinta en su ruta accesible DOM');
       void this.load(); // pobla el catálogo para el fallback DOM
       return;
     }
     const canvas = this.canvasRef()?.nativeElement;
     if (!canvas) {
+      this.log.debug('todavía no hay canvas, no se monta el motor');
       return;
     }
     try {
-      this.engine = new BookEngine(canvas, this.reducedMotion);
+      this.engine = new BookEngine(canvas, this.reducedMotion, this.log.scoped('3d/book'));
       this.engine.onSpreadChange((s) => this.onSpread(s));
       void this.load();
-    } catch {
+    } catch (error) {
+      // Degradación que nadie más va a contar: la vista sigue viéndose, en DOM en vez de en 3D.
+      this.log.warn('no se pudo crear el motor 3D: se cae a la ruta accesible', error);
       this.engine = null;
       this.webglSupported.set(false);
       void this.load();
@@ -622,12 +628,13 @@ export class RecipeBook3d implements AfterViewInit, OnDestroy {
 
   private prefillLines(recipe: Recipe): InitialLine[] {
     const byId = this.suppliesById();
-    return recipe.lines.map((line) => {
-      const supply = byId.get(line.supplyId.value);
+    return recipe.ingredients.map((ingredient) => {
+      const supply = byId.get(ingredient.supplyId.value);
       return {
+        supplyId: ingredient.supplyId.value,
         name: supply?.name ?? '—',
-        quantity: line.quantity.value,
-        baseUnit: line.quantity.unit,
+        quantity: ingredient.quantity.value,
+        baseUnit: ingredient.quantity.unit,
       };
     });
   }
@@ -648,12 +655,12 @@ export class RecipeBook3d implements AfterViewInit, OnDestroy {
       case 'ArrowRight':
       case 'PageDown':
         event.preventDefault();
-        void this.next();
+        this.next();
         break;
       case 'ArrowLeft':
       case 'PageUp':
         event.preventDefault();
-        void this.prev();
+        this.prev();
         break;
       case 'Home':
         event.preventDefault();
@@ -683,18 +690,33 @@ export class RecipeBook3d implements AfterViewInit, OnDestroy {
     }
   }
 
+  /**
+   * Relee el catálogo y repinta el libro.
+   *
+   * **No lanza nunca, a propósito.** Se invoca con `void` desde siete sitios (montaje, cierre de
+   * cada diálogo, cambios de insumos); si dejara escapar el rechazo, cada uno sería una promesa
+   * flotante distinta que hay que acordarse de capturar. Al absorberlo aquí, este método es el
+   * único dueño del fallo «no se pudo leer el catálogo» y lo registra una sola vez.
+   */
   private async load(focus?: BookFocus): Promise<void> {
-    const catalog = await this.listRecipeBook.execute();
-    this.catalog.set(catalog);
-    const pages = toPages(catalog);
-    this._indexEntries.set(buildIndex(catalog, pages));
-    // Tras cerrar un formulario/diálogo salta a lo último que se tocó (receta/categoría/insumos);
-    // si no hay foco, conserva la cara actual (no volver al inicio).
-    const target = focus ? resolveFace(pages, focus) : -1;
-    const face = target >= 0 ? target : (this.engine?.currentFaceIndex ?? 0);
-    this.engine?.setPages(pages);
-    if (face > 0) {
-      this.engine?.jumpToFace(face);
+    try {
+      const catalog = await this.listRecipeBook.execute();
+      this.catalog.set(catalog);
+      const pages = toPages(catalog);
+      this._indexEntries.set(buildIndex(catalog, pages));
+      // Tras cerrar un formulario/diálogo salta a lo último que se tocó (receta/categoría/insumos);
+      // si no hay foco, conserva la cara actual (no volver al inicio).
+      const target = focus ? resolveFace(pages, focus) : -1;
+      const face = target >= 0 ? target : (this.engine?.currentFaceIndex ?? 0);
+      this.engine?.setPages(pages);
+      if (face > 0) {
+        this.engine?.jumpToFace(face);
+      }
+      this.log.debug('libro repintado', { caras: pages.length, face });
+    } catch (error) {
+      this.log.error('no se pudo leer el catálogo: el libro se queda como estaba', error, {
+        focus: focus ?? null,
+      });
     }
   }
 

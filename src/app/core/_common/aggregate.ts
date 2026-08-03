@@ -1,11 +1,13 @@
-import { DomainEvent } from './domain-event';
+import { DomainEvent } from './eventbus/domain-event';
 
 /**
- * Aggregate root that records the domain events it produces during its own
- * state transitions. The use case pulls and publishes them after persisting.
- * Use this base only for aggregates whose events emerge from internal logic
- * (e.g. Supply recording SupplyRepriced); aggregates whose events are
- * simple outcomes can let the use case build the event directly.
+ * Aggregate root that records the domain events it produces. The event belongs to the aggregate —
+ * "this recipe was saved" is its own fact — so the aggregate records it in its `create(...)` factory
+ * and the use case only pulls the queue with `pullEvents()` after persisting, and publishes it.
+ *
+ * The counterpart is mandatory: every aggregate also exposes a `restore(data)` that rebuilds it
+ * **without** recording anything. Mappers, the seed and test builders go through `restore` — reading
+ * is not saving, and going through `create` would queue a spurious event on every read.
  */
 export abstract class AggregateRoot {
   private events: DomainEvent[] = [];

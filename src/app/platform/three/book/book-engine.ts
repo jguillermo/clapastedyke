@@ -13,6 +13,7 @@ import {
   Vector3,
   WebGLRenderer,
 } from 'three';
+import { Logger } from '@core/_common/logger/logger';
 import { buildBookMesh, BookMesh, PAGE_H, PAGE_W } from './book-mesh';
 import { PageContent } from './page-content';
 import { renderPageTexture } from './page-texture';
@@ -90,10 +91,16 @@ export class BookEngine {
   constructor(
     private readonly canvas: HTMLCanvasElement,
     private readonly reducedMotion: boolean,
+    /**
+     * El registro entra por constructor y no con `inject()`: esto es una clase plana que la feature
+     * instancia con `new`, fuera de todo contexto de inyección. Obligatorio a propósito.
+     */
+    private readonly log: Logger,
   ) {
     const { clientWidth: w, clientHeight: h } = canvas;
     this.aspect = h > 0 ? w / h : 1;
     this.widthPx = w;
+    this.log.debug('creando el motor', { w, h, reducedMotion });
 
     this.renderer = new WebGLRenderer({ canvas, antialias: true });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -154,6 +161,11 @@ export class BookEngine {
     this.renderCurrent();
     this.emitSpread();
     this.requestRender();
+    this.log.debug('páginas cargadas', {
+      caras: faces.length,
+      hojas: this.totalLeaves,
+      modo: this.mode,
+    });
   }
 
   /** Registra el observador de cambios de spread (para HUD / aria-live). */
@@ -251,7 +263,14 @@ export class BookEngine {
     this.queue.push(dir);
     this.turn.hurry(); // acelera el volteo en curso para encadenar el siguiente
     if (!this.draining) {
-      void this.drain();
+      // Promesa flotante: nadie espera el drenado. Sin este `catch`, un fallo a mitad de volteo
+      // dejaría el libro trabado sin decir por qué (y `draining` en `true` para siempre).
+      this.drain().catch((error: unknown) => {
+        this.draining = false;
+        this.log.error('el drenado de volteos ha fallado', error, {
+          pendientes: this.queue.length,
+        });
+      });
     }
   }
 
@@ -448,6 +467,7 @@ export class BookEngine {
     this.blankTexture?.dispose();
     this.book.dispose();
     this.renderer.dispose();
+    this.log.debug('motor liberado');
   }
 
   // ---------- interno ----------

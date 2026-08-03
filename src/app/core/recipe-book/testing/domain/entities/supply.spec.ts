@@ -15,7 +15,36 @@ describe('Supply', () => {
     expect(supply.purchasePrice.amount).toBe(5);
   });
 
-  it('restore rehydrates from storage', () => {
+  it('create recorta el nombre y graba un SupplySaved con el estado COMPLETO', () => {
+    const supply = Supply.create(
+      new EntityId('IN-1'),
+      '  Harina sin gluten  ',
+      'g',
+      'recipe',
+      price(5),
+    );
+
+    expect(supply.name).toBe('Harina sin gluten');
+    const events = supply.pullEvents();
+    expect(events).toHaveLength(1);
+    expect(events[0].name).toBe('SupplySaved');
+    expect(events[0].aggregateId).toBe('IN-1'); // el id va aquí, no dentro del payload
+    expect(events[0].data).toEqual({
+      name: 'Harina sin gluten',
+      baseUnit: 'g',
+      usage: 'recipe',
+      purchasePrice: { amount: 5, currency: 'PEN', per: { value: 1000, unit: 'g' } },
+    });
+  });
+
+  it('pullEvents empties the queue: the event is published exactly once', () => {
+    const supply = Supply.create(new EntityId('IN-1'), 'Harina', 'g', 'recipe', price(5));
+
+    expect(supply.pullEvents()).toHaveLength(1);
+    expect(supply.pullEvents()).toEqual([]);
+  });
+
+  it('restore rehydrates from storage WITHOUT recording anything (reading is not saving)', () => {
     const supply = Supply.restore({
       id: new EntityId('IN-1'),
       name: 'Harina',
@@ -23,44 +52,15 @@ describe('Supply', () => {
       usage: 'recipe',
       purchasePrice: price(5),
     });
+
     expect(supply.purchasePrice.amount).toBe(5);
+    expect(supply.pullEvents()).toEqual([]);
   });
 
-  it('repricedTo returns a new instance and leaves the original unchanged', () => {
-    const original = Supply.restore({
-      id: new EntityId('IN-1'),
-      name: 'Harina',
-      baseUnit: 'g',
-      usage: 'recipe',
-      purchasePrice: price(5),
-    });
-    const updated = original.repricedTo(price(8));
-
-    expect(updated).not.toBe(original);
-    expect(updated.purchasePrice.amount).toBe(8);
-    expect(original.purchasePrice.amount).toBe(5); // inmutable
-  });
-
-  it('renamedTo returns a new instance with the new name, same identity', () => {
-    const original = Supply.restore({
-      id: new EntityId('IN-1'),
-      name: 'Harina',
-      baseUnit: 'g',
-      usage: 'recipe',
-      purchasePrice: price(5),
-    });
-    const renamed = original.renamedTo('  Harina sin gluten  ');
-
-    expect(renamed).not.toBe(original);
-    expect(renamed.name).toBe('Harina sin gluten'); // sin espacios sobrantes
-    expect(original.name).toBe('Harina'); // inmutable
-    expect(renamed.id.equals(original.id)).toBe(true);
-    expect(renamed.purchasePrice.amount).toBe(5);
-  });
-
-  it('renamedTo rejects an empty name', () => {
-    const supply = Supply.create(new EntityId('IN-1'), 'Harina', 'g', 'recipe', price(5));
-    expect(() => supply.renamedTo('   ')).toThrow('Supply name is required');
+  it('create rejects an empty name', () => {
+    expect(() => Supply.create(new EntityId('IN-1'), '   ', 'g', 'recipe', price(5))).toThrow(
+      'Supply name is required',
+    );
   });
 
   it('equals by id', () => {
@@ -78,9 +78,14 @@ describe('Supply', () => {
     ).not.toThrow();
   });
 
-  it('repricedTo rejects a price in a different unit family', () => {
+  it('re-tarifar es armarlo de nuevo sobre la misma unidad base: otra familia se rechaza', () => {
+    // Es la invariante que protegía `repricedTo`: pasando el baseUnit del insumo que ya estaba,
+    // `create` sigue impidiendo que un insumo por conteo pase a medirse en gramos.
     const eggs = Supply.create(new EntityId('IN-1'), 'Huevos', 'u', 'recipe', countPrice(12));
-    expect(() => eggs.repricedTo(price(5))).toThrow(); // precio en `g` sobre un insumo `u`
-    expect(() => eggs.repricedTo(countPrice(15, 30))).not.toThrow();
+
+    expect(() => Supply.create(eggs.id, eggs.name, eggs.baseUnit, eggs.usage, price(5))).toThrow();
+    expect(() =>
+      Supply.create(eggs.id, eggs.name, eggs.baseUnit, eggs.usage, countPrice(15, 30)),
+    ).not.toThrow();
   });
 });

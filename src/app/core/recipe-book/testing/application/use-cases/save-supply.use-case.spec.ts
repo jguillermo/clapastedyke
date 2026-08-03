@@ -1,72 +1,126 @@
 import { TestBed } from '@angular/core/testing';
+import { EntityId } from '../../../../_common/entity-id';
+import { EventBus } from '../../../../_common/eventbus/event-bus';
 import { aPurchase, makeRecipeBookFakes, RecordingEventBus } from '../../recipe-book-test-doubles';
 import { SupplyRepository } from '../../../domain/repositories/supply.repository';
-import { EventBus } from '../../../../_common/event-bus';
-import { EntityId } from '../../../../_common/entity-id';
 import { SaveSupply } from '../../../application/use-cases/save-supply.use-case';
 
 describe('SaveSupply', () => {
-  let bus: RecordingEventBus;
-
   beforeEach(() => {
     TestBed.configureTestingModule({ providers: makeRecipeBookFakes().providers });
-    bus = TestBed.inject(EventBus) as RecordingEventBus;
   });
 
-  it('creates a new supply with its price and emits SupplySaved', async () => {
-    const result = await TestBed.inject(SaveSupply).execute({
+  it('sin id → acuña la identidad y publica un solo SupplySaved con el nombre', async () => {
+    const { id } = await TestBed.inject(SaveSupply).execute({
       name: 'Harina',
-      baseUnit: 'g',
-      usage: 'recipe',
-      purchasePrice: aPurchase('g'),
-    });
-
-    const stored = await TestBed.inject(SupplyRepository).byId(new EntityId(result.id));
-    expect(stored?.name).toBe('Harina');
-    expect(stored?.purchasePrice.amount).toBe(5);
-    expect(bus.names()).toEqual(['SupplySaved']);
-    expect(bus.published[0].data['isNew']).toBe(true);
-  });
-
-  it('upserts by name (case-insensitive) without re-pricing when the price is unchanged', async () => {
-    const useCase = TestBed.inject(SaveSupply);
-    const first = await useCase.execute({
-      name: 'Harina',
-      baseUnit: 'g',
-      usage: 'recipe',
-      purchasePrice: aPurchase('g'),
-    });
-    const second = await useCase.execute({
-      name: 'harina',
-      baseUnit: 'g',
-      usage: 'recipe',
-      purchasePrice: aPurchase('g'),
-    });
-
-    expect(second.id).toBe(first.id);
-    expect(await TestBed.inject(SupplyRepository).all()).toHaveLength(1);
-    expect(bus.names()).toEqual(['SupplySaved', 'SupplySaved']);
-    expect(bus.published[1].data['isNew']).toBe(false);
-  });
-
-  it('re-prices an existing supply, persisting the new price', async () => {
-    const useCase = TestBed.inject(SaveSupply);
-    const first = await useCase.execute({
-      name: 'Harina',
-      baseUnit: 'g',
       usage: 'recipe',
       purchasePrice: aPurchase('g', 5),
     });
+
+    const saved = await TestBed.inject(SupplyRepository).byId(new EntityId(id));
+    expect(saved?.name).toBe('Harina');
+    expect(saved?.baseUnit).toBe('g');
+    expect(saved?.purchasePrice.amount).toBe(5);
+
+    const bus = TestBed.inject(EventBus) as RecordingEventBus;
+    expect(bus.published).toHaveLength(1);
+    expect(bus.published[0].name).toBe('SupplySaved');
+    expect(bus.published[0].data['name']).toBe('Harina');
+  });
+
+  it('sin id y con un nombre que ya está → reusa esa identidad, no duplica', async () => {
+    // Es lo que evita que el formulario de receta acuñe un insumo nuevo cada vez que se guarda.
+    const uc = TestBed.inject(SaveSupply);
+    const a = await uc.execute({ name: 'Harina', purchasePrice: aPurchase('g', 5) });
+    const b = await uc.execute({ name: 'harina', purchasePrice: aPurchase('g', 8) });
+
+    expect(b.id).toBe(a.id);
+    const repo = TestBed.inject(SupplyRepository);
+    expect(await repo.all()).toHaveLength(1);
+    expect((await repo.byId(new EntityId(a.id)))?.purchasePrice.amount).toBe(8);
+  });
+
+  it('con id → renombrar conserva la identidad que referencian las recetas', async () => {
+    const uc = TestBed.inject(SaveSupply);
+    const { id } = await uc.execute({ name: 'Harina', purchasePrice: aPurchase('g', 5) });
+
+    await uc.execute({ id, name: 'Harina sin gluten', purchasePrice: aPurchase('g', 9) });
+
+    const repo = TestBed.inject(SupplyRepository);
+    const saved = await repo.byId(new EntityId(id));
+    expect(saved?.name).toBe('Harina sin gluten');
+    expect(saved?.purchasePrice.amount).toBe(9);
+    expect(await repo.all()).toHaveLength(1);
+  });
+
+  it('guardar es guardar: llamarlo otra vez publica igual, sin comparar estados', async () => {
+    // Este caso de uso solo se invoca cuando el usuario guarda un insumo de verdad (su pantalla, o
+    // fijar su precio en la grilla). Nadie lo usa para resolver ids, así que no hay que decidir si
+    // «pasó algo»: si te llaman, pasó.
+    const uc = TestBed.inject(SaveSupply);
+    const { id } = await uc.execute({ name: 'Harina', purchasePrice: aPurchase('g', 5) });
+    const bus = TestBed.inject(EventBus) as RecordingEventBus;
     bus.published.length = 0;
-    await useCase.execute({
-      name: 'Harina',
-      baseUnit: 'g',
-      usage: 'recipe',
-      purchasePrice: aPurchase('g', 8),
+
+    const again = await uc.execute({ id, name: 'Harina', purchasePrice: aPurchase('g', 5) });
+
+    expect(again.id).toBe(id); // la identidad no cambia
+    expect(bus.published.map((e) => e.name)).toEqual(['SupplySaved']);
+  });
+
+  it('cambiar el precio sí publica', async () => {
+    const uc = TestBed.inject(SaveSupply);
+    const { id } = await uc.execute({ name: 'Harina', purchasePrice: aPurchase('g', 5) });
+    const bus = TestBed.inject(EventBus) as RecordingEventBus;
+    bus.published.length = 0;
+
+    await uc.execute({ id, name: 'Harina', purchasePrice: aPurchase('g', 9) });
+
+    expect(bus.published.map((e) => e.name)).toEqual(['SupplySaved']);
+  });
+
+  it('rechaza renombrar con el nombre de OTRO insumo', async () => {
+    const uc = TestBed.inject(SaveSupply);
+    await uc.execute({ name: 'Harina', purchasePrice: aPurchase('g', 5) });
+    const { id } = await uc.execute({ name: 'Azúcar', purchasePrice: aPurchase('g', 4) });
+
+    await expect(
+      uc.execute({ id, name: 'Harina', purchasePrice: aPurchase('g', 4) }),
+    ).rejects.toThrow('Ya existe un insumo con ese nombre');
+  });
+
+  it('conserva el uso del insumo que ya estaba cuando no se manda', async () => {
+    const uc = TestBed.inject(SaveSupply);
+    const { id } = await uc.execute({
+      name: 'Topper estrella',
+      usage: 'topper',
+      purchasePrice: aPurchase('u', 3),
     });
 
-    const stored = await TestBed.inject(SupplyRepository).byId(new EntityId(first.id));
-    expect(stored?.purchasePrice.amount).toBe(8);
-    expect(bus.names()).toEqual(['SupplySaved']);
+    await uc.execute({ id, name: 'Topper estrella', purchasePrice: aPurchase('u', 4) });
+
+    expect((await TestBed.inject(SupplyRepository).byId(new EntityId(id)))?.usage).toBe('topper');
+  });
+
+  it('rechaza cambiar de familia de unidad (g → u) sobre un insumo existente', async () => {
+    const uc = TestBed.inject(SaveSupply);
+    const { id } = await uc.execute({ name: 'Harina', purchasePrice: aPurchase('g', 5) });
+
+    await expect(
+      uc.execute({ id, name: 'Harina', purchasePrice: aPurchase('u', 5) }),
+    ).rejects.toThrow();
+  });
+
+  it('con un id que no existe → lo persiste con ese id', async () => {
+    const { id } = await TestBed.inject(SaveSupply).execute({
+      id: 'IN-NUEVO',
+      name: 'Harina',
+      purchasePrice: aPurchase('g', 5),
+    });
+
+    expect(id).toBe('IN-NUEVO');
+    expect((await TestBed.inject(SupplyRepository).byId(new EntityId('IN-NUEVO')))?.name).toBe(
+      'Harina',
+    );
   });
 });

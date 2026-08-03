@@ -14,8 +14,14 @@ export class RecipeBookFallbackPage {
 
   readonly root = this.page.locator('app-recipe-book-3d');
   readonly title = this.root.getByText('Mi libro de recetas');
-  readonly back = this.root.getByRole('button', { name: 'Volver' });
-  readonly suppliesButton = this.root.getByRole('button', { name: 'Insumos' });
+  /*
+   * Las acciones de la vista se exigen con `exact: true` porque `getByRole` coincide por
+   * SUBCADENA: las filas de receta viven bajo la misma raíz, y una receta llamada «Volver a
+   * empezar» o «Insumos varios» satisfaría el nombre del botón. Con el nombre exacto, el
+   * locator señala la acción y solo la acción.
+   */
+  readonly back = this.root.getByRole('button', { name: 'Volver', exact: true });
+  readonly suppliesButton = this.root.getByRole('button', { name: 'Insumos', exact: true });
 
   /**
    * Todas las cabeceras de categoría, en el orden en que se pintan.
@@ -33,9 +39,15 @@ export class RecipeBookFallbackPage {
     });
   }
 
-  /** Botón `Nuevo` de una categoría → abre el formulario de crear receta ahí. */
+  /**
+   * Botón `Nuevo` de una categoría → abre el formulario de crear receta ahí.
+   *
+   * `exact: true` no es cosmético: las filas de receta de la sección también son `button`, y
+   * `getByRole` coincide por subcadena, así que una receta llamada «Con insumo **nuevo**» haría
+   * que este locator resolviera a dos elementos. Con el nombre exacto solo queda la acción.
+   */
   newRecipeIn(category: CategoryName | string): Locator {
-    return this.category(category).getByRole('button', { name: 'Nuevo' });
+    return this.category(category).getByRole('button', { name: 'Nuevo', exact: true });
   }
 
   /**

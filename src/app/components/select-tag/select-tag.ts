@@ -100,7 +100,8 @@ function parseFactorInput(raw: string): number | null {
  * valor nuevo hay **un único "Añadir"**, que **pregunta a qué grupo** añadirlo y
  * **valida** el valor según ese tipo (`validate`). Si el tipo declara `extraField`,
  * tras elegir el grupo se pide ese dato numérico (p.ej. un factor de escalado) antes
- * de confirmar — al completarse emite `created` para que el consumidor lo persista.
+ * de confirmar. Al completarse emite **`created`** —siempre, declare `extraField` o
+ * no— para que el consumidor lo persista.
  * Presentacional: la validación y los tipos los aporta el consumidor; aquí solo se
  * ejecutan.
  */
@@ -274,8 +275,12 @@ export class SelectTag implements OnDestroy {
   readonly ariaLabel = input('');
 
   readonly valueChange = output<Record<string, string>>();
-  /** Se emite cuando se completa la creación de un valor nuevo con `extraField` (p.ej. persistirlo). */
-  readonly created = output<{ typeKey: string; value: string; extra: number }>();
+  /**
+   * Se emite al completarse la creación de un valor **nuevo**, sea del tipo que sea (p.ej. para
+   * persistirlo). `extra` solo viaja si el tipo declara `extraField`; en los que no lo declaran, se
+   * crea igual y el evento llega sin él.
+   */
+  readonly created = output<{ typeKey: string; value: string; extra?: number }>();
 
   protected readonly positions = POSITIONS;
   private readonly box = viewChild.required<ElementRef<HTMLElement>>('box');
@@ -555,14 +560,13 @@ export class SelectTag implements OnDestroy {
         }
         this.addExtra(option.typeKey!, option.value);
         this.commit(option.typeKey!, option.value);
-        if (type?.extraField) {
-          // El valor ya era un número (p.ej. "33"): se usa directo, sin preguntar nada más.
-          this.created.emit({
-            typeKey: option.typeKey!,
-            value: option.value,
-            extra: Number(option.value),
-          });
-        }
+        // Crear siempre se anuncia; el `extra` solo existe si el tipo lo pide (y aquí el valor ya
+        // era un número —p.ej. "33"—, así que se usa directo sin preguntar nada más).
+        this.created.emit({
+          typeKey: option.typeKey!,
+          value: option.value,
+          ...(type?.extraField ? { extra: Number(option.value) } : {}),
+        });
         break;
       }
     }

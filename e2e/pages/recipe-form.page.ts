@@ -24,10 +24,19 @@ export class RecipeFormPage {
   readonly body = this.root.locator('migo-card-body');
   readonly footer = this.root.locator('migo-card-footer');
 
-  readonly name = this.root.getByLabel('Nombre');
-  readonly save = this.root.getByRole('button', { name: 'Guardar' });
-  readonly cancel = this.root.getByRole('button', { name: 'Cancelar' });
-  readonly close = this.root.getByRole('button', { name: 'Cerrar' });
+  /*
+   * Nombre y acciones, exigidos **exactos**. `getByLabel`/`getByRole` coinciden por subcadena y
+   * bajo esta raíz vive también la grilla de ingredientes: sin `exact`, el día que la grilla
+   * estrene un campo «Nombre del insumo» o un botón «Guardar y cerrar» el locator resolvería a
+   * dos elementos y la suite se caería por un cambio que no rompe nada.
+   *
+   * Ojo: la captura de precio NO cuenta aquí — es un overlay del CDK y vive fuera de
+   * `app-recipe-form`, por eso su `Cancelar` nunca colisiona con este.
+   */
+  readonly name = this.root.getByLabel('Nombre', { exact: true });
+  readonly save = this.root.getByRole('button', { name: 'Guardar', exact: true });
+  readonly cancel = this.root.getByRole('button', { name: 'Cancelar', exact: true });
+  readonly close = this.root.getByRole('button', { name: 'Cerrar', exact: true });
   readonly error = this.root.locator('migo-card-body > div > [role="alert"]');
 
   /**
@@ -113,7 +122,7 @@ class SelectTag {
 
   /** × de un chip elegido. */
   removeChip(type: string, value: string): Locator {
-    return this.root.getByRole('button', { name: `Quitar ${type}: ${value}` });
+    return this.root.getByRole('button', { name: `Quitar ${type}: ${value}`, exact: true });
   }
 
   async open(): Promise<void> {
@@ -156,7 +165,7 @@ class SelectTag {
     if (options?.factor) {
       const extra = this.listbox.locator('input[type="text"]');
       await extra.fill(options.factor);
-      await this.listbox.getByRole('button', { name: 'Confirmar' }).click();
+      await this.listbox.getByRole('button', { name: 'Confirmar', exact: true }).click();
     }
   }
 
