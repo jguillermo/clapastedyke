@@ -12,6 +12,7 @@ import { InputField } from '@components/input/input';
 import { Button } from '@components/button/button';
 import { Badge } from '@components/badge/badge';
 import { Icon } from '@components/icon/icon';
+import { Alert } from '@components/alert/alert';
 import { Logger } from '@core/_common/logger/logger';
 import { GetAuthSettings } from '@core/auth/application/use-cases/get-auth-settings.use-case';
 import { SaveAuthSettings } from '@core/auth/application/use-cases/save-auth-settings.use-case';
@@ -52,6 +53,7 @@ import { WatchSyncStatus } from '@core/external-sync/application/use-cases/watch
     Button,
     Badge,
     Icon,
+    Alert,
   ],
 })
 export class Account implements OnInit {

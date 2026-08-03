@@ -47,7 +47,12 @@ export type MatIconName =
   | 'mat:settings'
   | 'mat:arrow_back'
   | 'mat:layers'
-  | 'mat:edit';
+  | 'mat:edit'
+  | 'mat:check_circle'
+  | 'mat:content_copy'
+  | 'mat:open_in_new'
+  | 'mat:cloud_upload'
+  | 'mat:refresh';
 
 // Iconos propios sin librería externa
 export type CustomIconName = never; // añadir: | 'custom:nombre'
@@ -77,4 +82,14 @@ export const ICON_PATHS: Record<IconName, string> = {
     'M11.99 18.54l-7.37-5.73L3 14.07l9 7 9-7-1.63-1.27-7.38 5.74zM12 16l7.36-5.73L21 9l-9-7-9 7 1.63 1.27L12 16z', // mat · layers
   'mat:edit':
     'M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z', // mat · edit
+  'mat:check_circle':
+    'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z', // mat · check_circle
+  'mat:content_copy':
+    'M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z', // mat · content_copy
+  'mat:open_in_new':
+    'M19 19H5V5h7V3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z', // mat · open_in_new
+  'mat:cloud_upload':
+    'M19.35 10.04A7.49 7.49 0 0 0 12 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 0 0 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z', // mat · cloud_upload
+  'mat:refresh':
+    'M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z', // mat · refresh
 };

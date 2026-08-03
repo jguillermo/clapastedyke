@@ -36,7 +36,7 @@
         </migo-form-field>
 
         @if (settingsSaved()) {
-          <p class="m-0 text-caption text-success" role="status">Configuración guardada.</p>
+          <migo-alert variant="success">Configuración guardada.</migo-alert>
         }
 
         <button migo-button type="submit" variant="secondary" [loading]="busy()">
@@ -74,8 +74,8 @@
           </p>
         }
 
-        @if (actionError()) {
-          <p class="m-0 text-sm font-medium text-error" role="alert">{{ actionError() }}</p>
+        @if (actionError(); as error) {
+          <migo-alert variant="error">{{ error }}</migo-alert>
         }
       </div>
     </migo-card-body>
@@ -122,17 +122,19 @@
 
         @if (status().targetUrl) {
           <a
-            class="inline-flex min-h-11 w-fit items-center font-body text-sm font-semibold text-brand underline"
+            class="inline-flex min-h-11 w-fit items-center gap-1 font-body text-sm font-semibold text-brand underline"
             [href]="status().targetUrl"
             target="_blank"
             rel="noopener noreferrer"
           >
             Abrir la hoja en Google Sheets
+            <!-- Señala que sale de la app: abrir en pestaña nueva sin avisar desorienta. -->
+            <migo-icon name="mat:open_in_new" size="xs" />
           </a>
         }
 
-        @if (status().lastError) {
-          <p class="m-0 text-sm font-medium text-error" role="alert">{{ status().lastError }}</p>
+        @if (status().lastError; as error) {
+          <migo-alert variant="error">{{ error }}</migo-alert>
         }
       </div>
     </migo-card-body>

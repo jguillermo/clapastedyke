@@ -45,6 +45,8 @@ targets táctiles ≥ 44px (`min-h-11`). Detalle en
 | [Checkbox](#checkbox) | `migo-checkbox` | Control booleano | ✅ | ✅ |
 | [Select](#select) | `migo-select` | Control (CDK Overlay+Listbox) | ✅ | ✅ |
 | [Badge](#badge) | `migo-badge` | Presentacional (píldora de característica) | — | ✅ |
+| [Alert](#alert) | `migo-alert` | Presentacional (aviso en línea) | — | ✅ |
+| [CopyField](#copyfield) | `migo-copy-field` | Presentacional (valor + copiar) | — | ✅ |
 | [Table](#table) | `migo-table` | Hoja de cálculo (`<table>` + teclado) | — | ✅ |
 | [SelectTag](#selecttag) | `migo-select-tag` | Etiquetas tipo Select2 (chips + autocompletar) | — | ✅ |
 | [Dialog](#dialog) | `MigoDialog` (servicio) | Servicio (CDK Dialog) | — | ✅ |
@@ -248,6 +250,54 @@ del 4.5:1 de WCAG AA). La jerarquía la marcan el tamaño y el peso, no una manc
 <migo-badge size="xs">Porciones: 40</migo-badge>
 ```
 
+## Alert
+
+`migo-alert` — **aviso en línea**: un mensaje con peso semántico que se queda en la página (a
+diferencia de un toast, que pasa). `variant`: `info` (default) · `success` · `warning` · `error`.
+`heading` es un título opcional; el cuerpo es contenido proyectado.
+
+El **texto va en `text-body`, no en el color de la variante**. El color semántico se reserva al
+icono y al borde: sobre `bg-*-soft`, un `text-error` se queda por debajo del 4.5:1 de WCAG AA.
+
+El **rol ARIA cambia con la urgencia**: `error` (o `assertive`) usa `role="alert"`, que interrumpe
+al lector de pantalla; el resto usa `role="status"`, que espera turno. Un aviso informativo que
+interrumpe molesta tanto como un error que pasa desapercibido.
+
+```html
+<migo-alert variant="error">No se ha podido guardar la receta.</migo-alert>
+
+<migo-alert variant="warning" heading="Falta un paso">
+  Activa la API de Apps Script en tu cuenta y vuelve a intentarlo.
+</migo-alert>
+```
+
+## CopyField
+
+`migo-copy-field` — un valor de **solo lectura que el usuario tiene que llevarse a otro sitio**: una
+URL que pegar en otra pestaña, un identificador que teclear en una consola. `value` es obligatorio;
+`ariaLabel` (para cuando no hay `migo-form-field`) y `copyLabel` son opcionales. Emite `copied` con
+el valor. **No es un `ControlValueAccessor`**: no edita nada.
+
+Se copia con el **`Clipboard` del CDK**, no con `navigator.clipboard`: es síncrono, devuelve
+`boolean` (así hay una rama de fallo real que pintar) y no exige contexto seguro.
+
+**El nombre accesible del botón no cambia al copiar.** Cambiar el nombre de un elemento que tiene el
+foco se anuncia de forma inconsistente entre lectores de pantalla, y duplicaría lo que ya dice la
+región viva. Lo que cambia es el icono; la confirmación va en un `role="status"` aparte.
+
+El `<input readonly>` no es decorativo: da **scroll horizontal** cuando el valor no cabe (crítico a
+375px) y se autoselecciona al enfocarlo, así que **Tab + Cmd/Ctrl+C funciona sin tocar el botón** —
+que es también la salida cuando el portapapeles falla. Por eso es `readonly` y no `disabled`: un
+`disabled` no recibe foco ni se puede seleccionar.
+
+```html
+<migo-copy-field ariaLabel="URL del sincronizador" [value]="webAppUrl()" />
+
+<migo-form-field label="URL del sincronizador" hint="No hace falta que hagas nada con ella.">
+  <migo-copy-field [value]="webAppUrl()" />
+</migo-form-field>
+```
+
 ## Dialog
 
 **Servicio que abre un componente** (`@angular/cdk/dialog`). El Dialog es un shell agnóstico: el
@@ -394,7 +444,8 @@ Pendiente (ningún componente de abajo existe todavía). Orden sugerido por uso 
 - [ ] **Radio / RadioGroup** (`migo-radio-group` + `migo-radio`) — CVA, `@angular/cdk/a11y`.
 - [ ] **Switch / Toggle** (`migo-switch`) — booleano, CVA.
 - [ ] **Spinner / Progress** (`migo-spinner`, `migo-progress-bar`) — estados de carga.
-- [ ] **Alert / Banner** (`migo-alert`) — info/success/warning/error inline (tokens semánticos).
+- [x] **Alert / Banner** (`migo-alert`) — ✅ hecho: aviso en línea info/success/warning/error, con
+      icono por variante y `role` según urgencia (`alert` vs `status`).
 - [ ] **Toast / Snackbar** (servicio `MigoToast` sobre CDK Overlay) — notificaciones efímeras.
 
 ### Prioridad media (navegación / overlays)

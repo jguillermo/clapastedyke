@@ -84,24 +84,46 @@ creado tú a mano.
 
 ---
 
-## 3 · Pantalla de consentimiento OAuth
+## 3 · Google Auth Platform (el consentimiento)
 
-En **APIs y servicios → Pantalla de consentimiento de OAuth**:
+> **Google renombró esta pantalla.** Lo que antes era «Pantalla de consentimiento de OAuth» ahora se
+> llama **Google Auth Platform** y está partido en secciones: *Overview · Branding · Audience ·
+> Clients · Data Access · Verification Center · Settings*. Es lo mismo, con otros nombres. Abajo va
+> la equivalencia.
 
-1. Tipo de usuario: **Externo**.
-2. Datos de la app: nombre (el que verá el usuario al conectar), correo de asistencia y correo de
-   contacto. El logo es opcional.
-3. **Permisos (scopes)** — añade exactamente estos cuatro:
+Si es un proyecto nuevo verás **«Google Auth Platform not configured yet»** y un botón **Get
+started**. Te pedirá cuatro cosas seguidas:
 
-   | Scope                                            | Para qué                                    |
-   | ------------------------------------------------ | ------------------------------------------- |
-   | `openid`                                          | identificar la cuenta de forma estable      |
-   | `.../auth/userinfo.email`                         | saber a qué correo pertenece la hoja        |
-   | `.../auth/userinfo.profile`                       | mostrar el nombre en la pantalla de cuenta  |
-   | `https://www.googleapis.com/auth/drive.file`      | crear y escribir **solo** la hoja de la app |
+1. **App name** — el nombre que verá el usuario al conectar (p. ej. `Clapastedyke`).
+2. **User support email** — tu correo.
+3. **Audience** → **External**. (*Internal* solo existe con Google Workspace y limitaría la app a tu
+   organización.)
+4. **Contact information** — tu correo. Aceptas la política y **Create**.
 
-4. **Usuarios de prueba**: mientras la app esté en modo *Prueba*, añade aquí el correo de cada
-   persona que vaya a usarla (máximo 100). Quien no esté en la lista verá un error al conectar.
+Después, dos secciones:
+
+### `Data Access` — los permisos (antes «Permisos / scopes»)
+
+**Add or remove scopes**. Los de identidad salen en la lista; `drive.file` puede que no, así que usa
+la caja **«Manually add scopes»** y pega estos cuatro:
+
+| Scope                                        | Para qué                                    |
+| -------------------------------------------- | ------------------------------------------- |
+| `openid`                                      | identificar la cuenta de forma estable      |
+| `.../auth/userinfo.email`                     | saber a qué correo pertenece la hoja        |
+| `.../auth/userinfo.profile`                   | mostrar el nombre en la pantalla de cuenta  |
+| `https://www.googleapis.com/auth/drive.file`  | crear y escribir **solo** la hoja de la app |
+
+> **Si un scope no aparece, falta el paso 2.** Los permisos de una API solo se ofrecen cuando esa
+> API está habilitada en el proyecto. Comprueba Sheets y Drive en *APIs y servicios → Biblioteca*.
+
+**Estos cuatro y ninguno más.** Cada scope extra es una casilla más que el usuario tiene que marcar
+en la pantalla de consentimiento. Con estos cuatro ve **una sola**: la de Drive.
+
+### `Audience` — los usuarios de prueba
+
+Baja a **Test users → Add users** y añade el correo de cada persona que vaya a usarla (máximo 100).
+**Quien no esté en la lista verá un error al conectar**, aunque todo lo demás esté bien.
 
 > **¿Hay que publicar la app?** Solo si van a usarla más de 100 personas o no quieres ir añadiendo
 > correos. Al publicar, Google muestra una pantalla de «app no verificada» que el usuario puede
@@ -111,22 +133,31 @@ En **APIs y servicios → Pantalla de consentimiento de OAuth**:
 
 ## 4 · Client ID de OAuth
 
-En **APIs y servicios → Credenciales → Crear credenciales → ID de cliente de OAuth**:
+Ahora está en **Google Auth Platform → `Clients` → Create client** (antes: *APIs y servicios →
+Credenciales → Crear credenciales*).
 
-1. Tipo de aplicación: **Aplicación web**.
-2. **Orígenes de JavaScript autorizados** — añade uno por cada sitio desde el que se abra la app:
+1. **Application type**: **Web application**.
+2. **Authorized JavaScript origins** — uno por cada sitio desde el que se abra la app:
 
    ```
    http://localhost:4200          ← desarrollo (ng serve y los E2E)
+   http://127.0.0.1:4200          ← el mismo servidor por la otra vía; ver abajo
    https://TU-USUARIO.github.io   ← la demo publicada
    ```
 
-   > Es el **origen**, sin ruta: `https://tu-usuario.github.io`, **no**
+   > **Es el origen, sin ruta**: `https://tu-usuario.github.io`, **no**
    > `https://tu-usuario.github.io/clapastedyke/`. Con la ruta incluida, Google rechaza el formulario
-   > o la conexión falla con un error de origen.
+   > o la conexión falla.
+   >
+   > **`localhost` y `127.0.0.1` son orígenes DISTINTOS para Google**, aunque sean la misma máquina.
+   > Los servidores locales suelen imprimir las dos URLs al arrancar; si registras una y abres la
+   > otra, sale `Error 400: origin_mismatch`. Lo cómodo es registrar las dos.
+   >
+   > Y ojo con el **puerto**: si 4200 está ocupado, muchos servidores estáticos cogen otro sin
+   > avisar. Para salir de dudas, en la consola del navegador: `location.origin` — eso, carácter por
+   > carácter, es lo que tiene que estar registrado.
 
-3. **URIs de redirección autorizados**: ninguno. El modelo de token de Google Identity Services no
-   los usa.
+3. **Authorized redirect URIs**: ninguno. El modelo de token de Google Identity Services no los usa.
 4. Copia el **Client ID** (acaba en `.apps.googleusercontent.com`). Lo necesitas dos veces: en el
    paso 6 y en el paso 8.
 
