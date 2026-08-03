@@ -89,7 +89,8 @@ export class RecipeBook3dPage {
    * orden alfabético, así que basta con pasar páginas hacia adelante.
    *
    * Se pasa página a mano (y no se salta desde el índice) para ejercitar la navegación real del
-   * libro; el salto desde el índice se cubre en `specs/recipe-book/book-3d/index-panel.spec.ts`.
+   * libro; el salto desde el índice se cubre en `specs/recipe-book/book-3d/book-3d.spec.ts` y se
+   * reutiliza dentro de un journey con {@link jumpToRecipe}.
    */
   async goToRecipe(name: string): Promise<void> {
     const target = this.page
@@ -103,6 +104,25 @@ export class RecipeBook3dPage {
       }
       await this.goNext();
     }
+    await expect(target.first()).toBeVisible();
+  }
+
+  /**
+   * Salta a la página de una receta **desde el índice**, sin depender de dónde esté el libro.
+   *
+   * {@link goToRecipe} solo avanza, así que dentro de un journey que visita varias recetas la
+   * segunda podría quedar por detrás y no alcanzarse nunca. El salto por índice es
+   * bidireccional y es la navegación que el propio usuario tiene para eso (su mecánica se
+   * cubre en `book-3d.spec.ts`).
+   */
+  async jumpToRecipe(name: string): Promise<void> {
+    await this.indexToggle.click();
+    await expect(this.indexPanel).toBeVisible();
+    await this.indexRecipe(name).click();
+    await expect(this.indexPanel).toHaveCount(0);
+    const target = this.page
+      .locator('app-recipe-overlay')
+      .filter({ has: this.page.getByRole('heading', { level: 2, name, exact: true }) });
     await expect(target.first()).toBeVisible();
   }
 

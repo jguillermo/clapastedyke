@@ -2,18 +2,23 @@ import { test, expect } from '../../../fixtures/app-fixture';
 import { RECIPES, SUPPLIES } from '../../../support/seed';
 
 /**
- * Flujo completo de **editar receta**: el formulario es el mismo que el de crear,
- * precargado con nombre, líneas y características. Cada test acaba con el cambio
- * proyectado de vuelta en la lista (o comprobado al reabrir el formulario).
+ * Edición de recetas: el formulario es el mismo que el de crear, precargado con nombre, líneas
+ * y características. Dos journeys, un arranque cada uno — uno sobre el nombre y las líneas,
+ * otro sobre las características y la categoría fija.
+ *
+ * Cada cambio se cierra releyéndolo (lista o formulario reabierto), nunca en el estado
+ * intermedio de «se escribió en el campo».
  */
 test.describe('Formulario de receta · editar', () => {
-  test('receta existente → renombrar → guardar → la lista muestra el nombre nuevo', async ({
+  test('renombrar una receta → guardar → la lista muestra el nombre nuevo → editar cantidades, añadir y quitar líneas → guardar → todo persiste al reabrir', async ({
     openCatalog,
     catalog,
     form,
+    grid,
   }) => {
     await openCatalog();
 
+    // Renombrar: la lista cambia, pero no gana ni pierde recetas.
     await catalog.recipe('Queques', 'Keke de Limón').click();
     await form.waitReady();
     await form.name.fill('Keke de Limón renombrado E2E');
@@ -24,56 +29,24 @@ test.describe('Formulario de receta · editar', () => {
     expect(names).toContain('Keke de Limón renombrado E2E');
     expect(names).not.toContain('Keke de Limón');
     expect(names).toHaveLength(RECIPES.Queques.length);
-  });
 
-  test('receta existente → editar la cantidad de una línea → guardar → se conserva al reabrir', async ({
-    openCatalog,
-    catalog,
-    form,
-    grid,
-  }) => {
-    await openCatalog();
-
+    // Cambiar una cantidad y añadir una línea nueva (el seed trae una sola).
     await catalog.recipe('Rellenos', 'Manjar Blanco').click();
     await form.waitReady();
     await grid.quantityInput(0).fill('777');
+    await grid.fillExistingLine(1, SUPPLIES.huevos.name, '4');
     await form.save.click();
     await form.waitClosed();
 
     await catalog.recipe('Rellenos', 'Manjar Blanco').click();
     await form.waitReady();
     await expect(grid.quantityInput(0)).toHaveValue('777');
-  });
-
-  test('receta existente → añadir una línea nueva → guardar → la receta queda con una línea más', async ({
-    openCatalog,
-    catalog,
-    form,
-    grid,
-  }) => {
-    await openCatalog();
-
-    await catalog.recipe('Rellenos', 'Manjar Blanco').click();
-    await form.waitReady();
-    const filledRows = 1; // el seed de esta receta trae una sola línea
-    await grid.fillExistingLine(filledRows, SUPPLIES.huevos.name, '4');
-    await form.save.click();
-    await form.waitClosed();
-
-    await catalog.recipe('Rellenos', 'Manjar Blanco').click();
-    await form.waitReady();
     await expect(grid.nameInput(1)).toHaveValue(SUPPLIES.huevos.name);
     await expect(grid.quantityInput(1)).toHaveValue('4');
-  });
+    await form.cancel.click();
+    await form.waitClosed();
 
-  test('receta existente → quitar una línea → guardar → la línea ya no está al reabrir', async ({
-    openCatalog,
-    catalog,
-    form,
-    grid,
-  }) => {
-    await openCatalog();
-
+    // Quitar una línea: las de abajo suben y la receta se guarda con una menos.
     await catalog.recipe('Coberturas', 'Ganache de Chocolate').click();
     await form.waitReady();
     const firstName = await grid.nameInput(0).inputValue();
@@ -91,14 +64,22 @@ test.describe('Formulario de receta · editar', () => {
     expect(await grid.nameInput(1).inputValue()).toEqual('');
   });
 
-  test('receta con características → quitar el sabor → guardar → su badge desaparece', async ({
+  test('la categoría es fija y no se ofrece cambiarla → añadir un sabor → guardar → su badge aparece → quitarlo → guardar → la fila se queda sin badges', async ({
     openCatalog,
     catalog,
     form,
   }) => {
     await openCatalog();
 
-    // Primero se le pone un sabor (el seed no trae ninguno).
+    // El formulario solo tiene Nombre y Características: no hay control de categoría.
+    await catalog.recipe('Coberturas', 'Fudge de Chocolate').click();
+    await form.waitReady();
+    await expect(form.subtitle).toHaveText('Coberturas');
+    await expect(form.fieldLabels).toHaveText(['Nombre', 'Características (opcional)']);
+    await form.cancel.click();
+    await form.waitClosed();
+
+    // El seed no trae sabor: primero se pone…
     await catalog.recipe('Queques', 'Vainilla Clásica').click();
     await form.waitReady();
     await form.properties.pick('Sabor', 'Vainilla');
@@ -106,7 +87,7 @@ test.describe('Formulario de receta · editar', () => {
     await form.waitClosed();
     await expect(catalog.recipe('Queques', 'Vainilla Clásica')).toContainText('Sabor: Vainilla');
 
-    // Y luego se le quita.
+    // …y luego se quita, que es el caso que de verdad puede romperse.
     await catalog.recipe('Queques', 'Vainilla Clásica').click();
     await form.waitReady();
     await form.properties.removeChip('Sabor', 'Vainilla').click();
@@ -115,23 +96,5 @@ test.describe('Formulario de receta · editar', () => {
     await form.waitClosed();
 
     await expect(catalog.recipeBadges('Queques', 'Vainilla Clásica')).toHaveCount(0);
-  });
-
-  test('editar receta → cambiar de categoría no se ofrece (la categoría es fija)', async ({
-    openCatalog,
-    catalog,
-    form,
-  }) => {
-    await openCatalog();
-
-    await catalog.recipe('Coberturas', 'Fudge de Chocolate').click();
-    await form.waitReady();
-
-    await expect(form.subtitle).toHaveText('Coberturas');
-    // No hay control de categoría: solo Nombre y Características.
-    await expect(form.fieldLabels).toHaveText(['Nombre', 'Características (opcional)']);
-
-    await form.cancel.click();
-    await form.waitClosed();
   });
 });

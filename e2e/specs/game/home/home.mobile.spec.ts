@@ -1,13 +1,21 @@
 import { test, expect } from '../../../fixtures/app-fixture';
 
 /**
- * Regla dura mobile-first verificada a **375px** sobre la vista de la cocina: nada
- * desborda en horizontal, el dock cabe y todo target táctil mide ≥ 44px.
+ * Regla dura mobile-first verificada a **375px** sobre la cocina: nada desborda en horizontal,
+ * el dock cabe con targets ≥ 44px, el viewport bloquea el zoom (excepción aceptada de AXE) y el
+ * flujo completo se opera al toque.
+ *
+ * Un solo journey: se mide la vista y, sin volver a arrancar, se entra al libro y se vuelve.
  */
-test.describe('Home 3D · móvil 375px', () => {
+test.describe('Cocina · móvil 375px', () => {
   test.use({ webgl: true });
 
-  test('mundo cargado a 375px → no hay desbordamiento horizontal', async ({ openHome, page }) => {
+  test('cocina a 375px → sin desbordamiento, dock táctil y zoom bloqueado → toque en la estación abre el libro → Volver → vuelve la cocina', async ({
+    openHome,
+    home,
+    book,
+    page,
+  }) => {
     await openHome();
 
     const [scrollWidth, innerWidth] = await page.evaluate(() => [
@@ -15,16 +23,12 @@ test.describe('Home 3D · móvil 375px', () => {
       window.innerWidth,
     ]);
     expect(scrollWidth).toBeLessThanOrEqual(innerWidth);
-  });
 
-  test('dock a 375px → cabe en el viewport y sus targets miden ≥ 44px', async ({
-    openHome,
-    home,
-    page,
-  }) => {
-    await openHome();
+    const viewportMeta = await home.viewportContent();
+    expect(viewportMeta).toContain('user-scalable=no');
+    expect(viewportMeta).toContain('maximum-scale=1');
+
     await expect(home.dock).toBeVisible();
-
     const viewport = page.viewportSize()!;
     const dock = (await home.dock.boundingBox())!;
     expect(dock.x).toBeGreaterThanOrEqual(0);
@@ -35,25 +39,6 @@ test.describe('Home 3D · móvil 375px', () => {
       const box = (await home.stations.nth(i).boundingBox())!;
       expect(box.height, `estación ${i} debe cumplir el target táctil`).toBeGreaterThanOrEqual(44);
     }
-  });
-
-  test('viewport bloqueado → sin zoom del usuario (excepción aceptada de AXE)', async ({
-    home,
-    openHome,
-  }) => {
-    await openHome();
-
-    const viewportMeta = await home.viewportContent();
-    expect(viewportMeta).toContain('user-scalable=no');
-    expect(viewportMeta).toContain('maximum-scale=1');
-  });
-
-  test('toque en la estación a 375px → se abre el libro → Volver → vuelve la cocina', async ({
-    openHome,
-    home,
-    book,
-  }) => {
-    await openHome();
 
     await home.station('Libro de recetas').tap();
     await book.waitReady();

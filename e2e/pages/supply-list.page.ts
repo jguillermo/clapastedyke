@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page } from '@playwright/test';
+import type { UnitKey } from './supply-grid.page';
 
 /**
  * Page object de `features/recipe-book/supply-list` (`app-supply-list`): la hoja
@@ -59,16 +60,40 @@ export class SupplyListPage {
   }
 
   /**
-   * Crea un insumo en el renglón de agregar y confirma con Enter. Termina cuando la
-   * fila se ha guardado (aparece la marca de comprobación).
+   * Espera a que un alta haya **aterrizado**: el componente da id a la fila guardada y deja
+   * arriba un renglón de agregar nuevo y vacío.
+   *
+   * **No se espera por {@link addedMark}, y es importante.** La marca es un único
+   * `recentlyAddedId` que se mueve de fila y se borra a los 2.5 s: al encadenar altas, la del
+   * alta anterior sigue en pantalla cuando empieza la siguiente, así que esperar por ella se
+   * satisface al instante y se vuelve **antes** de que la fila se haya guardado — el alta
+   * siguiente pisa el renglón y se pierde. Que el renglón de agregar esté vacío otra vez sí es
+   * inequívoco.
    */
-  async addSupply(name: string, packaging: string, price: string): Promise<void> {
+  async waitAdded(): Promise<void> {
+    await expect(this.nameInput(SupplyListPage.ADD_ROW)).toHaveValue('');
+  }
+
+  /**
+   * Crea un insumo en el renglón de agregar y confirma con Enter. Termina cuando la fila se ha
+   * guardado de verdad (ver {@link waitAdded}).
+   *
+   * `unit` fija la unidad del empaque pulsando su inicial (`k`/`g`/`u`): el `migo-unit-input` la
+   * lee en keydown, así que escribirla dentro del texto no sirve.
+   */
+  async addSupply(name: string, packaging: string, price: string, unit?: UnitKey): Promise<void> {
     const row = SupplyListPage.ADD_ROW;
     await this.nameInput(row).fill(name);
     await this.packagingInput(row).fill(packaging);
+    if (unit) {
+      // Se espera a que el valor aterrice antes de la tecla: si la pulsación adelanta al `fill`,
+      // el control resuelve la unidad con el valor viejo (fuente de intermitencias).
+      await expect(this.packagingInput(row)).toHaveValue(packaging);
+      await this.packagingInput(row).press(unit);
+    }
     await this.priceInput(row).fill(price);
     await this.priceInput(row).press('Enter');
-    await expect(this.addedMark).toBeVisible();
+    await this.waitAdded();
   }
 
   /**

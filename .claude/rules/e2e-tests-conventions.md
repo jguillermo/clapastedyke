@@ -3,9 +3,9 @@
 Applies to **todo** el testing end-to-end del proyecto, que vive **exclusivamente** en la carpeta
 `e2e/` de la raíz.
 
-## CRITICAL: todos los E2E viven en `e2e/` y prueban `src/app/features`
+## CRITICAL: todos los E2E viven en `e2e/`, prueban `src/app/features` y son journeys completos
 
-Dos reglas duras, sin excepción:
+Tres reglas duras, sin excepción:
 
 1. **Ubicación única — `e2e/`.** No hay E2E en `src/`, ni junto al componente, ni en ninguna otra
    carpeta de tests: **la carpeta `tests/` de la raíz no existe y no debe volver a crearse.** Todo
@@ -15,11 +15,66 @@ Dos reglas duras, sin excepción:
    ruta del usuario (`/home` → estación → diálogo → dato guardado). Los componentes del design
    system (`src/app/components/`) **no** se prueban aquí: su cobertura por estado/variante es el
    `play` de su `*.stories.ts` (ver [components-conventions.md](components-conventions.md)).
+3. **Forma única — el journey completo.** Un test **no** es un caso de uso: es un **recorrido
+   largo** que encadena varios casos en una sola sesión (poner un dato mal → intentar guardar →
+   ver el error → corregirlo → guardar → comprobar el resultado → seguir con el caso siguiente).
+   **Está prohibido el test de una sola comprobación.** Ver
+   [«Journeys completos»](#critical-un-test--un-journey-no-un-caso-de-uso).
 
 > **Cuando se pida "crear tests E2E", se crean SIEMPRE con la forma de esta regla**: un spec bajo
 > `e2e/specs/<área>/<vista>/`, usando los **page objects** de `e2e/pages/` y el **fixture** de
 > `e2e/fixtures/app-fixture.ts`. Nunca un spec suelto con `page.locator(...)` a pelo, nunca un
 > `playwright.config.ts` nuevo, nunca una carpeta de tests paralela.
+
+## CRITICAL: un test = un journey, no un caso de uso
+
+**Lo caro de un E2E no es la interacción: es el arranque.** Cada test recibe de Playwright un
+contexto de navegador nuevo, y eso significa rehacer entero el camino más lento que hay —
+levantar el navegador, bootstrap de Angular, sembrar IndexedDB, montar la vista (y, con
+`webgl: true`, además el motor 3D). Comprobar un botón cuesta milisegundos; llegar hasta él,
+segundos. **Partir un flujo en tests pequeños no añade cobertura: multiplica arranques.**
+
+Por eso la unidad de test es el **journey**: un test arranca la app **una vez** y recorre dentro
+de esa misma sesión todos los casos que compartan punto de partida.
+
+```typescript
+// MAL — tres tests, tres arranques, cero cobertura extra
+test('Guardar está deshabilitado sin nombre', async ({ openCatalog, catalog, form }) => { … });
+test('con nombre se habilita', async ({ openCatalog, catalog, form }) => { … });
+test('sin insumos avisa', async ({ openCatalog, catalog, form }) => { … });
+
+// BIEN — un arranque, el camino entero, con su error y su corrección
+test('Nuevo en Queques → Guardar deshabilitado → nombre válido → Guardar sin insumos avisa → añadir insumo → guardar → aparece listada', async ({
+  openCatalog, catalog, form, grid,
+}) => {
+  await openCatalog();                                   // ← el único arranque del test
+  await catalog.newRecipeIn('Queques').click();
+  await form.waitReady();
+  await expect(form.save).toBeDisabled();                // caso 1
+  await form.name.fill('Bizcocho E2E');
+  await expect(form.save).toBeEnabled();                 // caso 2
+  await form.save.click();
+  await expect(grid.error).toHaveText('Agrega al menos un ingrediente.');   // caso 3
+  await grid.fillExistingLine(0, SUPPLIES.harina.name, '200');
+  await form.save.click();
+  await form.waitClosed();
+  await expect(catalog.recipe('Queques', 'Bizcocho E2E')).toBeVisible();    // terminal
+});
+```
+
+### Cómo se encadena sin volverlo frágil
+
+| Regla | Por qué |
+|---|---|
+| **Encadena por punto de partida, no por tema.** Todo lo que se prueba desde el catálogo abierto va en el mismo journey. | Cada punto de partida distinto es un arranque distinto. |
+| **Ordena los casos según lo que escriben.** Primero los que **no** persisten (validaciones, cancelar, medir el layout), después los que sí. | El estado inicial del caso *n+1* es lo que dejó el caso *n*; el seed intacto solo existe al principio. |
+| **Cada caso termina en su estado terminal antes de empezar el siguiente.** Diálogo cerrado (`waitClosed()`), dato releído, vista de vuelta. | Un caso que arranca sobre un overlay a medio cerrar es una intermitencia, no un test. |
+| **Si un caso deja la app en un sitio impredecible, va el último.** Escape sobre overlays anidados es el ejemplo: cierra el popover y *a veces* también el diálogo y el libro. | Así no hace falta normalizar el estado (recargar) en mitad del journey. |
+| **Datos propios por caso** (`'… E2E'` en cada nombre) cuando el caso escribe. | Dos casos que pelean por la misma receta se estorban. |
+| **Un journey que ya no cabe en la cabeza se parte por punto de partida**, nunca por aserción. | El límite es la legibilidad, no el número de `expect`. |
+
+Los comentarios dentro del test marcan dónde empieza cada caso. Eso es lo que sustituye a tener
+un `test()` por caso: se lee igual de bien y cuesta un arranque en vez de seis.
 
 ## Estructura de `e2e/`
 
@@ -40,18 +95,19 @@ e2e/
 ```
 
 `specs/` **espeja la estructura de `src/app/features/`**: una carpeta por área, una por vista, y un
-fichero por **grupo de casos** (no por componente ni por elemento).
+fichero por **eje del flujo** (no por componente, no por elemento y **no por caso**). Dentro de cada
+fichero hay **uno o dos journeys**, no una lista de comprobaciones.
 
 | Feature | Specs |
 |---|---|
-| `features/game/home/` | `specs/game/home/*.spec.ts` |
-| `features/recipe-book/book-3d/` | `specs/recipe-book/book-3d/*.spec.ts` (3D) + `specs/recipe-book/fallback/*.spec.ts` (sin WebGL) |
-| `features/recipe-book/book-3d/recipe-overlay/` | `specs/recipe-book/recipe-overlay/*.spec.ts` |
-| `features/recipe-book/recipe-form/` | `specs/recipe-book/recipe-form/*.spec.ts` |
-| `features/recipe-book/_shared/supply-grid/` | `specs/recipe-book/supply-grid/*.spec.ts` |
-| `features/recipe-book/_shared/price-capture/` | `specs/recipe-book/price-capture/*.spec.ts` |
-| `features/recipe-book/supply-list/` | `specs/recipe-book/supply-list/*.spec.ts` |
-| `features/recipe-book/supplies-dialog/` | `specs/recipe-book/supplies-dialog/*.spec.ts` |
+| `features/game/home/` | `specs/game/home/home-3d.spec.ts` (con WebGL) · `home-dom.spec.ts` (ruta accesible) · `home.mobile.spec.ts` |
+| `features/recipe-book/book-3d/` | `specs/recipe-book/book-3d/*.spec.ts` (3D) + `specs/recipe-book/fallback/catalog*.spec.ts` (sin WebGL) |
+| `features/recipe-book/book-3d/recipe-overlay/` | `specs/recipe-book/recipe-overlay/recipe-overlay.spec.ts` |
+| `features/recipe-book/recipe-form/` | `specs/recipe-book/recipe-form/{create-recipe,edit-recipe,dismiss}.spec.ts` + su `.mobile` |
+| `features/recipe-book/_shared/supply-grid/` | `specs/recipe-book/supply-grid/supply-grid.spec.ts` |
+| `features/recipe-book/_shared/price-capture/` | `specs/recipe-book/price-capture/price-capture.spec.ts` |
+| `features/recipe-book/supply-list/` | `specs/recipe-book/supply-list/supply-list.spec.ts` |
+| `features/recipe-book/supplies-dialog/` | `specs/recipe-book/supplies-dialog/supplies-dialog.spec.ts` + su `.mobile` |
 
 **Toda feature nueva estrena su carpeta de specs en el mismo PR que la crea.** No es opcional: una
 feature sin E2E se considera incompleta.
@@ -234,7 +290,9 @@ No se duplica la suite entera en móvil: un spec móvil por vista con lo que **c
 
 ## Core principle: flujos completos, no estados intermedios
 
-**Un test de flujo completo siempre vale más que un test de estado intermedio.**
+**Un test de flujo completo siempre vale más que un test de estado intermedio.** Es la otra cara de
+[«un test = un journey»](#critical-un-test--un-journey-no-un-caso-de-uso): además de encadenar
+varios casos por sesión, **cada** caso llega hasta su final.
 
 Un estado intermedio (apareció un botón, se abrió un modal, hay un spinner) solo prueba que un paso
 funcionó — no dice nada de si la feature sirve. Cada test empieza en el **punto de entrada del
@@ -300,7 +358,9 @@ Antes de escribir los tests de una vista, se mapea su **máquina de estados**:
 2. **Leer los `output()` y sus handlers en el consumidor** — definen qué es un estado terminal
    *en ese contexto* (p.ej. `(closed)="showBook.set(false)"` → terminal = libro desmontado).
 3. **Enumerar cada camino** desde la entrada hasta un terminal.
-4. **Un test por camino.**
+4. **Agrupar los caminos que comparten punto de partida en un journey** y ordenarlos según lo que
+   escriben (primero los que no persisten). **No** se hace un test por camino: eso es justo lo que
+   prohíbe [«un test = un journey»](#critical-un-test--un-journey-no-un-caso-de-uso).
 
 Ejemplo — `RecipeForm` abierto desde el libro:
 
@@ -344,8 +404,11 @@ Cuando se pida "validar" o "revisar" un spec contra estas convenciones:
 | Ubicación | ¿Está bajo `e2e/specs/<área>/<vista>/`, espejando `src/app/features/`? |
 | Fixture | ¿Importa `test`/`expect` de `fixtures/app-fixture`? |
 | Page objects | ¿Cero `page.locator(...)`/selectores crudos en el spec? |
-| Flujo completo | ¿El `expect` final asserta un estado terminal, no intermedio? |
-| Naming | ¿Usa `→` y describe el camino, no un elemento? |
+| **Journey** | ¿El test encadena **varios casos** en un solo arranque, o es un caso suelto que debería fusionarse con otro del mismo punto de partida? |
+| **Un arranque** | ¿Hay un único `openX()`/`goto()` por test (salvo una normalización documentada al final)? |
+| Flujo completo | ¿Cada caso del journey acaba en un estado terminal, y el `expect` final también? |
+| Orden | ¿Los casos que no persisten van antes que los que escriben, y lo impredecible al final? |
+| Naming | ¿Usa `→` y describe el camino entero, no un elemento? |
 | Sincronización | ¿Aserciones web-first, sin `waitForTimeout` como espera? |
 | Semántica | ¿Locators por rol/ARIA, sin clases de utilidad? |
 
