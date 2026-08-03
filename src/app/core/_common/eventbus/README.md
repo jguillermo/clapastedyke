@@ -281,20 +281,29 @@ siguiente tick. Si ves registros acumulados, hay un suscriptor fallando.
 
 ## Tests
 
-Tres specs, dentro del propio paquete:
+**Un solo fichero, el paquete entero**: [`eventbus.spec.ts`](eventbus.spec.ts), dentro del propio
+paquete —como el resto de él, se lleva tal cual a otro sitio—. Ocho bloques, uno por pieza:
 
-- `persistent-event-bus.spec.ts` — los cuatro pasos, el orden, el objeto compartido, los reintentos
-  por suscriptor y la supervivencia a un reinicio. Corre contra una **cola falsa declarada en el
-  propio fichero**, no contra IndexedDB: lo que se verifica es el reparto, y eso no depende de dónde
-  esté guardada la cola.
-- `on-event.spec.ts` — el decorador: qué anota, que dispara el caso de uso, que **apilarlo lanza**,
-  que una subclase no hereda la suscripción y que una excepción sube al bus.
-- `trace-events.use-case.spec.ts` — que el trazador cubre el catálogo **entero** (si alguien lo
-  cambia por una lista escrita a mano, falla) y qué deja en consola.
+| Bloque | Qué fija |
+|---|---|
+| `DomainEvent` | La hora sellada al crear, el payload copiado y congelado, y que `restoreEvent` **no** re-sella la hora |
+| `EventDispatcher · propagación` | A quién llega y a quién no, el orden, saltarse a quien ya lo tiene, y que un suscriptor roto no arrastra a los demás |
+| `EventWriter + EventReader · la cola` | El registro que se guarda, el id acolchado, el turno que **sobrevive a la recarga**, el FIFO por índice y el fallo traducido con su `cause` |
+| `EventDatabase · apertura` | Que abre **su** base de datos, crea el store con su índice, reutiliza la conexión y traduce el error de apertura |
+| `PersistentEventBus · los cuatro pasos` | Publicar es guardar; el reparto, el orden, el borrado, el reintento por suscriptor, la invariante de «nunca dos a la vez» y la durabilidad |
+| `@OnEvent` / `provideEventHandlers()` | Qué anota el decorador, que **apilarlo lanza**, la construcción perezosa y que una excepción sube al bus |
+| `TraceEvents` | Que traza el catálogo **entero** (si alguien lo cambia por una lista a mano, falla) y qué deja escrito |
+| `provideEventBus() · cableado` | El puerto resuelto, el app-initializer que arranca el reparto y el camino completo publicar → trazar → reaccionar → borrar |
 
-`EventDatabase`, `EventWriter` y `EventReader` no tienen test unitario: son CRUD de IndexedDB sin
-lógica, y se ejercitan desde los E2E (ver
-[`unit-tests-conventions.md`](../../../../../.claude/rules/unit-tests-conventions.md)).
+**Lo único falso es IndexedDB.** Un doble en memoria con forma de IndexedDB (transacciones con modo,
+store por clave, índice `seq`) declarado en el propio fichero; encima corre el código de producción
+—`EventWriter` y `EventReader` incluidos—, así que lo que se prueba es el bus de verdad.
+
+**El registro es parte del contrato y se afirma línea por línea.** Un evento sin suscriptor es
+invisible: el test comprueba que el bus escribe qué encoló, que el repartidor escribe
+`evento → suscriptor` y el **«no lo escucha nadie»**, y que un fallo va con la causa en **su propia
+ranura** (no anidada en el contexto). Para eso el fichero declara su propio `LogSpy` — el `Logger`
+real escribe y ya está: no guarda, no acumula, no se consulta.
 
 ---
 
