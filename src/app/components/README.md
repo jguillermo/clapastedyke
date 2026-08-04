@@ -47,6 +47,8 @@ targets táctiles ≥ 44px (`min-h-11`). Detalle en
 | [Badge](#badge) | `migo-badge` | Presentacional (píldora de característica) | — | ✅ |
 | [Alert](#alert) | `migo-alert` | Presentacional (aviso en línea) | — | ✅ |
 | [CopyField](#copyfield) | `migo-copy-field` | Presentacional (valor + copiar) | — | ✅ |
+| [CodeBlock](#codeblock) | `migo-code-block` | Presentacional (texto largo + copiar) | — | ✅ |
+| [Checklist](#checklist) | `migo-checklist` | Presentacional (pasos que se van marcando) | — | ✅ |
 | [Table](#table) | `migo-table` | Hoja de cálculo (`<table>` + teclado) | — | ✅ |
 | [SelectTag](#selecttag) | `migo-select-tag` | Etiquetas tipo Select2 (chips + autocompletar) | — | ✅ |
 | [Dialog](#dialog) | `MigoDialog` (servicio) | Servicio (CDK Dialog) | — | ✅ |
@@ -296,6 +298,59 @@ que es también la salida cuando el portapapeles falla. Por eso es `readonly` y 
 <migo-form-field label="URL del sincronizador" hint="No hace falta que hagas nada con ella.">
   <migo-copy-field [value]="webAppUrl()" />
 </migo-form-field>
+```
+
+## CodeBlock
+
+`migo-code-block` — el **hermano largo de `migo-copy-field`**: aquel es un `<input>` de una línea para
+un valor suelto; este es un `<pre>` con scroll para cientos de líneas, y su razón de ser es el botón
+de copiar (nadie selecciona 900 líneas a mano en un móvil). `code` es obligatorio; `label` nombra el
+bloque (y es el nombre accesible de la región), `copyLabel`, `emptyLabel` y `open` son opcionales.
+Emite `copied` con el texto.
+
+**Viene plegado**: un script entero empujaría el resto de la página fuera de la pantalla. Con más de
+12 líneas aparece «Ver entero»; copiar funciona igual esté plegado o no. `open` lo deja desplegado y
+sin ventana de altura, para bloques de tres líneas.
+
+`code` vacío no es un fallo que ocultar: se pinta `emptyLabel`. Es el estado de un fichero que no se
+pudo leer, y la pantalla debe poder contarlo.
+
+El `<pre>` es `role="region"` y `tabindex="0"`: un bloque con scroll propio al que no se llega con el
+teclado es una trampa (WCAG 2.1.1). Usa `font-mono`, la única tipografía del tema que no es de marca
+— es texto para copiar, donde importa distinguir `0`/`O` y `l`/`1`.
+
+```html
+<migo-code-block label="Code.gs" [code]="setup().script" (copied)="onCopied()" />
+<migo-code-block label="appsscript.json" [code]="setup().manifest" open />
+```
+
+## Checklist
+
+`migo-checklist` — la lista de **pasos que se van marcando** mientras un proceso largo avanza: icono
+de estado, rótulo, detalle opcional y un raíl vertical que se colorea al completarse el paso.
+`items` es obligatorio (`{ label, state, detail? }` con `state`: `pending` | `running` | `done` |
+`failed`); `label` da el nombre accesible de la lista y `stateLabels` sustituye los textos de estado
+si la app no está en español.
+
+**Presentacional puro: no ejecuta nada.** Recibe los pasos ya resueltos y los pinta; quien los
+avanza es la feature, que es la única que puede llamar a casos de uso. Un `failed` es terminal: los
+pasos que venían detrás se quedan en `pending`, que es justo lo que hace legible dónde se rompió.
+
+**El icono no es la única señal del estado** (WCAG 1.4.1): cada paso lleva su estado en texto en un
+`sr-only`, y la lista es una región viva `polite` con `aria-busy` mientras haya un paso en curso, así
+que el salto de «En curso» a «Hecho» se anuncia sin interrumpir. El giro y el salto de escala van con
+`motion-reduce:`.
+
+```html
+<migo-checklist [items]="pasos()" label="Progreso de la conexión" />
+```
+
+```typescript
+protected readonly pasos = signal<ChecklistItem[]>([
+  { label: 'Leyendo la configuración', state: 'done', detail: 'Client ID encontrado' },
+  { label: 'Creando la hoja en tu Drive', state: 'running' },
+  { label: 'Sincronizando tu recetario', state: 'pending' },
+]);
 ```
 
 ## Dialog

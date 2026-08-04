@@ -131,7 +131,7 @@ UI propia, invierte la dirección de la sincronización y no funciona sin red.)*
 ### 3.2 Por qué no se llama a la API de Sheets directamente
 
 Sería posible (Google sirve CORS) y ahorraría el despliegue manual. Se descartó por los **tres
-cerrojos** que hoy viven en `apps-script/Code.gs` y que habría que reimplementar en el cliente:
+cerrojos** que hoy viven en `public/apps-script/Code.gs` y que habría que reimplementar en el cliente:
 
 1. **`LockService`** — serializa toda escritura. En el navegador no hay equivalente: dos pestañas
    abiertas podrían pisarse.
@@ -266,7 +266,7 @@ más despista, porque el despliegue parece correcto.
 |---|---|---|
 | `Error 400: origin_mismatch` | El origen no está registrado, o es `127.0.0.1` vs `localhost`, o el puerto cambió | Ver 5.3 |
 | «La respuesta del Apps Script no es JSON» | La URL acaba en `/dev`, o el despliegue pide iniciar sesión | Usar la URL `/exec`, acceso «Cualquiera» |
-| `CLIENT_MISMATCH` | El token se emitió para otro Client ID | Revisar `ALLOWED_CLIENT_IDS` y el Client ID de `/cuenta` |
+| `CLIENT_MISMATCH` | El token se emitió para otro Client ID | Revisar `ALLOWED_CLIENT_IDS` y `googleClientId` en `public/config.json` |
 | `SCOPE_MISSING` | El usuario no marcó la casilla de Drive | Reconectar y marcarla |
 | `NOT_CONFIGURED` | Falta `appsScriptUrl` en `public/config.json` | `appscript.md` §8 |
 | Al recargar pide reconectar | **Es el comportamiento correcto** | Ver 2.4 |
@@ -397,7 +397,7 @@ los tecleara un usuario: un insumo llamado «12/03» se volvería fecha y uno qu
 | El transporte y la trampa del CORS | `core/external-sync/infrastructure/apps-script-endpoint.ts` |
 | La cola durable | `core/external-sync/infrastructure/indexeddb-sync-outbox.ts` |
 | Las cinco ramas de salida de la sincronización | `core/external-sync/application/use-cases/synchronize.use-case.ts` |
-| El script | `apps-script/Code.gs` + `apps-script/appsscript.json` |
+| El script | `public/apps-script/Code.gs` + `public/apps-script/appsscript.json` |
 | La configuración del despliegue | `public/config.json` |
 | La pantalla | `features/account/` |
 

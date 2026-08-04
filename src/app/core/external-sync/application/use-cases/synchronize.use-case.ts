@@ -52,6 +52,8 @@ export interface SynchronizeResult {
  *    desenlace. Nunca hay un instante en el que un cambio no esté ni en la cola ni enviado. En
  *    `scope: 'all'` no se toma nada —se relee el origen completo—, así que ambas llamadas son un
  *    no-op sobre una lista vacía.
+ *
+ * Y un tercero, para el envío completo: **nunca hay dos a la vez**. Ver `execute`.
  */
 @Injectable({ providedIn: 'root' })
 export class Synchronize extends UseCase<SynchronizeRequest, SynchronizeResult> {
@@ -63,7 +65,46 @@ export class Synchronize extends UseCase<SynchronizeRequest, SynchronizeResult> 
   private readonly bus = inject(EventBus);
   private readonly log = inject(Logger).scoped('external-sync/synchronize');
 
-  async execute({ scope, aggregate }: SynchronizeRequest): Promise<SynchronizeResult> {
+  /** El envío completo en curso, mientras dura. `null` si no hay ninguno. */
+  private fullPush: Promise<SynchronizeResult> | null = null;
+
+  /**
+   * **Un envío completo a la vez.** Dos disparadores piden lo mismo casi a la vez al conectar una
+   * cuenta —el suscriptor de sesión y la propia pantalla, que espera el resultado para contarlo—, y
+   * empujar el recetario entero dos veces en paralelo no añade nada: el destino serializa las
+   * escrituras, así que la segunda solo consigue esperar a la primera y, si se le acaba la
+   * paciencia, marcar un fallo que no existe. Quien llega segundo comparte el envío que ya va.
+   *
+   * `scope: 'pending'` NO se comparte, y es deliberado: cada llamada vacía la cola tal como esté en
+   * ese momento, y compartir una anterior dejaría fuera lo que se guardó mientras tanto.
+   */
+  execute(request: SynchronizeRequest): Promise<SynchronizeResult> {
+    if (request.scope !== 'all') {
+      return this.perform(request);
+    }
+    if (this.fullPush) {
+      this.log.debug('ya hay un envío completo en curso, se comparte');
+      return this.fullPush;
+    }
+
+    const run = this.perform(request);
+    this.fullPush = run;
+    // Las dos ramas, para que este `then` no deje nunca un rechazo sin dueño: del fallo ya responde
+    // quien llamó (y `perform` lo registra).
+    void run.then(
+      () => this.forget(run),
+      () => this.forget(run),
+    );
+    return run;
+  }
+
+  private forget(run: Promise<SynchronizeResult>): void {
+    if (this.fullPush === run) {
+      this.fullPush = null;
+    }
+  }
+
+  private async perform({ scope, aggregate }: SynchronizeRequest): Promise<SynchronizeResult> {
     this.log.debug('ejecutando', { scope, aggregate: aggregate ?? null });
 
     const credentials = await this.credentials.current();

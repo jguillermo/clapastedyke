@@ -6,10 +6,16 @@ usuario. El código de la app ya está listo; sin estos pasos, la pantalla `/cue
 
 Se hace una sola vez por despliegue. Tiempo aproximado: **20 minutos**.
 
-> El código del Web App vive en este mismo repositorio:
-> [`apps-script/Code.gs`](../apps-script/Code.gs) y
-> [`apps-script/appsscript.json`](../apps-script/appsscript.json). No hay que escribir nada: se copia
-> y se pega.
+> **Los mismos pasos están dentro de la app**, en `/cuenta` → tarjeta **Puesta en marcha**, con
+> botones de copiar para el código y para cada valor que hay que pegar en la consola de Google. Si
+> tienes la app delante, es el camino corto; este documento añade el porqué de cada ajuste y el
+> diagnóstico de fallos.
+>
+> El código del Web App vive en este mismo repositorio, bajo **`public/`** para que la app pueda
+> servirlo y enseñarlo:
+> [`public/apps-script/Code.gs`](../public/apps-script/Code.gs) y
+> [`public/apps-script/appsscript.json`](../public/apps-script/appsscript.json). No hay que escribir
+> nada: se copia y se pega.
 
 > **Este documento es el «cómo». El «por qué» está en
 > [`google-integration.md`](google-integration.md)**: por qué hace falta el login de Google, por qué
@@ -27,7 +33,7 @@ Se hace una sola vez por despliegue. Tiempo aproximado: **20 minutos**.
 | Pantalla de consentimiento + Client ID | console.cloud.google.com                | ❌ manual  |
 | Proyecto de Apps Script + despliegue | script.google.com                         | ❌ manual  |
 | URL del Web App                      | `public/config.json`                      | ❌ manual  |
-| Client ID en el navegador            | pantalla `/cuenta` (se guarda en IndexedDB) | ❌ manual (una vez por usuario) |
+| Client ID de OAuth                   | `public/config.json`                      | ❌ manual (uno para todo el despliegue) |
 | Creación de la hoja de cálculo       | la crea el script en el Drive del usuario | ✅ automático |
 | Pestañas, cabeceras y escritura      | el script                                 | ✅ automático |
 
@@ -174,10 +180,10 @@ Credenciales → Crear credenciales*).
 
 1. Entra en [script.google.com](https://script.google.com/) y crea un **proyecto nuevo**. Ponle un
    nombre reconocible: `Clapastedyke · sincronización`.
-2. Borra el contenido de `Código.gs` y pega **todo** [`apps-script/Code.gs`](../apps-script/Code.gs).
+2. Borra el contenido de `Código.gs` y pega **todo** [`public/apps-script/Code.gs`](../public/apps-script/Code.gs).
 3. Muestra el manifiesto: **⚙ Configuración del proyecto → Mostrar el archivo de manifiesto
    "appsscript.json"**. Abre el fichero que aparece en el editor y sustituye su contenido por
-   [`apps-script/appsscript.json`](../apps-script/appsscript.json):
+   [`public/apps-script/appsscript.json`](../public/apps-script/appsscript.json):
 
    ```json
    {
@@ -263,12 +269,11 @@ usuario. Los `warn` y los `error` se ven igual: eso no se puede apagar. Ver
 [logging-conventions.md](.claude/rules/logging-conventions.md). Al desplegarse en GitHub Pages con
 `--base-href /clapastedyke/`, la app lo pide como `config.json` relativo y resuelve solo.
 
-**El Client ID → la pantalla `/cuenta`** de la app: se pega en el campo *Client ID de OAuth* y se
-guarda en el IndexedDB de ese navegador. Si prefieres que venga por defecto para todo el mundo,
-ponlo también en `googleClientId` dentro de `config.json`; lo que el usuario guarde tendrá
-preferencia, y dejar el campo en blanco vuelve a usar el del despliegue.
+**El Client ID → también `public/config.json`**, en `googleClientId`. Es uno solo para todo el
+despliegue —identifica a la aplicación, no al usuario—, así que **no se pide en la pantalla**:
+`/cuenta` lo lee de aquí y se limita a decir si está o no configurado.
 
-> La URL **no** se configura desde la app: es del despliegue, no del usuario.
+> Ni la URL ni el Client ID se configuran desde la app: son del despliegue, no del usuario.
 
 ---
 
@@ -276,10 +281,25 @@ preferencia, y dejar el campo en blanco vuelve a usar el del despliegue.
 
 1. Arranca la app (`ng serve`) y entra en **`/cuenta`** (o pulsa **Cuenta**, arriba a la derecha en la
    cocina).
-2. Pega el **Client ID** y pulsa **Conectar con Google**.
+2. Pulsa **Conectar con Google**. La pantalla enseña una lista de cinco pasos que se van marcando:
+
+   | Paso                                     | Qué comprueba                                                        |
+   | ---------------------------------------- | -------------------------------------------------------------------- |
+   | Leyendo la configuración de la app       | que el despliegue trae `googleClientId`                                |
+   | Conectando con tu cuenta de Google       | el consentimiento y el permiso `drive.file`                            |
+   | Preparando la hoja en tu Drive           | `op: hello` — el script localiza la hoja o la crea                     |
+   | Enviando y leyendo un dato de prueba     | `op: verify` — escribe en `_meta!B6` y **lo vuelve a leer** de la hoja |
+   | Sincronizando tu recetario               | `op: upsert` con el recetario entero                                   |
+
+   El cuarto es el que de verdad dice que la integración funciona: que la cuenta conecte no prueba
+   que se pueda escribir, y que una escritura no dé error no prueba que lo escrito esté. Si un paso
+   falla, los siguientes se quedan pendientes y el motivo sale bajo el paso roto — busca su código en
+   [Solución de problemas](#12--solución-de-problemas). **Reintentar** vuelve a empezar desde arriba:
+   los cinco pasos son idempotentes.
 3. Elige la cuenta y acepta el permiso *«Ver y gestionar los archivos de Google Drive que hayas
    abierto o creado con esta aplicación»*.
-4. En cuanto conecta, la app empuja el recetario **entero**. En unos segundos deberías ver:
+4. Al terminar los cinco pasos deberías ver:
+   - **Conexión lista** bajo la lista;
    - el estado en **Al día** y la fecha de la última sincronización;
    - el enlace **Abrir la hoja en Google Sheets**;
    - en tu Drive, en la **raíz**, un fichero **«Clapastedyke — Recetario»** con estas pestañas:
@@ -290,7 +310,7 @@ preferencia, y dejar el campo en blanco vuelve a usar el del despliegue.
      | `Recetas`       | una receta por fila, con categoría, sabor y capacidades  |
      | `RecetaInsumos` | una línea por insumo de cada receta                      |
      | `Categorias`, `Sabores`, `Capacidades` | tablas de referencia que citan las recetas |
-     | `_meta`         | versión del esquema y fecha de la última sincronización  |
+     | `_meta`         | versión del esquema, fecha de la última sincronización y, en la fila 6, el último dato de prueba |
 
 5. Vuelve a la cocina, crea o edita una receta y mira la hoja: la fila aparece o se actualiza sola,
    sin que el guardado tarde más de lo normal.
@@ -313,8 +333,10 @@ Así se conserva **la misma URL `/exec`** y no hay que tocar `config.json`. Si e
 
 Lista de comprobación del montaje completo:
 
-- [ ] La URL `/exec` abierta en el navegador devuelve `{"ok":true,"service":"clapastedyke-sheet-sync",…}`.
-- [ ] `/cuenta` conecta y muestra el correo de la cuenta.
+- [ ] La URL `/exec` abierta en el navegador devuelve `{"ok":true,"service":"clapastedyke-sheet-sync",…}`
+      con `"ops":["hello","upsert","verify"]` — si falta `verify`, el despliegue está anticuado (paso 10).
+- [ ] `/cuenta` recorre los **cinco pasos** hasta *Conexión lista* y muestra el correo de la cuenta.
+- [ ] En `_meta!B6` hay un identificador: es el último dato de prueba que fue y volvió.
 - [ ] La hoja aparece en la **raíz** del Drive de esa cuenta, con sus 7 pestañas y sus cabeceras.
 - [ ] Crear una receta añade su fila en `Recetas` y sus líneas en `RecetaInsumos`.
 - [ ] Editar el precio de un insumo **actualiza** su fila; no crea una segunda.
@@ -344,7 +366,9 @@ Lista de comprobación del montaje completo:
 | Error de **CORS** en la consola del navegador                                | Alguien añadió una cabecera propia o `application/json` a la llamada | La app manda `text/plain` sin cabeceras extra a propósito. No tocar `apps-script-endpoint.ts`. |
 | *«La respuesta del Apps Script no es JSON»*                                  | La URL acaba en `/dev`, o el despliegue pide iniciar sesión         | Usa la URL `/exec` y despliega con acceso **Cualquiera** (paso 7)                              |
 | `Script function not found: doPost`                                          | El proyecto no está desplegado como aplicación web                  | Paso 7                                                                                          |
-| `CLIENT_MISMATCH`                                                            | El token se emitió para otro Client ID                              | Revisa `ALLOWED_CLIENT_IDS` (paso 6) y el Client ID de `/cuenta`                               |
+| *«Operación desconocida: verify»*                                            | El script desplegado es anterior a la comprobación de ida y vuelta  | Copia el `Code.gs` actual y **vuelve a desplegar** (paso 10)                                    |
+| *«El dato de prueba no ha vuelto igual que como se envió»*                   | La hoja existe pero la escritura no cuaja: despliegue a medias, o el `_meta` protegido | Vuelve a desplegar (paso 10); si sigue, borra la hoja y deja que el script la recree |
+| `CLIENT_MISMATCH`                                                            | El token se emitió para otro Client ID                              | Revisa `ALLOWED_CLIENT_IDS` (paso 6) y `googleClientId` en `public/config.json`                 |
 | *«El script no tiene ALLOWED_CLIENT_IDS configurado»*                        | Falta la propiedad                                                  | Paso 6 — sin ella el script rechaza todo por diseño                                            |
 | `SCOPE_MISSING`                                                              | Se conectó sin aceptar el permiso de Drive                          | Cierra sesión, vuelve a conectar y acepta la casilla                                            |
 | `UNAUTHENTICATED` / *«El token no es válido o ha caducado»*                  | El token dura una hora                                              | Vuelve a **Conectar con Google**; los cambios pendientes se reintentan                          |
@@ -368,7 +392,7 @@ Qué se guarda, dónde y hasta cuándo:
 | Correo, nombre y avatar         | **solo memoria**                          | desaparece       |
 | Enlace a la hoja                | **solo memoria**                          | desaparece       |
 | Cambios pendientes de sincronizar | **solo memoria**                        | se descartan     |
-| Client ID                       | IndexedDB de ese navegador                | se conserva: es configuración, no un dato del usuario |
+| Client ID                       | `public/config.json` del despliegue       | intacto: es configuración de la app, no un dato del usuario |
 | Recetas e insumos               | IndexedDB (como siempre) + la hoja del usuario | intactos: la integración no cambia la persistencia local |
 | Mapeo `cuenta → hoja`           | propiedades del script, una entrada por usuario | se conserva, para reutilizar la hoja al volver |
 
@@ -391,10 +415,11 @@ Por si hay que depurar a mano o escribir otro cliente.
 
 ```jsonc
 {
-  "op": "hello" | "upsert",
+  "op": "hello" | "upsert" | "verify",
   "requestId": "uuid-v4",        // idempotencia: reenviar el mismo id no vuelve a escribir
   "accessToken": "ya29…",
   "sentAt": "2026-07-30T12:00:00.000Z",
+  "probe": "uuid-v4",             // solo en `verify`: el dato que tiene que volver
   "payload": {                    // solo en `upsert`; cada lista puede faltar
     "supplies":    [{ "id": "…", "name": "…", "baseUnit": "g", "usage": "recipe",
                       "priceAmount": 4.5, "pricePerValue": 1000, "pricePerUnit": "g",
@@ -420,13 +445,21 @@ códigos de estado):
 { "ok": true, "schemaVersion": 1,
   "account": { "sub": "…", "email": "…", "name": "…", "picture": "…" },
   "spreadsheetId": "1AbC…", "spreadsheetUrl": "https://…", "created": false,
-  "applied": { "supplies": 3, "recipes": 1, "recipeLines": 7 }, "cached": false }
+  "applied": { "supplies": 3, "recipes": 1, "recipeLines": 7 },
+  "echo": "uuid-v4",              // solo en `verify`: lo LEÍDO de la hoja tras escribir el probe
+  "cached": false }
 
 { "ok": false, "error": { "code": "UNAUTHENTICATED", "message": "…" } }
 ```
 
 Códigos de error: `UNAUTHENTICATED`, `CLIENT_MISMATCH`, `SCOPE_MISSING`, `BAD_REQUEST`, `QUOTA`,
 `INTERNAL`.
+
+**`verify` no pasa por la caché de `requestId`**, a propósito: su razón de ser es tocar la hoja de
+verdad, así que devolver el resultado recordado de otra petición no demostraría nada. Escribe
+`['pruebaConexion', probe, sentAt]` en `_meta!A6:C6` y devuelve en `echo` **lo que lee** de esa misma
+celda; quien llama compara. Si `echo` no coincide con `probe`, la hoja existe pero no se está
+escribiendo bien.
 
 **Claves de escritura:** `Insumos`, `Recetas`, `Categorias`, `Sabores` y `Capacidades` hacen *upsert*
 por `id`. `RecetaInsumos` se reemplaza **por receta entera** (se borran las líneas de esa receta y se
@@ -441,7 +474,8 @@ Google ni a Sheets. Todo lo concreto está en `infrastructure/`, y se elige en u
 
 | Pieza                                      | Fichero                                                                     |
 | ------------------------------------------ | --------------------------------------------------------------------------- |
-| Web App                                    | `apps-script/Code.gs`                                                         |
+| Web App                                    | `public/apps-script/Code.gs` (servido con la app: `/cuenta` lo lee y lo enseña) |
+| La guía dentro de la app                   | `src/app/features/account/account.html` + `external-sync/…/get-sync-setup.use-case.ts` |
 | Autenticación (contexto genérico)          | `src/app/core/auth/` — puerto `Authenticator`                                 |
 | **Todo lo específico de Google**           | `src/app/core/auth/infrastructure/google-authenticator.ts` — y solo ahí       |
 | Sincronización (contexto genérico)         | `src/app/core/external-sync/` — puerto `SyncGateway`                          |

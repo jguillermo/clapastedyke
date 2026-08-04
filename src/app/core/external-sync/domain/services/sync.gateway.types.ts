@@ -1,4 +1,5 @@
 import { SyncBatch } from '../value-objects/sync-batch';
+import { SyncProbe } from '../value-objects/sync-probe';
 import { SyncTarget } from '../value-objects/sync-target';
 
 export interface SyncRequest {
@@ -16,6 +17,26 @@ export interface SyncOutcome {
   target: SyncTarget;
   /** Filas aplicadas por tabla, tal como las cuenta el destino. Sirve para dar parte al usuario. */
   applied: Readonly<Record<string, number>>;
+}
+
+/** Lo mínimo para pedirle al destino que exista: con qué se autoriza y nada más. */
+export interface OpenRequest {
+  /** Credencial del usuario que autoriza la operación. Nunca se registra ni se guarda. */
+  credential: string;
+}
+
+export interface ProbeRequest extends OpenRequest {
+  /** El dato que tiene que volver. Ver {@link SyncProbe}. */
+  probe: SyncProbe;
+}
+
+export interface ProbeOutcome {
+  target: SyncTarget;
+  /**
+   * Lo que el destino **leyó** de donde escribió la prueba. Se devuelve en crudo, sin juzgarlo: quien
+   * decide si la ida y vuelta salió bien es el value object, no el transporte.
+   */
+  echo: string;
 }
 
 /** Formas en que puede fallar una sincronización. Parte del contrato del puerto. */

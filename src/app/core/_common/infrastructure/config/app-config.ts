@@ -12,7 +12,7 @@ export interface ConfigDocument {
   debug?: boolean;
   /** URL `/exec` del Web App de Apps Script que escribe en la hoja. */
   appsScriptUrl?: string;
-  /** Client ID de OAuth por defecto. */
+  /** Client ID de OAuth de la app ante Google. */
   googleClientId?: string;
 }
 
@@ -23,7 +23,7 @@ export interface ConfigDocument {
 export interface IntegrationConfig {
   /** URL `/exec` del Web App de Apps Script que escribe en la hoja. */
   appsScriptUrl: string | null;
-  /** Client ID de OAuth por defecto. Cada usuario puede poner el suyo en `/cuenta`. */
+  /** Client ID de OAuth de la app. Uno para todo el despliegue: no se configura por usuario. */
   googleClientId: string | null;
 }
 

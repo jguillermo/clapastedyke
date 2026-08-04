@@ -154,6 +154,15 @@ var TABLES = [
 
 var META_SHEET = '_meta';
 
+/**
+ * Dónde vive el dato de prueba de la operación `verify`, en la pestaña `_meta`.
+ *
+ * Fila 6 a propósito: `writeMeta_` ocupa de la 1 a la 4, así que la prueba no pisa nada y se puede
+ * mirar a ojo en la hoja. Es una celda fija: escribirla dos veces no ensucia el fichero.
+ */
+var PROBE_ROW = 6;
+var PROBE_KEY = 'pruebaConexion';
+
 // ───────────────────────────────────────────────────────────────────────────────
 // Puntos de entrada
 // ───────────────────────────────────────────────────────────────────────────────
@@ -167,7 +176,7 @@ function doGet() {
     ok: true,
     service: 'clapastedyke-sheet-sync',
     schemaVersion: SCHEMA_VERSION,
-    ops: ['hello', 'upsert'],
+    ops: ['hello', 'upsert', 'verify'],
   });
 }
 
@@ -184,7 +193,11 @@ function doPost(e) {
     var request = parseRequest_(e);
     var identity = authenticate_(request.accessToken);
 
-    var cached = cachedResult_(identity.sub, request.requestId);
+    // `verify` se salta la caché a propósito: su razón de ser es tocar la hoja de verdad, así que
+    // devolver el resultado recordado de otra petición no demostraría nada.
+    var cacheable = request.op !== 'verify';
+
+    var cached = cacheable ? cachedResult_(identity.sub, request.requestId) : null;
     if (cached) {
       cached.cached = true;
       return json_(cached);
@@ -196,6 +209,10 @@ function doPost(e) {
         request.op === 'upsert'
           ? applyPayload_(request.accessToken, target.spreadsheetId, request.payload, request.sentAt)
           : {};
+      var echo =
+        request.op === 'verify'
+          ? verifyProbe_(request.accessToken, target.spreadsheetId, request.probe, request.sentAt)
+          : null;
       return {
         ok: true,
         schemaVersion: SCHEMA_VERSION,
@@ -204,11 +221,14 @@ function doPost(e) {
         spreadsheetUrl: target.spreadsheetUrl,
         created: target.created,
         applied: applied,
+        echo: echo,
         cached: false,
       };
     });
 
-    rememberResult_(identity.sub, request.requestId, result);
+    if (cacheable) {
+      rememberResult_(identity.sub, request.requestId, result);
+    }
     return json_(result);
   } catch (error) {
     return json_(errorBody_(error));
@@ -230,7 +250,7 @@ function parseRequest_(e) {
     throw fail_('BAD_REQUEST', 'El cuerpo no es JSON válido.');
   }
   var op = body.op || 'hello';
-  if (op !== 'hello' && op !== 'upsert') {
+  if (op !== 'hello' && op !== 'upsert' && op !== 'verify') {
     throw fail_('BAD_REQUEST', 'Operación desconocida: ' + op);
   }
   if (!body.accessToken) {
@@ -239,12 +259,16 @@ function parseRequest_(e) {
   if (op === 'upsert' && !body.payload) {
     throw fail_('BAD_REQUEST', 'La operación upsert necesita un payload.');
   }
+  if (op === 'verify' && !body.probe) {
+    throw fail_('BAD_REQUEST', 'La operación verify necesita un probe que devolver.');
+  }
   return {
     op: op,
     requestId: body.requestId || '',
     accessToken: body.accessToken,
     sentAt: body.sentAt || new Date().toISOString(),
     payload: body.payload || {},
+    probe: body.probe || '',
   };
 }
 
@@ -740,6 +764,37 @@ function writeRows_(accessToken, spreadsheetId, table, matrix, previousCount, ca
       {},
     );
   }
+}
+
+/**
+ * Ida y vuelta de verdad: escribe `probe` en la hoja del usuario y **lo vuelve a leer** de la propia
+ * hoja, devolviendo lo leído. Quien llama compara; si coincide, la cadena entera (token → Drive →
+ * Sheets → escritura → lectura) funciona.
+ *
+ * Se lee después de escribir en lugar de devolver lo recibido porque un eco del propio parámetro no
+ * demostraría nada: pasaría igual con la hoja borrada o sin permisos de escritura.
+ */
+function verifyProbe_(accessToken, spreadsheetId, probe, sentAt) {
+  ensureLayout_(accessToken, spreadsheetId, [META_SHEET]);
+
+  var range = quoteRange_(META_SHEET, 'A' + PROBE_ROW + ':C' + PROBE_ROW);
+  valuesBatchUpdate_(accessToken, spreadsheetId, [
+    { range: range, values: [[PROBE_KEY, probe, sentAt]] },
+  ]);
+
+  var response = fetchJson_(
+    accessToken,
+    'get',
+    'https://sheets.googleapis.com/v4/spreadsheets/' +
+      spreadsheetId +
+      '/values/' +
+      encodeURIComponent(range) +
+      '?majorDimension=ROWS',
+    null,
+  );
+  var rows = response.body.values || [];
+  var row = rows.length > 0 ? rows[0] : [];
+  return row.length > 1 ? String(row[1]) : '';
 }
 
 function writeMeta_(accessToken, spreadsheetId, sentAt) {

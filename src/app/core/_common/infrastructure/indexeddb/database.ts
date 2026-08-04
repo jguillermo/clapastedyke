@@ -35,9 +35,9 @@ const STORES = [
   // 'google_integration' nació y murió dentro de la misma tanda que 'auth_settings' (se renombró al
   // hacer genérico el contexto de autenticación). Se conserva porque los stores solo se AÑADEN.
   'google_integration',
-  // Ajustes de autenticación: SOLO configuración de este navegador (el identificador de cliente).
-  // Ni credenciales, ni identidad, ni referencias a la hoja del usuario — eso vive en memoria y
-  // desaparece al cerrar sesión.
+  // 'auth_settings' es legacy: guardaba el identificador de cliente de ESTE navegador, hasta que se
+  // vio que identifica a la aplicación y no al usuario, y pasó a salir de `public/config.json`. Se
+  // conserva en la lista porque los stores solo se AÑADEN, pero ya no se lee ni se escribe.
   'auth_settings',
   // Cola durable de cambios pendientes de sincronizar. No guarda un agregado sino TRABAJO POR HACER,
   // y por eso vive aquí: un refresco a media sincronización no puede llevarse por delante los

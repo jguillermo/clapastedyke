@@ -36,7 +36,7 @@ export class SignIn extends UseCase<void, SignInResult> {
       if (!clientId) {
         this.log.debug('sin identificador de cliente configurado, no se puede autenticar');
         throw new Error(
-          'Falta el identificador de cliente. Pégalo en esta pantalla (ver manual/appscript.md, paso 4).',
+          'Falta el identificador de cliente en la configuración del despliegue (ver manual/appscript.md, paso 4).',
         );
       }
 

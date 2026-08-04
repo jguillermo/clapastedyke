@@ -9,7 +9,9 @@ import { NotifyRecipeSaved } from './application/use-cases/notify-recipe-saved.u
 import { NotifySupplySaved } from './application/use-cases/notify-supply-saved.use-case';
 import { SyncGateway } from './domain/services/sync.gateway';
 import { SyncOutbox } from './domain/services/sync-outbox';
+import { SyncSetupSource } from './domain/services/sync-setup-source';
 import { SyncStatus } from './domain/services/sync-status';
+import { AppsScriptSetupSource } from './infrastructure/apps-script-setup-source';
 import { AppsScriptSyncGateway } from './infrastructure/apps-script-sync.gateway';
 import { IndexeddbSyncOutbox } from './infrastructure/indexeddb-sync-outbox';
 import { InMemorySyncStatus } from './infrastructure/in-memory-sync-status';
@@ -42,6 +44,9 @@ export const EVENT_DRIVEN_USE_CASES = [NotifyRecipeSaved, NotifySupplySaved];
 export function provideExternalSync(): EnvironmentProviders {
   return makeEnvironmentProviders([
     { provide: SyncGateway, useClass: AppsScriptSyncGateway },
+    // La ceremonia de puesta en marcha del mismo destino: qué hay que pegar y dónde. Va aparte
+    // porque es la conversación de ANTES, la que tiene una persona con la consola de su proveedor.
+    { provide: SyncSetupSource, useClass: AppsScriptSetupSource },
     { provide: SyncOutbox, useClass: IndexeddbSyncOutbox },
     { provide: SyncStatus, useClass: InMemorySyncStatus },
     provideAppInitializer(() => inject(RecipeBookChangedSubscriber).register()),

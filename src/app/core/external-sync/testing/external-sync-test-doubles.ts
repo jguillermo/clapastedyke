@@ -15,8 +15,15 @@ import {
 } from '../../_common/credentials/credentials-provider';
 import { ExportableData, ExportedRows, ExportQuery } from '../../_common/export/exportable-data';
 import { SyncGateway } from '../domain/services/sync.gateway';
-import { SyncOutcome, SyncRequest } from '../domain/services/sync.gateway.types';
+import {
+  ProbeOutcome,
+  ProbeRequest,
+  SyncOutcome,
+  SyncRequest,
+} from '../domain/services/sync.gateway.types';
 import { SyncOutbox } from '../domain/services/sync-outbox';
+import { SyncSetupSource } from '../domain/services/sync-setup-source';
+import { SyncSetup } from '../domain/services/sync-setup.types';
 import { SyncStatus } from '../domain/services/sync-status';
 import { SyncItem } from '../domain/value-objects/sync-item';
 import { SyncTarget } from '../domain/value-objects/sync-target';
@@ -126,14 +133,61 @@ export class FakeEventBus extends EventBus {
 @Injectable()
 export class FakeSyncGateway extends SyncGateway {
   readonly sent: SyncRequest[] = [];
+  readonly probed: ProbeRequest[] = [];
   failWith: Error | null = null;
+  /**
+   * Qué devuelve la comprobación de ida y vuelta. `null` = el eco correcto (lo que se mandó); un
+   * string fuerza el caso interesante: el destino contesta bien pero lo leído no coincide.
+   */
+  echo: string | null = null;
 
   async send(request: SyncRequest): Promise<SyncOutcome> {
     this.sent.push(request);
     if (this.failWith) {
       throw this.failWith;
     }
-    return { target: SyncTarget.of('target-1', 'https://example.test/hoja'), applied: {} };
+    return { target: this.target(), applied: {} };
+  }
+
+  async open(): Promise<SyncTarget> {
+    if (this.failWith) {
+      throw this.failWith;
+    }
+    return this.target();
+  }
+
+  async probe(request: ProbeRequest): Promise<ProbeOutcome> {
+    this.probed.push(request);
+    if (this.failWith) {
+      throw this.failWith;
+    }
+    return { target: this.target(), echo: this.echo ?? request.probe.value };
+  }
+
+  private target(): SyncTarget {
+    return SyncTarget.of('target-1', 'https://example.test/hoja');
+  }
+}
+
+/**
+ * Fuentes falsas de la puesta en marcha. Por defecto viene todo resuelto; los tests vacían lo que
+ * quieran para comprobar cómo se cuenta un hueco.
+ */
+@Injectable()
+export class FakeSyncSetupSource extends SyncSetupSource {
+  setup: SyncSetup = {
+    snippets: [
+      { id: 'script', value: 'function doPost() {}' },
+      { id: 'manifest', value: '{ "runtimeVersion": "V8" }' },
+      { id: 'clientId', value: '123-abc.apps.googleusercontent.com' },
+      { id: 'origin', value: 'https://example.test' },
+      { id: 'endpoint', value: 'https://script.example.test/exec' },
+    ],
+    configured: true,
+  };
+
+  async read(): Promise<SyncSetup> {
+    return this.setup;
   }
 }
 
@@ -174,10 +228,12 @@ export function makeExternalSyncFakes(): { providers: Provider[] } {
       { provide: Logger, useClass: ConsoleLogger },
       FakeSyncOutbox,
       FakeSyncGateway,
+      FakeSyncSetupSource,
       FakeCredentialsProvider,
       FakeExportableData,
       { provide: SyncOutbox, useExisting: FakeSyncOutbox },
       { provide: SyncGateway, useExisting: FakeSyncGateway },
+      { provide: SyncSetupSource, useExisting: FakeSyncSetupSource },
       { provide: CredentialsProvider, useExisting: FakeCredentialsProvider },
       { provide: ExportableData, useExisting: FakeExportableData },
       { provide: SyncStatus, useClass: InMemorySyncStatus },

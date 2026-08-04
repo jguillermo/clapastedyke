@@ -52,7 +52,8 @@ export type MatIconName =
   | 'mat:content_copy'
   | 'mat:open_in_new'
   | 'mat:cloud_upload'
-  | 'mat:refresh';
+  | 'mat:refresh'
+  | 'mat:radio_button_unchecked';
 
 // Iconos propios sin librería externa
 export type CustomIconName = never; // añadir: | 'custom:nombre'
@@ -92,4 +93,6 @@ export const ICON_PATHS: Record<IconName, string> = {
     'M19.35 10.04A7.49 7.49 0 0 0 12 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 0 0 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z', // mat · cloud_upload
   'mat:refresh':
     'M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z', // mat · refresh
+  'mat:radio_button_unchecked':
+    'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z', // mat · radio_button_unchecked
 };

@@ -13,40 +13,7 @@
     </a>
   </header>
 
-  <!-- 1 · Configuración de este navegador -->
-  <migo-card variant="outlined">
-    <migo-card-header>
-      <migo-icon card-icon name="mat:settings" size="lg" />
-      <migo-card-title>Configuración</migo-card-title>
-      <migo-card-subtitle>
-        Identificador de la app ante Google. La URL del Apps Script la pone el despliegue.
-      </migo-card-subtitle>
-    </migo-card-header>
-
-    <migo-card-body>
-      <form class="flex flex-col gap-4" [formGroup]="form" (ngSubmit)="saveSettings()">
-        <migo-form-field
-          label="Client ID de OAuth"
-          hint="Acaba en .apps.googleusercontent.com. Se crea en Google Cloud (manual/appscript.md, paso 4)."
-        >
-          <migo-input
-            formControlName="clientId"
-            placeholder="123456-abc.apps.googleusercontent.com"
-          />
-        </migo-form-field>
-
-        @if (settingsSaved()) {
-          <migo-alert variant="success">Configuración guardada.</migo-alert>
-        }
-
-        <button migo-button type="submit" variant="secondary" [loading]="busy()">
-          Guardar configuración
-        </button>
-      </form>
-    </migo-card-body>
-  </migo-card>
-
-  <!-- 2 · La cuenta conectada -->
+  <!-- 1 · La cuenta conectada, con el detalle de lo que pasa al conectar -->
   <migo-card variant="outlined">
     <migo-card-header>
       <migo-card-title>Cuenta</migo-card-title>
@@ -60,7 +27,7 @@
     </migo-card-header>
 
     <migo-card-body>
-      <div class="flex flex-col gap-3">
+      <div class="flex flex-col gap-4">
         @if (session().connected) {
           <div class="flex flex-col gap-0.5">
             <p class="m-0 text-base font-semibold text-body">{{ session().displayName }}</p>
@@ -68,10 +35,72 @@
           </div>
         } @else {
           <p class="m-0 text-sm text-body">
-            Al conectar, la app crea una hoja llamada «Clapastedyke — Recetario» en tu Google Drive
-            y escribe en ella tus recetas e insumos. Solo puede ver los archivos que ella misma
-            crea.
+            Un botón: eliges tu cuenta de Google y aceptas un permiso. A partir de ahí, la app crea
+            una hoja llamada «Clapastedyke — Recetario» en tu Drive y escribe en ella tus recetas e
+            insumos. Solo puede ver los archivos que ella misma crea, nada más de tu Drive.
           </p>
+        }
+
+        @if (progress().length > 0) {
+          <migo-checklist [items]="progress()" label="Progreso de la conexión" />
+        }
+
+        @if (ready()) {
+          <migo-alert variant="success" heading="Conexión lista">
+            El dato de prueba ha ido y ha vuelto igual, y tu recetario ya está en la hoja.
+          </migo-alert>
+        }
+
+        <!-- Un error sin salida es un callejón. Y una salida que no es tuya, tampoco: lo que puedes
+             hacer va arriba; lo que se arregla en la instalación, abajo y dicho como lo que es. -->
+        @if (failure(); as problem) {
+          <migo-alert variant="error" [heading]="problem.step.label">
+            <div class="flex flex-col gap-3">
+              <p>{{ problem.step.remedy.what }}</p>
+
+              @if (problem.step.remedy.userActions.length > 0) {
+                <p><strong>Qué puedes hacer:</strong></p>
+                <ul class="list-disc ps-5">
+                  @for (action of problem.step.remedy.userActions; track action.text) {
+                    <li class="pb-2">{{ action.text }}</li>
+                  }
+                </ul>
+              } @else {
+                <p>
+                  <strong>Esto no se arregla desde tu cuenta:</strong> es de cómo está instalada la
+                  app. Avisa a quien la mantiene — mientras tanto, tus recetas siguen guardadas en
+                  este dispositivo, como siempre.
+                </p>
+              }
+
+              @if (problem.step.remedy.deployerHint; as hint) {
+                <div class="flex flex-col gap-2 border-t border-border-subtle pt-3">
+                  <p class="text-caption text-muted">
+                    <strong>Para quien mantiene la app:</strong>
+                    {{ hint }}
+                  </p>
+                  <p class="text-caption text-muted">{{ problem.reason }}</p>
+                </div>
+              }
+            </div>
+
+            <div alert-actions>
+              <button migo-button type="button" variant="primary" (click)="connect()">
+                Reintentar
+              </button>
+              @if (problem.step.remedy.guideStep; as guideStep) {
+                <button
+                  migo-button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  (click)="showGuideStep(guideStep)"
+                >
+                  Ver los pasos de instalación
+                </button>
+              }
+            </div>
+          </migo-alert>
         }
 
         @if (actionError(); as error) {
@@ -81,6 +110,8 @@
     </migo-card-body>
 
     <migo-card-footer>
+      <!-- Reintentar NO vive aquí: cuando algo falla, el botón está dentro del aviso, junto a las
+           instrucciones que hay que haber seguido antes de volver a pulsarlo. -->
       @if (session().connected) {
         <button
           migo-button
@@ -92,6 +123,8 @@
           Cerrar sesión
         </button>
       } @else {
+        <!-- Sin `disabled` a propósito: si falta el Client ID, que lo diga el primer paso de la
+             lista, no un botón apagado sin explicación. -->
         <button migo-button type="button" variant="primary" [loading]="busy()" (click)="connect()">
           Conectar con Google
         </button>
@@ -99,7 +132,7 @@
     </migo-card-footer>
   </migo-card>
 
-  <!-- 3 · Estado de la sincronización -->
+  <!-- 2 · Estado de la sincronización -->
   <migo-card variant="outlined">
     <migo-card-header>
       <migo-card-title>Sincronización</migo-card-title>
@@ -153,8 +186,371 @@
     </migo-card-footer>
   </migo-card>
 
+  <!-- 3 · Instalación: el runbook de QUIEN PUBLICA la app, no de quien la usa. Plegado siempre;
+       se abre desde el aviso de un paso roto, o a mano si eres quien la mantiene. -->
+  <migo-card variant="outlined">
+    <migo-card-header>
+      <migo-icon card-icon name="mat:layers" size="lg" />
+      <migo-card-title>Instalar el sincronizador</migo-card-title>
+      <migo-card-subtitle>
+        Para quien publica la app: se hace <strong>una sola vez</strong> y sirve para todos sus
+        usuarios. Si solo usas la app, no tienes que hacer nada de esto — te basta con «Conectar con
+        Google».
+      </migo-card-subtitle>
+      <button
+        card-actions
+        migo-button
+        type="button"
+        variant="ghost"
+        size="sm"
+        [attr.aria-expanded]="guideOpen()"
+        aria-controls="guia-puesta-en-marcha"
+        (click)="toggleGuide()"
+      >
+        <migo-icon
+          icon-leading
+          size="sm"
+          [name]="guideOpen() ? 'mat:expand_less' : 'mat:expand_more'"
+        />
+        {{ guideOpen() ? 'Ocultar' : 'Ver los pasos' }}
+      </button>
+    </migo-card-header>
+
+    @if (guideOpen()) {
+      <migo-card-body>
+        <div id="guia-puesta-en-marcha" class="flex flex-col gap-6">
+          @if (setup(); as data) {
+            @if (!data.configured) {
+              <migo-alert variant="info" heading="Falta algo por configurar" live="off">
+                Los pasos marcados con
+                <strong>pendiente</strong> son los que quedan. El resto ya está.
+              </migo-alert>
+            }
+
+            <!-- Los pasos son una lista ordenada de verdad: el lector de pantalla dice «3 de 10».
+                 El `role="list"` explícito es obligatorio con `list-none`: Safari retira la semántica
+                 de lista en cuanto se le quita el marcador. -->
+            <ol class="m-0 flex list-none flex-col gap-6 p-0" role="list">
+              <!-- 1 -->
+              <li class="flex scroll-mt-4 gap-3" id="paso-1">
+                <span
+                  class="flex size-8 shrink-0 items-center justify-center rounded-full bg-brand-soft font-body text-sm font-semibold text-heading"
+                  aria-hidden="true"
+                  >1</span
+                >
+                <div class="flex min-w-0 flex-1 flex-col gap-2">
+                  <h4 class="m-0 font-body text-base font-semibold text-heading">
+                    Crea el proyecto en Google Cloud
+                  </h4>
+                  <p class="m-0 text-sm text-body">
+                    Entra en
+                    <a
+                      class="font-semibold text-brand underline"
+                      href="https://console.cloud.google.com/projectcreate"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      >console.cloud.google.com <migo-icon name="mat:open_in_new" size="xs"
+                    /></a>
+                    y crea un proyecto (por ejemplo «Clapastedyke»). Después, en
+                    <em>APIs y servicios → Biblioteca</em>, activa
+                    <strong>Google Sheets API</strong> y <strong>Google Drive API</strong>.
+                  </p>
+                </div>
+              </li>
+
+              <!-- 2 -->
+              <li class="flex scroll-mt-4 gap-3" id="paso-2">
+                <span
+                  class="flex size-8 shrink-0 items-center justify-center rounded-full bg-brand-soft font-body text-sm font-semibold text-heading"
+                  aria-hidden="true"
+                  >2</span
+                >
+                <div class="flex min-w-0 flex-1 flex-col gap-2">
+                  <h4 class="m-0 font-body text-base font-semibold text-heading">
+                    Configura la pantalla de consentimiento
+                  </h4>
+                  <p class="m-0 text-sm text-body">
+                    En <em>Google Auth Platform</em>: tipo de usuario <strong>Externo</strong>. En
+                    <em>Data Access</em> añade estos permisos:
+                  </p>
+                  <ul class="m-0 flex list-disc flex-col gap-1 ps-5 text-sm text-body">
+                    <li>
+                      <code>openid</code>, <code>userinfo.email</code>,
+                      <code>userinfo.profile</code>
+                    </li>
+                    <li>
+                      <code>auth/drive.file</code> — el que permite crear y escribir
+                      <strong>solo</strong> la hoja de esta app
+                    </li>
+                  </ul>
+                  <p class="m-0 text-sm text-body">
+                    En <em>Audience</em>, añade tu propio correo como
+                    <strong>usuario de prueba</strong>; si no, Google bloqueará el acceso.
+                  </p>
+                </div>
+              </li>
+
+              <!-- 3 -->
+              <li class="flex scroll-mt-4 gap-3" id="paso-3">
+                <span
+                  class="flex size-8 shrink-0 items-center justify-center rounded-full bg-brand-soft font-body text-sm font-semibold text-heading"
+                  aria-hidden="true"
+                  >3</span
+                >
+                <div class="flex min-w-0 flex-1 flex-col gap-2">
+                  <h4 class="m-0 font-body text-base font-semibold text-heading">
+                    Crea el Client ID de OAuth
+                  </h4>
+                  <p class="m-0 text-sm text-body">
+                    En <em>Credenciales → Crear credenciales → ID de cliente de OAuth</em>, tipo
+                    <strong>Aplicación web</strong>. En «Orígenes de JavaScript autorizados» pega
+                    exactamente esto (es desde donde se sirve esta app):
+                  </p>
+                  <migo-copy-field
+                    ariaLabel="Origen de JavaScript autorizado"
+                    [value]="data.origin"
+                    (copied)="onCopied('origin')"
+                  />
+                </div>
+              </li>
+
+              <!-- 4 -->
+              <li class="flex scroll-mt-4 gap-3" id="paso-4">
+                <span
+                  class="flex size-8 shrink-0 items-center justify-center rounded-full bg-brand-soft font-body text-sm font-semibold text-heading"
+                  aria-hidden="true"
+                  >4</span
+                >
+                <div class="flex min-w-0 flex-1 flex-col gap-2">
+                  <h4 class="m-0 font-body text-base font-semibold text-heading">
+                    Pega el Client ID en <code>public/config.json</code>
+                  </h4>
+                  @if (data.clientId) {
+                    <p class="m-0 text-sm text-body">
+                      Hecho: este despliegue ya trae uno. Es el que tendrás que autorizar en el paso
+                      7.
+                    </p>
+                    <migo-copy-field
+                      ariaLabel="Client ID de OAuth configurado"
+                      [value]="data.clientId"
+                      (copied)="onCopied('clientId')"
+                    />
+                  } @else {
+                    <migo-alert variant="warning" heading="Pendiente" live="off">
+                      Copia el Client ID del paso anterior en la clave
+                      <code>googleClientId</code> de <code>public/config.json</code> y recarga esta
+                      página. No hay que recompilar: el fichero se lee en cada arranque.
+                    </migo-alert>
+                  }
+                </div>
+              </li>
+
+              <!-- 5 -->
+              <li class="flex scroll-mt-4 gap-3" id="paso-5">
+                <span
+                  class="flex size-8 shrink-0 items-center justify-center rounded-full bg-brand-soft font-body text-sm font-semibold text-heading"
+                  aria-hidden="true"
+                  >5</span
+                >
+                <div class="flex min-w-0 flex-1 flex-col gap-2">
+                  <h4 class="m-0 font-body text-base font-semibold text-heading">
+                    Crea el proyecto de Apps Script y pega el código
+                  </h4>
+                  <p class="m-0 text-sm text-body">
+                    Entra en
+                    <a
+                      class="font-semibold text-brand underline"
+                      href="https://script.google.com/home/projects/create"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      >script.google.com <migo-icon name="mat:open_in_new" size="xs"
+                    /></a>
+                    y crea un proyecto nuevo. Borra todo el contenido de <code>Código.gs</code> y
+                    pega este, entero:
+                  </p>
+                  <migo-code-block
+                    label="Code.gs"
+                    emptyLabel="No se ha podido leer public/apps-script/Code.gs desde el servidor."
+                    [code]="data.script"
+                    (copied)="onCopied('script')"
+                  />
+                </div>
+              </li>
+
+              <!-- 6 -->
+              <li class="flex scroll-mt-4 gap-3" id="paso-6">
+                <span
+                  class="flex size-8 shrink-0 items-center justify-center rounded-full bg-brand-soft font-body text-sm font-semibold text-heading"
+                  aria-hidden="true"
+                  >6</span
+                >
+                <div class="flex min-w-0 flex-1 flex-col gap-2">
+                  <h4 class="m-0 font-body text-base font-semibold text-heading">
+                    Sustituye el manifiesto
+                  </h4>
+                  <p class="m-0 text-sm text-body">
+                    En <em>⚙ Configuración del proyecto</em>, marca «Mostrar el archivo de
+                    manifiesto <code>appsscript.json</code>». Ábrelo en el editor y sustituye su
+                    contenido por este:
+                  </p>
+                  <migo-code-block
+                    label="appsscript.json"
+                    emptyLabel="No se ha podido leer public/apps-script/appsscript.json desde el servidor."
+                    open
+                    [code]="data.manifest"
+                    (copied)="onCopied('manifest')"
+                  />
+                  <p class="m-0 text-caption text-muted">
+                    Guarda con Ctrl/Cmd + S. El único permiso que el script pide para sí mismo es
+                    hacer peticiones externas; todo lo demás lo hace con tu propio token.
+                  </p>
+                </div>
+              </li>
+
+              <!-- 7 -->
+              <li class="flex scroll-mt-4 gap-3" id="paso-7">
+                <span
+                  class="flex size-8 shrink-0 items-center justify-center rounded-full bg-brand-soft font-body text-sm font-semibold text-heading"
+                  aria-hidden="true"
+                  >7</span
+                >
+                <div class="flex min-w-0 flex-1 flex-col gap-2">
+                  <h4 class="m-0 font-body text-base font-semibold text-heading">
+                    Autoriza el Client ID en el script
+                  </h4>
+                  <p class="m-0 text-sm text-body">
+                    En
+                    <em
+                      >⚙ Configuración del proyecto → Propiedades de la secuencia de comandos →
+                      Añadir propiedad</em
+                    >, crea <code>ALLOWED_CLIENT_IDS</code> con este valor:
+                  </p>
+                  @if (data.clientId) {
+                    <migo-copy-field
+                      ariaLabel="Valor de ALLOWED_CLIENT_IDS"
+                      [value]="data.clientId"
+                      (copied)="onCopied('clientId')"
+                    />
+                  } @else {
+                    <migo-alert variant="warning" heading="Pendiente" live="off">
+                      Hace falta el Client ID del paso 4.
+                    </migo-alert>
+                  }
+                  <p class="m-0 text-caption text-muted">
+                    Es el cerrojo de seguridad: sin esta propiedad el script rechaza
+                    <em>todas</em> las peticiones, a propósito.
+                  </p>
+                </div>
+              </li>
+
+              <!-- 8 -->
+              <li class="flex scroll-mt-4 gap-3" id="paso-8">
+                <span
+                  class="flex size-8 shrink-0 items-center justify-center rounded-full bg-brand-soft font-body text-sm font-semibold text-heading"
+                  aria-hidden="true"
+                  >8</span
+                >
+                <div class="flex min-w-0 flex-1 flex-col gap-2">
+                  <h4 class="m-0 font-body text-base font-semibold text-heading">
+                    Despliega como aplicación web
+                  </h4>
+                  <p class="m-0 text-sm text-body">
+                    <em>Implementar → Nueva implementación → ⚙ → Aplicación web</em>, con estos dos
+                    ajustes exactos:
+                  </p>
+                  <ul class="m-0 flex list-disc flex-col gap-1 ps-5 text-sm text-body">
+                    <li><strong>Ejecutar como:</strong> Yo (tu cuenta)</li>
+                    <li><strong>Quién tiene acceso:</strong> Cualquiera</li>
+                  </ul>
+                  <p class="m-0 text-sm text-body">
+                    Copia la <strong>URL del Web App</strong> que te da al terminar; acaba en
+                    <code>/exec</code>.
+                  </p>
+                  <migo-alert variant="info" heading="«Cualquiera» no expone tus datos" live="off">
+                    Un navegador no puede mandar la cabecera de autorización a un Apps Script, así
+                    que el acceso tiene que ser abierto. El cerrojo es otro: el script valida tu
+                    token contra <code>ALLOWED_CLIENT_IDS</code> y escribe siempre con la identidad
+                    de quien llama, nunca con la tuya.
+                  </migo-alert>
+                </div>
+              </li>
+
+              <!-- 9 -->
+              <li class="flex scroll-mt-4 gap-3" id="paso-9">
+                <span
+                  class="flex size-8 shrink-0 items-center justify-center rounded-full bg-brand-soft font-body text-sm font-semibold text-heading"
+                  aria-hidden="true"
+                  >9</span
+                >
+                <div class="flex min-w-0 flex-1 flex-col gap-2">
+                  <h4 class="m-0 font-body text-base font-semibold text-heading">
+                    Pega la URL en <code>public/config.json</code>
+                  </h4>
+                  @if (data.endpoint) {
+                    <p class="m-0 text-sm text-body">
+                      Hecho. Ábrela en otra pestaña: tiene que responder un JSON con
+                      <code>"ops":["hello","upsert","verify"]</code>. Si falta <code>verify</code>,
+                      el despliegue es anterior al código del paso 5 y hay que actualizarlo (ver
+                      abajo).
+                    </p>
+                    <a
+                      class="inline-flex min-h-11 w-fit items-center gap-1 font-body text-sm font-semibold text-brand underline"
+                      [href]="data.endpoint"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Comprobar el script
+                      <migo-icon name="mat:open_in_new" size="xs" />
+                    </a>
+                  } @else {
+                    <migo-alert variant="warning" heading="Pendiente" live="off">
+                      Pega la URL <code>/exec</code> en la clave <code>appsScriptUrl</code> de
+                      <code>public/config.json</code> y recarga esta página.
+                    </migo-alert>
+                  }
+                </div>
+              </li>
+
+              <!-- 10 -->
+              <li class="flex scroll-mt-4 gap-3" id="paso-10">
+                <span
+                  class="flex size-8 shrink-0 items-center justify-center rounded-full bg-brand-soft font-body text-sm font-semibold text-heading"
+                  aria-hidden="true"
+                  >10</span
+                >
+                <div class="flex min-w-0 flex-1 flex-col gap-2">
+                  <h4 class="m-0 font-body text-base font-semibold text-heading">
+                    Vuelve arriba y pulsa «Conectar con Google»
+                  </h4>
+                  <p class="m-0 text-sm text-body">
+                    Los cinco pasos de la conexión te dirán exactamente dónde se rompe si algo quedó
+                    a medias. El cuarto manda un dato de prueba y lo vuelve a leer de la hoja: hasta
+                    que ese pasa, no está listo.
+                  </p>
+                </div>
+              </li>
+            </ol>
+
+            <migo-alert variant="warning" heading="Cada vez que cambie el Code.gs" live="off">
+              <p>
+                Guardar en el editor <strong>no despliega nada</strong>. Hay que hacer
+                <em
+                  >Implementar → Gestionar implementaciones → ✏️ editar → Versión: Nueva versión →
+                  Implementar</em
+                >. Así se conserva la misma URL <code>/exec</code> y no hay que tocar la
+                configuración. Si en su lugar creas una implementación nueva, la URL cambia.
+              </p>
+            </migo-alert>
+          } @else {
+            <p class="m-0 text-sm text-muted">Cargando la guía…</p>
+          }
+        </div>
+      </migo-card-body>
+    }
+  </migo-card>
+
   <p class="m-0 text-caption text-muted">
-    Cómo se monta el Apps Script y el proyecto de Google, paso a paso:
-    <code>manual/appscript.md</code> en el repositorio.
+    La misma guía, con capturas y diagnóstico de fallos: <code>manual/appscript.md</code> en el
+    repositorio.
   </p>
 </div>
