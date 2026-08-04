@@ -36,7 +36,7 @@ export async function readConfigDocument(): Promise<ConfigDocument | null> {
   }
 }
 
-const EMPTY: IntegrationConfig = { appsScriptUrl: null, googleClientId: null };
+const EMPTY: IntegrationConfig = { googleClientId: null };
 
 /**
  * {@link AppConfig} sobre el documento servido en `public/config.json`.
@@ -60,10 +60,7 @@ export class PublicFileAppConfig extends AppConfig {
     if (!this.document) {
       return EMPTY;
     }
-    return {
-      appsScriptUrl: trimmedOrNull(this.document.appsScriptUrl),
-      googleClientId: trimmedOrNull(this.document.googleClientId),
-    };
+    return { googleClientId: trimmedOrNull(this.document.googleClientId) };
   }
 }
 

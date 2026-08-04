@@ -5,6 +5,7 @@ import { CredentialsProvider } from '@core/_common/credentials/credentials-provi
 import { ExportableData } from '@core/_common/export/exportable-data';
 import { Logger } from '@core/_common/logger/logger';
 import { SyncEvents } from '../../domain/events/sync-events';
+import { SyncTargetRepository } from '../../domain/repositories/sync-target.repository';
 import { SyncGateway } from '../../domain/services/sync.gateway';
 import { SyncError } from '../../domain/services/sync.gateway.types';
 import { SyncOutbox } from '../../domain/services/sync-outbox';
@@ -27,7 +28,13 @@ export interface SynchronizeRequest {
   aggregate?: string;
 }
 
-export type SyncSkipReason = 'disconnected' | 'nothing-pending' | 'stale-session' | 'failed';
+export type SyncSkipReason =
+  | 'disconnected'
+  /** Hay sesión, pero esta cuenta todavía no tiene su hoja preparada. */
+  | 'no-target'
+  | 'nothing-pending'
+  | 'stale-session'
+  | 'failed';
 
 export interface SynchronizeResult {
   synced: boolean;
@@ -58,6 +65,7 @@ export interface SynchronizeResult {
 @Injectable({ providedIn: 'root' })
 export class Synchronize extends UseCase<SynchronizeRequest, SynchronizeResult> {
   private readonly credentials = inject(CredentialsProvider);
+  private readonly targets = inject(SyncTargetRepository);
   private readonly source = inject(ExportableData);
   private readonly gateway = inject(SyncGateway);
   private readonly outbox = inject(SyncOutbox);
@@ -114,6 +122,14 @@ export class Synchronize extends UseCase<SynchronizeRequest, SynchronizeResult> 
       return { synced: false, rows: 0, reason: 'disconnected' };
     }
 
+    // A dónde se escribe depende de quién está conectado: cada cuenta tiene su hoja. Sin ella no se
+    // toca la cola — lo pendiente sigue esperando a que la haya.
+    const target = await this.targets.forAccount(credentials.accountId);
+    if (!target) {
+      this.log.debug('esta cuenta todavía no tiene hoja');
+      return { synced: false, rows: 0, reason: 'no-target' };
+    }
+
     const items = scope === 'pending' ? await this.dequeue(aggregate) : [];
     if (scope === 'pending' && items.length === 0) {
       this.log.debug('nada pendiente en la cola');
@@ -136,7 +152,7 @@ export class Synchronize extends UseCase<SynchronizeRequest, SynchronizeResult> 
         return { synced: true, rows: 0 };
       }
 
-      const outcome = await this.gateway.send({ credential: credentials.token, batch });
+      const outcome = await this.gateway.send({ credential: credentials.token, target, batch });
 
       if (await this.sessionChanged(credentials.epoch)) {
         this.log.debug('la sesión cambió durante el envío, los cambios vuelven a la cola', {
@@ -150,8 +166,8 @@ export class Synchronize extends UseCase<SynchronizeRequest, SynchronizeResult> 
       }
 
       await this.outbox.ack(items);
-      this.status.markSynced(outcome.target, batch.syncedAt);
-      await this.bus.publish([SyncEvents.succeeded(outcome.target.id, batch.total)]);
+      this.status.markSynced(target, batch.syncedAt);
+      await this.bus.publish([SyncEvents.succeeded(target.id, batch.total)]);
       this.log.debug('sincronizado', { filas: batch.total, aplicadas: outcome.applied });
       return { synced: true, rows: batch.total };
     } catch (error) {

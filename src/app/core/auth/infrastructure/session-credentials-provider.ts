@@ -35,6 +35,11 @@ export class SessionCredentialsProvider extends CredentialsProvider {
       return null;
     }
     this.log.debug('credencial vigente', { accountId: account.id.value, epoch });
-    return { token: credential.token, epoch, accountEmail: account.email };
+    return {
+      token: credential.token,
+      epoch,
+      accountId: account.id.value,
+      accountEmail: account.email,
+    };
   }
 }

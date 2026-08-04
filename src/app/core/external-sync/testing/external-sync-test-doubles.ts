@@ -22,8 +22,7 @@ import {
   SyncRequest,
 } from '../domain/services/sync.gateway.types';
 import { SyncOutbox } from '../domain/services/sync-outbox';
-import { SyncSetupSource } from '../domain/services/sync-setup-source';
-import { SyncSetup } from '../domain/services/sync-setup.types';
+import { SyncTargetRepository } from '../domain/repositories/sync-target.repository';
 import { SyncStatus } from '../domain/services/sync-status';
 import { SyncItem } from '../domain/value-objects/sync-item';
 import { SyncTarget } from '../domain/value-objects/sync-target';
@@ -129,11 +128,15 @@ export class FakeEventBus extends EventBus {
   }
 }
 
-/** Destino falso: registra los envíos y puede programarse para fallar el siguiente. */
+/** Destino falso: registra lo que se le manda y puede programarse para fallar lo siguiente. */
 @Injectable()
 export class FakeSyncGateway extends SyncGateway {
   readonly sent: SyncRequest[] = [];
   readonly probed: ProbeRequest[] = [];
+  /** Cuántas hojas se han creado. Para asertar que no se crea una en cada conexión. */
+  created = 0;
+  /** `false` simula que el usuario borró su hoja o la mandó a la papelera. */
+  targetAlive = true;
   failWith: Error | null = null;
   /**
    * Qué devuelve la comprobación de ida y vuelta. `null` = el eco correcto (lo que se mandó); un
@@ -141,19 +144,24 @@ export class FakeSyncGateway extends SyncGateway {
    */
   echo: string | null = null;
 
+  async create(): Promise<SyncTarget> {
+    if (this.failWith) {
+      throw this.failWith;
+    }
+    this.created += 1;
+    return SyncTarget.of(`target-${this.created}`, 'https://example.test/hoja');
+  }
+
+  async exists(): Promise<boolean> {
+    return this.targetAlive;
+  }
+
   async send(request: SyncRequest): Promise<SyncOutcome> {
     this.sent.push(request);
     if (this.failWith) {
       throw this.failWith;
     }
-    return { target: this.target(), applied: {} };
-  }
-
-  async open(): Promise<SyncTarget> {
-    if (this.failWith) {
-      throw this.failWith;
-    }
-    return this.target();
+    return { applied: {} };
   }
 
   async probe(request: ProbeRequest): Promise<ProbeOutcome> {
@@ -161,33 +169,30 @@ export class FakeSyncGateway extends SyncGateway {
     if (this.failWith) {
       throw this.failWith;
     }
-    return { target: this.target(), echo: this.echo ?? request.probe.value };
-  }
-
-  private target(): SyncTarget {
-    return SyncTarget.of('target-1', 'https://example.test/hoja');
+    return { echo: this.echo ?? request.probe.value };
   }
 }
 
-/**
- * Fuentes falsas de la puesta en marcha. Por defecto viene todo resuelto; los tests vacían lo que
- * quieran para comprobar cómo se cuenta un hueco.
- */
+/** Las hojas recordadas, en memoria y por cuenta, con la misma semántica que la real. */
 @Injectable()
-export class FakeSyncSetupSource extends SyncSetupSource {
-  setup: SyncSetup = {
-    snippets: [
-      { id: 'script', value: 'function doPost() {}' },
-      { id: 'manifest', value: '{ "runtimeVersion": "V8" }' },
-      { id: 'clientId', value: '123-abc.apps.googleusercontent.com' },
-      { id: 'origin', value: 'https://example.test' },
-      { id: 'endpoint', value: 'https://script.example.test/exec' },
-    ],
-    configured: true,
-  };
+export class FakeSyncTargetRepository extends SyncTargetRepository {
+  private readonly byAccount = new Map<string, SyncTarget>();
 
-  async read(): Promise<SyncSetup> {
-    return this.setup;
+  async forAccount(accountId: string): Promise<SyncTarget | null> {
+    return this.byAccount.get(accountId) ?? null;
+  }
+
+  async save(accountId: string, target: SyncTarget): Promise<void> {
+    this.byAccount.set(accountId, target);
+  }
+
+  async remove(accountId: string): Promise<void> {
+    this.byAccount.delete(accountId);
+  }
+
+  /** Cuántas cuentas tienen hoja recordada. Para asertar que no se crea de más. */
+  count(): number {
+    return this.byAccount.size;
   }
 }
 
@@ -197,6 +202,7 @@ export class FakeCredentialsProvider extends CredentialsProvider {
   credentials: UserCredentials | null = {
     token: 't-1',
     epoch: 1,
+    accountId: 'cuenta-1',
     accountEmail: 'chef@example.test',
   };
 
@@ -228,12 +234,12 @@ export function makeExternalSyncFakes(): { providers: Provider[] } {
       { provide: Logger, useClass: ConsoleLogger },
       FakeSyncOutbox,
       FakeSyncGateway,
-      FakeSyncSetupSource,
+      FakeSyncTargetRepository,
       FakeCredentialsProvider,
       FakeExportableData,
       { provide: SyncOutbox, useExisting: FakeSyncOutbox },
       { provide: SyncGateway, useExisting: FakeSyncGateway },
-      { provide: SyncSetupSource, useExisting: FakeSyncSetupSource },
+      { provide: SyncTargetRepository, useExisting: FakeSyncTargetRepository },
       { provide: CredentialsProvider, useExisting: FakeCredentialsProvider },
       { provide: ExportableData, useExisting: FakeExportableData },
       { provide: SyncStatus, useClass: InMemorySyncStatus },

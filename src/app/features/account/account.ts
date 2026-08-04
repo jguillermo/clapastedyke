@@ -1,13 +1,4 @@
-import {
-  afterNextRender,
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  inject,
-  Injector,
-  type OnInit,
-  signal,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Card } from '@components/card/card';
 import { CardBody } from '@components/card/card-body';
@@ -18,20 +9,13 @@ import { CardTitle } from '@components/card/card-title';
 import { Button } from '@components/button/button';
 import { Badge } from '@components/badge/badge';
 import { Checklist, ChecklistItem, ChecklistState } from '@components/checklist/checklist';
-import { CodeBlock } from '@components/code-block/code-block';
-import { CopyField } from '@components/copy-field/copy-field';
 import { Icon } from '@components/icon/icon';
 import { Alert } from '@components/alert/alert';
 import { Logger } from '@core/_common/logger/logger';
-import { GetAuthSettings } from '@core/auth/application/use-cases/get-auth-settings.use-case';
 import { SignIn } from '@core/auth/application/use-cases/sign-in.use-case';
 import { SignOut } from '@core/auth/application/use-cases/sign-out.use-case';
 import { WatchSession } from '@core/auth/application/use-cases/watch-session.use-case';
-import {
-  GetSyncSetup,
-  SyncSetupView,
-} from '@core/external-sync/application/use-cases/get-sync-setup.use-case';
-import { OpenSyncTarget } from '@core/external-sync/application/use-cases/open-sync-target.use-case';
+import { PrepareSyncTarget } from '@core/external-sync/application/use-cases/prepare-sync-target.use-case';
 import { Synchronize } from '@core/external-sync/application/use-cases/synchronize.use-case';
 import { VerifySyncConnection } from '@core/external-sync/application/use-cases/verify-sync-connection.use-case';
 import { WatchSyncStatus } from '@core/external-sync/application/use-cases/watch-sync-status.use-case';
@@ -39,6 +23,10 @@ import { WatchSyncStatus } from '@core/external-sync/application/use-cases/watch
 /** Una cosa concreta que puede hacer quien está delante, en imperativo. */
 interface RemedyAction {
   text: string;
+  /** A dónde tiene que ir, si hay que ir a algún sitio. */
+  url?: string;
+  /** Cómo se llama ese sitio, para que el enlace no diga «aquí». */
+  urlLabel?: string;
 }
 
 /**
@@ -61,8 +49,11 @@ interface StepRemedy {
   userActions: readonly RemedyAction[];
   /** Qué falta en la instalación, en una frase, para quien la mantiene. */
   deployerHint?: string;
-  /** El paso de la guía de puesta en marcha donde está el detalle largo. */
-  guideStep?: number;
+  /**
+   * Ofrece «Reinstalar desde cero». Solo en los pasos donde reintentar no puede bastar: lo que hay
+   * guardado apunta a una hoja o a un sincronizador que ya no sirven.
+   */
+  offerReinstall?: boolean;
 }
 
 /** Un paso de la conexión: lo que se cuenta, lo que hace y qué hacer si se rompe. */
@@ -86,46 +77,36 @@ interface ConnectFailure {
  * Pantalla de cuenta (`/cuenta`): conectar una cuenta de Google y ver el estado de la
  * sincronización con la hoja de cálculo.
  *
- * Tres bloques: **cuenta** (conectar / cerrar sesión, con la lista de pasos), **sincronización**
- * (estado, hoja, pendientes y sincronización manual) e **instalación** (el runbook de quien publica
- * la app, plegado).
+ * Dos bloques: **cuenta** (conectar / cerrar sesión, con la lista de pasos) y **sincronización**
+ * (estado, hoja, pendientes y sincronización manual). Nada más — aquí no hay consolas, ni ficheros de
+ * configuración, ni pasos de instalación: todo eso lo hace la app sola cuando el usuario conecta.
  *
- * No hay bloque de «configuración». Que el despliegue traiga Client ID no es un estado que merezca
- * sitio propio en la pantalla: es la primera comprobación de conectar, y ahí se cuenta — con su
- * nombre, su ✔ y, si falta, el motivo y a dónde ir. Un panel permanente le explicaba el contenido de
- * un fichero de despliegue a quien solo venía a por su copia de seguridad.
+ * ## Conectar lo hace todo, y se cuenta paso a paso
  *
- * ## Conectar se cuenta paso a paso, y termina probando la ida y vuelta
+ * Al pulsar «Conectar con Google» la app crea la hoja en el Drive del usuario **e instala allí su
+ * propio sincronizador**, con su secreto. Son unos segundos y cinco llamadas a Google, así que se
+ * cuenta por pasos en vez de dejar un spinner mudo.
  *
- * «Conectado» no significa «funciona». Iniciar sesión solo demuestra que el usuario se identificó;
- * entre eso y «mis recetas se guardan» está el permiso que no se concedió, el despliegue que
- * contesta pero no escribe y la hoja que alguien borró. Por eso conectar es una secuencia de cinco
- * pasos que el usuario ve marcarse, y el último de verdad es **mandar un dato de prueba y volver a
- * leerlo**: hasta que ese vuelve igual, la conexión no está lista.
+ * «Conectado» tampoco significa «funciona»: entre identificarse y «mis recetas se guardan» está el
+ * permiso que no se concedió y el sincronizador que contesta pero no escribe. Por eso el penúltimo
+ * paso es **mandar un dato de prueba y volver a leerlo de la hoja**: hasta que ese vuelve igual, la
+ * conexión no está lista.
  *
  * La feature solo orquesta casos de uso y traduce cada uno a un paso de la lista; ninguna de las
- * cinco operaciones sabe que hay una lista.
+ * operaciones sabe que hay una lista.
  *
- * ## Dos públicos en una pantalla, y no se mezclan
+ * ## No queda ningún paso manual
  *
- * **Quien usa la app hace una cosa: pulsar «Conectar con Google», elegir cuenta y aceptar un
- * permiso.** Nada más — ni consolas, ni proyectos, ni ficheros. La tarjeta de instalación es el
- * runbook de **quien publica la app**: se hace una vez, sirve para todos sus usuarios, y por eso
- * viene plegada y rotulada como lo que es.
+ * La app crea la hoja y la escribe ella misma con las APIs de Sheets y Drive. No hay nada que
+ * desplegar, nada que instalar en la cuenta de nadie y ningún interruptor que encender: **una casilla
+ * de permiso y ya**.
  *
- * Lo mismo con los fallos: `StepRemedy` separa lo que puede resolver quien está delante de lo que
- * solo se arregla en la instalación. Cuando no hay nada que la persona pueda hacer, se le dice
- * exactamente eso —y que sus datos siguen a salvo— en vez de mandarla a Google Cloud.
- *
- * El montaje sí vive aquí, y no solo en `manual/appscript.md`, porque se hace **con la app
- * delante**: cada valor que hay que pegar sale con su botón de copiar y ya resuelto con la
- * configuración de ESTE despliegue. `GetSyncSetup` los trae; el código se lee de `public/`, así que
- * lo que se enseña es literalmente el fichero que se despliega, no una transcripción que se quede
- * vieja.
+ * Aun así, `StepRemedy` reparte los fallos por quién puede resolverlos: lo que depende de quien está
+ * delante (permitir la ventana emergente, aceptar la casilla, mirar la conexión) va arriba; lo que es
+ * de la instalación de la app se dice como tal, sin mandar a nadie a una consola.
  *
  * Solo inyecta casos de uso. El estado reactivo llega por las signals que exponen `WatchSession` y
- * `WatchSyncStatus`, así que la vista no toca ni la sesión ni la cola. El porqué de cada ajuste y el
- * diagnóstico de fallos siguen en `manual/appscript.md`.
+ * `WatchSyncStatus`, así que la vista no toca ni la sesión ni la cola.
  */
 @Component({
   selector: 'app-account',
@@ -143,25 +124,19 @@ interface ConnectFailure {
     Button,
     Badge,
     Checklist,
-    CodeBlock,
-    CopyField,
     Icon,
     Alert,
   ],
 })
-export class Account implements OnInit {
+export class Account {
   private readonly watchSession = inject(WatchSession);
   private readonly watchStatus = inject(WatchSyncStatus);
   private readonly signIn = inject(SignIn);
   private readonly signOut = inject(SignOut);
-  private readonly readSettings = inject(GetAuthSettings);
-  private readonly readSetup = inject(GetSyncSetup);
-  private readonly openTarget = inject(OpenSyncTarget);
+  private readonly prepareTarget = inject(PrepareSyncTarget);
   private readonly verifyConnection = inject(VerifySyncConnection);
   private readonly sync = inject(Synchronize);
   private readonly log = inject(Logger).scoped('ui/account');
-  /** Para `afterNextRender` fuera del constructor: el salto a un paso de la guía. */
-  private readonly injector = inject(Injector);
 
   /** Estado de la sesión y de la sincronización, tal como los publica cada caso de uso. */
   protected readonly session = this.watchSession.state;
@@ -170,19 +145,6 @@ export class Account implements OnInit {
   protected readonly busy = signal(false);
   /** Error de la última acción del usuario (los de sincronización viven en `status`). */
   protected readonly actionError = signal('');
-
-  /**
-   * Lo que hay que llevarse a la consola de Google para dejar montado el destino. `null` mientras se
-   * lee (el código sale de `public/`, así que hay una ida a la red).
-   */
-  protected readonly setup = signal<SyncSetupView | null>(null);
-
-  /**
-   * Si la guía de puesta en marcha está desplegada. **Se abre sola cuando falta configuración**: quien
-   * ya lo tiene montado no necesita doce pasos delante cada vez que entra, y quien no, no debería
-   * tener que buscarlos.
-   */
-  protected readonly guideOpen = signal(false);
 
   /** Los pasos de la conexión, tal como los pinta `migo-checklist`. Vacío = todavía no se intentó. */
   protected readonly progress = signal<ChecklistItem[]>([]);
@@ -205,68 +167,58 @@ export class Account implements OnInit {
   protected readonly failed = computed(() => this.failure() !== null);
 
   /**
-   * Los cinco pasos, en orden. Cada uno es **un caso de uso**: si un paso necesitara saber algo del
+   * Los cuatro pasos, en orden. Cada uno es **un caso de uso**: si un paso necesitara saber algo del
    * anterior que no sea «salió bien», el que estaría mal partido es el caso de uso.
    *
    * Cada uno lleva además **qué está haciendo** y **qué hacer si se rompe, separado por quién puede
-   * hacerlo**. Casi todos estos fallos son de la instalación, no de la cuenta de quien está delante:
-   * ese reparto es lo que evita pedirle a alguien que solo quería su copia de seguridad que abra la
-   * consola de Google.
+   * hacerlo**. Ningún paso pide nada al usuario salvo lo que ya está haciendo: elegir cuenta y
+   * aceptar el permiso.
    */
   private readonly steps: readonly ConnectStep[] = [
     {
-      label: 'Leyendo el Client ID de la configuración',
-      doing: 'Buscando el identificador de la app en su configuración…',
-      run: () => this.readClientId(),
-      remedy: {
-        what: 'Leo el identificador de esta app ante Google. Viene con la instalación, es el mismo para todo el mundo y no depende de tu cuenta.',
-        userActions: [],
-        deployerHint:
-          'Falta googleClientId en public/config.json. Se crea una vez en la consola de Google Cloud (paso 3 de la guía) y se pega en ese fichero; no hay que recompilar.',
-        guideStep: 3,
-      },
-    },
-    {
       label: 'Conectando con tu cuenta de Google',
-      doing: 'Esperando a que elijas cuenta y aceptes el permiso…',
+      doing: 'Esperando a que elijas cuenta y aceptes los permisos…',
       run: () => this.authenticate(),
       remedy: {
-        what: 'Le pido a Google que te identifique y me dé permiso para crear un archivo en tu Drive. El permiso es el más estrecho que existe: solo alcanza los archivos que crea esta app, no ve el resto de tu Drive.',
+        what: 'Le pido a Google que te identifique y me dé permiso para crear tu hoja y dejar en tu cuenta el pequeño programa que la mantiene al día. El permiso sobre tu Drive es el más estrecho que existe: solo alcanza los archivos que crea esta app.',
         userActions: [
           {
             text: 'Si no llegaste a ver la ventana de Google, la bloqueó el navegador: permite las ventanas emergentes de este sitio y vuelve a intentarlo.',
           },
           {
-            text: 'Cuando Google te pregunte, marca la casilla del permiso. Sin ella no hay dónde guardar la copia.',
+            text: 'Cuando Google te pregunte, acepta las casillas. Sin ellas no hay dónde guardar la copia ni quién la escriba.',
           },
         ],
         deployerHint:
-          'Si Google habló de un origen no autorizado o de «acceso bloqueado», es cosa de la instalación: falta autorizar esta dirección en el Client ID, o dar de alta esa cuenta como usuario de prueba.',
-        guideStep: 2,
+          'Si Google habló de un origen no autorizado o de «acceso bloqueado», es de la instalación de la app: falta autorizar esta dirección en el Client ID, o dar de alta esa cuenta como usuario de prueba.',
       },
     },
     {
-      label: 'Preparando la hoja en tu Drive',
-      doing: 'Pidiendo que se localice tu hoja de cálculo, o que se cree…',
-      run: () => this.prepareTarget(),
+      label: 'Preparando tu hoja en Drive',
+      doing: 'Creando la hoja «Clapastedyke — Recetario» en tu Drive…',
+      run: () => this.prepare(),
       remedy: {
-        what: 'Pido que se busque en tu Drive la hoja «Clapastedyke — Recetario», o que se cree si es la primera vez. Quien la crea es el sincronizador que viene con la instalación.',
-        userActions: [],
-        deployerHint:
-          'El sincronizador no está desplegado, o su dirección no está en public/config.json. Es un Apps Script que se despliega una vez (pasos 5 a 9 de la guía).',
-        guideStep: 5,
+        what: 'Creo la hoja en tu Drive con sus pestañas y sus cabeceras. Se hace una sola vez: la próxima vez que conectes, se reutiliza la misma. Si la borraste, se crea otra.',
+        userActions: [
+          {
+            text: 'Comprueba tu conexión y pulsa Reintentar: crear la hoja es una sola llamada y no deja nada a medias.',
+          },
+        ],
+        offerReinstall: true,
       },
     },
     {
       label: 'Enviando y leyendo un dato de prueba',
-      doing: 'Escribiendo un dato de prueba y volviéndolo a leer…',
+      doing: 'Escribiendo un dato de prueba en tu hoja y volviéndolo a leer…',
       run: () => this.checkRoundTrip(),
       remedy: {
         what: 'Escribo un dato de usar y tirar en tu hoja y lo leo de vuelta. Es lo único que demuestra que todo funciona antes de mandar nada tuyo.',
-        userActions: [],
-        deployerHint:
-          'La hoja existe pero la escritura no cuaja. Suele ser un despliegue anticuado: hay que volver a pegar el Code.gs y publicar una versión nueva (guardar en el editor no despliega).',
-        guideStep: 5,
+        userActions: [
+          {
+            text: 'Si borraste la hoja o su sincronizador, reinstálalos: se crean otra vez desde cero y no pierdes nada.',
+          },
+        ],
+        offerReinstall: true,
       },
     },
     {
@@ -287,31 +239,6 @@ export class Account implements OnInit {
       },
     },
   ];
-
-  async ngOnInit(): Promise<void> {
-    // Angular no espera este hook: sin `catch` un fallo sería un rechazo no capturado.
-    try {
-      const setup = await this.readSetup.execute();
-      this.setup.set(setup);
-      // NO se abre sola aunque falte configuración: quien entra aquí casi siempre viene a por su
-      // copia de seguridad, y esos pasos no son suyos. Si algo falla, el aviso del paso roto ofrece
-      // el botón que la abre justo por donde toca.
-      this.log.debug('guía de puesta en marcha lista', { configurado: setup.configured });
-    } catch (error) {
-      // El caso de uso no lanza —los huecos vienen vacíos—, así que llegar aquí es un fallo de
-      // verdad. La guía se queda sin datos y hay que dejar rastro de por qué.
-      this.log.error('no se pudo preparar la guía de puesta en marcha', error);
-    }
-  }
-
-  protected toggleGuide(): void {
-    this.guideOpen.update((open) => !open);
-  }
-
-  /** El design system no registra; aquí sí interesa saber que alguien se llevó un trozo de la guía. */
-  protected onCopied(what: string): void {
-    this.log.debug('copiado de la guía', { what });
-  }
 
   /**
    * Conecta la cuenta recorriendo los pasos y marcándolos según ocurren.
@@ -352,23 +279,22 @@ export class Account implements OnInit {
   }
 
   /**
-   * Abre la guía por el paso que toca y baja hasta él.
+   * Olvida la hoja de esta cuenta, crea otra y reintenta desde el principio.
    *
-   * El desplazamiento se hace **después** de que Angular haya pintado la guía: hasta entonces el
-   * destino no existe en el documento, porque el cuerpo de la tarjeta está detrás de un `@if`.
+   * Es la salida de «esta hoja ya no sirve»: reintentar sin más no arreglaría nada, porque lo que hay
+   * guardado sigue apuntando a ella. La anterior **no se borra** — se queda en el Drive del usuario,
+   * que es el único que puede decidir tirar sus datos.
    */
-  protected showGuideStep(step: number): void {
-    this.guideOpen.set(true);
-    this.log.debug('saltando a un paso de la guía', { step });
-    afterNextRender(
-      () =>
-        document.getElementById(`paso-${step}`)?.scrollIntoView({
-          // Respeta a quien pidió que la interfaz no se mueva (WCAG 2.3.3).
-          behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
-          block: 'start',
-        }),
-      { injector: this.injector },
-    );
+  protected async reinstall(): Promise<void> {
+    this.log.debug('recrear la hoja ▶');
+    try {
+      await this.prepareTarget.recreate();
+    } catch (error) {
+      // El fallo se cuenta igual que cualquier otro de la conexión, así que se deja que lo haga
+      // `connect()`: aquí solo queda constancia de que no se llegó a recrear.
+      this.log.warn('recrear la hoja ✘', error);
+    }
+    await this.connect();
   }
 
   protected async disconnect(): Promise<void> {
@@ -387,29 +313,14 @@ export class Account implements OnInit {
 
   // ── Los pasos ────────────────────────────────────────────────────────────────────────────────
 
-  /**
-   * Que exista Client ID es el primer paso de la lista, y no un estado permanente de la pantalla,
-   * porque solo importa cuando alguien intenta conectar. Enseñarlo siempre era contar el detalle de
-   * un fichero de despliegue a quien solo quería su copia de seguridad.
-   */
-  private async readClientId(): Promise<string> {
-    const { isConfigured } = await this.readSettings.execute();
-    if (!isConfigured) {
-      throw new Error(
-        'Este despliegue no trae Client ID de OAuth en public/config.json, así que no se puede conectar ninguna cuenta. Sigue la guía de puesta en marcha, más abajo.',
-      );
-    }
-    return 'Encontrado en la configuración del despliegue';
-  }
-
   private async authenticate(): Promise<string> {
     const { email } = await this.signIn.execute();
     return email;
   }
 
-  private async prepareTarget(): Promise<string> {
-    await this.openTarget.execute();
-    return 'La hoja está lista en tu Drive';
+  private async prepare(): Promise<string> {
+    const { created } = await this.prepareTarget.execute();
+    return created ? 'Hoja creada en tu Drive' : 'Ya tenías tu hoja, se reutiliza';
   }
 
   private async checkRoundTrip(): Promise<string> {

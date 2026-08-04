@@ -1,39 +1,39 @@
 import { SyncTarget } from '../value-objects/sync-target';
 import {
-  OpenRequest,
+  CredentialRequest,
   ProbeOutcome,
   ProbeRequest,
   SyncOutcome,
   SyncRequest,
+  TargetRequest,
 } from './sync.gateway.types';
 
 /**
- * Envía un lote del recetario al destino donde el usuario guarda su copia.
+ * Escribe la copia del usuario donde el usuario la tiene.
  *
  * El puerto **no sabe qué hay al otro lado**. No aparece aquí ninguna URL, ningún formato de
- * transporte y ninguna tecnología: entra un lote con una credencial y sale dónde quedó guardado.
- * Esa es toda la conversación. La implementación concreta —con su destino, su formato y su
- * configuración— vive entera en `infrastructure/`.
+ * transporte y ninguna tecnología: entra una credencial, un destino y un lote, y sale cuántas filas
+ * quedaron aplicadas. Esa es toda la conversación.
  *
  * Es un **servicio**, no un repositorio: no lee ni escribe agregados de este contexto, coordina una
- * operación remota (el destino decide dónde guardar, lo crea si falta y aplica el upsert).
+ * operación remota.
  *
  * El contrato es idempotente por construcción: mandar dos veces el mismo `SyncBatch` deja el destino
  * igual que mandarlo una.
  */
 export abstract class SyncGateway {
-  abstract send(request: SyncRequest): Promise<SyncOutcome>;
-
   /**
-   * Se asegura de que el destino exista y dice dónde está, sin mandar ningún dato.
+   * Crea el destino del usuario, listo para recibir datos. Devuelve dónde quedó.
    *
-   * Existe para que conectar una cuenta pueda contarse por pasos: «preparar dónde se va a guardar»
-   * es una operación con su propio resultado visible (la dirección de la copia) y su propio fallo
-   * —el permiso, la cuota— que nada tiene que ver con las filas que se manden después.
-   *
-   * Idempotente: llamarlo dos veces no crea dos destinos.
+   * No comprueba si ya existía otro parecido — para eso está el repositorio, que recuerda el de cada
+   * cuenta. Llamarlo dos veces crea dos destinos, y eso es responsabilidad de quien orquesta.
    */
-  abstract open(request: OpenRequest): Promise<SyncTarget>;
+  abstract create(request: CredentialRequest): Promise<SyncTarget>;
+
+  /** `true` si el destino sigue estando donde se dejó. `false` si lo borraron o está en la papelera. */
+  abstract exists(request: TargetRequest): Promise<boolean>;
+
+  abstract send(request: SyncRequest): Promise<SyncOutcome>;
 
   /**
    * Escribe el dato de prueba en el destino y **lo vuelve a leer de allí**, devolviendo lo leído.

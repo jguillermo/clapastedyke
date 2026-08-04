@@ -8,8 +8,8 @@ marcha. Aquí no hay nada de producto ni de negocio — eso vive en [`.claude/do
 
 | Documento | Qué es |
 |---|---|
-| [`appscript.md`](appscript.md) | **El cómo.** Guía paso a paso de la puesta en marcha manual de la integración con Google Sheets: proyecto de Cloud, pantalla de consentimiento, Client ID, despliegue del Apps Script y conexión de la app. Incluye diagnóstico de fallos y el contrato con el script. |
-| [`google-integration.md`](google-integration.md) | **El porqué.** Modelo mental de la integración con Google, las restricciones de la plataforma que la fuerzan (sin refresh token en navegador, el preflight CORS que Apps Script no atiende, las dos identidades con las que puede escribir un script), las arquitecturas descartadas y los datos medidos que respaldan cada decisión. |
+| [`google-setup.md`](google-setup.md) | **El cómo.** Lo que hay que montar una vez para que la integración con Google Sheets funcione: proyecto de Cloud, pantalla de consentimiento, Client ID y la única clave de `config.json`. Incluye la lista de comprobación y el diagnóstico de fallos. La hoja de cada usuario la crea la app sola. |
+| [`google-integration.md`](google-integration.md) | **El porqué.** Modelo mental de la integración con Google, las restricciones de la plataforma que la fuerzan (sin refresh token en un navegador, el alcance real de `drive.file`), las arquitecturas descartadas y los datos medidos que respaldan cada decisión. |
 
 ## Documentación que NO está aquí, y por qué
 

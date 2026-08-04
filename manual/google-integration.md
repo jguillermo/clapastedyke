@@ -1,7 +1,7 @@
 # Integración con Google — modelo mental y decisiones
 
 Este documento es el **por qué**. El paso a paso para ponerlo en marcha está en
-[`appscript.md`](appscript.md); aquí está lo que hay que entender antes de tocarlo, las alternativas
+[`google-setup.md`](google-setup.md); aquí está lo que hay que entender antes de tocarlo, las alternativas
 que se evaluaron y los datos medidos que respaldan cada decisión.
 
 Se escribió después de una investigación con pruebas reales contra la API de Google (agosto 2026).
@@ -19,7 +19,7 @@ enciende si quiere.
 Consecuencias que conviene tener presentes:
 
 - **Con la integración apagada no cambia nada.** Es el estado por defecto: `public/config.json` sale
-  del repositorio con `appsScriptUrl` y `googleClientId` vacíos.
+  del repositorio con `googleClientId` vacío.
 - **Nunca se lee de la hoja.** El puerto `SyncGateway` solo tiene `send()`. Si algún día la hoja
   fuera también entrada, habría que resolver conflictos, merge y deduplicación entre dos fuentes que
   escriben a la vez — un capítulo aparte, no una ampliación.
@@ -93,15 +93,15 @@ navegador — o sea, un servidor.
 
 Por eso el aislamiento **no puede** basarse en que nadie conozca la URL. Se basa en el token.
 
-### 2.6 Un Apps Script solo tiene dos identidades
+### 2.6 `drive.file` alcanza justo lo que la app crea, y eso basta
 
-| Cómo escribe | Con qué identidad | Dónde acaba la hoja |
-|---|---|---|
-| `SpreadsheetApp` / `DriveApp` | La del **dueño del script** | En **su** Drive |
-| `UrlFetchApp` + token | La del **usuario que llama** | En el Drive **del usuario** |
+El scope se lee así: *«solo los ficheros específicos de Drive que uses con esta app»*. No es «solo
+lectura» ni «solo crear»: sobre **los ficheros que la app ha creado** puede todo — leerlos, escribirlos
+y borrarlos. Sobre el resto del Drive, nada; ni siquiera listarlo.
 
-No hay una tercera. De aquí sale toda la arquitectura: para que la hoja sea del usuario **hace falta
-su token**, y por tanto su login.
+De ahí sale toda la arquitectura actual: la app **crea** la hoja, y por haberla creado puede
+**escribirla**, sin pedir un permiso más ancho y sin nada intermedio. Medido: crear la hoja con solo
+`drive.file` devuelve 200 ([Anexo A.2](#a2-resultados-medidos-3-agosto-2026-cuenta-real)).
 
 ---
 
@@ -109,8 +109,9 @@ su token**, y por tanto su login.
 
 | | Aísla por usuario | Necesita backend | Coste |
 |---|---|---|---|
-| **Apps Script Web App + token del usuario** ← **lo montado** | ✅ | ❌ | Despliegue manual del script, una vez |
-| Sheets REST API directa desde el navegador | ✅ | ❌ | Reimplementar upsert, orden y bloqueo en el cliente |
+| **Sheets + Drive REST desde el navegador** ← **lo montado** | ✅ | ❌ | El upsert y el orden de escritura viven en la app |
+| Apps Script Web App + token del usuario | ✅ | ❌ | Despliegue manual del script, una vez, por quien publica |
+| Apps Script desplegado por la app en cada cuenta | ✅ | ❌ | Un interruptor manual **por usuario** (ver Anexo A) |
 | Google Picker (el usuario elige una hoja) | ✅ | ❌ | Solo resuelve *qué* hoja, no *cómo* escribir |
 | Backend propio con refresh tokens | ✅ | ✅ | Servidor + custodia de credenciales de terceros |
 | **Google Forms** | ❌ | ❌ | Rompe el aislamiento (ver 3.1) |
@@ -128,63 +129,63 @@ fila nueva en vez de corregir la anterior.
 *(Existe el resquicio de crear un formulario por usuario con la Forms API, pero obliga a abandonar la
 UI propia, invierte la dirección de la sincronización y no funciona sin red.)*
 
-### 3.2 Por qué no se llama a la API de Sheets directamente
+### 3.2 Qué costó quitar el Apps Script de en medio
 
-Sería posible (Google sirve CORS) y ahorraría el despliegue manual. Se descartó por los **tres
-cerrojos** que hoy viven en `public/apps-script/Code.gs` y que habría que reimplementar en el cliente:
+Hubo una versión con un Web App de Apps Script que había que desplegar a mano. Se cambió por la
+llamada directa a Sheets, y lo que había que resolver eran los **tres cerrojos** que aquel daba
+gratis:
 
-1. **`LockService`** — serializa toda escritura. En el navegador no hay equivalente: dos pestañas
-   abiertas podrían pisarse.
-2. **`CacheService`** — recuerda `requestId` 6 h, así que reenviar el mismo lote no reescribe nada.
-3. **Upsert por clave** y reemplazo por padre — mandar datos equivalentes converge siempre al mismo
-   estado.
+1. **`LockService`** — serializaba toda escritura. En el navegador no hay equivalente exacto:
+   `navigator.locks` cubre las pestañas del mismo navegador, y entre dos dispositivos escribiendo el
+   mismo segundo no hay cerrojo. **Se acepta**: la convergencia del punto 3 hace que el desenlace sea
+   una hoja consistente, no una a medias.
+2. **`CacheService`** — recordaba el `requestId` 6 h, así que reenviar el mismo lote no reescribía
+   nada. **Se pierde**, y no importa: reescribir el mismo lote deja la hoja igual.
+3. **Upsert por clave y reemplazo por padre** — mandar datos equivalentes converge siempre al mismo
+   estado. **No se pierde**: es el mismo algoritmo, movido a `infrastructure/sheet-merge.ts`, donde
+   además se puede probar sin red — cosa que dentro de un Apps Script no se podía.
 
-Son protecciones contra corrupción silenciosa de datos, que es dificilísima de depurar.
+El tercero era el que de verdad protegía contra corrupción silenciosa, y es el que se conserva.
 
 ---
 
 ## 4 · La arquitectura montada
 
 ```
-Navegador                          Apps Script (tuyo)              Drive del usuario
-─────────                          ──────────────────              ─────────────────
+Navegador                                            Drive del usuario
+─────────                                            ─────────────────
 IndexedDB (fuente de verdad)
     │
     │ evento de dominio
     ▼
 SyncOutbox (cola durable)
     │
-    │ POST text/plain
-    │ { op, requestId, accessToken, sentAt, payload }
-    ▼
-                              valida el token (tokeninfo)
-                              · aud ∈ ALLOWED_CLIENT_IDS
-                              · scope incluye drive.file
-                                     │
-                                     │ UrlFetchApp + token DEL USUARIO
-                                     ▼
-                                                            «Clapastedyke — Recetario»
+    │ Authorization: Bearer <token DEL USUARIO>
+    │
+    ├─ GET  drive/v3/files/{id}          ¿sigue estando la hoja?
+    ├─ POST sheets/v4/spreadsheets       crearla, la primera vez
+    ├─ GET  …/values:batchGet            leer lo que ya hay
+    │       (fusionar por id, en la app)
+    └─ POST …/values:batchUpdate  ───────────────────►  «Clapastedyke — Recetario»
 ```
 
-**El script es un traductor sin memoria de credenciales.** Recibe el token en cada POST, lo valida,
-lo usa y lo tira. Su único estado persistente es el mapa `sub → spreadsheetId` en las propiedades del
-script — un identificador de fichero, no un secreto.
+**Entre la app y la hoja no hay nada.** No hay servidor, ni script alojado, ni intermediario que
+custodie credenciales: la autorización es el token del propio usuario, que vive en memoria y muere
+con la sesión. Lo único que se recuerda entre sesiones es **el id de su hoja** — un identificador de
+fichero, no un secreto.
 
-Por eso, aunque el despliegue sea «ejecutar como: yo» + «acceso: cualquiera», **el script no trabaja
-con tu Drive**: la autorización efectiva es el token que viaja en el cuerpo.
+Y por `drive.file`, ese token solo alcanza los ficheros que esta app creó. Aunque alguien se lo
+llevara, no podría leer nada más del Drive de esa persona.
 
-### 4.1 Por qué el token va en el cuerpo y no en una cabecera
+### 4.1 El token va donde tiene que ir: en la cabecera
 
-> **No tocar sin leer esto.** Está documentado también en
-> `core/external-sync/infrastructure/apps-script-endpoint.ts`.
+Las APIs REST de Google **sí responden al preflight CORS**, así que desde el navegador se llaman como
+cualquier otra: `Authorization: Bearer …` y `Content-Type: application/json`. Está en
+`core/external-sync/infrastructure/google-api.ts`, que es el único sitio del contexto que hace red.
 
-Un Web App de Apps Script **no responde al preflight CORS**. En cuanto mandas
-`Content-Type: application/json` o cualquier cabecera propia —`Authorization` incluida—, el navegador
-manda un `OPTIONS` previo, nadie lo contesta y la llamada muere antes de salir.
-
-Con `Content-Type: text/plain;charset=utf-8` y sin cabeceras propias es una **petición simple**: no
-hay preflight. El token viaja, por eso, en el JSON. Y `redirect: 'follow'` es obligatorio: el script
-contesta con un 302 a `script.googleusercontent.com`.
+Merece la pena saber que la excepción era Apps Script: **un Web App no contesta al `OPTIONS`**, así
+que cualquier cabecera propia mataba la llamada antes de salir y obligaba a mandar el token dentro
+del cuerpo con `text/plain`. Todo aquel rodeo desapareció al quitar el script de en medio.
 
 ### 4.2 Por qué `drive.file` y no otro scope
 
@@ -201,7 +202,7 @@ viable**: la app escribe.
 
 ## 5 · Puesta en marcha
 
-El procedimiento completo está en [`appscript.md`](appscript.md). Aquí solo las **trampas** que se
+El procedimiento completo está en [`google-setup.md`](google-setup.md). Aquí solo las **trampas** que se
 descubrieron ejecutándolo, porque son las que hacen perder una tarde:
 
 ### 5.1 Google renombró la consola
@@ -247,16 +248,19 @@ Google presenta los permisos como **casillas desmarcadas** que el usuario tiene 
 una. Si no las marca, el token vuelve **sin esos permisos y sin error aparente** — el fallo aparece
 mucho después y sin relación visible con la causa.
 
-Con los cuatro scopes de este diseño, el usuario ve **una sola casilla**: la de Drive.
+Con los cuatro scopes de este diseño, el usuario ve **una sola casilla**: la de Drive. Los tres
+primeros (`openid`, `email`, `profile`) no suman ninguna.
 
 > `GoogleAuthenticator` se protege de esto comprobando `credential.allows(DRIVE_FILE_PERMISSION)`
 > nada más recibir el token, y falla con un mensaje accionable. **Cualquier scope nuevo necesita su
 > comprobación equivalente.**
 
-### 5.6 `ALLOWED_CLIENT_IDS` es el cerrojo
+### 5.6 El techo de 100 usuarios, y cómo se quita
 
-Sin esa propiedad de script, el Web App **rechaza todo**. Falla cerrado a propósito. Es el error que
-más despista, porque el despliegue parece correcto.
+Mientras la pantalla de consentimiento esté en *Testing*, hay que añadir el correo de cada persona a
+mano y **quien no esté en la lista ve un error al conectar**. Publicándola se acaba esa tarea: sale
+una pantalla de «app no verificada» que se salta con un clic, y **no hace falta pasar la
+verificación** porque `drive.file` no es un scope sensible. Es el único límite operativo que queda.
 
 ---
 
@@ -265,10 +269,9 @@ más despista, porque el despliegue parece correcto.
 | Síntoma | Causa | Arreglo |
 |---|---|---|
 | `Error 400: origin_mismatch` | El origen no está registrado, o es `127.0.0.1` vs `localhost`, o el puerto cambió | Ver 5.3 |
-| «La respuesta del Apps Script no es JSON» | La URL acaba en `/dev`, o el despliegue pide iniciar sesión | Usar la URL `/exec`, acceso «Cualquiera» |
-| `CLIENT_MISMATCH` | El token se emitió para otro Client ID | Revisar `ALLOWED_CLIENT_IDS` y `googleClientId` en `public/config.json` |
-| `SCOPE_MISSING` | El usuario no marcó la casilla de Drive | Reconectar y marcarla |
-| `NOT_CONFIGURED` | Falta `appsScriptUrl` en `public/config.json` | `appscript.md` §8 |
+| `UNAUTHENTICATED` | El token caducó (dura una hora) | Reconectar; lo pendiente se reintenta |
+| `REJECTED` | El usuario no marcó la casilla de Drive, o revocó el acceso | Reconectar y marcarla |
+| `TARGET_GONE` | La hoja se borró o está en la papelera | Se recrea sola al reconectar; también **Crear una hoja nueva** |
 | Al recargar pide reconectar | **Es el comportamiento correcto** | Ver 2.4 |
 | `INTERNAL` con «*… API has not been used in project …*» | Falta habilitar Sheets o Drive API | *APIs y servicios → Biblioteca* |
 
@@ -393,11 +396,11 @@ los tecleara un usuario: un insumo llamado «12/03» se volvería fecha y uno qu
 | La credencial y su caducidad | `core/auth/domain/value-objects/credential.ts` |
 | Traducción de sesión → contrato compartido | `core/auth/infrastructure/session-credentials-provider.ts` |
 | El puerto agnóstico del destino | `core/external-sync/domain/services/sync.gateway.ts` |
-| Todo lo que sabe que el destino es una hoja | `core/external-sync/infrastructure/apps-script-sync.gateway.ts` |
-| El transporte y la trampa del CORS | `core/external-sync/infrastructure/apps-script-endpoint.ts` |
+| Todo lo que sabe que el destino es una hoja | `core/external-sync/infrastructure/google-sheets.gateway.ts` |
+| El transporte HTTP hacia Google | `core/external-sync/infrastructure/google-api.ts` |
+| El esquema de la hoja y la fusión | `core/external-sync/infrastructure/sheet-schema.ts` + `sheet-merge.ts` |
 | La cola durable | `core/external-sync/infrastructure/indexeddb-sync-outbox.ts` |
 | Las cinco ramas de salida de la sincronización | `core/external-sync/application/use-cases/synchronize.use-case.ts` |
-| El script | `public/apps-script/Code.gs` + `public/apps-script/appsscript.json` |
 | La configuración del despliegue | `public/config.json` |
 | La pantalla | `features/account/` |
 

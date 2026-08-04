@@ -146,7 +146,6 @@ Un booleano, en el fichero que ya configura el despliegue. **No hay nada más qu
 // public/config.json — servido al lado del bundle, editable sin recompilar
 {
   "debug": true,          // ¿se ve el detalle del flujo? Ausente = false
-  "appsScriptUrl": "",    // el resto de la configuración de despliegue vive aquí también
   "googleClientId": ""
 }
 ```

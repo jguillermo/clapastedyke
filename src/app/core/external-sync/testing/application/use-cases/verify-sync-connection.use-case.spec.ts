@@ -2,21 +2,34 @@ import { TestBed } from '@angular/core/testing';
 import {
   FakeCredentialsProvider,
   FakeSyncGateway,
+  FakeSyncTargetRepository,
   makeExternalSyncFakes,
 } from '../../external-sync-test-doubles';
 import { VerifySyncConnection } from '../../../application/use-cases/verify-sync-connection.use-case';
 import { SyncError } from '../../../domain/services/sync.gateway.types';
+import { SyncTarget } from '../../../domain/value-objects/sync-target';
 
 describe('VerifySyncConnection', () => {
   let verify: VerifySyncConnection;
   let gateway: FakeSyncGateway;
   let credentials: FakeCredentialsProvider;
+  let targets: FakeSyncTargetRepository;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     TestBed.configureTestingModule({ providers: makeExternalSyncFakes().providers });
     verify = TestBed.inject(VerifySyncConnection);
     gateway = TestBed.inject(FakeSyncGateway);
     credentials = TestBed.inject(FakeCredentialsProvider);
+    targets = TestBed.inject(FakeSyncTargetRepository);
+
+    await targets.save('cuenta-1', SyncTarget.of('target-1', 'https://example.test/hoja'));
+  });
+
+  it('sin hoja preparada no hay dónde escribir la prueba', async () => {
+    await targets.remove('cuenta-1');
+
+    await expect(verify.execute()).rejects.toThrow(SyncError);
+    expect(gateway.probed).toHaveLength(0);
   });
 
   it('manda un dato de prueba y lo da por bueno cuando vuelve igual', async () => {

@@ -70,7 +70,7 @@ npm run typecheck   # tsc over app + stories, unit specs, and the E2E suite
 
 A 3D in-browser cooking game (`misaevol` / "clapastedyke"). The user navigates a three.js kitchen world (`/home`); the real data-entry forms are the screens reached from it. `/ui` is the living component showcase. State is persisted locally in IndexedDB — **that is the source of truth and it has no backend**.
 
-The one network integration is **optional and additive**: from `/cuenta` a user can connect a Google account and mirror recipes and supplies into a spreadsheet in their own Drive. The app never calls the Sheets or Drive APIs — it posts to a Google Apps Script Web App (`public/apps-script/Code.gs`) that writes on the user's behalf. Setting it up is manual and documented end to end in [`manual/appscript.md`](manual/appscript.md); the design reasoning, the constraints that force it (no refresh token in a browser, the CORS preflight Apps Script never answers, the two identities a script can write with) and the alternatives that were measured and rejected are in [`manual/google-integration.md`](manual/google-integration.md). Nothing about local persistence changes when it is off (which is the default: `public/config.json` ships with both Google keys empty).
+The one network integration is **optional and additive**: from `/cuenta` a user can connect a Google account and mirror recipes and supplies into a spreadsheet in their own Drive. The app creates that spreadsheet and writes it **itself**, with the Sheets and Drive REST APIs and the user's own token — no Apps Script, nothing deployed into anyone's account, one consent checkbox (`drive.file`, which only reaches files the app created). The one-time setup for whoever publishes the app (Cloud project, consent screen, Client ID) is in [`manual/google-setup.md`](manual/google-setup.md); the design reasoning, the platform constraints (no refresh token in a browser, what `drive.file` actually covers) and the alternatives that were measured and rejected are in [`manual/google-integration.md`](manual/google-integration.md). Nothing about local persistence changes when it is off (which is the default: `public/config.json` ships with `googleClientId` empty).
 
 ## Architecture: four layers under `src/app/`
 
@@ -109,14 +109,14 @@ Key invariants the code already follows:
 
 Cross-context primitives, **not** a bounded context: `UseCase`, `AggregateRoot` (records domain events via `pullEvents()`), `EntityId`, `Quantity`, the `EventBus` port + `InMemoryEventBus`, `config/` (the `AppConfig` port over `public/config.json`, read in `main.ts` **before** bootstrap so it is synchronous everywhere), and `infrastructure/indexeddb/` (single DB `clapastedyke`, one object store per aggregate, versioning only ever ADDS stores). New cross-cutting projections also go here.
 
-**`core/auth/` and `core/external-sync/` are technology-agnostic on purpose.** Their domain and application layers never name Google, Sheets or Apps Script — not even in a type. Each has exactly one port (`Authenticator`, `SyncGateway`) and one concrete adapter, bound in its `provide*()`:
+**`core/auth/` and `core/external-sync/` are technology-agnostic on purpose.** Their domain and application layers never name Google or Sheets — not even in a type. Each has exactly one port (`Authenticator`, `SyncGateway`) and one concrete adapter, bound in its `provide*()`:
 
 | Context | Port | Today's adapter | Swapping it |
 |---|---|---|---|
 | `auth` | `Authenticator` | `infrastructure/google-authenticator.ts` (all of Google Identity Services) | one line in `auth.providers.ts` |
-| `external-sync` | `SyncGateway` | `infrastructure/apps-script-sync.gateway.ts` + `apps-script-endpoint.ts` | one line in `external-sync.providers.ts` |
+| `external-sync` | `SyncGateway` | `infrastructure/google-sheets.gateway.ts` + `google-api.ts` | one line in `external-sync.providers.ts` |
 
-The deployment config (`AppConfig` over `public/config.json`) lives under `_common/infrastructure/config/` for the same reason: its keys are technology (`debug`, `appsScriptUrl`, `googleClientId`), so only adapters read it — never a use case. **There is one build for every environment**: no `src/environments/`, no `fileReplacements` — what changes per deployment is that served file.
+The deployment config (`AppConfig` over `public/config.json`) lives under `_common/infrastructure/config/` for the same reason: its keys are technology (`debug`, `googleClientId`), so only adapters read it — never a use case. **There is one build for every environment**: no `src/environments/`, no `fileReplacements` — what changes per deployment is that served file.
 
 ### Domain events
 
@@ -187,7 +187,6 @@ umbral de nivel, ni interruptor en `window`, ni estado en `localStorage`.
 // public/config.json — el MISMO build lo lee en todos los entornos
 {
   "debug": true,          // ¿se ve el detalle del flujo? Ausente = false
-  "appsScriptUrl": "",
   "googleClientId": ""
 }
 ```

@@ -3,6 +3,7 @@ import {
   FakeCredentialsProvider,
   FakeExportableData,
   FakeSyncGateway,
+  FakeSyncTargetRepository,
   FakeSyncOutbox,
   makeExternalSyncFakes,
 } from '../../external-sync-test-doubles';
@@ -18,14 +19,31 @@ describe('Synchronize', () => {
   let gateway: FakeSyncGateway;
   let credentials: FakeCredentialsProvider;
   let source: FakeExportableData;
+  let targets: FakeSyncTargetRepository;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     TestBed.configureTestingModule({ providers: makeExternalSyncFakes().providers });
     sync = TestBed.inject(Synchronize);
     outbox = TestBed.inject(FakeSyncOutbox);
     gateway = TestBed.inject(FakeSyncGateway);
     credentials = TestBed.inject(FakeCredentialsProvider);
     source = TestBed.inject(FakeExportableData);
+    targets = TestBed.inject(FakeSyncTargetRepository);
+
+    // Sincronizar presupone una cuenta con su hoja ya preparada: el caso contrario tiene su propio
+    // test, y sin esto todos los demás saldrían por la rama `no-target`.
+    await targets.save('cuenta-1', SyncTarget.of('target-1', 'https://example.test/hoja'));
+  });
+
+  it('sin hoja preparada no se toca la cola: lo pendiente sigue esperando', async () => {
+    await targets.remove('cuenta-1');
+    await outbox.enqueue(SyncItem.of('recipe', 'R-1'));
+
+    const result = await sync.execute({ scope: 'pending' });
+
+    expect(result).toEqual({ synced: false, rows: 0, reason: 'no-target' });
+    expect(outbox.stored()).toEqual(['recipe:R-1']);
+    expect(outbox.pending()).toBe(1);
   });
 
   it('envía los cambios en orden de llegada y los retira de la cola', async () => {
@@ -109,7 +127,12 @@ describe('Synchronize', () => {
     await outbox.enqueue(SyncItem.of('recipe', 'R-1'));
     gateway.send = async (request) => {
       // Otra cuenta entra mientras la petición está en vuelo.
-      credentials.credentials = { token: 't-2', epoch: 2, accountEmail: 'otra@example.test' };
+      credentials.credentials = {
+        token: 't-2',
+        epoch: 2,
+        accountId: 'cuenta-2',
+        accountEmail: 'otra@example.test',
+      };
       gateway.sent.push(request);
       return { target: SyncTarget.of('target-1', ''), applied: {} };
     };

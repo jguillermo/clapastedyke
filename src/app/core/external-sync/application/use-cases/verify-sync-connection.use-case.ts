@@ -2,6 +2,7 @@ import { inject, Injectable } from '@angular/core';
 import { CredentialsProvider } from '@core/_common/credentials/credentials-provider';
 import { Logger } from '@core/_common/logger/logger';
 import { UseCase } from '@core/_common/use-case';
+import { SyncTargetRepository } from '../../domain/repositories/sync-target.repository';
 import { SyncGateway } from '../../domain/services/sync.gateway';
 import { SyncError } from '../../domain/services/sync.gateway.types';
 import { SyncProbe } from '../../domain/value-objects/sync-probe';
@@ -12,20 +13,20 @@ export interface VerifySyncConnectionResult {
 }
 
 /**
- * Comprueba que la conexión sirve **de verdad**: manda un dato de prueba al destino, lo vuelve a
- * leer de allí y comprueba que es el mismo.
+ * Comprueba que la conexión sirve **de verdad**: escribe un dato de prueba en la hoja del usuario, lo
+ * vuelve a leer de allí y comprueba que es el mismo.
  *
- * Por qué no basta con haber conectado la cuenta: iniciar sesión solo demuestra que el usuario se
- * identificó, y preparar el destino solo demuestra que existe. Entre eso y «mis recetas se guardan»
- * queda todo lo que suele romperse de verdad —el permiso que no se concedió, el despliegue que
- * contesta pero no escribe, la hoja que alguien borró— y nada de eso se ve hasta que se intenta
- * escribir y volver a leer.
+ * Por qué no basta con que la hoja exista: existir solo demuestra que Drive la tiene. Entre eso y
+ * «mis recetas se guardan» queda todo lo que suele romperse de verdad —el permiso que se revocó, la
+ * pestaña que alguien renombró, la escritura que Google acepta y no aplica— y nada de eso se ve hasta
+ * que se intenta escribir y volver a leer.
  *
  * No escribe nada del usuario, así que se puede repetir tantas veces como haga falta.
  */
 @Injectable({ providedIn: 'root' })
 export class VerifySyncConnection extends UseCase<void, VerifySyncConnectionResult> {
   private readonly credentials = inject(CredentialsProvider);
+  private readonly targets = inject(SyncTargetRepository);
   private readonly gateway = inject(SyncGateway);
   private readonly log = inject(Logger).scoped('external-sync/verify-sync-connection');
 
@@ -41,19 +42,25 @@ export class VerifySyncConnection extends UseCase<void, VerifySyncConnectionResu
       );
     }
 
+    const target = await this.targets.forAccount(credentials.accountId);
+    if (!target) {
+      this.log.debug('sin hoja → no hay dónde escribir la prueba');
+      throw new SyncError('TARGET_GONE', 'Todavía no hay una hoja preparada para esta cuenta.');
+    }
+
     const probe = SyncProbe.of(crypto.randomUUID());
-    const { target, echo } = await this.gateway.probe({ credential: credentials.token, probe });
+    const { echo } = await this.gateway.probe({ credential: credentials.token, target, probe });
 
     if (!probe.matches(echo)) {
-      // Es una degradación de las que no se ven: el destino contestó «bien» y aun así lo escrito no
-      // está. Sin esta línea, el usuario solo tendría el mensaje amable de la pantalla.
+      // Es una degradación de las que no se ven: el sincronizador contestó «bien» y aun así lo
+      // escrito no está. Sin esta línea, el usuario solo tendría el mensaje amable de la pantalla.
       this.log.warn('la prueba de ida y vuelta no ha vuelto igual', undefined, {
         targetId: target.id,
         conEco: echo.length > 0,
       });
       throw new SyncError(
         'REJECTED',
-        'El dato de prueba no ha vuelto igual que como se envió. La copia existe pero no se está escribiendo bien; revisa el despliegue del Apps Script (ver manual/appscript.md).',
+        'El dato de prueba no ha vuelto igual que como se envió. Tu hoja existe pero no se está escribiendo bien.',
       );
     }
 

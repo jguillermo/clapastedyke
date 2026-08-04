@@ -26,6 +26,13 @@ const USERINFO_URL = 'https://openidconnect.googleapis.com/v1/userinfo';
 /** Permiso sin el cual no se puede crear ni escribir la hoja de cálculo del usuario. */
 export const DRIVE_FILE_PERMISSION = 'https://www.googleapis.com/auth/drive.file';
 
+/**
+ * **Una sola casilla, y la más estrecha que existe.** `drive.file` alcanza únicamente los ficheros
+ * que esta app crea: la hoja del recetario entra, y el resto del Drive del usuario no se ve siquiera.
+ *
+ * Con esto basta para crearla Y para escribirla, así que no hace falta ningún permiso más. Google no
+ * lo considera sensible, así que tampoco hay verificación ni techo de usuarios.
+ */
 const SCOPES = ['openid', 'email', 'profile', DRIVE_FILE_PERMISSION].join(' ');
 
 // Tipado mínimo de GIS, escrito a mano: `tsconfig.app.json` declara `"types": []` (sin tipos
@@ -194,10 +201,10 @@ function describe(type: string | undefined, detail: string | undefined): string 
     case 'access_denied':
       return 'Has denegado el permiso. Sin él la app no puede crear la hoja en tu Drive.';
     case 'idpiframe_initialization_failed':
-      return 'Google no acepta este origen. Añade la URL de la app a «Orígenes de JavaScript autorizados» del Client ID (ver manual/appscript.md, paso 4).';
+      return 'Google no acepta este origen. Añade la URL de la app a «Orígenes de JavaScript autorizados» del Client ID (ver manual/google-integration.md).';
     default:
       return detail
         ? `Google ha rechazado la autorización: ${detail}`
-        : 'Google ha rechazado la autorización. Comprueba el Client ID y sus orígenes autorizados (ver manual/appscript.md, paso 4).';
+        : 'Google ha rechazado la autorización. Comprueba el Client ID y sus orígenes autorizados (ver manual/google-integration.md).';
   }
 }

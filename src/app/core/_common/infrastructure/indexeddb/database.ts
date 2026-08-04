@@ -5,7 +5,7 @@
  */
 
 export const DB_NAME = 'clapastedyke';
-export const DB_VERSION = 9;
+export const DB_VERSION = 11;
 
 const STORES = [
   'ingredients',
@@ -43,6 +43,13 @@ const STORES = [
   // y por eso vive aquí: un refresco a media sincronización no puede llevarse por delante los
   // cambios que esperaban turno. Ver `external-sync/infrastructure/indexeddb-sync-outbox.ts`.
   'sync_outbox',
+  // 'sync_installations' nació y murió dentro de la misma tanda: guardaba el Apps Script que se
+  // instalaba en cada cuenta, hasta que se vio que la app puede escribir la hoja ella misma con la
+  // API de Sheets. Se conserva porque los stores solo se AÑADEN, pero ya no se lee ni se escribe.
+  'sync_installations',
+  // Dónde tiene su hoja cada cuenta. Una entrada por persona: sin esto, cada recarga crearía una
+  // hoja nueva en su Drive. No guarda credenciales — esas viven en memoria y mueren con la sesión.
+  'sync_targets',
   // 'domain_events' nació y murió en la misma tanda: el bus de eventos acabó con su PROPIA base de
   // datos (`_common/eventbus/event-database.ts`) para no depender del versionado de esta. Se
   // conserva en la lista porque los stores solo se AÑADEN, pero ya no se lee ni se escribe.
