@@ -5,7 +5,7 @@
  */
 
 export const DB_NAME = 'clapastedyke';
-export const DB_VERSION = 11;
+export const DB_VERSION = 12;
 
 const STORES = [
   'ingredients',
@@ -39,6 +39,10 @@ const STORES = [
   // vio que identifica a la aplicación y no al usuario, y pasó a salir de `public/config.json`. Se
   // conserva en la lista porque los stores solo se AÑADEN, pero ya no se lee ni se escribe.
   'auth_settings',
+  // Con qué cuenta se estaba, para poder reanudar la sesión al recargar sin volver a preguntar. NO
+  // guarda la credencial —eso sigue viviendo solo en memoria—, solo el id y el correo con los que
+  // pedirle al proveedor un token nuevo en silencio. Ver `auth/domain/repositories/session-hint`.
+  'auth_session_hint',
   // Cola durable de cambios pendientes de sincronizar. No guarda un agregado sino TRABAJO POR HACER,
   // y por eso vive aquí: un refresco a media sincronización no puede llevarse por delante los
   // cambios que esperaban turno. Ver `external-sync/infrastructure/indexeddb-sync-outbox.ts`.

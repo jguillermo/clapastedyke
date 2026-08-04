@@ -3,6 +3,7 @@ import { UseCase } from '../../../_common/use-case';
 import { EventBus } from '../../../_common/eventbus/event-bus';
 import { Logger } from '../../../_common/logger/logger';
 import { AuthEvents } from '../../domain/events/auth-events';
+import { SessionHintRepository } from '../../domain/repositories/session-hint.repository';
 import { Authenticator } from '../../domain/services/authenticator';
 import { Session } from '../../domain/services/session';
 
@@ -18,6 +19,7 @@ import { Session } from '../../domain/services/session';
 export class SignOut extends UseCase<void, void> {
   private readonly authenticator = inject(Authenticator);
   private readonly session = inject(Session);
+  private readonly hints = inject(SessionHintRepository);
   private readonly bus = inject(EventBus);
   private readonly log = inject(Logger).scoped('auth/sign-out');
 
@@ -47,6 +49,10 @@ export class SignOut extends UseCase<void, void> {
         );
       }
     }
+
+    // Antes de cerrar: si la pista sobreviviera, la próxima carga volvería a entrar sola y cerrar
+    // sesión no habría servido de nada.
+    await this.hints.clear();
 
     this.session.close();
     const { epoch } = this.session.snapshot();

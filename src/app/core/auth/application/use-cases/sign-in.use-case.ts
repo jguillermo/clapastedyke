@@ -4,6 +4,7 @@ import { EventBus } from '../../../_common/eventbus/event-bus';
 import { Logger } from '../../../_common/logger/logger';
 import { AuthEvents } from '../../domain/events/auth-events';
 import { AuthSettingsRepository } from '../../domain/repositories/auth-settings.repository';
+import { SessionHintRepository } from '../../domain/repositories/session-hint.repository';
 import { Authenticator } from '../../domain/services/authenticator';
 import { Session } from '../../domain/services/session';
 
@@ -15,8 +16,9 @@ export interface SignInResult {
 /**
  * Inicia sesión.
  *
- * Orquesta tres pasos y ninguna regla propia: leer el `clientId` configurado, pedir la
- * autenticación al proveedor y abrir la sesión. Publique lo que publique, **siempre sale un
+ * Orquesta cuatro pasos y ninguna regla propia: leer el `clientId` configurado, pedir la
+ * autenticación al proveedor, abrir la sesión y dejar anotado con qué cuenta, para poder reanudarla
+ * al recargar (ver `ResumeSession`). Publique lo que publique, **siempre sale un
  * evento**: `AuthenticationSucceeded` o `AuthenticationFailed`.
  *
  * El error se relanza además del evento, porque quien pulsó el botón necesita ver el motivo.
@@ -26,6 +28,7 @@ export class SignIn extends UseCase<void, SignInResult> {
   private readonly authenticator = inject(Authenticator);
   private readonly session = inject(Session);
   private readonly settings = inject(AuthSettingsRepository);
+  private readonly hints = inject(SessionHintRepository);
   private readonly bus = inject(EventBus);
   private readonly log = inject(Logger).scoped('auth/sign-in');
 
@@ -43,6 +46,9 @@ export class SignIn extends UseCase<void, SignInResult> {
       this.log.debug('pidiendo autenticación al proveedor');
       const { account, credential } = await this.authenticator.authenticate(clientId);
       this.session.open(account, credential);
+      // Se anota con qué cuenta se entró para poder reanudar al recargar. NO es la credencial: sin
+      // la sesión del propio navegador con el proveedor, esta pista no abre nada.
+      await this.hints.save({ accountId: account.id.value, email: account.email });
 
       const { epoch } = this.session.snapshot();
       await this.bus.publish([

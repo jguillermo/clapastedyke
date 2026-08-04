@@ -57,24 +57,41 @@ Por tanto: **la reconexión periódica no es un defecto de la implementación, e
 plataforma.** La única forma de evitarla es un cliente confidencial (un servidor que custodie
 refresh tokens), que es justamente lo que este proyecto no quiere ser.
 
-### 2.4 La credencial no se persiste: recargar la página obliga a reconectar
+### 2.4 La credencial no se persiste — pero recargar ya no echa a nadie
 
 `Credential` vive **solo en memoria** (`core/auth/domain/value-objects/credential.ts`). No está en
 `localStorage`, ni en IndexedDB, ni en una cookie. Es deliberado: cerrar sesión o recargar la borra
 sin que haya que acordarse de limpiar nada, y un token no se queda olvidado en el disco del usuario.
 
-Esto muerde más que la caducidad de una hora: **F5 = reconectar**, aunque hayan pasado cinco
-segundos.
+Durante un tiempo eso significó **F5 = reconectar**, y era inaceptable. La salida no fue guardar el
+token, sino **volver a pedirlo**:
 
-Se puede cambiar, y este es el intercambio:
-
-| Dónde guardarlo | Sobrevive a… | Coste |
+| Dónde guardar el token | Sobrevive a… | Coste |
 |---|---|---|
-| **Memoria** (lo actual) | nada | Reconectar en cada recarga |
-| `sessionStorage` | recarga sí, cerrar pestaña no | El token es legible por cualquier XSS mientras dure |
-| IndexedDB / `localStorage` | todo, hasta que caduque | Igual, y además persiste en disco |
+| **Memoria** (lo actual) | nada, por sí solo | ninguno |
+| `sessionStorage` | recarga sí, cerrar pestaña no | legible por cualquier XSS mientras dure |
+| IndexedDB / `localStorage` | todo, hasta que caduque | igual, y además persiste en disco |
 
-Ninguna opción pasa de **1 hora**, porque ahí caduca el token.
+Ninguna de las dos últimas pasa de **1 hora** —ahí caduca el token—, así que ni siquiera resolvían el
+problema entero. Lo que sí lo resuelve es `ResumeSession`: se guarda **solo con qué cuenta se estaba**
+(id y correo, nunca el token) y al arrancar se le pide al proveedor un token nuevo con `prompt: ''`.
+Si esa persona ya consintió y sigue con su sesión de Google abierta, Google lo emite **sin enseñar
+nada**. Recargar deja de echar a nadie, y funciona igual pasada la hora.
+
+Lo guardado no abre nada por sí solo: sin la sesión de Google del propio navegador, esa pista es un
+correo y un identificador. Y al cerrar sesión se borra, porque si no la siguiente carga volvería a
+entrar sola.
+
+**La misma pieza cubre la caducidad en caliente.** Si el token muere con la app abierta,
+`SessionCredentialsProvider` no devuelve `null` —que haría creer a todo el mundo que el usuario cerró
+sesión—: pide la renovación y entrega el token nuevo. `ResumeSession` comparte un solo intento entre
+todos los que lo descubran a la vez, y renovar **no toca el `epoch`**: es la misma sesión, y si el
+número cambiara, cualquier operación en vuelo tiraría su resultado creyendo que entró otra cuenta.
+
+**Reanudar publica `SessionResumed`, no `AuthenticationSucceeded`.** Son hechos distintos: «ha entrado
+una cuenta» significa tirar lo que quedara de la anterior y subirlo todo, y aquí no hay cuenta
+anterior — la cola pendiente es de esta misma persona y hay que respetarla. Reutilizar el evento de
+entrada haría que **cada recarga borrase los cambios que esperaban turno**.
 
 **La arquitectura ya absorbe esto y no se pierde ni un dato**: credencial caducada →
 `SessionCredentialsProvider.current()` devuelve `null` → `Synchronize` sale por

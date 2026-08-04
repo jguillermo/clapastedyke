@@ -2,8 +2,8 @@ import { DomainEvent, domainEvent } from '@core/_common/eventbus/domain-event';
 import { IntegrationEventName } from '@core/_common/events/integration-events';
 
 /**
- * Los cuatro eventos del contexto: entrar bien, entrar mal, salir bien, salir mal. Nombres en
- * pasado y payload de primitivos, sin una palabra del proveedor concreto.
+ * Los eventos del contexto: entrar bien, entrar mal, volver sin pedir nada, salir bien, salir mal.
+ * Nombres en pasado y payload de primitivos, sin una palabra del proveedor concreto.
  *
  * Los nombres viven en el shared kernel porque **cruzan la frontera**: quien reacciona a ellos no
  * puede importar de aquí (ver `core-conventions.md` → «Los contextos no se conocen»).
@@ -15,6 +15,14 @@ const ANONYMOUS = 'anonymous';
 export const AuthEvents = {
   authenticationSucceeded: (accountId: string, email: string, epoch: number): DomainEvent =>
     domainEvent(IntegrationEventName.AUTHENTICATION_SUCCEEDED, accountId, { email, epoch }),
+
+  /**
+   * La sesión de siempre, recuperada sola al recargar. Aparte de `authenticationSucceeded` a
+   * propósito: quien reacciona a «ha entrado alguien» limpia lo de la cuenta anterior, y aquí no hay
+   * cuenta anterior que limpiar — es la misma, y lo que quedó pendiente es suyo.
+   */
+  sessionResumed: (accountId: string, epoch: number): DomainEvent =>
+    domainEvent(IntegrationEventName.SESSION_RESUMED, accountId, { epoch }),
 
   authenticationFailed: (reason: string): DomainEvent =>
     domainEvent(IntegrationEventName.AUTHENTICATION_FAILED, ANONYMOUS, { reason }),

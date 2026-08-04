@@ -14,9 +14,11 @@ const SUBSCRIBER = 'external-sync:auth-changed';
  * significa para la sincronización.
  *
  * **Al entrar** se tira la cola anterior (no pertenece a esta cuenta) y se empuja el recetario
- * COMPLETO. Ese envío completo no es un lujo: es lo que sube los datos sembrados y todo lo que el
- * usuario creó antes de tener cuenta —nada de eso pasó nunca por la cola— y lo que recupera los
- * cambios perdidos al recargar la página.
+ * COMPLETO. **Al reanudar** —la misma cuenta que vuelve tras una recarga— NO se tira nada: la cola es
+ * suya y solo se empuja lo que hubiera pendiente.
+ *
+ * Ese envío completo no es un lujo: es lo que sube los datos sembrados y todo lo que el usuario creó
+ * antes de tener cuenta — nada de eso pasó nunca por la cola.
  *
  * **Al salir** se borra la cola y se reinicia el estado, así que no queda ni el enlace a la hoja de
  * la cuenta que se acaba de cerrar. Se escuchan los DOS eventos de salida: la sesión local se cierra
@@ -61,6 +63,21 @@ export class AuthChangedSubscriber {
       this.sync
         .execute({ scope: 'all' })
         .catch((error: unknown) => this.log.error('Sincronización inicial fallida', error));
+    });
+
+    // Volver no es entrar. La cuenta es la misma, así que lo que quedó en la cola antes de recargar
+    // es SUYO: vaciarla aquí borraría cambios reales. Solo se marca conectado y se empuja lo que
+    // estuviera esperando — que es justo lo que una recarga interrumpió.
+    this.bus.subscribe(SUBSCRIBER, IntegrationEventName.SESSION_RESUMED, async (event) => {
+      if (this.isStale(event.occurredOn)) {
+        this.log.debug('evento de una sesión anterior, se ignora', { event: event.name });
+        return;
+      }
+      this.log.debug('sesión reanudada: se conserva la cola y se sincroniza lo pendiente');
+      this.status.markConnected();
+      this.sync
+        .execute({ scope: 'pending' })
+        .catch((error: unknown) => this.log.error('Sincronización tras reanudar fallida', error));
     });
 
     for (const eventName of [
