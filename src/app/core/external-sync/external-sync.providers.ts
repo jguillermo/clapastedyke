@@ -8,10 +8,12 @@ import { provideEventHandlers } from '@core/_common/eventbus/event-bus.providers
 import { NotifyRecipeSaved } from './application/use-cases/notify-recipe-saved.use-case';
 import { NotifySupplySaved } from './application/use-cases/notify-supply-saved.use-case';
 import { SyncTargetRepository } from './domain/repositories/sync-target.repository';
+import { DeviceIdentity } from './domain/services/device-identity';
 import { SyncGateway } from './domain/services/sync.gateway';
 import { SyncOutbox } from './domain/services/sync-outbox';
 import { SyncStatus } from './domain/services/sync-status';
 import { GoogleSheetsGateway } from './infrastructure/google-sheets.gateway';
+import { IndexedDbDeviceIdentity } from './infrastructure/indexeddb-device-identity';
 import { IndexedDbSyncTargetRepository } from './infrastructure/indexeddb-sync-target.repository';
 import { IndexeddbSyncOutbox } from './infrastructure/indexeddb-sync-outbox';
 import { InMemorySyncStatus } from './infrastructure/in-memory-sync-status';
@@ -30,10 +32,11 @@ import { RecipeBookChangedSubscriber } from './infrastructure/recipe-book-change
  * `ExportableData` del shared kernel (hoy lo hace `recipe-book`). Así este contexto no conoce a
  * nadie: ni de dónde vienen las filas ni quién le manda los eventos.
  *
- * **Dos cosas se persisten**: la cola (trabajo pendiente, perderlo es perder cambios del usuario) y
- * dónde tiene su hoja cada cuenta (sin eso, cada recarga crearía una hoja nueva en su
- * Drive). El estado sí vive en memoria a propósito — es de la sesión, y una sesión no sobrevive a la
- * recarga.
+ * **Tres cosas se persisten**: la cola (trabajo pendiente, perderlo es perder cambios del usuario),
+ * dónde tiene su hoja cada cuenta (sin eso, cada recarga crearía una hoja nueva en su Drive) y qué
+ * dispositivo es este navegador (con el que se desempatan los conflictos simultáneos; si cambiara en
+ * cada recarga, dos dispositivos podrían no converger nunca). El estado sí vive en memoria a
+ * propósito — es de la sesión, y una sesión no sobrevive a la recarga.
  *
  * Los dos app-initializers registran las suscripciones al arrancar; sin ellos la app funciona igual,
  * solo que sin sincronizar — la integración es un añadido desacoplado, no una dependencia del
@@ -52,6 +55,7 @@ export function provideExternalSync(): EnvironmentProviders {
     { provide: SyncTargetRepository, useClass: IndexedDbSyncTargetRepository },
     { provide: SyncOutbox, useClass: IndexeddbSyncOutbox },
     { provide: SyncStatus, useClass: InMemorySyncStatus },
+    { provide: DeviceIdentity, useClass: IndexedDbDeviceIdentity },
     provideAppInitializer(() => inject(RecipeBookChangedSubscriber).register()),
     provideAppInitializer(() => inject(AuthChangedSubscriber).register()),
     // Los casos de uso que reaccionan a un evento: aquí solo se registra la suscripción que cada uno

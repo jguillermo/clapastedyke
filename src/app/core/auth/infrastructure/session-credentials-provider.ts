@@ -24,6 +24,24 @@ import { Session } from '../domain/services/session';
  * Así que aquí se intenta la renovación, **una vez y compartida** (de eso responde `ResumeSession`), y
  * solo se devuelve `null` si tampoco eso funciona. Ahí sí es cierto: hace falta volver a conectar.
  *
+ * ## «No hay sesión en memoria» tampoco es «no hay sesión»
+ *
+ * En un arranque en frío la credencial vive **solo en memoria**, así que a los pocos milisegundos de
+ * bootstrap no hay ninguna: la reanudación es un app-initializer que corre **sin que nadie la espere**
+ * (`void inject(ResumeSession).execute()`, deliberado para que la app no se bloquee ante Google). Si
+ * este puerto contestara `null` en cuanto el snapshot viene vacío, todo el que preguntara al arrancar
+ * concluiría «desconectado» **en cada carga**, y ~300 ms después aparecería una sesión que ya nadie
+ * mira.
+ *
+ * Para la sincronización eso no es un detalle cosmético: quien decide al arrancar si hay que **bajar
+ * antes de subir** preguntaría aquí, oiría «desconectado», arrancaría en local-only y luego subiría
+ * datos viejos encima de una hoja más fresca. La pérdida es real y silenciosa.
+ *
+ * Por eso los dos casos —sin sesión y con credencial caducada— hacen **lo mismo**: esperar a
+ * `ResumeSession` y volver a leer. Sale gratis para un usuario anónimo, porque `ResumeSession` vuelve
+ * enseguida cuando este navegador no tiene pista de nadie («no hay pista: nadie había entrado»), y es
+ * single-flight, así que N preguntas concurrentes al arrancar comparten un único intento.
+ *
  * > **Por qué un adaptador llama a un caso de uso.** Es la única flecha de este contexto que apunta
  * > de infraestructura hacia aplicación, y es deliberada: la promesa del puerto es «las credenciales
  * > de la sesión activa», y mantenerla viva es parte de esa promesa, no del trabajo de quien la
@@ -69,21 +87,20 @@ export class SessionCredentialsProvider extends CredentialsProvider {
       return { account: snapshot.account, credential: snapshot.credential, epoch: snapshot.epoch };
     }
 
-    if (!snapshot.account) {
-      // Quien pregunta solo ve `null` y lo trata como «desconectado». Distinguir POR QUÉ es la
-      // diferencia entre «no ha entrado» y «se le caducó el token», que se arreglan distinto.
-      this.log.debug('sin sesión abierta');
-      return null;
+    // Quien pregunta solo ve `null` y lo trata como «desconectado». Distinguir POR QUÉ es la
+    // diferencia entre «no ha entrado» y «se le caducó el token», que se arreglan distinto.
+    if (snapshot.account) {
+      this.log.debug('credencial caducada, se intenta renovar sin molestar al usuario', {
+        accountId: snapshot.account.id.value,
+      });
+    } else {
+      this.log.debug('sin sesión en memoria, se intenta reanudar la de este navegador');
     }
-
-    this.log.debug('credencial caducada, se intenta renovar sin molestar al usuario', {
-      accountId: snapshot.account.id.value,
-    });
     await this.resume.execute();
 
     const renewed = this.session.snapshot();
     if (!renewed.account || !renewed.credential || renewed.credential.isExpired(Date.now())) {
-      this.log.debug('no se pudo renovar: hará falta volver a conectar a mano');
+      this.log.debug('sin credencial utilizable: hará falta conectar a mano');
       return null;
     }
     return { account: renewed.account, credential: renewed.credential, epoch: renewed.epoch };

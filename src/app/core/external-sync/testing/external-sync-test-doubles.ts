@@ -14,6 +14,7 @@ import {
   UserCredentials,
 } from '../../_common/credentials/credentials-provider';
 import { ExportableData, ExportedRows, ExportQuery } from '../../_common/export/exportable-data';
+import { DeviceIdentity } from '../domain/services/device-identity';
 import { SyncGateway } from '../domain/services/sync.gateway';
 import {
   ProbeOutcome,
@@ -211,6 +212,22 @@ export class FakeCredentialsProvider extends CredentialsProvider {
   }
 }
 
+/**
+ * Identidad de dispositivo fija.
+ *
+ * Es un valor **estable y legible** a propósito: entra en la versión de cada fila, así que un
+ * identificador aleatorio haría que los asertos sobre versiones cambiaran en cada corrida. Los specs
+ * que necesiten dos dispositivos distintos cambian este campo.
+ */
+@Injectable()
+export class FakeDeviceIdentity extends DeviceIdentity {
+  deviceId = 'dev00001';
+
+  async current(): Promise<string> {
+    return this.deviceId;
+  }
+}
+
 /** Origen falso: devuelve una fila por cada referencia pedida (o una fija cuando se pide todo). */
 @Injectable()
 export class FakeExportableData extends ExportableData {
@@ -237,11 +254,13 @@ export function makeExternalSyncFakes(): { providers: Provider[] } {
       FakeSyncTargetRepository,
       FakeCredentialsProvider,
       FakeExportableData,
+      FakeDeviceIdentity,
       { provide: SyncOutbox, useExisting: FakeSyncOutbox },
       { provide: SyncGateway, useExisting: FakeSyncGateway },
       { provide: SyncTargetRepository, useExisting: FakeSyncTargetRepository },
       { provide: CredentialsProvider, useExisting: FakeCredentialsProvider },
       { provide: ExportableData, useExisting: FakeExportableData },
+      { provide: DeviceIdentity, useExisting: FakeDeviceIdentity },
       { provide: SyncStatus, useClass: InMemorySyncStatus },
       { provide: EventBus, useClass: FakeEventBus },
     ],

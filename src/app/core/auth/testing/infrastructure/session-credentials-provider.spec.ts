@@ -12,8 +12,9 @@ import {
 
 /**
  * Excepción consciente a «solo se testean dominio y casos de uso»: esta clase es la que decide, para
- * todos los demás contextos, si hay sesión o no. Su rama interesante —el token caducó pero la sesión
- * sigue viva— no se puede ejercitar desde un caso de uso sin montar medio contexto.
+ * todos los demás contextos, si hay sesión o no. Sus dos ramas interesantes —el token caducó pero la
+ * sesión sigue viva, y el arranque en frío en el que todavía no hay credencial en memoria— no se
+ * pueden ejercitar desde un caso de uso sin montar medio contexto.
  */
 describe('SessionCredentialsProvider', () => {
   let credentials: CredentialsProvider;
@@ -38,9 +39,33 @@ describe('SessionCredentialsProvider', () => {
     await hints.save({ accountId: 'cuenta-1', email: 'chef@example.test' });
   });
 
-  it('sin sesión abierta no hay credenciales, y no se molesta al proveedor', async () => {
+  it('sin pista de nadie no hay credenciales, y no se molesta al proveedor', async () => {
+    await hints.clear();
+
     expect(await credentials.current()).toBeNull();
     expect(authenticator.resumeCalls).toBe(0);
+  });
+
+  it('en un arranque en frío, con pista de este navegador, reanuda y entrega credenciales', async () => {
+    // Nadie ha abierto sesión todavía: la credencial vive solo en memoria y el initializer que
+    // reanuda no se espera. Si esto contestara `null`, quien decide al arrancar si hay que bajar
+    // antes de subir concluiría «desconectado» en CADA carga.
+    const result = await credentials.current();
+
+    expect(result?.token).toBe('t-1');
+    expect(result?.accountId).toBe('cuenta-1');
+    expect(authenticator.resumeCalls).toBe(1);
+  });
+
+  it('varias preguntas a la vez al arrancar comparten un único intento', async () => {
+    const [uno, dos, tres] = await Promise.all([
+      credentials.current(),
+      credentials.current(),
+      credentials.current(),
+    ]);
+
+    expect([uno?.token, dos?.token, tres?.token]).toEqual(['t-1', 't-1', 't-1']);
+    expect(authenticator.resumeCalls).toBe(1);
   });
 
   it('con una credencial vigente la entrega tal cual', async () => {
