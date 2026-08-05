@@ -152,8 +152,13 @@ test.describe('Cuenta · la hoja es la fuente de la verdad', () => {
 
     // El motor le pone identidad, huella y versión **en su propia fila**: sin eso, el ciclo siguiente le
     // inventaría otra identidad y crearía un insumo nuevo cada dos minutos.
+    //
+    // Se espera con `poll` en vez de leer de golpe, por la misma razón que en el caso 1: el rebote
+    // ambiental pudo lanzar su propio ciclo justo antes de que esta fila se añadiera, y entonces el
+    // ciclo que pide `sync()` se une a ése —que leyó la hoja sin esta fila todavía— y es el siguiente
+    // el que la adopta. Converge igual; solo hay que dejarle llegar.
+    await expect.poll(() => String(insumos.cell(nueva, 'id')), { timeout: 20_000 }).not.toBe('');
     const adoptado = String(insumos.cell(nueva, 'id'));
-    expect(adoptado).not.toBe('');
     expect(String(insumos.cell(nueva, 'huella'))).not.toBe('');
     expect(String(insumos.cell(nueva, 'version'))).not.toBe('');
     expect(insumos.cell(nueva, 'Nombre')).toBe('Cardamomo E2E');
@@ -169,7 +174,9 @@ test.describe('Cuenta · la hoja es la fuente de la verdad', () => {
 
     await sync(account);
 
-    expect(insumos.cell(nueva, 'id')).toBe(adoptado);
+    // Mismo motivo que el poll de arriba: un ciclo ambiental pudo unirse al de `sync()` habiendo leído
+    // la hoja antes de este cambio de id, y es el ciclo siguiente el que lo revierte.
+    await expect.poll(() => insumos.cell(nueva, 'id'), { timeout: 20_000 }).toBe(adoptado);
     // Y no se dio por borrado por haber «desaparecido» su id.
     await openSupplies(account, home, catalog, supplies);
     expect(await supplies.list.names()).toContain('Cardamomo E2E');
