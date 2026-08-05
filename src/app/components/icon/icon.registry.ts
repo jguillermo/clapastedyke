@@ -48,6 +48,7 @@ export type MatIconName =
   | 'mat:arrow_back'
   | 'mat:layers'
   | 'mat:edit'
+  | 'mat:delete'
   | 'mat:check_circle'
   | 'mat:content_copy'
   | 'mat:open_in_new'
@@ -83,6 +84,7 @@ export const ICON_PATHS: Record<IconName, string> = {
     'M11.99 18.54l-7.37-5.73L3 14.07l9 7 9-7-1.63-1.27-7.38 5.74zM12 16l7.36-5.73L21 9l-9-7-9 7 1.63 1.27L12 16z', // mat · layers
   'mat:edit':
     'M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z', // mat · edit
+  'mat:delete': 'M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z', // mat · delete
   'mat:check_circle':
     'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z', // mat · check_circle
   'mat:content_copy':

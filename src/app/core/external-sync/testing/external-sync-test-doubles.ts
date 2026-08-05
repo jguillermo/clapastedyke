@@ -32,6 +32,7 @@ import {
   ProbeOutcome,
   ProbeRequest,
   PurgeRequest,
+  StampRequest,
   SyncOutcome,
   SyncRequest,
 } from '../domain/services/sync.gateway.types';
@@ -198,6 +199,16 @@ export class FakeSyncGateway extends SyncGateway {
 
   async purge(request: PurgeRequest): Promise<void> {
     this.purged.push(request);
+  }
+
+  /** Celdas escritas sobre filas que ya existían: el id de un alta a mano, o un id devuelto. */
+  readonly stamped: StampRequest[] = [];
+
+  async stamp(request: StampRequest): Promise<void> {
+    this.stamped.push(request);
+    if (this.failWith) {
+      throw this.failWith;
+    }
   }
 
   async probe(request: ProbeRequest): Promise<ProbeOutcome> {

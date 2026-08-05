@@ -59,7 +59,7 @@ describe('Supply', () => {
 
   it('create rejects an empty name', () => {
     expect(() => Supply.create(new EntityId('IN-1'), '   ', 'g', 'recipe', price(5))).toThrow(
-      'Supply name is required',
+      'El insumo necesita un nombre.',
     );
   });
 

@@ -33,10 +33,9 @@ export class RecipeFlavor extends AggregateRoot {
 
   /** Arma el sabor y graba que se guardó. */
   static create(id: EntityId, label: string): RecipeFlavor {
-    if (!label.trim()) {
-      throw new Error('Flavor label is required');
-    }
-    const flavor = new RecipeFlavor({ id, label: label.trim() });
+    const data = { id, label: label.trim() };
+    RecipeFlavor.assertValid(data);
+    const flavor = new RecipeFlavor(data);
     flavor.recordEvent(RecipeBookEvents.flavorSaved(id.value, { label: flavor.label }));
     return flavor;
   }
@@ -44,6 +43,13 @@ export class RecipeFlavor extends AggregateRoot {
   /** Rehidrata desde almacenamiento: NO graba eventos (leer no es guardar). */
   static restore(data: RecipeFlavorData): RecipeFlavor {
     return new RecipeFlavor(data);
+  }
+
+  /** La regla que hace válido un sabor. Ver `Supply.assertValid` para el porqué. */
+  static assertValid(data: RecipeFlavorData): void {
+    if (!data.label.trim()) {
+      throw new Error('El sabor necesita un nombre.');
+    }
   }
 
   equals(other: RecipeFlavor): boolean {

@@ -8,6 +8,8 @@ import {
   ProbeOutcome,
   ProbeRequest,
   PurgeRequest,
+  StampedRow,
+  StampRequest,
   SyncError,
   SyncOutcome,
   SyncRequest,
@@ -376,27 +378,36 @@ export class GoogleSheetsGateway extends SyncGateway {
       return;
     }
 
-    const data: ValueRange[] = [];
-    for (const row of rows) {
-      const table = SHEET_TABLES.find((candidate) => candidate.name === row.table);
-      if (!table) {
-        continue;
-      }
-      const version = table.fields.indexOf('version');
-      const deleted = table.fields.indexOf('borrado');
-      if (version < 0 || deleted < 0) {
-        // Un destino que aún no tiene las columnas de servicio: `migrate()` las pone antes de llegar
-        // aquí, así que esto solo pasaría con un esquema a medias. Mejor no escribir que escribir mal.
-        continue;
-      }
-      data.push(
-        { range: cellRange(table.title, version, row.index), values: [[row.version]] },
-        { range: cellRange(table.title, deleted, row.index), values: [[FLAG_TRUE]] },
-      );
+    this.log.debug('marcando filas como borradas en la hoja', { filas: rows.length });
+    await this.write(
+      credential,
+      target,
+      cellsOf(
+        rows.map((row) => ({
+          table: row.table,
+          index: row.index,
+          cells: { version: row.version, borrado: FLAG_TRUE },
+        })),
+      ),
+    );
+  }
+
+  /**
+   * Escribe las celdas que se le pidan de filas que ya existen. Un rango por celda, todos en una
+   * petición.
+   */
+  async stamp({ credential, target, rows }: StampRequest): Promise<void> {
+    if (rows.length === 0) {
+      return;
     }
 
-    this.log.debug('marcando filas como borradas en la hoja', { filas: rows.length });
-    await this.write(credential, target, data);
+    this.log.debug('escribiendo celdas de servicio en la hoja', {
+      filas: rows.length,
+      // Los nombres de columna sí, el contenido no: en `id` va un dato que no es secreto pero tampoco
+      // hace falta, y en el resto no hay nada que leer.
+      columnas: [...new Set(rows.flatMap((row) => Object.keys(row.cells)))],
+    });
+    await this.write(credential, target, cellsOf(rows));
   }
 
   /**
@@ -468,6 +479,32 @@ export class GoogleSheetsGateway extends SyncGateway {
 /** `'Insumos'!J7` — una celda sola, por su columna (desde 0) y su fila (desde 1). */
 function cellRange(title: string, column: number, row: number): string {
   return rangeOf(title, `${columnLetter(column + 1)}${row}`);
+}
+
+/**
+ * Traduce «esta celda de esta fila» a rangos de la hoja, resolviendo cada nombre de campo a su columna.
+ *
+ * Una columna que el esquema del destino todavía no tiene se **omite en silencio**: `migrate()` las pone
+ * antes de llegar aquí, así que solo pasaría con un esquema a medias, y ahí escribir en la columna
+ * equivocada sería mucho peor que no escribir.
+ */
+function cellsOf(rows: readonly StampedRow[]): ValueRange[] {
+  const data: ValueRange[] = [];
+
+  for (const row of rows) {
+    const table = SHEET_TABLES.find((candidate) => candidate.name === row.table);
+    if (!table) {
+      continue;
+    }
+    for (const [field, value] of Object.entries(row.cells)) {
+      const column = table.fields.indexOf(field);
+      if (column < 0) {
+        continue;
+      }
+      data.push({ range: cellRange(table.title, column, row.index), values: [[value]] });
+    }
+  }
+  return data;
 }
 
 function sheet(target: SyncTarget): string {

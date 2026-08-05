@@ -86,6 +86,9 @@ export class ReconcileWithRemote extends UseCase<void, ReconcileWithRemoteResult
         tables: SHEET_TABLES,
         now: Date.now(),
         deviceId,
+        // Se le da igual que al ciclo aunque aquí no se escriba nada: sin identidad, un alta a mano no
+        // se podría ni contar, y contarlas es justo lo que se viene a ver.
+        newIdentity: () => crypto.randomUUID(),
         // Con esto un conflicto se decide con dato en vez de a ciegas: el origen dice cuándo se guardó
         // cada fila aquí, y eso ya es comparable con la versión que trae el destino.
         localVersionOf: localVersionsFrom(local, SHEET_TABLES, deviceId),
@@ -142,7 +145,10 @@ export class ReconcileWithRemote extends UseCase<void, ReconcileWithRemoteResult
       this.log.debug('primeras diferencias', { ejemplos: plan.drift.slice(0, 10) });
     }
 
-    for (const list of [plan.duplicates, plan.quarantined, plan.reids] as const) {
+    // Solo estas dos piden mano humana: cuál de dos filas con el mismo id es la de verdad, y qué se
+    // quiso escribir en una celda ilegible, no lo puede decidir el motor. Los ids cambiados y las altas
+    // sin id **sí** los arregla él (los cuenta la línea de arriba), así que no se avisa de ellos.
+    for (const list of [plan.duplicates, plan.quarantined] as const) {
       if (list.length > 0) {
         this.log.warn('el destino tiene filas que habría que arreglar a mano', undefined, {
           ejemplos: list.slice(0, 5),

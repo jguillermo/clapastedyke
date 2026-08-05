@@ -6,6 +6,7 @@ import {
   ProbeOutcome,
   ProbeRequest,
   PurgeRequest,
+  StampRequest,
   SyncOutcome,
   SyncRequest,
   TargetRequest,
@@ -66,6 +67,18 @@ export abstract class SyncGateway {
    * tiempo todos los dispositivos se enteraron del borrado y la fila solo estorba en la hoja.
    */
   abstract purge(request: PurgeRequest): Promise<void>;
+
+  /**
+   * Escribe **celdas concretas** de filas que ya existen, sin tocar el resto.
+   *
+   * Es la operación con la que el motor corrige el destino sin pisar a nadie: le pone el id a una fila
+   * que alguien añadió a mano, o le devuelve el suyo a una a la que se lo cambiaron. El contenido de esas
+   * filas es del usuario y no hay nada que cambiarle — solo le falta (o le sobra) identidad.
+   *
+   * No sirve `send`: reescribe el bloque entero y movería la fila de sitio, y el usuario la escribió
+   * donde quería tenerla.
+   */
+  abstract stamp(request: StampRequest): Promise<void>;
 
   /**
    * Escribe el dato de prueba en el destino y **lo vuelve a leer de allí**, devolviendo lo leído.

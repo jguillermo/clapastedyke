@@ -59,13 +59,7 @@ export class Recipe extends AggregateRoot {
     portionsCapacityId: EntityId | null = null,
     moldCapacityId: EntityId | null = null,
   ): Recipe {
-    if (!name.trim()) {
-      throw new Error('Recipe name is required');
-    }
-    if (ingredients.length === 0) {
-      throw new Error('Recipe needs at least one ingredient');
-    }
-    const recipe = new Recipe({
+    const data = {
       id,
       categoryId,
       name: name.trim(),
@@ -73,7 +67,9 @@ export class Recipe extends AggregateRoot {
       flavorId,
       portionsCapacityId,
       moldCapacityId,
-    });
+    };
+    Recipe.assertValid(data);
+    const recipe = new Recipe(data);
     recipe.recordEvent(RecipeBookEvents.recipeSaved(id.value, recipe.snapshot()));
     return recipe;
   }
@@ -81,6 +77,20 @@ export class Recipe extends AggregateRoot {
   /** Rehidrata desde almacenamiento: NO graba eventos (leer no es guardar). */
   static restore(data: RecipeData): Recipe {
     return new Recipe(data);
+  }
+
+  /**
+   * Las reglas que hacen válida una receta, **en un solo sitio**. Ver `Supply.assertValid` para el
+   * porqué de que estén aparte de `create`.
+   */
+  static assertValid(data: RecipeData): void {
+    if (!data.name.trim()) {
+      throw new Error('La receta necesita un nombre.');
+    }
+    // Sin esto, una receta a la que alguien le borró las líneas a mano entraría sin ingredientes.
+    if (data.ingredients.length === 0) {
+      throw new Error('La receta no tiene ningún ingrediente.');
+    }
   }
 
   equals(other: Recipe): boolean {

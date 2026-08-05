@@ -20,6 +20,9 @@ export function toRow(table: SheetTable, source: Record<string, unknown>): strin
   });
 }
 
+/** Una posición del bloque reescrito: o una fila con id, o una fila que se copia tal cual. */
+type Slot = { readonly key: string } | { readonly verbatim: string[] };
+
 /**
  * Upsert por clave: cada fila que llega pisa la que tuviera su mismo id, y las nuevas se añaden al
  * final. Las que ya estaban y no vienen en el lote **se conservan** — un envío parcial no borra el
@@ -29,6 +32,17 @@ export function toRow(table: SheetTable, source: Record<string, unknown>): strin
  * Los ids se comparan **canonizados** (recortados y sin mayúsculas), igual que en todo el motor: si no,
  * un id al que alguien le cambió una letra a mayúscula en la hoja dejaría de reconocerse como el suyo y
  * la fila se duplicaría en cada envío.
+ *
+ * ## Una fila sin id se conserva TAL CUAL, y en su sitio
+ *
+ * Es la línea que evita una pérdida de datos silenciosa. Una fila con contenido y sin id la escribió una
+ * persona a mano, y el motor la adopta —le asigna un id y la importa— en el mismo ciclo en que la ve
+ * (`plan.handAdds`). Pero entre que se escribe y se adopta puede pasar cualquier otro envío a esa
+ * pestaña, y antes ese envío **la borraba**: se saltaba las filas sin clave al reconstruir el bloque, así
+ * que lo que alguien acababa de teclear desaparecía sin dejar rastro ni aviso.
+ *
+ * Se copian con su contenido intacto y en su posición original, así que el bloque reescrito respeta el
+ * orden que el usuario ve.
  */
 export function mergeByKey(
   table: SheetTable,
@@ -40,7 +54,7 @@ export function mergeByKey(
     throw new Error(`La tabla ${table.name} no declara clave y no se puede fusionar por id.`);
   }
 
-  const order: string[] = [];
+  const slots: Slot[] = [];
   // Sin prototipo: un id que se llamara «constructor» o «toString» daría un falso positivo contra
   // un objeto normal.
   const byKey: Record<string, string[]> = Object.create(null) as Record<string, string[]>;
@@ -48,10 +62,11 @@ export function mergeByKey(
   for (const row of existing) {
     const key = canonicalCode(row[keyIndex]);
     if (!key) {
+      slots.push({ verbatim: [...row] });
       continue;
     }
     if (!byKey[key]) {
-      order.push(key);
+      slots.push({ key });
     }
     byKey[key] = [...row];
   }
@@ -59,12 +74,18 @@ export function mergeByKey(
   for (const row of incoming) {
     const key = canonicalCode(row[keyIndex]);
     if (!byKey[key]) {
-      order.push(key);
+      slots.push({ key });
     }
     byKey[key] = [...row];
   }
 
-  return order.map((key) => byKey[key]);
+  return slots.flatMap((slot) => {
+    if ('verbatim' in slot) {
+      return [slot.verbatim];
+    }
+    const row = byKey[slot.key];
+    return row ? [row] : [];
+  });
 }
 
 /**

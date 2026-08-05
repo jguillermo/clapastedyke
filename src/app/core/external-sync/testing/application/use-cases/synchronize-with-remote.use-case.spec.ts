@@ -238,6 +238,61 @@ describe('SynchronizeWithRemote', () => {
     });
   });
 
+  /**
+   * Las dos correcciones que el ciclo hace **sobre** el destino, y que no son ni subir ni bajar: darle
+   * identidad a una fila que alguien escribió a mano, y devolverle la suya a una a la que se la cambiaron.
+   * Las dos escriben celdas concretas, nunca la fila entera — el contenido es del usuario.
+   */
+  describe('las correcciones del destino', () => {
+    it('una fila añadida a mano se trae, se le escribe el id y queda en la base', async () => {
+      // Sin escribirle el id, el ciclo siguiente le inventaría otra identidad: un agregado nuevo cada
+      // dos minutos, para siempre.
+      reader.snapshot = remote([cellsOf({ ...insumo(''), name: 'Manteca' })]);
+
+      const result = await cycle.execute();
+
+      expect(result.applied).toBe(1);
+
+      // Se trajo con una identidad ya puesta…
+      const assigned = String(
+        (sink.changes[0]?.tables['supplies']?.[0] as Record<string, unknown>)['id'],
+      );
+      expect(assigned).not.toBe('');
+
+      // …y esa misma identidad se escribió en SU fila del destino, con su huella y su versión.
+      expect(gateway.stamped).toHaveLength(1);
+      expect(gateway.stamped[0].rows).toMatchObject([
+        { table: 'supplies', index: 2, cells: { id: assigned, origen: 'dev00001', borrado: '' } },
+      ]);
+      expect(gateway.stamped[0].rows[0].cells['huella']).not.toBe('');
+
+      // Y queda apuntada, así que el ciclo siguiente la ve como una fila normal.
+      expect(await shadow.all()).toMatchObject([{ table: 'supplies', rowId: assigned }]);
+    });
+
+    it('un id cambiado a mano se devuelve a su fila, y nada más se toca', async () => {
+      const fila = insumo('ing-1');
+      reader.snapshot = remote([cellsOf({ ...fila, id: 'ing-inventado' })]);
+      source.rows = { ...source.rows, supplies: [fila] };
+      await shadow.put({
+        table: 'supplies',
+        rowId: 'ing-1',
+        fingerprint: 'huella-vieja',
+        version: '0000000000000-0-otro',
+        deleted: false,
+      });
+
+      const result = await cycle.execute();
+
+      expect(gateway.stamped[0].rows).toEqual([
+        { table: 'supplies', index: 2, cells: { id: 'ing-1' } },
+      ]);
+      // Ni se da por borrada la fila que «desapareció», ni se escribe el bloque: solo la celda del id.
+      expect(result.removed).toBe(0);
+      expect(gateway.sent).toEqual([]);
+    });
+  });
+
   it('dos ciclos a la vez comparten uno: no se pisan escribiendo', async () => {
     source.rows = { ...source.rows, supplies: [insumo('ing-1')] };
 

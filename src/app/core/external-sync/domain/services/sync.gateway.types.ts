@@ -40,6 +40,23 @@ export interface PurgeRequest extends TargetRequest {
   readonly rows: readonly RemoteRowRef[];
 }
 
+/**
+ * Escribir **algunas celdas** de una fila que ya existe, dejando el resto como está.
+ *
+ * Es lo que hace falta para corregir el destino sin tocar lo que escribió una persona: ponerle el id a
+ * una fila que se añadió a mano (con su huella y su versión), o devolverle el id a una a la que se lo
+ * cambiaron. Reescribir la fila entera no serviría — el contenido es del usuario y no hay nada que
+ * cambiarle—, y reescribir el bloque la movería de sitio.
+ */
+export interface StampedRow extends RemoteRowRef {
+  /** Qué columnas se escriben, por **nombre de campo** del esquema (`id`, `version`, `huella`…). */
+  readonly cells: Readonly<Record<string, string>>;
+}
+
+export interface StampRequest extends TargetRequest {
+  readonly rows: readonly StampedRow[];
+}
+
 export interface SyncRequest extends TargetRequest {
   batch: SyncBatch;
 }

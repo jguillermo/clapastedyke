@@ -31,10 +31,9 @@ export class RecipeCategory extends AggregateRoot {
 
   /** Arma la categoría y graba que se guardó. */
   static create(id: EntityId, name: string): RecipeCategory {
-    if (!name.trim()) {
-      throw new Error('Category name is required');
-    }
-    const category = new RecipeCategory({ id, name: name.trim() });
+    const data = { id, name: name.trim() };
+    RecipeCategory.assertValid(data);
+    const category = new RecipeCategory(data);
     category.recordEvent(RecipeBookEvents.recipeCategorySaved(id.value, { name: category.name }));
     return category;
   }
@@ -42,6 +41,13 @@ export class RecipeCategory extends AggregateRoot {
   /** Rehidrata desde almacenamiento: NO graba eventos (leer no es guardar). */
   static restore(data: RecipeCategoryData): RecipeCategory {
     return new RecipeCategory(data);
+  }
+
+  /** La regla que hace válida una categoría. Ver `Supply.assertValid` para el porqué. */
+  static assertValid(data: RecipeCategoryData): void {
+    if (!data.name.trim()) {
+      throw new Error('La categoría necesita un nombre.');
+    }
   }
 
   equals(other: RecipeCategory): boolean {

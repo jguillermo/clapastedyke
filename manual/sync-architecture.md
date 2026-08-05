@@ -66,14 +66,43 @@ reloj de todos los dispositivos** al leerla. Con tope, se re-estampa y desaparec
 
 ## Lo que hace una persona en la hoja
 
-Tres detecciones, y sin ellas la edición manual se pierde en silencio:
+Cuatro detecciones, y sin ellas la edición manual se pierde en silencio:
 
 1. **Editó una fila** → se recalcula la huella de las celdas de datos; si no coincide con la celda
    `huella`, lo tocó un humano (la app escribe contenido y huella **juntos**). Se le da versión de *ahora*,
    así que **gana**. Sin esto, la resolución por versión pisaría su corrección: quien edita una celda no
    actualiza la columna de versión.
 2. **Borró una fila** → estaba en la base, no está en la hoja ⇒ lápida.
-3. **Añadió una fila sin id** → se adopta, se le pone un id y **se le escribe de vuelta**.
+3. **Añadió una fila sin id** → se **adopta**: se le asigna identidad, se importa como cualquier fila que
+   ganó allí, y se le **escriben de vuelta** el id, la huella y la versión *en su propia fila* (una
+   escritura por celda, para no moverla de sitio: el usuario la puso donde quería). Sin ese último paso el
+   ciclo siguiente le inventaría otra identidad — un agregado nuevo cada dos minutos.
+   Si la fila tiene una celda imposible **no se estampa**: se deja intacta para que su dueño la corrija, y
+   se cuenta como ilegible.
+4. **Le cambió el id a una fila** → se le **devuelve el suyo**. Es el desenlace más silencioso de todos si
+   no se corrige: el id viejo desaparece (⇒ se daría por borrado el agregado), el nuevo parece un alta, y
+   toda receta que apuntaba al viejo queda colgando mientras las columnas `(auto)` siguen mostrando el
+   nombre correcto. La hoja parece perfecta y la app está rota. Se reconoce comparando el contenido **sin
+   su id**, y se arregla escribiendo el id anterior en su celda.
+
+> **Una fila sin id se conserva aunque tarde en adoptarse.** El upsert por clave copia tal cual, y en su
+> sitio, las filas que no tienen id. Antes las descartaba, así que cualquier envío a esa pestaña ocurrido
+> entre que alguien teclea la fila y el ciclo la adopta **se la llevaba por delante** sin aviso.
+
+## Borrar desde la app
+
+Se borra una receta desde su formulario y un insumo desde su fila de la lista; los dos **preguntan en el
+sitio** antes (el pie del diálogo o la propia celda), sin diálogo encima del diálogo.
+
+- **Un insumo que una receta usa no se borra**: se dice qué receta lo usa. Las otras dos salidas eran
+  quitar la línea de cada receta (borrar datos que nadie pidió borrar) o dejarla colgando (una receta que
+  la app no sabe costear).
+- **Se borra con lápida, no se olvida**: el documento se queda con fecha de borrado y deja de entregarse.
+  Es lo que permite que el borrado **viaje** — si desapareciera, sería indistinguible de «esto nunca llegó
+  a este dispositivo» y el primer dispositivo desconectado lo resucitaría.
+- **No hay evento de borrado**, y no hace falta: la lápida sale de comparar lo que hay aquí con la base. La
+  única consecuencia es de cadencia — sin evento no hay rebote de cinco segundos, así que sube con el ciclo
+  siguiente (≤ 2 min, o antes si se toca cualquier otra cosa).
 
 ## La regla que evita la tormenta: huella vacía = adoptar
 
@@ -96,11 +125,11 @@ trabajo de otro dispositivo.
 
 1. **Puerta**: ¿credenciales? ¿hoja? Si no, para.
 2. **Bajar** la hoja entera en una petición (`values:batchGet`, sin formatear).
-3. **Barreras** (ver abajo).
-4. **Poner al día la forma** de la hoja si es de una versión anterior. Antes de escribir, o aparecerían
-   columnas sin nombre.
-5. **Fusionar**: decide sin tocar nada.
-6. **Aplicar** aquí lo que ganó allí, apuntando la base **fila a fila**.
+3. **Fusionar**: decide sin tocar nada — y **abortar** si salta una barrera (ver abajo).
+4. **Poner al día la forma** de la hoja si es de una versión anterior. Después de la barrera y antes de
+   escribir datos: ver «El orden entre la barrera y la forma».
+5. **Aplicar** aquí lo que ganó allí, apuntando la base **fila a fila**.
+6. **Adoptar** las altas a mano y **devolver** los ids cambiados.
 7. **Subir** lo que ganó aquí, con su huella y su versión.
 8. **Marcar borrado** en la hoja lo que se borró aquí, y **tirar** las lápidas viejas.
 
@@ -133,6 +162,17 @@ Un ciclo se **niega a seguir entero** —sin aplicar ni escribir nada— en tres
 | Falta una pestaña, o su cabecera no cuadra | «No hay filas» + «lo que no está, se borró» = borrar la tabla entera en todos los dispositivos. Un clic derecho en «Eliminar hoja» no puede costar eso. |
 | Se borrarían más de 20 filas o más del 30 % de una tabla | Una lectura a medias es indistinguible de un borrado real. El tope no distingue el accidente, pero convierte la pérdida total en una pregunta. |
 | Hay ids repetidos en una pestaña | No se sabe cuál es la de verdad; escribir en una dejaría la otra reapareciendo como un fantasma. |
+
+### El orden entre la barrera y la forma
+
+La migración **reescribe la fila de cabecera**, así que tiene que correr *después* de decidir. Si corriera
+antes, una columna insertada a mano quedaría tapada: el ciclo abortaría (decide con la hoja tal como la
+leyó) pero el siguiente encontraría cabeceras que cuadran sobre datos corridos una columna — leyendo el
+precio donde está la moneda, sin que nada volviera a quejarse. La barrera duraría un ciclo y el daño sería
+permanente y silencioso.
+
+Después de la barrera se sabe que las columnas de datos están en su sitio, así que lo único que la
+migración puede cambiar es lo suyo: los rótulos y las columnas de servicio.
 
 ## Una celda mal escrita no atasca nada
 
@@ -214,6 +254,8 @@ hoja y se emparejan sin duplicar nada; lo único que podría reaparecer es lo qu
 - **Se reescribe la pestaña entera al subir**, no fila a fila. Es lo que la hace idempotente y conserva el
   orden de filas del usuario. A cientos o pocos miles de filas sobra; con decenas de miles habría que
   paginar.
+- **Un borrado hecho aquí tarda hasta dos minutos en salir.** No publica evento, así que no tiene el rebote
+  de cinco segundos de un guardado: espera al ciclo siguiente. Nada se pierde — la lápida ya está en local.
 
 ## Diagnóstico
 
@@ -226,7 +268,8 @@ Con `"debug": true` en `public/config.json`, la consola trae el detalle:
 |---|---|
 | `diferencias por campo` con **casi todo el catálogo en un mismo campo** | La canonización de ese campo no es determinista. Es el fallo más grave y el único que no se puede cazar con tests: los dos lados atraviesan el mismo código en un test y coinciden por accidente. Síntoma en producción: la hoja se reescribe sola cada dos minutos. |
 | `N filas se adoptarían` en el primer ciclo | Normal: la hoja no tenía columna de huella. |
-| `ids duplicados`, `filas ilegibles`, `ids cambiados a mano` | Cosas que hay que arreglar en la hoja. Salen con ejemplos. |
+| `ids duplicados`, `filas ilegibles` | Lo que hay que arreglar **a mano** en la hoja: el motor no puede decidir por ti cuál de dos filas con el mismo id es la de verdad, ni qué querías escribir en una celda que no se puede leer. Salen con ejemplos. |
+| `idsDevueltos`, `altasAMano` | Correcciones que el motor **ya hizo**: le devolvió el id a una fila a la que se lo cambiaron, o adoptó una que estaba sin id. |
 | `el ciclo se ha negado a seguir` | Una barrera. El motivo dice qué pestaña. |
 | `conflictos` con `blind: true` | Se eligió sin saber cuándo se cambió aquí. Solo debería pasar con filas guardadas antes de que existiera `updatedAt`. |
 | `demasiado pronto para otro ciclo` | El mínimo ambiental haciendo su trabajo. No es un fallo. |

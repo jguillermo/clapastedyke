@@ -76,7 +76,7 @@ interface ParsedRange {
 /**
  * Una pestaña de la hoja: su cuadrícula tal cual, y las operaciones que haría **una persona**.
  *
- * Los métodos de mano (`setCell`, `setHeader`, `deleteRow`) tocan **solo** lo que se les pide: no
+ * Los métodos de mano (`setCell`, `setHeader`, `appendRow`, `deleteRow`) tocan **solo** lo que se les pide: no
  * actualizan la versión ni la huella, que es exactamente lo que las convierte en una edición manual a
  * ojos del motor. Localizar por rótulo de cabecera (`'Nombre'`) y no por índice es deliberado: la
  * cabecera es el contrato observable de la hoja, igual que un nombre accesible en el DOM, y la suite no
@@ -144,6 +144,22 @@ export class FakeTab {
       throw new Error(`La pestaña «${this.title}» no tiene la columna «${header}».`);
     }
     this.write(0, column, replacement);
+  }
+
+  /**
+   * Escribe una fila nueva debajo de la última con datos, rellenando **solo** las columnas que se le
+   * pasen: es un alta a mano, así que no lleva id, ni versión, ni huella. Devuelve su número de fila.
+   */
+  appendRow(values: Record<string, string>): number {
+    const row = this.dataRows().length + HEADER_ROW;
+    for (const [header, value] of Object.entries(values)) {
+      const column = this.columnOf(header);
+      if (column < 0) {
+        throw new Error(`La pestaña «${this.title}» no tiene la columna «${header}».`);
+      }
+      this.write(row, column, coerce(value));
+    }
+    return row + 1;
   }
 
   /** Borra una fila entera, desplazando hacia arriba las de debajo (como el menú de la hoja). */

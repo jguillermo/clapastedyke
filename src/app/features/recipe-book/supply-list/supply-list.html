@@ -4,7 +4,14 @@
     para añadir uno nuevo.
   </p>
 
-  <migo-table [columns]="columns" [rows]="lineControls()" bleed ariaLabel="Insumos del libro">
+  <migo-table
+    #table
+    [columns]="columns"
+    [rows]="lineControls()"
+    bleed
+    ariaLabel="Insumos del libro"
+    (removeRow)="deleteLine($event)"
+  >
     <ng-template let-line let-r="rowIndex" let-c="colIndex">
       <!-- El (keydown.enter) no es un control: escucha el Enter que BURBUJEA desde los inputs de
            la fila (que sí son focusables) para añadir la siguiente. Hacer focusable este div
@@ -50,6 +57,36 @@
               ariaLabel="Precio de compra"
               placeholder="0.00"
             />
+          }
+          @case (3) {
+            <!-- El renglón de agregar (fila 0) no se borra: todavía no existe nada. -->
+            @if (line.controls.id.value) {
+              @if (pendingDeleteId() === line.controls.id.value) {
+                <!-- Pregunta en el sitio: en una hoja, un diálogo por fila sería peor que el error que
+                     evita. El nombre accesible lleva el insumo para que se sepa cuál se confirma. -->
+                <button
+                  migo-button
+                  variant="danger"
+                  size="xs"
+                  type="button"
+                  [attr.aria-label]="'Confirmar borrar ' + line.controls.name.value"
+                  (click)="table.remove(r)"
+                >
+                  Borrar
+                </button>
+              } @else {
+                <button
+                  migo-button
+                  variant="ghost"
+                  size="xs"
+                  type="button"
+                  [attr.aria-label]="'Borrar ' + line.controls.name.value"
+                  (click)="pendingDeleteId.set(line.controls.id.value)"
+                >
+                  <migo-icon icon-leading name="mat:delete" size="sm" />
+                </button>
+              }
+            }
           }
         }
       </div>

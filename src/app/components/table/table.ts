@@ -18,6 +18,11 @@ export type TableAlign = 'start' | 'center' | 'end';
 
 /** Definición de columna de la tabla. */
 export interface TableColumn {
+  /**
+   * Rótulo de la columna. **Nunca vacío**, ni en una columna que solo lleve iconos: una cabecera de
+   * tabla en blanco es un fallo de AXE (`empty-table-header`) y deja a quien usa un lector de pantalla
+   * sin saber de qué es esa columna. Para la de acciones, «Acciones».
+   */
   name: string;
   /** Ancho de la columna. Omitido → flexible (ocupa lo que sobra). Ver {@link TableSize}. */
   size?: TableSize;

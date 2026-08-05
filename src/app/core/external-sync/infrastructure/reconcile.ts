@@ -184,17 +184,42 @@ export interface Quarantined {
   readonly field: string;
 }
 
-/** Una fila que alguien escribió a mano sin ponerle id. */
+/**
+ * Una fila que alguien escribió a mano en el destino sin ponerle id: se **adopta**.
+ *
+ * Adoptar es tres cosas en el mismo ciclo: darle una identidad, traerla aquí como cualquier fila que
+ * ganó allí, y **escribirle el id de vuelta** junto a su huella y su versión. Sin ese último paso la fila
+ * seguiría sin id en el destino y el ciclo siguiente le inventaría otra identidad, creando un agregado
+ * nuevo cada dos minutos.
+ *
+ * El id lo emite `ReconcileInput.newIdentity`. La fila viaja con el id **ya puesto** en `values`, y la
+ * huella se calcula sobre ese contenido — la identidad entra en la huella, así que calcularla antes de
+ * asignarla daría una huella que no vuelve a coincidir nunca.
+ */
 export interface HandAdd {
   readonly table: string;
   readonly index: number;
+  /** La identidad que se le asigna. */
+  readonly rowId: string;
   readonly values: Readonly<Record<string, RawValue>>;
+  readonly fingerprint: string;
+  readonly version: string;
 }
 
-/** Una fila cuyo id cambió a mano: hay que devolverle el suyo. */
+/**
+ * Una fila cuyo id cambió a mano: se le **devuelve el suyo**.
+ *
+ * Es el desenlace más silencioso de todos si no se corrige: el id viejo desaparece (⇒ se daría por
+ * borrado el agregado), el nuevo parece un alta, y **toda receta que apuntaba al id viejo queda
+ * colgando** mientras las columnas `(auto)` siguen mostrando el nombre correcto. La hoja parece perfecta
+ * y la app está rota. El id no es dato de usuario: de él depende la integridad referencial, así que se
+ * revierte escribiendo el id anterior en su celda.
+ */
 export interface Reid {
   readonly table: string;
+  /** El id que alguien escribió (el que hay ahora en la hoja). */
   readonly rowId: string;
+  /** El id que le corresponde, y que se le devuelve. */
   readonly previousRowId: string;
   readonly index: number;
 }
@@ -267,6 +292,13 @@ export interface ReconcileInput {
   readonly tables: readonly SheetTable[];
   readonly now: number;
   readonly deviceId: string;
+  /**
+   * De dónde sale la identidad de una fila que alguien añadió a mano al destino, sin id.
+   *
+   * Se recibe en vez de generarse aquí para que esta función siga siendo **pura y comprobable**: un test
+   * le pasa un contador y puede asertar exactamente qué id se asignó. En la app es `crypto.randomUUID()`.
+   */
+  readonly newIdentity: () => string;
   /**
    * Cuándo se cambió una fila **aquí**, si se sabe.
    *
@@ -373,7 +405,11 @@ export async function reconcile(input: ReconcileInput): Promise<MergePlan> {
     const duplicates = duplicatesOf(table.name, remote.rows);
     plan.duplicates.push(...duplicates);
     plan.quarantined.push(...remote.quarantined);
-    plan.handAdds.push(...remote.handAdds);
+    // La versión de un alta a mano se emite aquí, con el reloj ya puesto al día con todo lo leído: así
+    // nace por delante de cualquier versión que ya estuviera escrita en el destino.
+    for (const add of remote.handAdds) {
+      plan.handAdds.push({ ...add, version: clock.next(input.now).toString() });
+    }
 
     // Un id repetido no se toca por ningún lado: no se sabe cuál de las dos filas es la de verdad, y
     // escribir en una dejaría la otra reapareciendo como un fantasma en cada ciclo.
@@ -635,9 +671,41 @@ async function parseRemote(
     if (rowId.length === 0) {
       // Sin id: o es una fila que alguien escribió a mano (y hay que adoptarla dándole uno), o es el
       // hueco en blanco que deja una tabla que se encogió. Lo que las distingue es si tiene contenido.
-      if (hasContent(table, read)) {
-        handAdds.push({ table: table.name, index: row.index, values });
+      if (!hasContent(table, read)) {
+        continue;
       }
+
+      // Se le pone el id ANTES de canonizar: la identidad entra en la huella, así que calcularla sin ella
+      // daría una huella que no volvería a coincidir en ningún ciclo posterior.
+      const assigned = canonicalCode(input.newIdentity());
+      values[key] = assigned;
+      const adopted = canonicalRow(table.name, table.fields, read);
+      if ('unreadable' in adopted) {
+        // Un alta a mano con una celda imposible no se puede traer, y tampoco se le escribe el id: se
+        // deja intacta para que su dueño la corrija, y se cuenta como fila ilegible.
+        quarantined.push({
+          table: table.name,
+          rowId: null,
+          index: row.index,
+          field: adopted.unreadable.field,
+        });
+        continue;
+      }
+
+      const contents =
+        table.name === RECIPES_TABLE
+          ? [...adopted.values, blocks.get(assigned) ?? '']
+          : adopted.values;
+      handAdds.push({
+        table: table.name,
+        index: row.index,
+        rowId: assigned,
+        values: { ...values },
+        fingerprint: await fingerprintOf(contents),
+        // La versión se pone en el bucle de tablas, cuando el reloj ya ha visto TODO lo que había escrito
+        // en el destino: una versión emitida aquí podría nacer por detrás de algo ya escrito.
+        version: '',
+      });
       continue;
     }
 

@@ -62,6 +62,33 @@ test.describe('Formulario de receta · editar', () => {
     await form.waitReady();
     await expect(grid.nameInput(0)).toHaveValue(secondName);
     expect(await grid.nameInput(1).inputValue()).toEqual('');
+    await form.cancel.click();
+    await form.waitClosed();
+
+    /*
+     * Borrar la receta. Va al final del journey porque es lo único que no se puede deshacer, y se
+     * prueban las dos salidas: preguntar y **conservar** no borra nada; preguntar y confirmar sí.
+     */
+    await catalog.recipe('Queques', 'Keke de Limón renombrado E2E').click();
+    await form.waitReady();
+    await form.delete.click();
+    await form.keep.click();
+    // Al conservar vuelve el pie normal, y se puede seguir editando como si nada.
+    await expect(form.save).toBeVisible();
+    await form.cancel.click();
+    await form.waitClosed();
+    expect(await catalog.recipeNamesIn('Queques')).toContain('Keke de Limón renombrado E2E');
+
+    // Y ahora sí: preguntar, confirmar, y la receta deja de estar en su categoría.
+    await catalog.recipe('Queques', 'Keke de Limón renombrado E2E').click();
+    await form.waitReady();
+    await form.delete.click();
+    await form.confirmDelete.click();
+    await form.waitClosed();
+
+    const afterDelete = await catalog.recipeNamesIn('Queques');
+    expect(afterDelete).not.toContain('Keke de Limón renombrado E2E');
+    expect(afterDelete).toHaveLength(RECIPES.Queques.length - 1);
   });
 
   test('la categoría es fija y no se ofrece cambiarla → añadir un sabor → guardar → su badge aparece → quitarlo → guardar → la fila se queda sin badges', async ({

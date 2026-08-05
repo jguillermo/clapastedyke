@@ -39,6 +39,15 @@ export class RecipeFormPage {
   readonly close = this.root.getByRole('button', { name: 'Cerrar', exact: true });
   readonly error = this.root.locator('migo-card-body > div > [role="alert"]');
 
+  /*
+   * Borrar pregunta en el pie, y mientras pregunta el resto del pie desaparece. Los tres rótulos son
+   * distintos a propósito —«Borrar» pregunta, «Sí, borrar» confirma— para que pulsar dos veces por
+   * inercia no borre nada; `exact` es lo que mantiene separados los dos primeros.
+   */
+  readonly delete = this.root.getByRole('button', { name: 'Borrar', exact: true });
+  readonly confirmDelete = this.root.getByRole('button', { name: 'Sí, borrar', exact: true });
+  readonly keep = this.root.getByRole('button', { name: 'Conservar', exact: true });
+
   /**
    * Campo ÚNICO de características (`migo-select-tag` con tres tipos: `Sabor`, `Porciones` y
    * `Molde`). Cada llamada indica el tipo: `properties.pick('Sabor', 'Chocolate')`.

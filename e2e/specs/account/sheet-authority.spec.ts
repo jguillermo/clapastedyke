@@ -20,6 +20,8 @@ import { SUPPLIES, SUPPLY_COUNT } from '../../support/seed';
  * | se cambia una celda | el insumo cambia (la huella recalculada no cuadra con la escrita ⇒ gana la hoja) |
  * | se marca `borrado` | el insumo desaparece (lápida) |
  * | se borra la fila entera | el insumo desaparece (estaba en la base y ya no está en la hoja) |
+ * | se añade una fila **sin id** | se adopta: entra en la app y la hoja recibe su id, huella y versión |
+ * | se le **cambia el id** a una fila | se le devuelve el suyo (de él depende la integridad referencial) |
  *
  * Los insumos que este journey **borra** son los que él mismo ha creado. Borrar uno sembrado dejaría
  * recetas apuntando a un insumo que no está, y el test acabaría comprobando qué hace la vista con una
@@ -63,7 +65,7 @@ async function sync(account: AccountPage): Promise<void> {
 }
 
 test.describe('Cuenta · la hoja es la fuente de la verdad', () => {
-  test('insumos creados aquí suben a la hoja → editados a mano allí bajan a la app → marcado como borrado y fila eliminada desaparecen de aquí → el catálogo sembrado queda intacto', async ({
+  test('insumos creados aquí suben a la hoja → editados a mano allí bajan a la app → marcado como borrado y fila eliminada desaparecen de aquí → una fila sin id se adopta → un id cambiado a mano vuelve a su sitio', async ({
     google,
     connectAccount,
     account,
@@ -133,5 +135,43 @@ test.describe('Cuenta · la hoja es la fuente de la verdad', () => {
     expect(survivors).toContain(SUPPLIES.huevos.name);
     // La lista trae además un renglón vacío para agregar, de ahí el +1.
     expect(survivors).toHaveLength(SUPPLY_COUNT + 1);
+
+    // ── Caso 4 · una fila escrita a mano SIN id se adopta ────────────────────────────────────────
+    await backToAccount(supplies, catalog, home, account);
+    const nueva = insumos.appendRow({
+      Nombre: 'Cardamomo E2E',
+      'Unidad base': 'g',
+      Uso: 'recipe',
+      'Precio de compra': '18',
+      'Presentación (cantidad)': '100',
+      'Presentación (unidad)': 'g',
+      Moneda: 'PEN',
+    });
+
+    await sync(account);
+
+    // El motor le pone identidad, huella y versión **en su propia fila**: sin eso, el ciclo siguiente le
+    // inventaría otra identidad y crearía un insumo nuevo cada dos minutos.
+    const adoptado = String(insumos.cell(nueva, 'id'));
+    expect(adoptado).not.toBe('');
+    expect(String(insumos.cell(nueva, 'huella'))).not.toBe('');
+    expect(String(insumos.cell(nueva, 'version'))).not.toBe('');
+    expect(insumos.cell(nueva, 'Nombre')).toBe('Cardamomo E2E');
+
+    await openSupplies(account, home, catalog, supplies);
+    expect(await supplies.list.names()).toContain('Cardamomo E2E');
+
+    // ── Caso 5 · un id cambiado a mano se devuelve a su sitio ────────────────────────────────────
+    // Es el desenlace más silencioso: el id viejo «desaparece» y el nuevo parece un alta, dejando
+    // colgando todo lo que citaba al viejo mientras la hoja parece perfecta.
+    await backToAccount(supplies, catalog, home, account);
+    insumos.setCell(nueva, 'id', 'id-cambiado-a-mano');
+
+    await sync(account);
+
+    expect(insumos.cell(nueva, 'id')).toBe(adoptado);
+    // Y no se dio por borrado por haber «desaparecido» su id.
+    await openSupplies(account, home, catalog, supplies);
+    expect(await supplies.list.names()).toContain('Cardamomo E2E');
   });
 });

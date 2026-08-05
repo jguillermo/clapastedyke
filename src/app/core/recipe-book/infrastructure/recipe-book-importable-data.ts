@@ -9,7 +9,7 @@ import {
 } from '@core/_common/import/importable-data';
 import { Logger } from '@core/_common/logger/logger';
 import { BaseUnit, Quantity } from '@core/_common/quantity';
-import { CAPACITY_GROUPS, CapacityGroup, RecipeCapacity } from '../domain/entities/recipe-capacity';
+import { CapacityGroup, RecipeCapacity } from '../domain/entities/recipe-capacity';
 import { RecipeCategory } from '../domain/entities/recipe-category';
 import { RecipeFlavor } from '../domain/entities/recipe-flavor';
 import { Recipe } from '../domain/entities/recipe';
@@ -30,23 +30,22 @@ import { isSupplyUsage, SupplyUsage } from '../domain/value-objects/supply-usage
  * aquí se levanta el modelo desde tablas. Los dos viven en `infrastructure/` por lo mismo — son
  * adaptadores hacia el exterior, no intenciones del usuario.
  *
- * ## Rehidrata con `restore`, y por eso valida a mano
+ * ## Rehidrata con `restore`, y valida con `assertValid`
  *
  * `restore(...)` es la puerta muda: no graba eventos, que es justo lo que hace falta (ver
- * `ImportableData`). Pero **tampoco valida**, así que las reglas que `create(...)` comprueba hay que
- * comprobarlas aquí.
+ * `ImportableData`). Pero **tampoco valida**, así que las reglas de entidad hay que comprobarlas antes
+ * de rehidratar — y se comprueban **llamando a las de la entidad**, no repitiéndolas: cada agregado
+ * expone `assertValid(data)`, que es lo mismo que ejecuta su `create`. Un solo dueño por regla.
  *
- * La mayoría las ponen los propios value objects, que lanzan igual por las dos puertas: `EntityId`
+ * Antes estaban duplicadas aquí, y era una duplicación que se rompe sola: una regla nueva en `create`
+ * dejaba entrar por esta puerta un agregado que la app no sabe pintar. Llamar a `create` para validar y
+ * tirar la instancia no es alternativa —`infrastructure/` no puede llamar a `create`, y confiar en que
+ * nadie saque los eventos de una instancia tirada es justo el tipo de sutileza que se rompe—, y por eso
+ * la validación se expone aparte.
+ *
+ * El resto de reglas las ponen los value objects, que lanzan igual por las dos puertas: `EntityId`
  * rechaza un id vacío, `Quantity.of` una cantidad que no sea finita y positiva, `PurchasePrice.of` un
- * importe que no lo sea. Lo que queda son cuatro reglas de entidad —nombre no vacío, la unidad base
- * tiene que coincidir con la de la compra, una receta necesita al menos un ingrediente, y el grupo de
- * una capacidad tiene que existir— y esas sí se repiten aquí.
- *
- * **Es una duplicación consciente y hay que vigilarla**: si mañana `create` gana una regla, este
- * fichero se queda corto y una fila del destino podría entrar en un estado que la app no sabe pintar.
- * La alternativa —llamar a `create` para validar y tirar la instancia— está descartada: las
- * convenciones prohíben que `infrastructure/` llame a `create`, y confiar en que nadie saque los
- * eventos de una instancia tirada es exactamente el tipo de sutileza que se rompe sola.
+ * importe que no lo sea.
  *
  * ## Ninguna fila mala tumba el lote
  *
@@ -162,60 +161,56 @@ export class RecipeBookImportableData extends ImportableData {
   // ── Un método por agregado ───────────────────────────────────────────────────────────────────
 
   private async category(values: Record<string, unknown>): Promise<string> {
-    const id = new EntityId(text(values['id']));
-    const name = required(text(values['name']), 'La categoría necesita un nombre.');
+    const data = { id: new EntityId(text(values['id'])), name: text(values['name']) };
+    RecipeCategory.assertValid(data);
 
-    await this.categories.save(RecipeCategory.restore({ id, name }));
-    return id.value;
+    await this.categories.save(RecipeCategory.restore(data));
+    return data.id.value;
   }
 
   private async flavor(values: Record<string, unknown>): Promise<string> {
-    const id = new EntityId(text(values['id']));
-    const label = required(text(values['label']), 'El sabor necesita un nombre.');
+    const data = { id: new EntityId(text(values['id'])), label: text(values['label']) };
+    RecipeFlavor.assertValid(data);
 
-    await this.flavors.save(RecipeFlavor.restore({ id, label }));
-    return id.value;
+    await this.flavors.save(RecipeFlavor.restore(data));
+    return data.id.value;
   }
 
   private async capacity(values: Record<string, unknown>): Promise<string> {
-    const id = new EntityId(text(values['id']));
-    const label = required(text(values['label']), 'La capacidad necesita una etiqueta.');
-    const group = text(values['group']).toLowerCase();
-    if (!isCapacityGroup(group)) {
-      throw new Error(`«${group}» no es un grupo de capacidad (${CAPACITY_GROUPS.join(' o ')}).`);
-    }
-    const factor = number(values['factor'], 'El factor de la capacidad');
+    const data = {
+      id: new EntityId(text(values['id'])),
+      // La conversión de tipo es de la traducción, no una regla: `assertValid` comprueba justo después
+      // que el grupo exista de verdad, así que una celda con cualquier cosa se rechaza igual.
+      group: text(values['group']).toLowerCase() as CapacityGroup,
+      label: text(values['label']),
+      factor: number(values['factor'], 'El factor de la capacidad'),
+    };
+    RecipeCapacity.assertValid(data);
 
-    await this.capacities.save(RecipeCapacity.restore({ id, group, label, factor }));
-    return id.value;
+    await this.capacities.save(RecipeCapacity.restore(data));
+    return data.id.value;
   }
 
   private async supply(values: Record<string, unknown>): Promise<string> {
-    const id = new EntityId(text(values['id']));
-    const name = required(text(values['name']), 'El insumo necesita un nombre.');
-    const baseUnit = unit(values['baseUnit'], 'La unidad base del insumo');
-    const usage = supplyUsage(values['usage']);
-
     const per = Quantity.of(
       number(values['pricePerValue'], 'La presentación de compra'),
       unit(values['pricePerUnit'], 'La unidad de la presentación de compra'),
     );
-    // La misma invariante que protege `Supply.create`: un insumo que se mide en gramos no se puede
-    // comprar por unidades. Repetida aquí porque `restore` no valida — ver la cabecera.
-    if (baseUnit !== per.unit) {
-      throw new Error(
-        `El insumo se mide en «${baseUnit}» pero su compra está en «${per.unit}»: no cuadran.`,
-      );
-    }
-    const currency = text(values['currency']) || 'PEN';
-    const purchasePrice = PurchasePrice.of(
-      number(values['priceAmount'], 'El precio'),
-      per,
-      currency,
-    );
+    const data = {
+      id: new EntityId(text(values['id'])),
+      name: text(values['name']),
+      baseUnit: unit(values['baseUnit'], 'La unidad base del insumo'),
+      usage: supplyUsage(values['usage']),
+      purchasePrice: PurchasePrice.of(
+        number(values['priceAmount'], 'El precio'),
+        per,
+        text(values['currency']) || 'PEN',
+      ),
+    };
+    Supply.assertValid(data);
 
-    await this.supplies.save(Supply.restore({ id, name, baseUnit, usage, purchasePrice }));
-    return id.value;
+    await this.supplies.save(Supply.restore(data));
+    return data.id.value;
   }
 
   private async recipe(
@@ -223,27 +218,20 @@ export class RecipeBookImportableData extends ImportableData {
     lines: readonly ExportedRow[],
   ): Promise<string> {
     const id = new EntityId(text(values['id']));
-    const name = required(text(values['name']), 'La receta necesita un nombre.');
-    const categoryId = new EntityId(text(values['categoryId']));
+    const data = {
+      id,
+      categoryId: new EntityId(text(values['categoryId'])),
+      name: text(values['name']),
+      ingredients: await this.ingredientsOf(id.value, lines),
+      flavorId: optionalId(values['flavorId']),
+      portionsCapacityId: optionalId(values['portionsCapacityId']),
+      moldCapacityId: optionalId(values['moldCapacityId']),
+    };
+    // Aquí es donde muerde la regla «una receta necesita al menos un ingrediente»: si alguien le borró
+    // las líneas a mano, la receta se rechaza en vez de entrar en un estado que la app no sabe pintar.
+    Recipe.assertValid(data);
 
-    const ingredients = await this.ingredientsOf(id.value, lines);
-    // La misma invariante que protege `Recipe.create`. Sin ella, una receta a la que alguien le borró
-    // las líneas a mano entraría sin ingredientes, y la app no sabe pintar eso.
-    if (ingredients.length === 0) {
-      throw new Error('La receta no tiene ningún ingrediente que se pueda leer.');
-    }
-
-    await this.recipes.save(
-      Recipe.restore({
-        id,
-        categoryId,
-        name,
-        ingredients,
-        flavorId: optionalId(values['flavorId']),
-        portionsCapacityId: optionalId(values['portionsCapacityId']),
-        moldCapacityId: optionalId(values['moldCapacityId']),
-      }),
-    );
+    await this.recipes.save(Recipe.restore(data));
     return id.value;
   }
 
@@ -295,13 +283,6 @@ function text(value: unknown): string {
   return value === null || value === undefined ? '' : String(value).trim();
 }
 
-function required(value: string, message: string): string {
-  if (value.length === 0) {
-    throw new Error(message);
-  }
-  return value;
-}
-
 /**
  * Número de una celda, venga como número o como texto. Acepta la coma decimal de quien teclea en
  * español, y solo cuando no hay ambigüedad — `1.234,56` significa cosas distintas en dos idiomas y no
@@ -334,10 +315,6 @@ function supplyUsage(value: unknown): SupplyUsage {
   // Un uso en blanco no es un error del usuario: es una columna que quizá no rellenó. Se le pone el
   // caso normal en vez de rechazar la fila entera por una etiqueta de agrupación.
   return isSupplyUsage(raw) ? raw : 'recipe';
-}
-
-function isCapacityGroup(value: string): value is CapacityGroup {
-  return (CAPACITY_GROUPS as readonly string[]).includes(value);
 }
 
 /** Un id que puede no estar. Vacío = no hay, que es distinto de un id malo. */

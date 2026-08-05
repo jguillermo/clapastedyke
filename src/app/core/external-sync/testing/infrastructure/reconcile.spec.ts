@@ -140,6 +140,15 @@ function shadowOf(rows: Partial<ShadowRow>[]): ShadowRow[] {
   }));
 }
 
+/**
+ * Las identidades que se le dan a las altas a mano, en orden y **predecibles**: así un test puede
+ * asertar exactamente qué id se asignó y qué se escribiría en la hoja.
+ */
+function identities(): () => string {
+  let next = 0;
+  return () => `nuevo-${++next}`;
+}
+
 function run(input: {
   snapshot: RemoteSnapshot;
   local?: ExportedRows;
@@ -153,6 +162,7 @@ function run(input: {
     tables: SHEET_TABLES,
     now: AHORA,
     deviceId: DEVICE,
+    newIdentity: identities(),
     ...(input.localVersionOf ? { localVersionOf: input.localVersionOf } : {}),
   });
 }
@@ -483,15 +493,42 @@ describe('reconcile · lo que hace una persona en la hoja', () => {
     ]);
   });
 
-  it('una fila escrita a mano sin id se adopta como alta', async () => {
+  it('una fila escrita a mano sin id se adopta con identidad, huella y versión', async () => {
+    const fila = { ...insumo('ing-x'), id: '' };
+    const plan = await run({
+      snapshot: snapshotOf(remoteTable(INSUMOS, [cellsOf(INSUMOS, fila)])),
+    });
+
+    expect(plan.handAdds).toHaveLength(1);
+    const [alta] = plan.handAdds;
+    expect(alta.table).toBe('supplies');
+    expect(alta.index).toBe(2);
+    // La identidad se asigna aquí, y viaja YA PUESTA en los valores: el id entra en la huella, así que
+    // calcularla antes de asignarlo daría una huella que no vuelve a coincidir nunca.
+    expect(alta.rowId).toBe('nuevo-1');
+    expect(alta.values['id']).toBe('nuevo-1');
+    expect(alta.fingerprint).toBe(await fingerprintFor(INSUMOS, { ...fila, id: 'nuevo-1' }));
+    expect(alta.version).not.toBe('');
+    // No se aplica por la vía normal: hay que traerla Y escribirle el id de vuelta, y eso lo hace el
+    // ciclo con `plan.handAdds`.
+    expect(plan.apply).toEqual([]);
+  });
+
+  it('un alta a mano con una celda imposible no se adopta: se deja intacta y se cuenta', async () => {
+    // Escribirle el id la daría por buena y el dato malo entraría; dejarla como está deja que su dueño la
+    // corrija, y mientras tanto sale en la cuenta de filas ilegibles.
     const plan = await run({
       snapshot: snapshotOf(
-        remoteTable(INSUMOS, [cellsOf(INSUMOS, { ...insumo('ing-x'), id: '' })]),
+        remoteTable(INSUMOS, [
+          cellsOf(INSUMOS, { ...insumo('ing-x'), id: '', priceAmount: 'gratis' }),
+        ]),
       ),
     });
 
-    expect(plan.handAdds).toMatchObject([{ table: 'supplies', index: 2 }]);
-    expect(plan.apply).toEqual([]);
+    expect(plan.handAdds).toEqual([]);
+    expect(plan.quarantined).toMatchObject([
+      { table: 'supplies', rowId: null, index: 2, field: 'priceAmount' },
+    ]);
   });
 
   it('una fila entera en blanco no es un alta: es el hueco de una tabla que se encogió', async () => {

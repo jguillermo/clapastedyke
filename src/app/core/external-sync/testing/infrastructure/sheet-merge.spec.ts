@@ -78,10 +78,21 @@ describe('mergeByKey', () => {
     expect(twice).toEqual(once);
   });
 
-  it('una fila sin id que hubiera quedado suelta en la hoja se descarta, no se duplica', () => {
-    const merged = mergeByKey(SUPPLIES, [['', 'basura', '']], [['S-1', 'Harina', '4.5']]);
+  it('una fila sin id se conserva TAL CUAL y en su sitio: la escribió una persona', () => {
+    /*
+     * Antes se descartaba, y era una pérdida de datos silenciosa: una fila con contenido y sin id la
+     * acaba de teclear alguien en su hoja, y el motor la adopta —le da id y la importa— en el ciclo en
+     * que la ve. Pero cualquier envío a esa pestaña ocurrido entremedias se la llevaba por delante, sin
+     * aviso y sin rastro.
+     */
+    const aMano = ['', 'Manteca a mano', '9.9'];
+    const merged = mergeByKey(
+      SUPPLIES,
+      [aMano, ['S-1', 'Harina', '4']],
+      [['S-1', 'Harina', '4.5']],
+    );
 
-    expect(merged).toEqual([['S-1', 'Harina', '4.5']]);
+    expect(merged).toEqual([aMano, ['S-1', 'Harina', '4.5']]);
   });
 
   it('un id que se llame como una propiedad de Object no confunde la búsqueda', () => {

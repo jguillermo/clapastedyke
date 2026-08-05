@@ -60,15 +60,9 @@ export class Supply extends AggregateRoot {
     usage: SupplyUsage,
     purchasePrice: PurchasePrice,
   ): Supply {
-    if (!name.trim()) {
-      throw new Error('Supply name is required');
-    }
-    if (baseUnit !== purchasePrice.per.unit) {
-      throw new Error(
-        `Supply base unit (${baseUnit}) must match its purchase presentation unit (${purchasePrice.per.unit})`,
-      );
-    }
-    const supply = new Supply({ id, name: name.trim(), baseUnit, usage, purchasePrice });
+    const data = { id, name: name.trim(), baseUnit, usage, purchasePrice };
+    Supply.assertValid(data);
+    const supply = new Supply(data);
     supply.recordEvent(RecipeBookEvents.supplySaved(id.value, supply.snapshot()));
     return supply;
   }
@@ -76,6 +70,30 @@ export class Supply extends AggregateRoot {
   /** Rehidrata desde almacenamiento: NO graba eventos (leer no es guardar). */
   static restore(data: SupplyData): Supply {
     return new Supply(data);
+  }
+
+  /**
+   * Las reglas que hacen válido un insumo, **en un solo sitio**.
+   *
+   * Está aparte de `create` porque hay un segundo camino legítimo hacia el modelo: rehidratar filas que
+   * vienen de fuera (la sincronización trae filas que ha escrito una persona a mano). Ese camino usa
+   * `restore`, que no valida a propósito —leer no puede fallar por una regla de negocio—, así que
+   * necesita comprobarlas él. Antes las repetía, con lo que eso tiene de divergir en silencio: una regla
+   * nueva aquí dejaba entrar por la otra puerta un insumo que la app no sabe pintar.
+   *
+   * **Los mensajes se le enseñan a alguien**, así que están escritos para leerse: los pinta el formulario
+   * cuando el guardado falla, y salen en el diagnóstico de las filas que no se pueden leer.
+   */
+  static assertValid(data: SupplyData): void {
+    if (!data.name.trim()) {
+      throw new Error('El insumo necesita un nombre.');
+    }
+    // Un insumo que se mide en gramos no se puede comprar por unidades.
+    if (data.baseUnit !== data.purchasePrice.per.unit) {
+      throw new Error(
+        `El insumo se mide en «${data.baseUnit}» pero su compra está en «${data.purchasePrice.per.unit}»: no cuadran.`,
+      );
+    }
   }
 
   equals(other: Supply): boolean {

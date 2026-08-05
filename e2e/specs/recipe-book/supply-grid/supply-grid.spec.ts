@@ -26,7 +26,7 @@ test.describe('Grilla de ingredientes', () => {
 
     // Arranca con un único renglón vacío: sin quitar fila y sin total que mostrar.
     await expect(grid.rows).toHaveCount(1);
-    await expect(grid.columnHeaders).toHaveText(['Ingrediente', 'Cantidad', 'Costo', '']);
+    await expect(grid.columnHeaders).toHaveText(['Ingrediente', 'Cantidad', 'Costo', 'Acciones']);
     await expect(grid.nameInput(0)).toHaveValue('');
     await expect(grid.removeRowButton(0)).toHaveCount(0);
     await expect(grid.materialTotalLabel).toHaveCount(0);

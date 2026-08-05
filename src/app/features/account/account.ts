@@ -464,16 +464,19 @@ function summaryOf(result: ReconcileWithRemoteResult): string {
     return `La sincronización se negaría a seguir: ${cause}. El detalle está en la consola.`;
   }
 
+  // Solo van arriba las que piden mano humana. Un id cambiado y un alta sin id los arregla el propio
+  // ciclo, así que son movimientos, no deberes del usuario.
   const problems = [
     count(plan.duplicates.length, 'id repetido', 'ids repetidos'),
     count(plan.quarantined.length, 'fila ilegible', 'filas ilegibles'),
-    count(plan.reids.length, 'id cambiado a mano', 'ids cambiados a mano'),
   ].filter((text) => text !== '');
 
   const moves = [
     count(plan.apply.length, 'fila bajaría', 'filas bajarían'),
     count(plan.push.length, 'fila subiría', 'filas subirían'),
     count(plan.remove.length, 'fila se borraría', 'filas se borrarían'),
+    count(plan.handAdds.length, 'fila sin id se adoptaría', 'filas sin id se adoptarían'),
+    count(plan.reids.length, 'id se devolvería a su fila', 'ids se devolverían a su fila'),
     count(plan.adopt.length, 'fila se adoptaría', 'filas se adoptarían'),
     count(plan.drift.length, 'diferencia', 'diferencias'),
   ].filter((text) => text !== '');

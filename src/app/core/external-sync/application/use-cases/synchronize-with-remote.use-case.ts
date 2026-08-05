@@ -16,6 +16,7 @@ import { SyncOutbox } from '../../domain/services/sync-outbox';
 import { SyncReader } from '../../domain/services/sync-reader';
 import { SyncShadow } from '../../domain/services/sync-shadow';
 import { SyncStatus } from '../../domain/services/sync-status';
+import { StampedRow } from '../../domain/services/sync.gateway.types';
 import { SyncBatch } from '../../domain/value-objects/sync-batch';
 import { SyncTarget } from '../../domain/value-objects/sync-target';
 import {
@@ -58,13 +59,15 @@ export interface SynchronizeWithRemoteResult {
  *
  * 1. **Puerta**: credenciales y destino. Sin eso no hay ciclo.
  * 2. **Bajar** el destino entero, de una vez.
- * 3. **Poner al día su forma** si hace falta. Antes de escribir, o aparecerían columnas sin nombre.
- * 4. **Fusionar**, que decide sin tocar nada.
+ * 3. **Fusionar**, que decide sin tocar nada — y **abortar** si una barrera salta.
+ * 4. **Poner al día su forma** si hace falta. Después de la barrera y antes de escribir datos: ver el
+ *    comentario en `cycle`, porque el orden ES parte de la barrera.
  * 5. **Aplicar** aquí lo que ganó allí, actualizando la base **fila a fila**.
- * 6. **Subir** lo que ganó aquí.
- * 7. **Apuntar la base** de lo subido y de lo adoptado.
+ * 6. **Adoptar las altas a mano**: filas sin id que alguien escribió en el destino.
+ * 7. **Subir** lo que ganó aquí.
+ * 8. **Apuntar la base** de lo subido y de lo adoptado.
  *
- * El 5 antes del 6 importa: si se subiera primero y el proceso muriera, el destino tendría cambios que
+ * El 5 antes del 7 importa: si se subiera primero y el proceso muriera, el destino tendría cambios que
  * aquí no están y la base no lo sabría.
  *
  * ## La base se escribe fila a fila, no al final
@@ -200,10 +203,6 @@ export class SynchronizeWithRemote extends UseCase<void, SynchronizeWithRemoteRe
       return stopped('stale-target');
     }
 
-    // Antes de escribir nada: si la hoja es de una versión anterior, ponerle la forma de ahora. Es
-    // idempotente y con una hoja al día no cuesta ninguna llamada.
-    await this.gateway.migrate({ credential: token, target, snapshot });
-
     const plan = await reconcile({
       snapshot,
       shadow,
@@ -211,6 +210,7 @@ export class SynchronizeWithRemote extends UseCase<void, SynchronizeWithRemoteRe
       tables: SHEET_TABLES,
       now: Date.now(),
       deviceId,
+      newIdentity: () => crypto.randomUUID(),
       localVersionOf: localVersionsFrom(local, SHEET_TABLES, deviceId),
     });
 
@@ -222,10 +222,27 @@ export class SynchronizeWithRemote extends UseCase<void, SynchronizeWithRemoteRe
       return { ...stopped('blocked'), rejected: 0 };
     }
 
+    /*
+     * La forma de la hoja se pone al día **después de la barrera**, y el orden es la barrera misma.
+     *
+     * La migración reescribe la fila de cabecera. Si corriera antes de decidir, una columna insertada a
+     * mano quedaría *tapada*: este ciclo abortaría (decide con la hoja tal como la leyó), pero el
+     * siguiente encontraría cabeceras que cuadran sobre datos corridos una columna — leyendo el precio
+     * donde está la moneda, sin que nada volviera a quejarse. La barrera duraría un ciclo y el daño sería
+     * permanente y silencioso.
+     *
+     * Después de la barrera, en cambio, se sabe que las columnas de datos están en su sitio, así que lo
+     * único que la migración puede cambiar es lo que le toca: los rótulos y las columnas de servicio.
+     * Sigue siendo antes de escribir datos, que es lo que exige (si no, aparecerían columnas sin nombre).
+     */
+    await this.gateway.migrate({ credential: token, target, snapshot });
+
     const applied = await this.applyRemote(plan);
+    const adopted = await this.adoptHandAdds(token, target, plan, deviceId);
     const pushed = await this.pushLocal(token, target, plan, local, deviceId);
     await this.markDeleted(token, target, plan);
     await this.purge(token, target, plan);
+    await this.revertReids(token, target, plan);
     // Lo adoptado va al final y **respeta lo que ya se apuntó**: una fila que se adoptó y además se
     // rechazó al aplicarla ya tiene su marca de cuarentena, y volver a escribirla sin ella la haría
     // reintentarse en cada ciclo para siempre.
@@ -238,19 +255,22 @@ export class SynchronizeWithRemote extends UseCase<void, SynchronizeWithRemoteRe
 
     this.status.markSynced(target, new Date().toISOString());
     this.log.debug('ciclo ✔', {
-      aplicadas: applied.applied,
+      aplicadas: applied.applied + adopted.applied,
       subidas: pushed,
       borradas: applied.removed,
-      rechazadas: applied.rejected,
+      rechazadas: applied.rejected + adopted.rejected,
+      altasAMano: adopted.applied,
+      idsDevueltos: plan.reids.length,
       adoptadas: plan.adopt.length,
       conflictos: plan.conflicts.length,
     });
     return {
       synced: true,
-      applied: applied.applied,
+      // Un alta a mano es una fila que baja del destino como cualquier otra: se cuenta con ellas.
+      applied: applied.applied + adopted.applied,
       pushed,
       removed: applied.removed,
-      rejected: applied.rejected,
+      rejected: applied.rejected + adopted.rejected,
     };
   }
 
@@ -324,6 +344,101 @@ export class SynchronizeWithRemote extends UseCase<void, SynchronizeWithRemoteRe
       rejected: outcome.rejected.length,
       touched,
     };
+  }
+
+  /**
+   * Adopta las filas que alguien escribió a mano en el destino sin ponerles id.
+   *
+   * Tres cosas, en este orden y todas o ninguna:
+   *
+   * 1. **Traerla aquí** con la identidad que le asignó la fusión.
+   * 2. **Escribirle el id de vuelta** en su fila, junto a la huella y la versión de esa misma decisión.
+   *    Sin este paso la fila seguiría sin id en el destino y el ciclo siguiente le inventaría otra
+   *    identidad: un agregado nuevo cada dos minutos, para siempre.
+   * 3. **Apuntarla en la base**, para que el ciclo siguiente la vea como lo que ya es: una fila normal.
+   *
+   * Una fila que no se puede leer (una celda imposible) **no se estampa**: se deja intacta para que su
+   * dueño la corrija, y se cuenta como ilegible. Se reintentará en cada ciclo mientras siga así, y eso es
+   * lo correcto: sin id en la hoja no hay forma de recordar que ya se intentó.
+   */
+  private async adoptHandAdds(
+    token: string,
+    target: SyncTarget,
+    plan: MergePlan,
+    deviceId: string,
+  ): Promise<{ applied: number; rejected: number }> {
+    if (plan.handAdds.length === 0) {
+      return { applied: 0, rejected: 0 };
+    }
+
+    const tables: Record<string, ExportedRow[]> = {};
+    for (const add of plan.handAdds) {
+      tables[add.table] = [...(tables[add.table] ?? []), add.values];
+    }
+
+    const outcome = await this.sink.apply({ tables, deleted: [] });
+    const byId = new Map(plan.handAdds.map((add) => [`${add.table}:${add.rowId}`, add]));
+    const stamped: StampedRow[] = [];
+
+    for (const ref of outcome.applied) {
+      const table = tableForAggregate(ref.aggregate);
+      const add = table ? byId.get(`${table}:${canonicalCode(ref.id)}`) : undefined;
+      if (!table || !add) {
+        continue;
+      }
+      stamped.push({
+        table: add.table,
+        index: add.index,
+        cells: {
+          id: add.rowId,
+          version: add.version,
+          origen: deviceId,
+          huella: add.fingerprint,
+          borrado: '',
+        },
+      });
+      await this.shadow.put({
+        table: add.table,
+        rowId: add.rowId,
+        fingerprint: add.fingerprint,
+        version: add.version,
+        deleted: false,
+      });
+    }
+
+    await this.gateway.stamp({ credential: token, target, rows: stamped });
+    this.log.debug('altas a mano adoptadas', {
+      adoptadas: stamped.length,
+      ilegibles: outcome.rejected.length,
+    });
+    return { applied: stamped.length, rejected: outcome.rejected.length };
+  }
+
+  /**
+   * Devuelve su id a las filas a las que alguien se lo cambió.
+   *
+   * Solo se escribe **la celda del id**: el contenido no cambió, así que su huella sigue siendo la que
+   * está escrita, y en cuanto la fila recupera su identidad vuelve a cuadrar con la base sin más.
+   */
+  private async revertReids(token: string, target: SyncTarget, plan: MergePlan): Promise<void> {
+    if (plan.reids.length === 0) {
+      return;
+    }
+
+    // Es una corrección, no un dato del usuario: que quede dicho en el registro, porque para quien mira
+    // la hoja el id «vuelve solo» y eso hay que poder explicarlo.
+    this.log.warn('se devuelve el id a filas a las que se lo cambiaron a mano', undefined, {
+      filas: plan.reids.map((reid) => ({ table: reid.table, index: reid.index })),
+    });
+    await this.gateway.stamp({
+      credential: token,
+      target,
+      rows: plan.reids.map((reid) => ({
+        table: reid.table,
+        index: reid.index,
+        cells: { id: reid.previousRowId },
+      })),
+    });
   }
 
   /** Sube lo que ganó aquí, con su huella y su versión, y apunta su base. */

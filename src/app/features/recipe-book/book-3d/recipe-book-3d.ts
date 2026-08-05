@@ -635,9 +635,16 @@ export class RecipeBook3d implements AfterViewInit, OnDestroy {
     });
     ref.closed.subscribe((result) => {
       this.dialogOpen = false;
-      if (result) {
-        void this.load({ categoryId: result.categoryId, recipeName: result.name });
+      if (!result) {
+        return;
       }
+      // Si se borró, se recarga la categoría pero NO se busca la receta: ya no está, y buscarla dejaría
+      // el libro en la portada sin explicar por qué.
+      void this.load(
+        result.deleted
+          ? { categoryId: result.categoryId }
+          : { categoryId: result.categoryId, recipeName: result.name },
+      );
     });
   }
 

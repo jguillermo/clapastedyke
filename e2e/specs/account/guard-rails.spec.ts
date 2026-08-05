@@ -17,7 +17,7 @@ import { RECIPES, SUPPLY_COUNT } from '../../support/seed';
  * la hoja arreglada y al día, que es el estado terminal.
  */
 test.describe('Cuenta · barreras de la sincronización', () => {
-  test('borrado masivo a mano → se niega y no borra nada → hoja arreglada, converge → pestaña eliminada → se niega → devuelta, converge → cabecera renombrada → se niega y la deja arreglada → converge', async ({
+  test('borrado masivo a mano → se niega y no borra nada → hoja arreglada, converge → pestaña eliminada → se niega → devuelta, converge → cabecera renombrada → se niega y NO la repara sola → arreglada, converge', async ({
     google,
     connectAccount,
     account,
@@ -86,12 +86,18 @@ test.describe('Cuenta · barreras de la sincronización', () => {
     await expect(account.statusLabel).toHaveText('Error');
     expect(insumos.dataRowCount).toBe(SUPPLY_COUNT);
 
-    // El ciclo se negó con la hoja **tal como la leyó**, y por el camino le devolvió el rótulo: el paso
-    // que pone al día la forma de la hoja corre antes de decidir. Así que arreglarlo no es cosa del
-    // usuario, y el ciclo siguiente ya converge sin que nadie toque nada.
-    expect(insumos.headers).toContain('Nombre');
-    expect(insumos.headers).not.toContain('Nombre del insumo');
+    /*
+     * La cabecera **se queda como la dejó el usuario**, y eso es la barrera funcionando.
+     *
+     * El paso que pone al día la forma de la hoja también escribe la fila de cabecera, y corre después de
+     * decidir justamente por esto: si la reparara antes, una columna *insertada* quedaría tapada — este
+     * ciclo abortaría, pero el siguiente vería cabeceras que cuadran sobre datos corridos un sitio y ya no
+     * se quejaría nunca. La barrera duraría un ciclo y el daño sería permanente.
+     */
+    expect(insumos.headers).toContain('Nombre del insumo');
 
+    // Y como no se arregla solo, el ciclo se sigue negando hasta que alguien lo arregla de verdad.
+    insumos.setHeader('Nombre del insumo', 'Nombre');
     await account.syncAll.click();
     await expect(account.statusLabel).toHaveText('Al día');
     expect(insumos.dataRowCount).toBe(SUPPLY_COUNT);

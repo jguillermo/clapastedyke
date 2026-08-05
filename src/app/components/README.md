@@ -405,6 +405,10 @@ Inputs: `columns` (`{ name, size?, align?, max? }[]`) · `rows` · `ariaLabel` �
 rompe el padding del padre y va borde a borde) · `maxWidth` (`'reading'|'page'`). Output: `removeRow`
 (índice). Métodos públicos: `focusCell(r, c)` · `remove(index)` (dispara `removeRow`).
 
+**El `name` de una columna nunca va vacío**, ni en la de acciones: una cabecera de tabla en blanco es un
+fallo de AXE (`empty-table-header`) y deja a quien usa un lector de pantalla sin saber de qué es esa
+columna. Para la columna del botón de eliminar, «Acciones».
+
 **Mobile-first**: vertical **nunca scrollea** (crece; scrollea el contenedor exterior). Las columnas
 flexibles (`auto`) absorben el ancho sobrante; si las fijas/% suman de más, hay **scroll horizontal**
 de fallback. `bleed` lleva la tabla a los bordes en móvil. Los inputs de celda llevan `min-w-0`
@@ -413,7 +417,7 @@ de fallback. `bleed` lleva la tabla a los bordes en móvil. Los inputs de celda 
 ```html
 <migo-table
   #table
-  [columns]="[{ name: 'Insumo' }, { name: 'Cantidad', size: 'fit', align: 'center' }, { name: '', size: 'fit' }]"
+  [columns]="[{ name: 'Insumo' }, { name: 'Cantidad', size: 'fit', align: 'center' }, { name: 'Acciones', size: 'fit' }]"
   [rows]="lineControls()"
   bleed
   (removeRow)="removeLine($event)"
