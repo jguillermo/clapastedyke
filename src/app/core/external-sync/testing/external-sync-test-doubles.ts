@@ -21,6 +21,7 @@ import {
 } from '../../_common/export/exportable-data';
 import { ApplyOutcome, ImportableData, ImportChange } from '../../_common/import/importable-data';
 import { DeviceIdentity } from '../domain/services/device-identity';
+import { SyncCoordinator } from '../domain/services/sync-coordinator';
 import { SyncReader } from '../domain/services/sync-reader';
 import { RemoteSnapshot } from '../domain/services/sync-reader.types';
 import { ShadowRow, SyncShadow } from '../domain/services/sync-shadow';
@@ -341,6 +342,43 @@ function aggregateOf(table: string): string {
   );
 }
 
+/**
+ * Coordinación falsa entre pestañas. Por defecto esta pestaña es la que trabaja, que es el caso de una
+ * sola pestaña; `leader = false` simula que otra la tiene.
+ */
+@Injectable()
+export class FakeSyncCoordinator extends SyncCoordinator {
+  private readonly leader = signal(true);
+  readonly isLeader: Signal<boolean> = this.leader.asReadonly();
+
+  claims = 0;
+  announces = 0;
+  private readonly handlers: (() => void)[] = [];
+
+  claim(): void {
+    this.claims += 1;
+  }
+
+  announce(): void {
+    this.announces += 1;
+  }
+
+  onAnnounced(handler: () => void): void {
+    this.handlers.push(handler);
+  }
+
+  /** Simula que otra pestaña acabó de sincronizar. */
+  otherTabAnnounced(): void {
+    for (const handler of this.handlers) {
+      handler();
+    }
+  }
+
+  setLeader(value: boolean): void {
+    this.leader.set(value);
+  }
+}
+
 /** Providers listos para el TestBed de cualquier spec del contexto. */
 export function makeExternalSyncFakes(): { providers: Provider[] } {
   return {
@@ -355,7 +393,9 @@ export function makeExternalSyncFakes(): { providers: Provider[] } {
       FakeSyncReader,
       FakeSyncShadow,
       FakeImportableData,
+      FakeSyncCoordinator,
       { provide: ImportableData, useExisting: FakeImportableData },
+      { provide: SyncCoordinator, useExisting: FakeSyncCoordinator },
       { provide: SyncOutbox, useExisting: FakeSyncOutbox },
       { provide: SyncGateway, useExisting: FakeSyncGateway },
       { provide: SyncReader, useExisting: FakeSyncReader },

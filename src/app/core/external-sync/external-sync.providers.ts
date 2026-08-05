@@ -9,6 +9,7 @@ import { NotifyRecipeSaved } from './application/use-cases/notify-recipe-saved.u
 import { NotifySupplySaved } from './application/use-cases/notify-supply-saved.use-case';
 import { SyncTargetRepository } from './domain/repositories/sync-target.repository';
 import { DeviceIdentity } from './domain/services/device-identity';
+import { SyncCoordinator } from './domain/services/sync-coordinator';
 import { SyncGateway } from './domain/services/sync.gateway';
 import { SyncOutbox } from './domain/services/sync-outbox';
 import { SyncReader } from './domain/services/sync-reader';
@@ -21,6 +22,8 @@ import { IndexedDbSyncShadow } from './infrastructure/indexeddb-sync-shadow';
 import { IndexedDbSyncTargetRepository } from './infrastructure/indexeddb-sync-target.repository';
 import { IndexeddbSyncOutbox } from './infrastructure/indexeddb-sync-outbox';
 import { InMemorySyncStatus } from './infrastructure/in-memory-sync-status';
+import { SyncScheduler } from './infrastructure/sync-scheduler';
+import { WebLocksSyncCoordinator } from './infrastructure/web-locks-sync-coordinator';
 import { AuthChangedSubscriber } from './infrastructure/auth-changed.subscriber';
 import { RecipeBookChangedSubscriber } from './infrastructure/recipe-book-changed.subscriber';
 
@@ -64,8 +67,12 @@ export function provideExternalSync(): EnvironmentProviders {
     { provide: SyncOutbox, useClass: IndexeddbSyncOutbox },
     { provide: SyncStatus, useClass: InMemorySyncStatus },
     { provide: DeviceIdentity, useClass: IndexedDbDeviceIdentity },
+    { provide: SyncCoordinator, useClass: WebLocksSyncCoordinator },
     provideAppInitializer(() => inject(RecipeBookChangedSubscriber).register()),
     provideAppInitializer(() => inject(AuthChangedSubscriber).register()),
+    // El planificador decide CUÁNDO se sincroniza. Se arranca aquí y no se espera: pide su turno entre
+    // pestañas y programa sus disparadores, pero el arranque de la app no depende de la red.
+    provideAppInitializer(() => inject(SyncScheduler).start()),
     // Los casos de uso que reaccionan a un evento: aquí solo se registra la suscripción que cada uno
     // declaró con `@OnEvent`. Ninguno se construye hasta que llega su evento.
     provideEventHandlers(...EVENT_DRIVEN_USE_CASES),
