@@ -11,9 +11,13 @@ import { SyncTargetRepository } from './domain/repositories/sync-target.reposito
 import { DeviceIdentity } from './domain/services/device-identity';
 import { SyncGateway } from './domain/services/sync.gateway';
 import { SyncOutbox } from './domain/services/sync-outbox';
+import { SyncReader } from './domain/services/sync-reader';
+import { SyncShadow } from './domain/services/sync-shadow';
 import { SyncStatus } from './domain/services/sync-status';
 import { GoogleSheetsGateway } from './infrastructure/google-sheets.gateway';
+import { GoogleSheetsReader } from './infrastructure/google-sheets.reader';
 import { IndexedDbDeviceIdentity } from './infrastructure/indexeddb-device-identity';
+import { IndexedDbSyncShadow } from './infrastructure/indexeddb-sync-shadow';
 import { IndexedDbSyncTargetRepository } from './infrastructure/indexeddb-sync-target.repository';
 import { IndexeddbSyncOutbox } from './infrastructure/indexeddb-sync-outbox';
 import { InMemorySyncStatus } from './infrastructure/in-memory-sync-status';
@@ -52,6 +56,10 @@ export const EVENT_DRIVEN_USE_CASES = [NotifyRecipeSaved, NotifySupplySaved];
 export function provideExternalSync(): EnvironmentProviders {
   return makeEnvironmentProviders([
     { provide: SyncGateway, useClass: GoogleSheetsGateway },
+    // Leer es un puerto aparte del de escribir: hay código que solo lee, y le viene bien no poder
+    // escribir ni por accidente. Ver `sync-reader.ts`.
+    { provide: SyncReader, useClass: GoogleSheetsReader },
+    { provide: SyncShadow, useClass: IndexedDbSyncShadow },
     { provide: SyncTargetRepository, useClass: IndexedDbSyncTargetRepository },
     { provide: SyncOutbox, useClass: IndexeddbSyncOutbox },
     { provide: SyncStatus, useClass: InMemorySyncStatus },

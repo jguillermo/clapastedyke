@@ -194,10 +194,23 @@ export const FIELD_KINDS: Readonly<Record<string, Readonly<Record<string, FieldK
   },
 };
 
+/**
+ * Las columnas de servicio de la sincronización, que **nunca** entran en la huella.
+ *
+ * Están aquí y no en `FIELD_KINDS` porque son las mismas en todas las tablas, y porque tienen que estar
+ * excluidas **antes** de existir: el día que se añadan al esquema, una huella que se las incluyera
+ * cambiaría al escribirlas, y una fila cuya huella cambia al escribir su propia huella no converge
+ * nunca.
+ */
+const TECHNICAL_FIELDS = new Set(['version', 'origen', 'huella', 'borrado']);
+
 /** Las columnas de una tabla que cuentan como dato del usuario, en el orden del esquema. */
 export function authoritativeFields(table: string, fields: readonly string[]): readonly string[] {
   const kinds = FIELD_KINDS[table] ?? {};
   return fields.filter((field) => {
+    if (TECHNICAL_FIELDS.has(field)) {
+      return false;
+    }
     const kind = kinds[field];
     // Un campo sin clasificar se considera dato: es lo prudente. Si alguien añade una columna al
     // esquema y olvida esta lista, la huella la incluirá (y el spec de coherencia se quejará) en vez

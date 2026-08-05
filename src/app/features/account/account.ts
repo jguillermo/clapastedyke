@@ -16,6 +16,10 @@ import { SignIn } from '@core/auth/application/use-cases/sign-in.use-case';
 import { SignOut } from '@core/auth/application/use-cases/sign-out.use-case';
 import { WatchSession } from '@core/auth/application/use-cases/watch-session.use-case';
 import { PrepareSyncTarget } from '@core/external-sync/application/use-cases/prepare-sync-target.use-case';
+import {
+  ReconcileWithRemote,
+  ReconcileWithRemoteResult,
+} from '@core/external-sync/application/use-cases/reconcile-with-remote.use-case';
 import { Synchronize } from '@core/external-sync/application/use-cases/synchronize.use-case';
 import { VerifySyncConnection } from '@core/external-sync/application/use-cases/verify-sync-connection.use-case';
 import { WatchSyncStatus } from '@core/external-sync/application/use-cases/watch-sync-status.use-case';
@@ -78,8 +82,13 @@ interface ConnectFailure {
  * sincronización con la hoja de cálculo.
  *
  * Dos bloques: **cuenta** (conectar / cerrar sesión, con la lista de pasos) y **sincronización**
- * (estado, hoja, pendientes y sincronización manual). Nada más — aquí no hay consolas, ni ficheros de
- * configuración, ni pasos de instalación: todo eso lo hace la app sola cuando el usuario conecta.
+ * (estado, hoja, pendientes, comprobar la hoja y sincronización manual). Nada más — aquí no hay
+ * consolas, ni ficheros de configuración, ni pasos de instalación: todo eso lo hace la app sola cuando
+ * el usuario conecta.
+ *
+ * De las dos acciones del pie, **«Comprobar la hoja» solo lee**: compara y cuenta lo que haría, sin
+ * tocar la hoja ni los datos de este dispositivo. Es lo que se pulsa para decidir si conviene pulsar la
+ * otra. Ver `ReconcileWithRemote`.
  *
  * ## Conectar lo hace todo, y se cuenta paso a paso
  *
@@ -136,6 +145,7 @@ export class Account {
   private readonly prepareTarget = inject(PrepareSyncTarget);
   private readonly verifyConnection = inject(VerifySyncConnection);
   private readonly sync = inject(Synchronize);
+  private readonly reconcile = inject(ReconcileWithRemote);
   private readonly log = inject(Logger).scoped('ui/account');
 
   /** Estado de la sesión y de la sincronización, tal como los publica cada caso de uso. */
@@ -145,6 +155,18 @@ export class Account {
   protected readonly busy = signal(false);
   /** Error de la última acción del usuario (los de sincronización viven en `status`). */
   protected readonly actionError = signal('');
+
+  /** Resumen de la última comprobación de la hoja. Vacío = todavía no se comprobó. */
+  protected readonly checkSummary = signal('');
+
+  /**
+   * Cuál de las dos acciones del pie está en marcha.
+   *
+   * Hace falta porque `busy` es una sola: con ella en los dos botones, pulsar «Comprobar» pondría a
+   * girar también «Sincronizar todo», y quien lo viera creería que se está escribiendo en su hoja
+   * cuando no se está tocando nada.
+   */
+  protected readonly running = signal<'check' | 'sync' | null>(null);
 
   /** Los pasos de la conexión, tal como los pinta `migo-checklist`. Vacío = todavía no se intentó. */
   protected readonly progress = signal<ChecklistItem[]>([]);
@@ -306,9 +328,37 @@ export class Account {
 
   /** Empuja el recetario completo. Idempotente: repetirlo no duplica nada en la hoja. */
   protected async syncAll(): Promise<void> {
-    await this.run('sincronizar todo', async () => {
-      await this.sync.execute({ scope: 'all' });
-    });
+    this.running.set('sync');
+    try {
+      await this.run('sincronizar todo', async () => {
+        await this.sync.execute({ scope: 'all' });
+      });
+    } finally {
+      this.running.set(null);
+    }
+  }
+
+  /**
+   * Compara la hoja con lo que hay aquí y cuenta lo que haría, **sin tocar nada**.
+   *
+   * Es una herramienta de diagnóstico, y por eso está aquí y no escondida: los dos fallos que pueden
+   * hundir la sincronización —que un mismo dato dé una huella distinta según venga del modelo o de una
+   * celda, y que una columna que la app recalcula cuente como dato— no se ven en ningún test, porque en
+   * un test los dos lados atraviesan el mismo código. Solo se ven contra una hoja de verdad.
+   *
+   * El resumen va a la pantalla; el detalle (qué campo difiere en qué fila) al registro, que es donde
+   * se puede leer sin límite de sitio. Con `"debug": true` en `public/config.json` ya sale.
+   */
+  protected async checkSheet(): Promise<void> {
+    this.checkSummary.set('');
+    this.running.set('check');
+    try {
+      await this.run('comprobar la hoja', async () => {
+        this.checkSummary.set(summaryOf(await this.reconcile.execute()));
+      });
+    } finally {
+      this.running.set(null);
+    }
   }
 
   // ── Los pasos ────────────────────────────────────────────────────────────────────────────────
@@ -372,4 +422,58 @@ function describe(error: unknown): string {
   return error instanceof Error && error.message
     ? error.message
     : 'La acción no se ha podido completar.';
+}
+
+/**
+ * El desenlace de una comprobación, en una frase.
+ *
+ * Se leen **las malas noticias primero**: un ciclo que se negaría a seguir, o filas que hay que
+ * arreglar a mano, importan más que las cuentas de lo que se movería. Un resumen que empezara por «12
+ * filas al día» dejaría enterrado el «y una pestaña ha desaparecido».
+ */
+function summaryOf(result: ReconcileWithRemoteResult): string {
+  const { plan } = result;
+  if (!plan) {
+    return {
+      disconnected: 'No hay ninguna cuenta conectada.',
+      'no-target': 'Esta cuenta todavía no tiene hoja: conéctala primero.',
+      failed: 'No se ha podido leer la hoja. El motivo está en la consola.',
+    }[result.reason ?? 'failed'];
+  }
+
+  const { aborted } = plan;
+  if (aborted) {
+    const cause = {
+      'missing-table': `falta la pestaña de «${aborted.table}»`,
+      headers: `las columnas de «${aborted.table}» no están donde deberían`,
+      'mass-delete': `se borrarían demasiadas filas de «${aborted.table}»`,
+    }[aborted.kind];
+    return `La sincronización se negaría a seguir: ${cause}. El detalle está en la consola.`;
+  }
+
+  const problems = [
+    count(plan.duplicates.length, 'id repetido', 'ids repetidos'),
+    count(plan.quarantined.length, 'fila ilegible', 'filas ilegibles'),
+    count(plan.reids.length, 'id cambiado a mano', 'ids cambiados a mano'),
+  ].filter((text) => text !== '');
+
+  const moves = [
+    count(plan.apply.length, 'fila bajaría', 'filas bajarían'),
+    count(plan.push.length, 'fila subiría', 'filas subirían'),
+    count(plan.remove.length, 'fila se borraría', 'filas se borrarían'),
+    count(plan.adopt.length, 'fila se adoptaría', 'filas se adoptarían'),
+    count(plan.drift.length, 'diferencia', 'diferencias'),
+  ].filter((text) => text !== '');
+
+  const head = problems.length > 0 ? `Hay que revisar: ${problems.join(', ')}. ` : '';
+  const body = moves.length > 0 ? moves.join(', ') : 'todo está al día';
+  return `${head}${body}. El detalle está en la consola.`;
+}
+
+/** `''` cuando no hay ninguno, para que el resumen no se llene de ceros. */
+function count(total: number, one: string, many: string): string {
+  if (total === 0) {
+    return '';
+  }
+  return total === 1 ? `1 ${one}` : `${total} ${many}`;
 }

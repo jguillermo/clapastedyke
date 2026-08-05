@@ -175,16 +175,32 @@
         @if (status().lastError; as error) {
           <migo-alert variant="error">{{ error }}</migo-alert>
         }
+
+        @if (checkSummary(); as summary) {
+          <migo-alert variant="info" heading="Comprobación de la hoja">{{ summary }}</migo-alert>
+        }
       </div>
     </migo-card-body>
 
     <migo-card-footer>
+      <!-- Solo lee y cuenta: no toca la hoja ni los datos de este dispositivo. Va antes que
+           «Sincronizar todo» porque es lo que se pulsa para saber si conviene pulsar el otro. -->
+      <button
+        migo-button
+        type="button"
+        variant="secondary"
+        [disabled]="!session().connected || busy()"
+        [loading]="running() === 'check'"
+        (click)="checkSheet()"
+      >
+        Comprobar la hoja
+      </button>
       <button
         migo-button
         type="button"
         variant="primary"
-        [disabled]="!session().connected"
-        [loading]="busy()"
+        [disabled]="!session().connected || busy()"
+        [loading]="running() === 'sync'"
         (click)="syncAll()"
       >
         Sincronizar todo

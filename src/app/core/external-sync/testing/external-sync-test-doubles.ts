@@ -15,6 +15,9 @@ import {
 } from '../../_common/credentials/credentials-provider';
 import { ExportableData, ExportedRows, ExportQuery } from '../../_common/export/exportable-data';
 import { DeviceIdentity } from '../domain/services/device-identity';
+import { SyncReader } from '../domain/services/sync-reader';
+import { RemoteSnapshot } from '../domain/services/sync-reader.types';
+import { ShadowRow, SyncShadow } from '../domain/services/sync-shadow';
 import { SyncGateway } from '../domain/services/sync.gateway';
 import {
   ProbeOutcome,
@@ -212,6 +215,44 @@ export class FakeCredentialsProvider extends CredentialsProvider {
   }
 }
 
+/** Lector falso: se le programa el estado remoto que debe devolver. */
+@Injectable()
+export class FakeSyncReader extends SyncReader {
+  snapshot: RemoteSnapshot = { tables: [], schemaVersion: null };
+  failWith: Error | null = null;
+  reads = 0;
+
+  async read(): Promise<RemoteSnapshot> {
+    this.reads += 1;
+    if (this.failWith) {
+      throw this.failWith;
+    }
+    return this.snapshot;
+  }
+}
+
+/** La base de la fusión, en memoria, con la misma semántica que la real. */
+@Injectable()
+export class FakeSyncShadow extends SyncShadow {
+  private readonly rows = new Map<string, ShadowRow>();
+
+  async all(): Promise<ShadowRow[]> {
+    return [...this.rows.values()];
+  }
+
+  async put(row: ShadowRow): Promise<void> {
+    this.rows.set(`${row.table}:${row.rowId}`, row);
+  }
+
+  async remove(table: string, rowId: string): Promise<void> {
+    this.rows.delete(`${table}:${rowId}`);
+  }
+
+  async clear(): Promise<void> {
+    this.rows.clear();
+  }
+}
+
 /**
  * Identidad de dispositivo fija.
  *
@@ -255,8 +296,12 @@ export function makeExternalSyncFakes(): { providers: Provider[] } {
       FakeCredentialsProvider,
       FakeExportableData,
       FakeDeviceIdentity,
+      FakeSyncReader,
+      FakeSyncShadow,
       { provide: SyncOutbox, useExisting: FakeSyncOutbox },
       { provide: SyncGateway, useExisting: FakeSyncGateway },
+      { provide: SyncReader, useExisting: FakeSyncReader },
+      { provide: SyncShadow, useExisting: FakeSyncShadow },
       { provide: SyncTargetRepository, useExisting: FakeSyncTargetRepository },
       { provide: CredentialsProvider, useExisting: FakeCredentialsProvider },
       { provide: ExportableData, useExisting: FakeExportableData },
