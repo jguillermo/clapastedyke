@@ -37,6 +37,9 @@ import {
 const SHEETS_API = 'https://sheets.googleapis.com/v4/spreadsheets';
 const DRIVE_API = 'https://www.googleapis.com/drive/v3/files';
 
+/** Lo que Drive llama a una hoja de cálculo. Acota la búsqueda a hojas y no a cualquier fichero. */
+const SPREADSHEET_MIME = 'application/vnd.google-apps.spreadsheet';
+
 /**
  * Todo lo que se escribe va en crudo. Sin esto, Sheets interpreta las cadenas como si las tecleara
  * una persona: un insumo llamado «12/03» se convertiría en fecha y uno que empiece por `=`, en
@@ -54,6 +57,12 @@ interface SpreadsheetMetadata {
   spreadsheetId: string;
   spreadsheetUrl: string;
   sheets?: { properties: SheetProperties }[];
+}
+
+/** Lo que devuelve la búsqueda en Drive. `webViewLink` es la dirección que el usuario abre. */
+interface DriveFile {
+  id: string;
+  webViewLink?: string;
 }
 
 interface ValueRange {
@@ -126,6 +135,53 @@ export class GoogleSheetsGateway extends SyncGateway {
 
     this.log.debug('hoja creada', { targetId: created.spreadsheetId });
     return SyncTarget.of(created.spreadsheetId, created.spreadsheetUrl);
+  }
+
+  /**
+   * Busca en el Drive del usuario la hoja de esta app, por su nombre.
+   *
+   * ## Por qué se puede buscar con `drive.file`
+   *
+   * El permiso alcanza **los ficheros que esta app creó**, y esa asociación la guarda Drive por
+   * aplicación —no por dispositivo ni por sesión—, así que la hoja que creó este mismo Client ID en otro
+   * teléfono aparece aquí. La búsqueda no ve nada más del Drive del usuario: no hace falta ningún
+   * permiso extra y no se puede tropezar con un fichero ajeno que se llame igual.
+   *
+   * ## Se coge la más antigua, a propósito
+   *
+   * Si ya hubiera varias —de una versión anterior que creaba una por dispositivo, o de dos dispositivos
+   * conectando en el mismo instante—, todos los dispositivos eligen **la primera que se creó**, así que
+   * convergen a la misma en vez de repartirse. Las demás **no se tocan**: son ficheros del usuario y
+   * solo él decide si las tira.
+   */
+  async locate({ credential }: CredentialRequest): Promise<SyncTarget | null> {
+    // Las comillas simples delimitan el valor en la sintaxis de búsqueda de Drive, así que las del
+    // propio nombre habría que escaparlas. El nombre no lleva ninguna, pero se escapa igual: es una
+    // constante que alguien puede cambiar.
+    const name = SPREADSHEET_NAME.replace(/'/g, "\\'");
+    const query = `name = '${name}' and mimeType = '${SPREADSHEET_MIME}' and trashed = false`;
+    const url =
+      `${DRIVE_API}?q=${encodeURIComponent(query)}` +
+      '&fields=files(id,webViewLink)&orderBy=createdTime&pageSize=10&spaces=drive';
+
+    this.log.debug('buscando la hoja de esta cuenta en Drive ▶');
+    const found = await googleFetch<{ files?: DriveFile[] }>(credential, 'GET', url);
+    const files = found.files ?? [];
+
+    if (files.length === 0) {
+      this.log.debug('la cuenta todavía no tiene hoja de esta app');
+      return null;
+    }
+    if (files.length > 1) {
+      // Que quede dicho: el usuario tiene copias de sobra en su Drive y conviene que lo sepa.
+      this.log.warn('hay más de una hoja con este nombre; se usa la más antigua', undefined, {
+        hojas: files.length,
+      });
+    }
+
+    const [oldest] = files;
+    this.log.debug('la cuenta ya tenía su hoja', { targetId: oldest.id });
+    return SyncTarget.of(oldest.id, oldest.webViewLink ?? sheetUrlOf(oldest.id));
   }
 
   /**
@@ -509,6 +565,11 @@ function cellsOf(rows: readonly StampedRow[]): ValueRange[] {
 
 function sheet(target: SyncTarget): string {
   return `${SHEETS_API}/${encodeURIComponent(target.id)}`;
+}
+
+/** La dirección que abre una hoja, para cuando la búsqueda no devuelve la suya. */
+function sheetUrlOf(id: string): string {
+  return `https://docs.google.com/spreadsheets/d/${id}/edit`;
 }
 
 function cell(value: string): { userEnteredValue: { stringValue: string } } {

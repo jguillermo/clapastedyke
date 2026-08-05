@@ -1,3 +1,4 @@
+import type { Page } from '@playwright/test';
 import { test, expect } from '../../fixtures/app-fixture';
 import { E2E_ACCOUNT } from '../../support/google-double';
 import {
@@ -136,4 +137,62 @@ test.describe('Cuenta · conexión y sincronización', () => {
     await expect(account.sheetLink).toHaveAttribute('href', fresh.url);
     await expect(account.statusLabel).toHaveText('Al día');
   });
+
+  test('la misma cuenta desde un dispositivo nuevo adopta la hoja que ya existe: nunca se duplica', async ({
+    google,
+    account,
+    page,
+  }) => {
+    /*
+     * Journey aparte porque su punto de partida es otro: un navegador **sin nada guardado**.
+     *
+     * Es el caso que rompía antes. Qué hoja tiene cada cuenta se recuerda en IndexedDB, que es por
+     * navegador, mientras que la hoja es por cuenta: un móvil nuevo llegaba sin saber nada y creaba otra
+     * «Clapastedyke — Recetario» en el mismo Drive. Una hoja por aparato, y los dispositivos
+     * sincronizando cada uno contra la suya sin verse nunca.
+     */
+    await account.goto();
+    await account.connectAndWait();
+
+    const first = google.sheet.id;
+    expect(google.sheets).toHaveLength(1);
+
+    // Un dispositivo nuevo es exactamente esto: sin la hoja recordada y sin la pista de sesión.
+    await clearLocalDatabases(page);
+    await account.goto();
+    await account.connectAndWait();
+
+    // Ni una hoja más en el Drive, y la que se usa es la misma.
+    expect(google.sheets).toHaveLength(1);
+    expect(google.sheet.id).toBe(first);
+    await expect(account.sheetLink).toHaveAttribute('href', google.sheet.url);
+
+    // Y adoptarla no duplicó su contenido: los ids del seed son fijos, así que las filas se emparejan
+    // con las que ya estaban en vez de añadirse otra vez.
+    expect(google.sheet.tab('Insumos').dataRowCount).toBe(SUPPLY_COUNT);
+    await expect(account.statusLabel).toHaveText('Al día');
+  });
 });
+
+/**
+ * Borra las bases locales del navegador: lo deja como el de alguien que abre la app por primera vez.
+ *
+ * Es la forma honesta de simular «otro dispositivo» sin un segundo contexto: lo que distingue a un
+ * aparato nuevo es justo no tener nada guardado, y ese es el estado que produce esto.
+ */
+async function clearLocalDatabases(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    for (const { name } of await indexedDB.databases()) {
+      if (!name) {
+        continue;
+      }
+      await new Promise<void>((resolve) => {
+        const request = indexedDB.deleteDatabase(name);
+        // Da igual cómo acabe: si algo quedara, la recarga siguiente lo dejaría ver.
+        request.onsuccess = () => resolve();
+        request.onerror = () => resolve();
+        request.onblocked = () => resolve();
+      });
+    }
+  });
+}

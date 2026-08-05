@@ -350,7 +350,10 @@ export class GoogleDouble {
       this.answer(route, () => ({ ...E2E_ACCOUNT, picture: null })),
     );
 
-    // 4 · Drive: solo se le pregunta si la hoja sigue viva.
+    // 4 · Drive: buscar la hoja de la cuenta (la colección) y preguntar si una sigue viva (un fichero).
+    await page.route('https://www.googleapis.com/drive/v3/files?*', (route) =>
+      this.answer(route, () => this.driveSearch(route)),
+    );
     await page.route('https://www.googleapis.com/drive/v3/files/**', (route) =>
       this.answer(route, () => this.drive(route)),
     );
@@ -393,6 +396,25 @@ export class GoogleDouble {
         body: JSON.stringify(body ?? {}),
       })
       .catch(ignore);
+  }
+
+  /**
+   * La búsqueda de Drive, acotada a lo que **esta app creó** — que es todo lo que hay en este doble, y
+   * también todo lo que `drive.file` alcanza de verdad.
+   *
+   * Se devuelven **en orden de creación**: es lo que hace que, si hubiera varias, todos los dispositivos
+   * elijan la misma (la más antigua) en vez de repartirse.
+   */
+  private driveSearch(route: Route): unknown {
+    const query = new URL(route.request().url()).searchParams.get('q') ?? '';
+    const name = /name\s*=\s*'((?:[^']|\\')*)'/.exec(query)?.[1]?.replace(/\\'/g, "'");
+
+    const files = this.files
+      .filter((file) => !file.trashed)
+      .filter((file) => name === undefined || file.title === name)
+      .map((file) => ({ id: file.id, webViewLink: file.url }));
+
+    return { files };
   }
 
   private drive(route: Route): unknown {

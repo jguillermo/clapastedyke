@@ -8,6 +8,7 @@ import {
 import { PrepareSyncTarget } from '../../../application/use-cases/prepare-sync-target.use-case';
 import { SyncShadow } from '../../../domain/services/sync-shadow';
 import { SyncError } from '../../../domain/services/sync.gateway.types';
+import { SyncTarget } from '../../../domain/value-objects/sync-target';
 
 describe('PrepareSyncTarget', () => {
   let prepare: PrepareSyncTarget;
@@ -101,6 +102,30 @@ describe('PrepareSyncTarget', () => {
     expect(targets.count()).toBe(0);
   });
 
+  it('un dispositivo nuevo de la misma cuenta ADOPTA la hoja que ya existe, no crea otra', async () => {
+    /*
+     * El caso que duele: lo que se recuerda es por navegador, y la hoja es por cuenta. Un móvil nuevo
+     * llega sin nada recordado, y antes de esto creaba otra hoja con el mismo nombre en el mismo Drive
+     * — una por aparato.
+     */
+    gateway.existing = SyncTarget.of('hoja-de-la-cuenta', 'https://example.test/suya');
+
+    const result = await prepare.execute();
+
+    expect(result).toEqual({ targetUrl: 'https://example.test/suya', created: false });
+    expect(gateway.created).toBe(0);
+    // Y queda recordada, así que el siguiente arranque de ESTE dispositivo ni pregunta.
+    expect((await targets.forAccount('cuenta-1'))?.id).toBe('hoja-de-la-cuenta');
+  });
+
+  it('solo se crea cuando la cuenta no tiene ninguna', async () => {
+    gateway.existing = null;
+
+    await prepare.execute();
+
+    expect(gateway.created).toBe(1);
+  });
+
   it('recrear olvida la anterior y crea otra, sin borrar la vieja del Drive', async () => {
     await prepare.execute();
 
@@ -109,6 +134,18 @@ describe('PrepareSyncTarget', () => {
     expect(result.created).toBe(true);
     expect(gateway.created).toBe(2);
     expect(targets.count()).toBe(1);
+  });
+
+  it('recrear crea de verdad aunque la cuenta ya tenga una hoja', async () => {
+    // Si `recreate` pasara por la búsqueda, encontraría justo la hoja que se acaba de dar por
+    // inservible y el botón «Crear una hoja nueva» no crearía nada.
+    gateway.existing = SyncTarget.of('la-que-no-sirve', 'https://example.test/vieja');
+
+    const result = await prepare.recreate();
+
+    expect(result.created).toBe(true);
+    expect(gateway.created).toBe(1);
+    expect((await targets.forAccount('cuenta-1'))?.id).not.toBe('la-que-no-sirve');
   });
 
   it('sin cuenta conectada no hay Drive donde crear nada', async () => {

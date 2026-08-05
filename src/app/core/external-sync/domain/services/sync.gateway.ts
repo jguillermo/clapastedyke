@@ -34,6 +34,19 @@ export abstract class SyncGateway {
    */
   abstract create(request: CredentialRequest): Promise<SyncTarget>;
 
+  /**
+   * El destino que **esta aplicación ya creó** para esta cuenta, si lo hay. `null` si no hay ninguno.
+   *
+   * Es lo que evita una copia por dispositivo. Quién tiene qué destino se recuerda en local, y lo local
+   * es por navegador: un móvil nuevo, otro navegador o unos datos del sitio borrados llegan sin saber
+   * nada, y sin esta pregunta crearían **otra** copia en la misma cuenta. Preguntarlo al destino es lo
+   * único que da una respuesta que no dependa del dispositivo.
+   *
+   * No hace falta ningún permiso extra: se busca **entre lo que la propia app creó**, que es justo el
+   * alcance que el usuario concedió.
+   */
+  abstract locate(request: CredentialRequest): Promise<SyncTarget | null>;
+
   /** `true` si el destino sigue estando donde se dejó. `false` si lo borraron o está en la papelera. */
   abstract exists(request: TargetRequest): Promise<boolean>;
 

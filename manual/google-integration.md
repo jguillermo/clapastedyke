@@ -187,7 +187,8 @@ SyncOutbox (cola durable)
     │ Authorization: Bearer <token DEL USUARIO>
     │
     ├─ GET  drive/v3/files/{id}          ¿sigue estando la hoja?
-    ├─ POST sheets/v4/spreadsheets       crearla, la primera vez
+    ├─ GET  drive/v3/files?q=name=…      ¿ya tiene una? (dispositivo nuevo)
+    ├─ POST sheets/v4/spreadsheets       crearla, SOLO si no tiene ninguna
     ├─ GET  …/values:batchGet            leer lo que ya hay
     │       (fusionar por id, en la app)
     └─ POST …/values:batchUpdate  ───────────────────►  «Clapastedyke — Recetario»
@@ -200,6 +201,25 @@ fichero, no un secreto.
 
 Y por `drive.file`, ese token solo alcanza los ficheros que esta app creó. Aunque alguien se lo
 llevara, no podría leer nada más del Drive de esa persona.
+
+### 3.1 Una hoja por cuenta, no una por dispositivo
+
+La hoja se crea **una sola vez por cuenta**, con el nombre fijo `Clapastedyke — Recetario` y en la raíz
+del Drive del usuario. Que el id se recuerde en local no basta para garantizarlo: **lo local es por
+navegador y la hoja es por cuenta**, así que un móvil nuevo, otro navegador o unos datos del sitio
+borrados llegan sin saber nada. Antes de crear nada, se le pregunta a Drive si la cuenta ya tiene su
+hoja (`SyncGateway.locate`, un `files.list` por nombre) y, si la tiene, **se adopta**.
+
+Esa búsqueda no pide ningún permiso extra: `drive.file` alcanza los ficheros que **esta app** creó, y
+Drive guarda esa asociación por aplicación —no por dispositivo ni por sesión—, así que la hoja que creó
+este mismo Client ID en otro teléfono aparece en la búsqueda. Y no puede tropezar con un fichero ajeno
+que se llame igual, porque lo ajeno no está en ese alcance.
+
+Si ya hubiera varias (de una versión anterior, o de dos dispositivos conectando en el mismo instante),
+todos eligen **la más antigua** y convergen a ella; las demás se quedan en el Drive del usuario, que es
+el único que puede decidir tirarlas. Queda un límite conocido: Drive no ofrece un «crear si no existe»
+atómico, así que dos conexiones **simultáneas** pueden crear dos hojas — del ciclo siguiente en adelante
+las dos se van a la misma.
 
 ### 4.1 El token va donde tiene que ir: en la cabecera
 

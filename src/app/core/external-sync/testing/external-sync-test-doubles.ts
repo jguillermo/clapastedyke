@@ -167,6 +167,17 @@ export class FakeSyncGateway extends SyncGateway {
     return SyncTarget.of(`target-${this.created}`, 'https://example.test/hoja');
   }
 
+  /**
+   * Lo que la cuenta ya tiene en el destino, visto desde fuera de este navegador. `null` = no tiene
+   * nada, y entonces sí toca crear. Es el caso de un dispositivo nuevo: aquí no hay nada recordado, pero
+   * la hoja existe.
+   */
+  existing: SyncTarget | null = null;
+
+  async locate(): Promise<SyncTarget | null> {
+    return this.existing;
+  }
+
   async exists(): Promise<boolean> {
     return this.targetAlive;
   }
