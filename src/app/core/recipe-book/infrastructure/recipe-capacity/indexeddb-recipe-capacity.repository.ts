@@ -6,6 +6,7 @@ import { CapacityGroup, RecipeCapacity } from '../../domain/entities/recipe-capa
 import { RecipeCapacityRepository } from '../../domain/repositories/recipe-capacity.repository';
 import { RecipeCapacityMapper } from './recipe-capacity.mapper';
 import { RecipeCapacityRecord } from '../records';
+import { isAlive, stamped, tombstoned } from '../synced-record';
 
 /**
  * Implementación IndexedDB de `RecipeCapacityRepository` sobre `IndexedDbStore` (store
@@ -23,28 +24,36 @@ export class IndexedDbRecipeCapacityRepository extends RecipeCapacityRepository 
 
   async byId(id: EntityId): Promise<RecipeCapacity | null> {
     const record = await this.store.get(id.value);
-    return record ? RecipeCapacityMapper.toDomain(record) : null;
+    return record && isAlive(record) ? RecipeCapacityMapper.toDomain(record) : null;
   }
 
   async byGroup(group: CapacityGroup): Promise<RecipeCapacity[]> {
     return (await this.store.all())
-      .filter((r) => r.group === group)
+      .filter((r) => isAlive(r) && r.group === group)
       .map(RecipeCapacityMapper.toDomain);
   }
 
   async all(): Promise<RecipeCapacity[]> {
-    const capacities = (await this.store.all()).map(RecipeCapacityMapper.toDomain);
+    const capacities = (await this.store.all()).filter(isAlive).map(RecipeCapacityMapper.toDomain);
     this.log.debug('capacidades leídas', { count: capacities.length });
     return capacities;
   }
 
   async save(capacity: RecipeCapacity): Promise<void> {
-    await this.store.put(RecipeCapacityMapper.toRecord(capacity));
+    await this.store.put(
+      stamped(RecipeCapacityMapper.toRecord(capacity), new Date().toISOString()),
+    );
     this.log.debug('capacidad guardada', { id: capacity.id.value, group: capacity.group });
   }
 
+  /** Borrado **lógico**, para que llegue a los demás dispositivos. Ver `synced-record.ts`. */
   async delete(id: EntityId): Promise<void> {
-    await this.store.delete(id.value);
+    const record = await this.store.get(id.value);
+    if (!record) {
+      this.log.debug('borrar una capacidad que no está: no hay nada que hacer', { id: id.value });
+      return;
+    }
+    await this.store.put(tombstoned(record, new Date().toISOString()));
     this.log.debug('capacidad borrada', { id: id.value });
   }
 }

@@ -13,4 +13,6 @@ export abstract class RecipeCategoryRepository {
   abstract byName(name: string): Promise<RecipeCategory | null>;
   abstract save(category: RecipeCategory): Promise<void>;
   abstract all(): Promise<RecipeCategory[]>;
+  /** Borra la categoría. El **cómo** es cosa de la implementación — ver `SupplyRepository.delete`. */
+  abstract delete(id: EntityId): Promise<void>;
 }

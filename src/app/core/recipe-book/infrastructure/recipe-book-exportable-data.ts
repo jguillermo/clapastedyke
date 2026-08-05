@@ -35,8 +35,17 @@ const RECIPE_TABLES = ['recipes', 'recipeLines', 'categories', 'flavors', 'capac
  * Filas exportadas: **DTOs de infraestructura**, solo primitivos. Los ids se acompañan de su
  * etiqueta resuelta (`categoryName`, `flavorLabel`…) porque el destino lo va a leer una persona; el
  * id sigue estando para poder reconciliar.
+ *
+ * Todas llevan además `updatedAt`: cuándo se guardó la fila en este dispositivo. No es para el usuario
+ * —no tiene columna en el destino— sino para que quien sincroniza pueda decidir **cuál de dos cambios
+ * es más reciente** cuando el mismo dato cambió aquí y allí. Sin él, un conflicto se resuelve a ciegas.
  */
-interface SupplyRow {
+interface ChangedAt {
+  /** ISO, o `null` en una fila guardada antes de que esto existiera. */
+  updatedAt: string | null;
+}
+
+interface SupplyRow extends ChangedAt {
   id: string;
   name: string;
   baseUnit: BaseUnit;
@@ -47,7 +56,7 @@ interface SupplyRow {
   currency: string;
 }
 
-interface RecipeRow {
+interface RecipeRow extends ChangedAt {
   id: string;
   name: string;
   categoryId: string;
@@ -70,17 +79,17 @@ interface RecipeLineRow {
   unit: BaseUnit;
 }
 
-interface NamedRow {
+interface NamedRow extends ChangedAt {
   id: string;
   name: string;
 }
 
-interface FlavorRow {
+interface FlavorRow extends ChangedAt {
   id: string;
   label: string;
 }
 
-interface CapacityRow {
+interface CapacityRow extends ChangedAt {
   id: string;
   group: CapacityGroup;
   label: string;
@@ -138,6 +147,7 @@ export class RecipeBookExportableData extends ExportableData {
         pricePerValue: supply.purchasePrice.per.value,
         pricePerUnit: supply.purchasePrice.per.unit,
         currency: supply.purchasePrice.currency,
+        updatedAt: supply.updatedAt,
       }));
 
     const recipeRows: RecipeRow[] = wantedRecipes.map((recipe) => ({
@@ -158,6 +168,7 @@ export class RecipeBookExportableData extends ExportableData {
       // `lineCount`/`RecipeLineRow` conservan el nombre: son columnas de la hoja del usuario, no del
       // dominio. Renombrarlas le cambiaría la cabecera a quien ya está sincronizando.
       lineCount: recipe.ingredients.length,
+      updatedAt: recipe.updatedAt,
     }));
 
     const recipeLineRows: RecipeLineRow[] = wantedRecipes.flatMap((recipe) =>
@@ -177,11 +188,15 @@ export class RecipeBookExportableData extends ExportableData {
 
     const categoryRows: NamedRow[] = categories
       .filter((category) => withRecipes || has(refs, 'category', category.id.value))
-      .map((category) => ({ id: category.id.value, name: category.name }));
+      .map((category) => ({
+        id: category.id.value,
+        name: category.name,
+        updatedAt: category.updatedAt,
+      }));
 
     const flavorRows: FlavorRow[] = flavors
       .filter((flavor) => withRecipes || has(refs, 'flavor', flavor.id.value))
-      .map((flavor) => ({ id: flavor.id.value, label: flavor.label }));
+      .map((flavor) => ({ id: flavor.id.value, label: flavor.label, updatedAt: flavor.updatedAt }));
 
     const capacityRows: CapacityRow[] = recipeCapacities
       .filter((capacity) => withRecipes || has(refs, 'capacity', capacity.id.value))
@@ -190,6 +205,7 @@ export class RecipeBookExportableData extends ExportableData {
         group: capacity.group,
         label: capacity.label,
         factor: capacity.factor,
+        updatedAt: capacity.updatedAt,
       }));
 
     const tables: ExportedRows = {

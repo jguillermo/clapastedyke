@@ -11,6 +11,8 @@ interface SupplyData {
   baseUnit: BaseUnit;
   purchasePrice: PurchasePrice;
   usage: SupplyUsage;
+  /** Ver `Supply.updatedAt`. Opcional: quien lo arma de cero todavía no lo ha guardado. */
+  updatedAt?: string | null;
 }
 
 /**
@@ -30,6 +32,15 @@ export class Supply extends AggregateRoot {
   readonly baseUnit: BaseUnit; // Nivel 1: unidad en la que se mide (g | u)
   readonly purchasePrice: PurchasePrice; // Nivel 1: costo de compra (presentación + precio)
   readonly usage: SupplyUsage; // Nivel 1: para qué se usa (recipe/topper/box/base)
+  /**
+   * Nivel 3: metadato de auditoría — cuándo se guardó por última vez (ISO), o `null` si aún no se ha
+   * guardado nunca.
+   *
+   * No es dato de negocio y nada del recetario decide en función de él: existe para que la
+   * sincronización pueda saber **cuál de dos cambios es más reciente** cuando el mismo insumo cambió
+   * aquí y en el destino. Lo estampa el repositorio al guardar, así que `create` no lo recibe.
+   */
+  readonly updatedAt: string | null;
 
   private constructor(data: SupplyData) {
     super();
@@ -38,6 +49,7 @@ export class Supply extends AggregateRoot {
     this.baseUnit = data.baseUnit;
     this.purchasePrice = data.purchasePrice;
     this.usage = data.usage;
+    this.updatedAt = data.updatedAt ?? null;
   }
 
   /** Arma el insumo con su precio de compra y graba que se guardó. */

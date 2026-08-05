@@ -7,7 +7,7 @@ import { SyncTargetRepository } from '../../domain/repositories/sync-target.repo
 import { DeviceIdentity } from '../../domain/services/device-identity';
 import { SyncReader } from '../../domain/services/sync-reader';
 import { SyncShadow } from '../../domain/services/sync-shadow';
-import { MergePlan, reconcile } from '../../infrastructure/reconcile';
+import { localVersionsFrom, MergePlan, reconcile } from '../../infrastructure/reconcile';
 import { SHEET_TABLES } from '../../infrastructure/sheet-schema';
 
 export type ReconcileSkipReason = 'disconnected' | 'no-target' | 'failed';
@@ -86,6 +86,9 @@ export class ReconcileWithRemote extends UseCase<void, ReconcileWithRemoteResult
         tables: SHEET_TABLES,
         now: Date.now(),
         deviceId,
+        // Con esto un conflicto se decide con dato en vez de a ciegas: el origen dice cuándo se guardó
+        // cada fila aquí, y eso ya es comparable con la versión que trae el destino.
+        localVersionOf: localVersionsFrom(local, SHEET_TABLES, deviceId),
       });
 
       this.report(plan);

@@ -5,6 +5,8 @@ import { RecipeBookEvents } from '../events/recipe-book-events';
 interface RecipeFlavorData {
   id: EntityId;
   label: string;
+  /** Ver `RecipeFlavor.updatedAt`. Opcional: quien lo arma de cero todavía no lo ha guardado. */
+  updatedAt?: string | null;
 }
 
 /**
@@ -19,11 +21,14 @@ interface RecipeFlavorData {
 export class RecipeFlavor extends AggregateRoot {
   readonly id: EntityId; // Nivel 1: identidad única del sabor
   readonly label: string; // Nivel 1: nombre visible (Vainilla, Chocolate…)
+  /** Nivel 3: metadato de auditoría — cuándo se guardó por última vez. Ver `Supply.updatedAt`. */
+  readonly updatedAt: string | null;
 
   private constructor(data: RecipeFlavorData) {
     super();
     this.id = data.id;
     this.label = data.label;
+    this.updatedAt = data.updatedAt ?? null;
   }
 
   /** Arma el sabor y graba que se guardó. */

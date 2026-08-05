@@ -14,6 +14,10 @@ export const RecipeFlavorMapper = {
   },
 
   toDomain(record: RecipeFlavorRecord): RecipeFlavor {
-    return RecipeFlavor.restore({ id: new EntityId(record.id), label: record.label });
+    return RecipeFlavor.restore({
+      id: new EntityId(record.id),
+      label: record.label,
+      updatedAt: record.updatedAt ?? null,
+    });
   },
 };

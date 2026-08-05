@@ -6,6 +6,7 @@ import { Supply } from '../../domain/entities/supply';
 import { SupplyRepository } from '../../domain/repositories/supply.repository';
 import { SupplyMapper } from './supply.mapper';
 import { SupplyRecord } from '../records';
+import { isAlive, stamped, tombstoned } from '../synced-record';
 
 /**
  * Implementación IndexedDB de `SupplyRepository` sobre `IndexedDbStore` (store `ingredients`, nombre
@@ -23,24 +24,42 @@ export class IndexedDbSupplyRepository extends SupplyRepository {
 
   async byId(id: EntityId): Promise<Supply | null> {
     const record = await this.store.get(id.value);
-    return record && isPriced(record) ? SupplyMapper.toDomain(record) : null;
+    return record && usable(record) ? SupplyMapper.toDomain(record) : null;
   }
 
   async byName(name: string): Promise<Supply | null> {
     const target = name.trim().toLowerCase();
     const record = (await this.store.all()).find(
-      (r) => isPriced(r) && r.name.toLowerCase() === target,
+      (r) => usable(r) && r.name.toLowerCase() === target,
     );
     return record ? SupplyMapper.toDomain(record) : null;
   }
 
   async save(supply: Supply): Promise<void> {
-    await this.store.put(SupplyMapper.toRecord(supply));
+    // La hora se estampa aquí, que es por donde pasan TODAS las escrituras: ni el caso de uso ni el
+    // agregado tienen que acordarse. Guardar además resucita un insumo que estuviera borrado.
+    await this.store.put(stamped(SupplyMapper.toRecord(supply), new Date().toISOString()));
     this.log.debug('insumo guardado', { id: supply.id.value });
   }
 
+  /**
+   * Borrado **lógico**: se le pone la lápida y se conserva el documento.
+   *
+   * Quitarlo del todo haría que un dispositivo desconectado lo resubiera al reconectar y lo borrado
+   * reapareciera. Un borrado tiene que ser un hecho que se pueda contar, no una ausencia.
+   */
+  async delete(id: EntityId): Promise<void> {
+    const record = await this.store.get(id.value);
+    if (!record) {
+      this.log.debug('borrar un insumo que no está: no hay nada que hacer', { id: id.value });
+      return;
+    }
+    await this.store.put(tombstoned(record, new Date().toISOString()));
+    this.log.debug('insumo borrado', { id: id.value });
+  }
+
   async all(): Promise<Supply[]> {
-    const records = await this.store.all();
+    const records = (await this.store.all()).filter(isAlive);
     const priced = records.filter(isPriced);
     // Degradación silenciosa: hay insumos guardados que la app no puede mostrar. No rompe nada
     // —se recrean con precio al reutilizarlos— pero el usuario ve menos de lo que hay, así que
@@ -63,4 +82,9 @@ export class IndexedDbSupplyRepository extends SupplyRepository {
  */
 function isPriced(record: SupplyRecord): boolean {
   return !!record.purchasePrice && typeof record.purchasePrice.amount === 'number';
+}
+
+/** Vivo y con precio: las dos condiciones para que un documento se pueda mapear a un insumo. */
+function usable(record: SupplyRecord): boolean {
+  return isAlive(record) && isPriced(record);
 }

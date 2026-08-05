@@ -15,6 +15,8 @@ interface RecipeCapacityData {
   group: CapacityGroup;
   label: string;
   factor: number;
+  /** Ver `RecipeCapacity.updatedAt`. Opcional: quien la arma de cero todavía no la ha guardado. */
+  updatedAt?: string | null;
 }
 
 /**
@@ -31,6 +33,8 @@ export class RecipeCapacity extends AggregateRoot {
   readonly group: CapacityGroup; // Nivel 1: grupo/dimensión (portions/mold)
   readonly label: string; // Nivel 1: nombre visible (Doble, Molde grande, 20 porciones…)
   readonly factor: number; // Nivel 1: factor de escalado sobre los valores base
+  /** Nivel 3: metadato de auditoría — cuándo se guardó por última vez. Ver `Supply.updatedAt`. */
+  readonly updatedAt: string | null;
 
   private constructor(data: RecipeCapacityData) {
     super();
@@ -38,6 +42,7 @@ export class RecipeCapacity extends AggregateRoot {
     this.group = data.group;
     this.label = data.label;
     this.factor = data.factor;
+    this.updatedAt = data.updatedAt ?? null;
   }
 
   /** Arma la capacidad y graba que se guardó. */

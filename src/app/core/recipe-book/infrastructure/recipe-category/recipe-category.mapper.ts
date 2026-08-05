@@ -17,6 +17,10 @@ export const RecipeCategoryMapper = {
   },
 
   toDomain(record: RecipeCategoryRecord): RecipeCategory {
-    return RecipeCategory.restore({ id: new EntityId(record.id), name: record.name });
+    return RecipeCategory.restore({
+      id: new EntityId(record.id),
+      name: record.name,
+      updatedAt: record.updatedAt ?? null,
+    });
   },
 };

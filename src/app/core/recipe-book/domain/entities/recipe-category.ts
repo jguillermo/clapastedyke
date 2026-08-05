@@ -5,6 +5,8 @@ import { RecipeBookEvents } from '../events/recipe-book-events';
 interface RecipeCategoryData {
   id: EntityId;
   name: string;
+  /** Ver `RecipeCategory.updatedAt`. Opcional: quien la arma de cero todavía no la ha guardado. */
+  updatedAt?: string | null;
 }
 
 /**
@@ -17,11 +19,14 @@ interface RecipeCategoryData {
 export class RecipeCategory extends AggregateRoot {
   readonly id: EntityId; // Nivel 1: identidad única de la categoría
   readonly name: string; // Nivel 1: nombre visible (Queques, Galletas…)
+  /** Nivel 3: metadato de auditoría — cuándo se guardó por última vez. Ver `Supply.updatedAt`. */
+  readonly updatedAt: string | null;
 
   private constructor(data: RecipeCategoryData) {
     super();
     this.id = data.id;
     this.name = data.name;
+    this.updatedAt = data.updatedAt ?? null;
   }
 
   /** Arma la categoría y graba que se guardó. */

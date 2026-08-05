@@ -68,6 +68,11 @@ class InMemorySupplyRepository extends SupplyRepository {
   byName = async (name: string) => this.store.byName(name, (s) => s.name);
   save = async (s: Supply) => this.store.save(s);
   all = async () => this.store.all();
+  // El doble borra de verdad. Que la implementación real lo haga con una lápida es asunto suyo: el
+  // contrato del puerto dice «borrado es borrado, no se vuelve a leer», y eso es lo que se dobla.
+  delete = async (id: EntityId) => {
+    this.store.items.delete(id.value);
+  };
 }
 
 class InMemoryRecipeCategoryRepository extends RecipeCategoryRepository {
@@ -77,6 +82,9 @@ class InMemoryRecipeCategoryRepository extends RecipeCategoryRepository {
   byName = async (name: string) => this.store.byName(name, (c) => c.name);
   save = async (c: RecipeCategory) => this.store.save(c);
   all = async () => this.store.all();
+  delete = async (id: EntityId) => {
+    this.store.items.delete(id.value);
+  };
 }
 
 class InMemoryRecipeRepository extends RecipeRepository {
@@ -95,6 +103,9 @@ class InMemoryRecipeRepository extends RecipeRepository {
     this.store.all().filter((r) => r.categoryId.equals(categoryId));
   save = async (r: Recipe) => this.store.save(r);
   all = async () => this.store.all();
+  delete = async (id: EntityId) => {
+    this.store.items.delete(id.value);
+  };
 }
 
 class InMemoryRecipeFlavorRepository extends RecipeFlavorRepository {

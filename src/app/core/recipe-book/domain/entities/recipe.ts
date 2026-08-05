@@ -11,6 +11,8 @@ interface RecipeData {
   flavorId: EntityId | null;
   portionsCapacityId: EntityId | null;
   moldCapacityId: EntityId | null;
+  /** Ver `Recipe.updatedAt`. Opcional: quien la arma de cero todavía no la ha guardado. */
+  updatedAt?: string | null;
 }
 
 /**
@@ -32,6 +34,8 @@ export class Recipe extends AggregateRoot {
   readonly flavorId: EntityId | null; // Nivel 2: sabor de la receta (id de otra raíz del contexto), opcional
   readonly portionsCapacityId: EntityId | null; // Nivel 2: capacidad por porciones (id de otra raíz del contexto), opcional
   readonly moldCapacityId: EntityId | null; // Nivel 2: capacidad por molde (id de otra raíz del contexto), opcional
+  /** Nivel 3: metadato de auditoría — cuándo se guardó por última vez. Ver `Supply.updatedAt`. */
+  readonly updatedAt: string | null;
 
   private constructor(data: RecipeData) {
     super();
@@ -42,6 +46,7 @@ export class Recipe extends AggregateRoot {
     this.flavorId = data.flavorId;
     this.portionsCapacityId = data.portionsCapacityId;
     this.moldCapacityId = data.moldCapacityId;
+    this.updatedAt = data.updatedAt ?? null;
   }
 
   /** Arma la receta a partir de sus value objects y graba que se guardó. */

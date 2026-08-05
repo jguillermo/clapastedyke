@@ -890,3 +890,43 @@ function hasContent(table: SheetTable, read: (field: string) => RawValue): boole
 function asRecord(row: ExportedRow): Record<string, RawValue> {
   return row as Record<string, RawValue>;
 }
+
+/** El campo con el que el origen dice cuándo se guardó cada fila aquí. No es columna del destino. */
+const UPDATED_AT_FIELD = 'updatedAt';
+
+/**
+ * De cuándo se guardó cada fila aquí, a una versión comparable con las del destino.
+ *
+ * Es lo que hace que un conflicto se resuelva **con dato** en vez de a ciegas. El instante sale del
+ * origen (lo estampa su repositorio al guardar) y el dispositivo es este, porque un cambio local se
+ * hizo, por definición, aquí.
+ *
+ * Una fila sin `updatedAt` —guardada antes de que el campo existiera— devuelve `null`, y su conflicto
+ * se resuelve a favor del destino y queda marcado como a ciegas. Es lo correcto: inventarle una fecha
+ * de ahora la haría ganar siempre, incluso frente a una edición remota posterior.
+ */
+export function localVersionsFrom(
+  local: ExportedRows,
+  tables: readonly SheetTable[],
+  deviceId: string,
+): (table: string, rowId: string) => string | null {
+  const versions = new Map<string, string>();
+
+  for (const table of tables) {
+    const key = table.key;
+    if (key === undefined) {
+      continue;
+    }
+    for (const row of local[table.name] ?? []) {
+      const values = asRecord(row);
+      const rowId = canonicalCode(values[key]);
+      const millis = Date.parse(canonicalText(values[UPDATED_AT_FIELD]));
+      if (rowId.length === 0 || !Number.isFinite(millis)) {
+        continue;
+      }
+      versions.set(`${table.name}:${rowId}`, RowVersion.of(millis, 0, deviceId).toString());
+    }
+  }
+
+  return (table, rowId) => versions.get(`${table}:${rowId}`) ?? null;
+}

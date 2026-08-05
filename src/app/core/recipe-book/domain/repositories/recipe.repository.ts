@@ -14,4 +14,6 @@ export abstract class RecipeRepository {
   abstract byCategory(categoryId: EntityId): Promise<Recipe[]>;
   abstract save(recipe: Recipe): Promise<void>;
   abstract all(): Promise<Recipe[]>;
+  /** Borra la receta. El **cómo** es cosa de la implementación — ver `SupplyRepository.delete`. */
+  abstract delete(id: EntityId): Promise<void>;
 }

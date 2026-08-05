@@ -9,6 +9,10 @@ import { quantityToDomain, quantityToRecord } from '../value-record.mappers';
  * Usado por `IndexedDbSupplyRepository`. Mapea los VOs `PurchasePrice` y `Quantity`
  * (la cantidad `per` vía `value-record.mappers`); aplica `'PEN'` por defecto a records legacy sin
  * moneda.
+ *
+ * **`updatedAt` solo viaja hacia el dominio.** Al escribir no se pone aquí: lo estampa el repositorio
+ * con la hora de *ese* guardado. Si lo escribiera el mapper con el valor que trae el agregado, guardar
+ * algo recién leído conservaría la fecha antigua y la sincronización creería que no ha cambiado.
  */
 export const SupplyMapper = {
   toRecord(supply: Supply): SupplyRecord {
@@ -36,6 +40,7 @@ export const SupplyMapper = {
         quantityToDomain(record.purchasePrice.per),
         record.purchasePrice.currency ?? 'PEN',
       ),
+      updatedAt: record.updatedAt ?? null,
     });
   },
 };

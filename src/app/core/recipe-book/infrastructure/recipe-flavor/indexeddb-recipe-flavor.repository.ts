@@ -6,6 +6,7 @@ import { RecipeFlavor } from '../../domain/entities/recipe-flavor';
 import { RecipeFlavorRepository } from '../../domain/repositories/recipe-flavor.repository';
 import { RecipeFlavorMapper } from './recipe-flavor.mapper';
 import { RecipeFlavorRecord } from '../records';
+import { isAlive, stamped, tombstoned } from '../synced-record';
 
 /**
  * Implementación IndexedDB de `RecipeFlavorRepository` sobre `IndexedDbStore` (store `flavors`);
@@ -22,22 +23,31 @@ export class IndexedDbRecipeFlavorRepository extends RecipeFlavorRepository {
 
   async byId(id: EntityId): Promise<RecipeFlavor | null> {
     const record = await this.store.get(id.value);
-    return record ? RecipeFlavorMapper.toDomain(record) : null;
+    return record && isAlive(record) ? RecipeFlavorMapper.toDomain(record) : null;
   }
 
   async all(): Promise<RecipeFlavor[]> {
-    const flavors = (await this.store.all()).map(RecipeFlavorMapper.toDomain);
+    const flavors = (await this.store.all()).filter(isAlive).map(RecipeFlavorMapper.toDomain);
     this.log.debug('sabores leídos', { count: flavors.length });
     return flavors;
   }
 
   async save(flavor: RecipeFlavor): Promise<void> {
-    await this.store.put(RecipeFlavorMapper.toRecord(flavor));
+    await this.store.put(stamped(RecipeFlavorMapper.toRecord(flavor), new Date().toISOString()));
     this.log.debug('sabor guardado', { id: flavor.id.value });
   }
 
+  /**
+   * Borrado **lógico**: antes se quitaba el documento, y así el borrado no llegaba a los demás
+   * dispositivos — el primero que estuviera desconectado lo resubía y el sabor reaparecía.
+   */
   async delete(id: EntityId): Promise<void> {
-    await this.store.delete(id.value);
+    const record = await this.store.get(id.value);
+    if (!record) {
+      this.log.debug('borrar un sabor que no está: no hay nada que hacer', { id: id.value });
+      return;
+    }
+    await this.store.put(tombstoned(record, new Date().toISOString()));
     this.log.debug('sabor borrado', { id: id.value });
   }
 }
