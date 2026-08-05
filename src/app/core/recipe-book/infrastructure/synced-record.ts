@@ -34,6 +34,19 @@ export interface SyncedRecord {
   deletedAt?: string;
 }
 
+/**
+ * Los dos ayudantes de abajo se atan a `object` y **no** a `SyncedRecord`, y ponen los metadatos en el
+ * tipo que devuelven.
+ *
+ * Es por una regla del sistema de tipos, no por gusto: `SyncedRecord` solo tiene campos opcionales, y a
+ * un tipo así TypeScript le aplica su comprobación de «tipo débil» — exige que el argumento comparta al
+ * menos una propiedad con él. Un documento que todavía no tuviera ni fecha ni lápida (el caso normal:
+ * todo lo escrito antes de que esto existiera) no comparte ninguna, y se rechazaba.
+ *
+ * Intersecar con la clave (`SyncedRecord & { id: string }`) tampoco vale: la comprobación se aplica
+ * **a cada miembro** de la intersección, así que seguía midiéndose contra `SyncedRecord` a solas.
+ */
+
 /** `true` si el documento sigue vivo. Un documento sin `deletedAt` lo está, que es el caso normal. */
 export function isAlive(record: SyncedRecord): boolean {
   return record.deletedAt === undefined;
@@ -44,9 +57,9 @@ export function isAlive(record: SyncedRecord): boolean {
  * es resucitarlo, y es lo correcto — un id que vuelve a usarse es el mismo dato otra vez, no un
  * fantasma que haya que arrastrar.
  */
-export function stamped<Doc extends SyncedRecord>(record: Doc, now: string): Doc {
-  const { deletedAt: _borrado, ...alive } = record;
-  return { ...alive, updatedAt: now } as Doc;
+export function stamped<Doc extends object>(record: Doc, now: string): Doc & SyncedRecord {
+  const { deletedAt: _borrado, ...alive } = record as Doc & SyncedRecord;
+  return { ...alive, updatedAt: now } as Doc & SyncedRecord;
 }
 
 /**
@@ -56,6 +69,6 @@ export function stamped<Doc extends SyncedRecord>(record: Doc, now: string): Doc
  * fila marcada como borrada de la que además hubieran desaparecido el nombre y el precio no le diría
  * qué fue lo que se borró.
  */
-export function tombstoned<Doc extends SyncedRecord>(record: Doc, now: string): Doc {
+export function tombstoned<Doc extends object>(record: Doc, now: string): Doc & SyncedRecord {
   return { ...record, updatedAt: now, deletedAt: now };
 }

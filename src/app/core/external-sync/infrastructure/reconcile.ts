@@ -391,22 +391,44 @@ function abortReasonOf(input: ReconcileInput, tables: readonly SheetTable[]): Ab
     // La cabecera es la prueba de que la columna N sigue siendo el campo N. Sin ella, insertar una
     // columna a mano haría leer el precio en la columna de la moneda, y como la fila quedaría
     // internamente coherente, el error no se vería nunca.
-    const found = remote.headers.map((header) => header.trim());
-    const expected = table.headers.map((header) => header.trim());
-    if (!sameHeaders(expected, found)) {
-      return { kind: 'headers', table: table.name, expected, found };
+    if (headersMoved(table, remote.headers)) {
+      return {
+        kind: 'headers',
+        table: table.name,
+        expected: [...table.headers],
+        found: [...remote.headers],
+      };
     }
   }
   return null;
 }
 
 /**
- * Una cabecera **de más al final** se tolera: es la columna de servicio que este destino todavía no
- * conoce, o una que alguien añadió a la derecha sin estorbar a nadie. Lo que no se tolera es que
- * cambie el orden o que falte alguna, que es lo que descoloca la lectura.
+ * `true` si las columnas de datos no están donde el esquema dice.
+ *
+ * Se comprueba **solo la posición de las columnas de datos**, y por dos razones concretas:
+ *
+ * 1. **Las de servicio se localizan por nombre**, no por posición, porque un destino escrito con una
+ *    versión anterior del esquema todavía no las tiene. Exigirlas aquí haría abortar la hoja de todo
+ *    el que ya estaba sincronizando, justo antes de poder migrarla.
+ * 2. **El rótulo se compara sin el `(auto)`**, que se añadió al renombrar las columnas derivadas. Es un
+ *    cambio de etiqueta, no de sitio: dar por corrupta una hoja por eso sería confundir «alguien
+ *    insertó una columna» —que es grave— con «esta hoja es de antes», que no lo es.
+ *
+ * Lo que sí sigue cazando: una columna insertada o quitada, que corre todo lo que viene detrás.
  */
-function sameHeaders(expected: readonly string[], found: readonly string[]): boolean {
-  return expected.every((header, index) => found[index] === header);
+function headersMoved(table: SheetTable, found: readonly string[]): boolean {
+  return table.fields.some((field, index) => {
+    if (SERVICE_FIELDS.has(field)) {
+      return false;
+    }
+    return labelOf(found[index] ?? '') !== labelOf(table.headers[index] ?? '');
+  });
+}
+
+/** El rótulo sin adornos: sin espacios alrededor y sin la marca de columna automática. */
+function labelOf(header: string): string {
+  return header.trim().replace(/\s*\(auto\)$/i, '');
 }
 
 function tableOf(snapshot: RemoteSnapshot, name: string): RemoteTable | undefined {

@@ -202,7 +202,12 @@ export const FIELD_KINDS: Readonly<Record<string, Readonly<Record<string, FieldK
  * cambiaría al escribirlas, y una fila cuya huella cambia al escribir su propia huella no converge
  * nunca.
  */
-const TECHNICAL_FIELDS = new Set(['version', 'origen', 'huella', 'borrado']);
+export const TECHNICAL_FIELDS: ReadonlySet<string> = new Set([
+  'version',
+  'origen',
+  'huella',
+  'borrado',
+]);
 
 /** Las columnas de una tabla que cuentan como dato del usuario, en el orden del esquema. */
 export function authoritativeFields(table: string, fields: readonly string[]): readonly string[] {

@@ -9,6 +9,7 @@
  * podría corromper datos en silencio, y así se puede razonar —y probar— sin red de por medio.
  */
 
+import { canonicalCode } from './sheet-canonical';
 import { SheetTable } from './sheet-schema';
 
 /** Un objeto del lote, convertido en fila con el orden de columnas de su tabla. */
@@ -22,7 +23,12 @@ export function toRow(table: SheetTable, source: Record<string, unknown>): strin
 /**
  * Upsert por clave: cada fila que llega pisa la que tuviera su mismo id, y las nuevas se añaden al
  * final. Las que ya estaban y no vienen en el lote **se conservan** — un envío parcial no borra el
- * resto del recetario.
+ * resto del recetario. Eso incluye las **lápidas**: una fila marcada como borrada es una fila que ya
+ * estaba, así que sobrevive a cualquier envío que no la mencione.
+ *
+ * Los ids se comparan **canonizados** (recortados y sin mayúsculas), igual que en todo el motor: si no,
+ * un id al que alguien le cambió una letra a mayúscula en la hoja dejaría de reconocerse como el suyo y
+ * la fila se duplicaría en cada envío.
  */
 export function mergeByKey(
   table: SheetTable,
@@ -40,7 +46,7 @@ export function mergeByKey(
   const byKey: Record<string, string[]> = Object.create(null) as Record<string, string[]>;
 
   for (const row of existing) {
-    const key = String(row[keyIndex] ?? '');
+    const key = canonicalCode(row[keyIndex]);
     if (!key) {
       continue;
     }
@@ -51,7 +57,7 @@ export function mergeByKey(
   }
 
   for (const row of incoming) {
-    const key = String(row[keyIndex] ?? '');
+    const key = canonicalCode(row[keyIndex]);
     if (!byKey[key]) {
       order.push(key);
     }

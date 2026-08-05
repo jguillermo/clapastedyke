@@ -6,6 +6,7 @@ import {
   canonicalRow,
   canonicalText,
   FIELD_KINDS,
+  TECHNICAL_FIELDS,
 } from '../../infrastructure/sheet-canonical';
 import { SHEET_TABLES } from '../../infrastructure/sheet-schema';
 
@@ -128,16 +129,26 @@ describe('canonicalFlag', () => {
 });
 
 describe('coherencia con el esquema de la hoja', () => {
-  it('cada columna del esquema está clasificada', () => {
+  it('cada columna del esquema está clasificada, o es de servicio', () => {
     // Si alguien añade un campo a SHEET_TABLES y olvida clasificarlo aquí, falla el test en vez de
-    // fallar la huella en la hoja de un usuario semanas después.
+    // fallar la huella en la hoja de un usuario semanas después. Las de servicio no se clasifican por
+    // tabla: se excluyen en un solo sitio, porque son las mismas en todas.
     const sinClasificar = SHEET_TABLES.flatMap((table) =>
       table.fields
-        .filter((field) => FIELD_KINDS[table.name]?.[field] === undefined)
+        .filter(
+          (field) => !TECHNICAL_FIELDS.has(field) && FIELD_KINDS[table.name]?.[field] === undefined,
+        )
         .map((field) => `${table.name}.${field}`),
     );
 
     expect(sinClasificar).toEqual([]);
+  });
+
+  it('ninguna columna de servicio entra en la huella', () => {
+    for (const table of SHEET_TABLES) {
+      const fields = authoritativeFields(table.name, table.fields);
+      expect(fields.filter((field) => TECHNICAL_FIELDS.has(field))).toEqual([]);
+    }
   });
 
   it('no hay columnas clasificadas que el esquema ya no tenga', () => {

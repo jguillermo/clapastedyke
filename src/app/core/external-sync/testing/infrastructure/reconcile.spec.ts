@@ -5,7 +5,7 @@ import { RowVersion } from '../../domain/value-objects/row-version';
 import { MergePlan, reconcile } from '../../infrastructure/reconcile';
 import { canonicalRow } from '../../infrastructure/sheet-canonical';
 import { fingerprintOf } from '../../infrastructure/sheet-hash';
-import { SHEET_TABLES, SheetTable } from '../../infrastructure/sheet-schema';
+import { SERVICE_COLUMNS, SHEET_TABLES, SheetTable } from '../../infrastructure/sheet-schema';
 
 /**
  * `reconcile` es el corazón del motor, y estos son sus modos de fallo.
@@ -45,14 +45,20 @@ function insumo(id: string, name = 'Harina', priceAmount = 2.5): Record<string, 
   };
 }
 
-/** Las celdas de una fila, en el orden del esquema, más las columnas de servicio que se le pasen. */
+/**
+ * Las celdas de una fila **en el orden del esquema**, columnas de servicio incluidas.
+ *
+ * Las de servicio ya son campos del esquema (v4), así que van en su sitio y no pegadas al final: si se
+ * añadieran detrás, caerían en posiciones que no les tocan y el motor leería la huella donde está la
+ * moneda.
+ */
 function cellsOf(
   table: SheetTable,
   row: Record<string, unknown>,
   service: { version?: string; huella?: string; borrado?: string } = {},
 ): unknown[] {
-  const cells = table.fields.map((field) => row[field] ?? '');
-  return [...cells, service.version ?? '', service.huella ?? '', service.borrado ?? ''];
+  const all: Record<string, unknown> = { ...row, ...service };
+  return table.fields.map((field) => all[field] ?? '');
 }
 
 /**
@@ -73,18 +79,36 @@ async function fingerprintFor(
   return fingerprintOf(values);
 }
 
-/**
- * Las cabeceras por defecto llevan las tres columnas de servicio **detrás** de las del esquema, que es
- * exactamente cómo están en un destino ya migrado mientras el esquema todavía no las declara. Es lo que
- * permite que `reconcile` las localice por nombre.
- */
+/** Una pestaña ya migrada: las cabeceras del esquema tal cual, columnas de servicio incluidas. */
 function remoteTable(table: SheetTable, rows: unknown[][], headers?: string[]): RemoteTable {
   return {
     name: table.name,
     present: true,
-    headers: headers ?? [...table.headers, 'version', 'huella', 'borrado'],
+    headers: headers ?? [...table.headers],
     rows: rows.map((cells, offset) => ({ index: 2 + offset, cells })),
   };
+}
+
+/** Los campos que tenía una hoja de la v3: los del esquema **sin** las columnas de servicio. */
+function v3Fields(table: SheetTable): readonly string[] {
+  return table.fields.filter((field) => !isServiceColumn(field));
+}
+
+/** Las cabeceras que tenía una hoja de la v3: sin columnas de servicio y sin el rótulo `(auto)`. */
+function v3Headers(table: SheetTable): string[] {
+  return table.fields
+    .map((field, index) => ({ field, header: table.headers[index] ?? '' }))
+    .filter(({ field }) => !isServiceColumn(field))
+    .map(({ header }) => header.replace(/\s*\(auto\)$/, ''));
+}
+
+function isServiceColumn(field: string): boolean {
+  return (SERVICE_COLUMNS as readonly string[]).includes(field);
+}
+
+/** Una fila tal como estaba escrita en una hoja de la v3. */
+function v3Cells(table: SheetTable, row: Record<string, unknown>): unknown[] {
+  return v3Fields(table).map((field) => row[field] ?? '');
 }
 
 /** Un destino con todas las tablas presentes y vacías, y las que se le pasen con contenido. */
@@ -166,12 +190,45 @@ describe('reconcile · barreras', () => {
     expect(plan.aborted).toMatchObject({ kind: 'headers', table: 'supplies' });
   });
 
-  it('una columna de servicio de más al final NO aborta: es la que el destino aún no conoce', async () => {
-    const conExtra = [...INSUMOS.headers, 'version', 'huella', 'borrado'];
-
-    const plan = await run({ snapshot: snapshotOf(remoteTable(INSUMOS, [], conExtra)) });
+  it('una hoja de la v3 NO aborta: le faltan las columnas de servicio y eso es válido', async () => {
+    // Sin esta tolerancia, la hoja de todo el que ya estaba sincronizando abortaría justo antes de
+    // poder migrarla.
+    const plan = await run({ snapshot: snapshotOf(remoteTable(INSUMOS, [], v3Headers(INSUMOS))) });
 
     expect(plan.aborted).toBeNull();
+  });
+
+  it('el rótulo «(auto)» sin poner tampoco aborta: es un cambio de etiqueta, no de sitio', async () => {
+    // Las derivadas se renombraron al pasar a la v4. Dar por corrupta una hoja por eso confundiría
+    // «alguien insertó una columna», que es grave, con «esta hoja es de antes», que no lo es.
+    const sinMarca = [...RECETAS.headers].map((header) => header.replace(/\s*\(auto\)$/, ''));
+
+    const plan = await run({ snapshot: snapshotOf(remoteTable(RECETAS, [], sinMarca)) });
+
+    expect(plan.aborted).toBeNull();
+  });
+
+  it('en una hoja de la v3, las filas se adoptan sin colisionar', async () => {
+    // El caso del primer ciclo de quien ya estaba sincronizando: no hay columna de huella, así que
+    // ninguna fila parece editada a mano y el catálogo no colisiona entero.
+    const filas = [insumo('ing-1'), insumo('ing-2')];
+
+    const plan = await run({
+      snapshot: snapshotOf(
+        remoteTable(
+          INSUMOS,
+          filas.map((fila) => v3Cells(INSUMOS, fila)),
+          v3Headers(INSUMOS),
+        ),
+      ),
+      local: localOf({ supplies: filas }),
+    });
+
+    expect(plan.aborted).toBeNull();
+    expect(plan.adopt).toHaveLength(2);
+    expect(plan.conflicts).toEqual([]);
+    expect(plan.apply).toEqual([]);
+    expect(plan.push).toEqual([]);
   });
 
   it('un borrado masivo aborta en vez de aplicarse', async () => {
