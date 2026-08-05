@@ -12,6 +12,7 @@ import { UseCase } from '@core/_common/use-case';
 import { SyncTargetRepository } from '../../domain/repositories/sync-target.repository';
 import { DeviceIdentity } from '../../domain/services/device-identity';
 import { SyncGateway } from '../../domain/services/sync.gateway';
+import { SyncOutbox } from '../../domain/services/sync-outbox';
 import { SyncReader } from '../../domain/services/sync-reader';
 import { SyncShadow } from '../../domain/services/sync-shadow';
 import { SyncStatus } from '../../domain/services/sync-status';
@@ -27,7 +28,8 @@ import {
 import { canonicalCode } from '../../infrastructure/sheet-canonical';
 import { SHEET_TABLES } from '../../infrastructure/sheet-schema';
 
-export type SyncStopReason = 'disconnected' | 'no-target' | 'blocked' | 'stale-session' | 'failed';
+export type SyncStopReason =
+  'disconnected' | 'no-target' | 'blocked' | 'stale-session' | 'stale-target' | 'failed';
 
 export interface SynchronizeWithRemoteResult {
   readonly synced: boolean;
@@ -87,15 +89,36 @@ export class SynchronizeWithRemote extends UseCase<void, SynchronizeWithRemoteRe
   private readonly source = inject(ExportableData);
   private readonly sink = inject(ImportableData);
   private readonly device = inject(DeviceIdentity);
+  private readonly outbox = inject(SyncOutbox);
   private readonly status = inject(SyncStatus);
   private readonly log = inject(Logger).scoped('external-sync/cycle');
 
   /** El ciclo en marcha, si hay uno. Dos ciclos a la vez se pisarían escribiendo. */
   private running: Promise<SynchronizeWithRemoteResult> | null = null;
 
-  execute(): Promise<SynchronizeWithRemoteResult> {
-    // Un solo ciclo a la vez, y quien llegue mientras comparte el resultado. Sin esto, el disparo por
-    // foco y el periódico podrían solaparse y escribir los dos.
+  async execute(): Promise<SynchronizeWithRemoteResult> {
+    const outcome = await this.share();
+
+    /*
+     * Un ciclo descartado porque la hoja cambió a mitad **no es la respuesta de quien preguntó**: se le
+     * da un ciclo de verdad, ya contra la hoja nueva.
+     *
+     * El caso que lo hace necesario: al conectar la cuenta se dispara un ciclo (lo hace
+     * `AuthChangedSubscriber`) y, en paralelo, la pantalla prepara la hoja — que si estaba en la papelera
+     * se reemplaza por otra. Sin este reintento, quien pidió el ciclo se quedaría con el resultado del
+     * que leyó la hoja abandonada, y la hoja nueva se quedaría vacía diciendo «listo».
+     *
+     * Una sola vez: si vuelve a cambiar, lo recogerá el disparador siguiente. Reintentar en bucle
+     * convertiría una carrera en un ciclo infinito.
+     */
+    return outcome.reason === 'stale-target' ? this.share() : outcome;
+  }
+
+  /**
+   * Un solo ciclo a la vez, y quien llegue mientras comparte el resultado. Sin esto, el disparo por
+   * foco y el periódico podrían solaparse y escribir los dos.
+   */
+  private share(): Promise<SynchronizeWithRemoteResult> {
     this.running ??= this.perform().finally(() => {
       this.running = null;
     });
@@ -107,8 +130,16 @@ export class SynchronizeWithRemote extends UseCase<void, SynchronizeWithRemoteRe
 
     const credentials = await this.credentials.current();
     if (!credentials) {
-      this.status.markDisconnected();
-      this.log.debug('ciclo omitido: no hay cuenta conectada');
+      // Si ya se había sincronizado en esta sesión, esto no es «no hay cuenta»: es «se caducó». El token
+      // de Google dura una hora y en un navegador no hay refresh token, así que pasa siempre — y lo que
+      // hay que hacer (volver a entrar) no es lo mismo que conectar por primera vez.
+      if (this.status.snapshot().target !== null) {
+        this.status.markNeedsReconnect();
+        this.log.debug('ciclo omitido: hay que volver a conectar');
+      } else {
+        this.status.markDisconnected();
+        this.log.debug('ciclo omitido: no hay cuenta conectada');
+      }
       return stopped('disconnected');
     }
 
@@ -121,7 +152,7 @@ export class SynchronizeWithRemote extends UseCase<void, SynchronizeWithRemoteRe
     const { epoch } = credentials;
     try {
       this.status.markSyncing();
-      const outcome = await this.cycle(credentials.token, target);
+      const outcome = await this.cycle(credentials.token, target, credentials.accountId);
 
       // La sesión pudo cambiar mientras se hablaba con el destino: si ahora hay otra cuenta, lo leído
       // y lo escrito eran de la anterior y no se puede tocar nada más con ellos.
@@ -139,13 +170,35 @@ export class SynchronizeWithRemote extends UseCase<void, SynchronizeWithRemoteRe
     }
   }
 
-  private async cycle(token: string, target: SyncTarget): Promise<SynchronizeWithRemoteResult> {
+  private async cycle(
+    token: string,
+    target: SyncTarget,
+    accountId: string,
+  ): Promise<SynchronizeWithRemoteResult> {
     const [snapshot, shadow, local, deviceId] = await Promise.all([
       this.reader.read({ credential: token, target }),
       this.shadow.all(),
       this.source.export({ all: true, refs: [] }),
       this.device.current(),
     ]);
+
+    /*
+     * La hoja pudo cambiar mientras se leía, y entonces lo leído no vale.
+     *
+     * `PrepareSyncTarget` reemplaza la hoja de una cuenta cuando la anterior ya no está —borrada, en la
+     * papelera, o porque el usuario pidió otra—, y eso puede ocurrir mientras este ciclo estaba leyendo
+     * la vieja. Seguir sería dañino por los dos lados: se escribiría en la hoja que el usuario acaba de
+     * abandonar, y la base quedaría describiendo filas que la hoja nueva no tiene — con lo que el ciclo
+     * siguiente vería el catálogo entero como borrado a mano y el tope de borrado masivo lo abortaría
+     * **para siempre**, dejando la hoja nueva vacía.
+     *
+     * Es la misma razón por la que se comprueba el `epoch` de la sesión al final: entre leer y escribir
+     * hay `await`s, y lo único cierto es lo que hay ahora.
+     */
+    if (await this.targetChanged(accountId, target)) {
+      this.log.debug('ciclo descartado: la hoja de la cuenta cambió mientras se leía');
+      return stopped('stale-target');
+    }
 
     // Antes de escribir nada: si la hoja es de una versión anterior, ponerle la forma de ahora. Es
     // idempotente y con una hoja al día no cuesta ninguna llamada.
@@ -171,10 +224,17 @@ export class SynchronizeWithRemote extends UseCase<void, SynchronizeWithRemoteRe
 
     const applied = await this.applyRemote(plan);
     const pushed = await this.pushLocal(token, target, plan, local, deviceId);
+    await this.markDeleted(token, target, plan);
+    await this.purge(token, target, plan);
     // Lo adoptado va al final y **respeta lo que ya se apuntó**: una fila que se adoptó y además se
     // rechazó al aplicarla ya tiene su marca de cuarentena, y volver a escribirla sin ella la haría
     // reintentarse en cada ciclo para siempre.
     await this.adopt(plan, applied.touched);
+
+    // La cola ya no decide QUÉ se sube —eso lo decide la diferencia contra la base—, así que ahora solo
+    // sirve para contarle al usuario cuántos cambios lleva sin sincronizar. Un ciclo completo la deja a
+    // cero por definición: acaba de mirarse todo.
+    await this.outbox.clear();
 
     this.status.markSynced(target, new Date().toISOString());
     this.log.debug('ciclo ✔', {
@@ -300,6 +360,56 @@ export class SynchronizeWithRemote extends UseCase<void, SynchronizeWithRemoteRe
     return batch.total;
   }
 
+  /**
+   * Marca en el destino lo que se borró aquí, y lo apunta en la base como borrado.
+   *
+   * La base se queda con la lápida en vez de olvidarla: si se olvidara, el ciclo siguiente vería una fila
+   * en el destino que aquí no está, sin base, y la traería de vuelta. Lo borrado volvería solo.
+   */
+  private async markDeleted(token: string, target: SyncTarget, plan: MergePlan): Promise<void> {
+    if (plan.tombstones.length === 0) {
+      return;
+    }
+
+    await this.gateway.markDeleted({
+      credential: token,
+      target,
+      rows: plan.tombstones.map((row) => ({
+        table: row.table,
+        index: row.index,
+        version: row.version,
+      })),
+    });
+
+    for (const row of plan.tombstones) {
+      const shadow = (await this.shadow.all()).find(
+        (candidate) => candidate.table === row.table && candidate.rowId === row.rowId,
+      );
+      await this.shadow.put({
+        table: row.table,
+        rowId: row.rowId,
+        fingerprint: shadow?.fingerprint ?? '',
+        version: row.version,
+        deleted: true,
+      });
+    }
+  }
+
+  /** Tira del destino las lápidas que ya nadie necesita, y las olvida también aquí. */
+  private async purge(token: string, target: SyncTarget, plan: MergePlan): Promise<void> {
+    if (plan.purge.length === 0) {
+      return;
+    }
+    await this.gateway.purge({
+      credential: token,
+      target,
+      rows: plan.purge.map((row) => ({ table: row.table, index: row.index })),
+    });
+    for (const row of plan.purge) {
+      await this.shadow.remove(row.table, row.rowId);
+    }
+  }
+
   /** Apunta como base lo que se adoptó del destino, sin aplicarlo ni subirlo. */
   private async adopt(plan: MergePlan, touched: ReadonlySet<string>): Promise<void> {
     for (const row of plan.adopt) {
@@ -314,6 +424,12 @@ export class SynchronizeWithRemote extends UseCase<void, SynchronizeWithRemoteRe
         deleted: row.deleted,
       });
     }
+  }
+
+  /** `true` si la hoja de esta cuenta ya no es la que este ciclo estaba usando. */
+  private async targetChanged(accountId: string, target: SyncTarget): Promise<boolean> {
+    const current = await this.targets.forAccount(accountId);
+    return current === null || current.id !== target.id;
   }
 
   private async sessionChanged(epoch: number): Promise<boolean> {

@@ -27,9 +27,11 @@ import { RemoteSnapshot } from '../domain/services/sync-reader.types';
 import { ShadowRow, SyncShadow } from '../domain/services/sync-shadow';
 import { SyncGateway } from '../domain/services/sync.gateway';
 import {
+  MarkDeletedRequest,
   MigrateRequest,
   ProbeOutcome,
   ProbeRequest,
+  PurgeRequest,
   SyncOutcome,
   SyncRequest,
 } from '../domain/services/sync.gateway.types';
@@ -181,6 +183,21 @@ export class FakeSyncGateway extends SyncGateway {
 
   async migrate(request: MigrateRequest): Promise<void> {
     this.migrated.push(request);
+  }
+
+  /** Filas marcadas como borradas, y filas tiradas. Para asertar qué se hizo con las lápidas. */
+  readonly markedDeleted: MarkDeletedRequest[] = [];
+  readonly purged: PurgeRequest[] = [];
+
+  async markDeleted(request: MarkDeletedRequest): Promise<void> {
+    this.markedDeleted.push(request);
+    if (this.failWith) {
+      throw this.failWith;
+    }
+  }
+
+  async purge(request: PurgeRequest): Promise<void> {
+    this.purged.push(request);
   }
 
   async probe(request: ProbeRequest): Promise<ProbeOutcome> {

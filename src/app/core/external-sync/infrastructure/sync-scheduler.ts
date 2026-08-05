@@ -125,6 +125,17 @@ export class SyncScheduler {
   }
 
   /**
+   * Un ciclo **ya**, sin esperar el mínimo ambiental y sin esperar a que acabe.
+   *
+   * Es para quien reacciona a un hecho que cambia todo el panorama —entrar con una cuenta, reanudar la
+   * sesión— y no puede quedarse esperando: quien avisa suele ser un manejador del bus, y ahí no se
+   * espera nunca a la red.
+   */
+  syncNow(trigger: string): void {
+    void this.run(trigger, true);
+  }
+
+  /**
    * Un disparador ambiental pide un ciclo. Puede que no toque todavía, y entonces no pasa nada.
    *
    * **El botón de la pantalla no pasa por aquí**: una feature solo puede inyectar casos de uso, no esto,

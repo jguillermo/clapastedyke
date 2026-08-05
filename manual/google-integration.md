@@ -12,19 +12,26 @@ costaron una tarde de obtener; están aquí para no repetirla.
 
 ## 1 · Qué es la integración, y qué no es
 
-**La app es local-first.** IndexedDB es la fuente de verdad y no hay backend. La integración con
-Google Sheets es **opcional y aditiva**: un espejo de una sola vía (app → hoja) que el usuario
-enciende si quiere.
+**La app funciona sin conexión y sin backend.** IndexedDB es la base de datos local de todo. La
+integración con Google Sheets es **opcional**: se enciende y entonces la hoja del usuario pasa a ser la
+**fuente de la verdad** — se lee, se fusiona con lo local y se escribe.
+
+> **Esto cambió.** Hasta agosto de 2026 la integración era un espejo de **una sola vía** (app → hoja) y
+> este documento decía que la hoja «nunca se lee», que el puerto solo tenía `send()` y que la
+> bidireccionalidad sería «un capítulo aparte, no una ampliación». Ese capítulo se escribió: hoy hay
+> lectura, fusión a tres vías, resolución de conflictos y borrados que viajan. **Todo lo demás de este
+> documento sigue vigente** — es lo que explica por qué el destino es Sheets, por qué no hay backend y por
+> qué la sesión caduca. El cómo funciona la sincronización está en
+> [`sync-architecture.md`](sync-architecture.md).
 
 Consecuencias que conviene tener presentes:
 
 - **Con la integración apagada no cambia nada.** Es el estado por defecto: `public/config.json` sale
-  del repositorio con `googleClientId` vacío.
-- **Nunca se lee de la hoja.** El puerto `SyncGateway` solo tiene `send()`. Si algún día la hoja
-  fuera también entrada, habría que resolver conflictos, merge y deduplicación entre dos fuentes que
-  escriben a la vez — un capítulo aparte, no una ampliación.
-- **Guardar nunca depende de la red.** El caso de uso escribe en IndexedDB y encola; la
-  sincronización va por su cuenta y su fallo no bloquea nada.
+  del repositorio con `googleClientId` vacío, y sin cuenta conectada nada de esto se ejecuta.
+- **La hoja manda, pero solo cuando hay hoja.** Sin cuenta conectada, IndexedDB es lo único que hay y la
+  app se comporta igual que antes.
+- **Guardar nunca depende de la red.** El caso de uso escribe en IndexedDB y vuelve; la sincronización va
+  por su cuenta y su fallo no bloquea nada ni pierde nada.
 
 ---
 

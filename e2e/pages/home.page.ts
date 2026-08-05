@@ -28,6 +28,9 @@ export class HomePage {
    */
   readonly coach = this.root.locator('p[role="status"]:not([aria-live])');
 
+  /** Acceso a `/cuenta` desde el HUD. En móvil solo se ve el icono; el nombre lo da `aria-label`. */
+  readonly accountLink = this.root.getByRole('link', { name: 'Cuenta', exact: true });
+
   /** Dock de estaciones: la ruta accesible. */
   readonly dock = this.root.locator('nav[aria-label="Estaciones de la cocina"]');
   readonly stations = this.dock.getByRole('button');

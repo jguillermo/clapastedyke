@@ -3,9 +3,11 @@ import { Logger } from '@core/_common/logger/logger';
 import { SyncGateway } from '../domain/services/sync.gateway';
 import {
   CredentialRequest,
+  MarkDeletedRequest,
   MigrateRequest,
   ProbeOutcome,
   ProbeRequest,
+  PurgeRequest,
   SyncError,
   SyncOutcome,
   SyncRequest,
@@ -14,6 +16,7 @@ import {
 import { SyncTarget } from '../domain/value-objects/sync-target';
 import { googleFetch } from './google-api';
 import { schemaMigrationFor } from './schema-migration';
+import { FLAG_TRUE } from './sheet-canonical';
 import { mergeByKey, replaceByParent, toRow } from './sheet-merge';
 import {
   ALL_TABS,
@@ -364,6 +367,89 @@ export class GoogleSheetsGateway extends SyncGateway {
     );
   }
 
+  /**
+   * Escribe la marca de borrado y la versión **en las celdas de esas dos columnas**, sin tocar el resto
+   * de la fila. Dos rangos por fila, todos en una sola petición.
+   */
+  async markDeleted({ credential, target, rows }: MarkDeletedRequest): Promise<void> {
+    if (rows.length === 0) {
+      return;
+    }
+
+    const data: ValueRange[] = [];
+    for (const row of rows) {
+      const table = SHEET_TABLES.find((candidate) => candidate.name === row.table);
+      if (!table) {
+        continue;
+      }
+      const version = table.fields.indexOf('version');
+      const deleted = table.fields.indexOf('borrado');
+      if (version < 0 || deleted < 0) {
+        // Un destino que aún no tiene las columnas de servicio: `migrate()` las pone antes de llegar
+        // aquí, así que esto solo pasaría con un esquema a medias. Mejor no escribir que escribir mal.
+        continue;
+      }
+      data.push(
+        { range: cellRange(table.title, version, row.index), values: [[row.version]] },
+        { range: cellRange(table.title, deleted, row.index), values: [[FLAG_TRUE]] },
+      );
+    }
+
+    this.log.debug('marcando filas como borradas en la hoja', { filas: rows.length });
+    await this.write(credential, target, data);
+  }
+
+  /**
+   * Quita filas de la hoja con `deleteDimension`, **de abajo arriba**.
+   *
+   * El orden es obligatorio, no una optimización: borrar una fila desplaza hacia arriba todas las de
+   * debajo, así que hacerlo de arriba abajo dejaría todos los índices siguientes apuntando una fila más
+   * abajo de lo que toca — y se borrarían filas ajenas.
+   */
+  async purge({ credential, target, rows }: PurgeRequest): Promise<void> {
+    if (rows.length === 0) {
+      return;
+    }
+
+    const metadata = await googleFetch<SpreadsheetMetadata>(
+      credential,
+      'GET',
+      `${sheet(target)}?fields=sheets(properties(sheetId,title))`,
+    );
+    const sheetIdOf = new Map(
+      (metadata.sheets ?? []).map((entry) => [entry.properties.title, entry.properties.sheetId]),
+    );
+
+    const requests = [...rows]
+      .sort((a, b) => b.index - a.index)
+      .flatMap((row) => {
+        const title = SHEET_TABLES.find((candidate) => candidate.name === row.table)?.title;
+        const sheetId = title === undefined ? undefined : sheetIdOf.get(title);
+        if (sheetId === undefined) {
+          return [];
+        }
+        return [
+          {
+            deleteDimension: {
+              range: {
+                sheetId,
+                dimension: 'ROWS',
+                // La API cuenta desde 0 y las filas de la hoja desde 1.
+                startIndex: row.index - 1,
+                endIndex: row.index,
+              },
+            },
+          },
+        ];
+      });
+
+    if (requests.length === 0) {
+      return;
+    }
+    this.log.debug('tirando lápidas viejas de la hoja', { filas: requests.length });
+    await googleFetch(credential, 'POST', `${sheet(target)}:batchUpdate`, { requests });
+  }
+
   private write(
     credential: string,
     target: SyncTarget,
@@ -377,6 +463,11 @@ export class GoogleSheetsGateway extends SyncGateway {
       data,
     }).then(() => undefined);
   }
+}
+
+/** `'Insumos'!J7` — una celda sola, por su columna (desde 0) y su fila (desde 1). */
+function cellRange(title: string, column: number, row: number): string {
+  return rangeOf(title, `${columnLetter(column + 1)}${row}`);
 }
 
 function sheet(target: SyncTarget): string {

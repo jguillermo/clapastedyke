@@ -177,6 +177,11 @@ const SUPPLY_REFS = {
 
 /** Insumo de referencia: nombre y precio salen del seed; el empaque es lo que pinta la vista. */
 export interface SeededSupply {
+  /**
+   * Su id. La UI no lo muestra nunca, pero **la hoja de cálculo sí**: es su columna `id`, y por ella
+   * localizan la fila los E2E de sincronización. Sale del seed, así que no puede envejecer.
+   */
+  readonly id: string;
   readonly name: string;
   readonly packaging: string;
   readonly unit: string;
@@ -208,7 +213,13 @@ export const SUPPLIES: Record<keyof typeof SUPPLY_REFS, SeededSupply> = Object.f
     );
     return [
       key,
-      { name: supply!.name, packaging: ref.packaging, unit: ref.unit, price: String(amount) },
+      {
+        id: ref.id,
+        name: supply!.name,
+        packaging: ref.packaging,
+        unit: ref.unit,
+        price: String(amount),
+      },
     ];
   }),
 ) as Record<keyof typeof SUPPLY_REFS, SeededSupply>;

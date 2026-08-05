@@ -2,8 +2,9 @@ import { inject, Injectable } from '@angular/core';
 import { EventBus } from '@core/_common/eventbus/event-bus';
 import { IntegrationEventName } from '@core/_common/events/integration-events';
 import { Logger } from '@core/_common/logger/logger';
-import { Synchronize } from '../application/use-cases/synchronize.use-case';
+import { SyncShadow } from '../domain/services/sync-shadow';
 import { SyncOutbox } from '../domain/services/sync-outbox';
+import { SyncScheduler } from './sync-scheduler';
 import { SyncStatus } from '../domain/services/sync-status';
 
 /** Identidad de este suscriptor ante el bus. Ver {@link EventBus.subscribe}. */
@@ -40,8 +41,9 @@ const SUBSCRIBER = 'external-sync:auth-changed';
 export class AuthChangedSubscriber {
   private readonly bus = inject(EventBus);
   private readonly outbox = inject(SyncOutbox);
+  private readonly shadow = inject(SyncShadow);
   private readonly status = inject(SyncStatus);
-  private readonly sync = inject(Synchronize);
+  private readonly scheduler = inject(SyncScheduler);
   private readonly log = inject(Logger).scoped('external-sync/on-auth-changed');
 
   /** Desde cuándo escucha. Todo lo anterior pertenece a una sesión que ya no existe. */
@@ -55,14 +57,17 @@ export class AuthChangedSubscriber {
         this.log.debug('evento de una sesión anterior, se ignora', { event: event.name });
         return;
       }
-      this.log.debug('cuenta conectada: se vacía la cola y se sincroniza todo');
-      // Se espera al vaciado —no a la red— para que la cola de la cuenta anterior esté fuera del
-      // disco ANTES de marcar conectado: si no, el envío completo podría arrastrarla.
+      this.log.debug('cuenta conectada: se olvida lo de la cuenta anterior y se sincroniza');
+      // Se espera al vaciado —no a la red— para que lo de la cuenta anterior esté fuera del disco
+      // ANTES de marcar conectado: si no, el primer ciclo podría arrastrarlo.
+      //
+      // **La base se vacía igual que la cola, y es imprescindible.** La base dice «esto es lo que había
+      // en la hoja»; si sobreviviera de otra cuenta, las filas de la hoja nueva se compararían contra
+      // una base que no es la suya y parecerían cambios remotos que no existen.
       await this.outbox.clear();
+      await this.shadow.clear();
       this.status.markConnected();
-      this.sync
-        .execute({ scope: 'all' })
-        .catch((error: unknown) => this.log.error('Sincronización inicial fallida', error));
+      this.scheduler.syncNow('cuenta conectada');
     });
 
     // Volver no es entrar. La cuenta es la misma, así que lo que quedó en la cola antes de recargar
@@ -73,11 +78,9 @@ export class AuthChangedSubscriber {
         this.log.debug('evento de una sesión anterior, se ignora', { event: event.name });
         return;
       }
-      this.log.debug('sesión reanudada: se conserva la cola y se sincroniza lo pendiente');
+      this.log.debug('sesión reanudada: se conserva lo pendiente y se sincroniza');
       this.status.markConnected();
-      this.sync
-        .execute({ scope: 'pending' })
-        .catch((error: unknown) => this.log.error('Sincronización tras reanudar fallida', error));
+      this.scheduler.syncNow('sesión reanudada');
     });
 
     for (const eventName of [
@@ -89,9 +92,11 @@ export class AuthChangedSubscriber {
           this.log.debug('evento de una sesión anterior, se ignora', { event: event.name });
           return;
         }
+        // Al salir se olvidan las dos cosas por cuenta: lo pendiente y la base de comparación.
         await this.outbox.clear();
+        await this.shadow.clear();
         this.status.markDisconnected();
-        this.log.debug('cuenta desconectada: cola vaciada', { event: event.name });
+        this.log.debug('cuenta desconectada: cola y base vaciadas', { event: event.name });
       });
     }
   }

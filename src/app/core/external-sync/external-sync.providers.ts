@@ -5,6 +5,7 @@ import {
   provideAppInitializer,
 } from '@angular/core';
 import { provideEventHandlers } from '@core/_common/eventbus/event-bus.providers';
+import { BootSync } from './application/use-cases/boot-sync.use-case';
 import { NotifyRecipeSaved } from './application/use-cases/notify-recipe-saved.use-case';
 import { NotifySupplySaved } from './application/use-cases/notify-supply-saved.use-case';
 import { SyncTargetRepository } from './domain/repositories/sync-target.repository';
@@ -73,6 +74,10 @@ export function provideExternalSync(): EnvironmentProviders {
     // El planificador decide CUÁNDO se sincroniza. Se arranca aquí y no se espera: pide su turno entre
     // pestañas y programa sus disparadores, pero el arranque de la app no depende de la red.
     provideAppInitializer(() => inject(SyncScheduler).start()),
+    // La puerta de arranque SÍ se espera: es lo que hace que, con conexión, se trabaje sobre lo que hay
+    // en la hoja y no sobre lo de la última vez. Trae su propio plazo, así que no puede colgar el
+    // arranque, y nunca lanza. Ver `BootSync`.
+    provideAppInitializer(() => inject(BootSync).execute()),
     // Los casos de uso que reaccionan a un evento: aquí solo se registra la suscripción que cada uno
     // declaró con `@OnEvent`. Ninguno se construye hasta que llega su evento.
     provideEventHandlers(...EVENT_DRIVEN_USE_CASES),

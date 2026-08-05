@@ -390,6 +390,82 @@ describe('reconcile · lo que hace una persona en la hoja', () => {
     ]);
   });
 
+  it('una fila que se borró AQUÍ se marca en la hoja, no se quita', async () => {
+    // Quitarla haría que el primer dispositivo desconectado la resubiera y lo borrado reapareciera.
+    const fila = insumo('ing-1');
+    const huella = await fingerprintFor(INSUMOS, fila);
+
+    const plan = await run({
+      snapshot: snapshotOf(remoteTable(INSUMOS, [cellsOf(INSUMOS, fila, { huella })])),
+      local: localOf({}),
+      shadow: shadowOf([{ table: 'supplies', rowId: 'ing-1', fingerprint: huella }]),
+    });
+
+    expect(plan.tombstones).toEqual([
+      { table: 'supplies', rowId: 'ing-1', index: 2, version: expect.any(String) },
+    ]);
+    expect(plan.apply).toEqual([]);
+  });
+
+  it('una fila en cuarentena NO se borra de la hoja por no estar aquí', async () => {
+    // No está porque no se pudo leer, no porque nadie la quisiera. Borrarla destruiría el dato que su
+    // dueño está intentando arreglar.
+    const fila = insumo('ing-1');
+    const huella = await fingerprintFor(INSUMOS, fila);
+
+    const plan = await run({
+      snapshot: snapshotOf(remoteTable(INSUMOS, [cellsOf(INSUMOS, fila, { huella })])),
+      local: localOf({}),
+      shadow: shadowOf([
+        { table: 'supplies', rowId: 'ing-1', fingerprint: huella, rejected: 'no se pudo leer' },
+      ]),
+    });
+
+    expect(plan.tombstones).toEqual([]);
+  });
+
+  it('las lápidas viejas se tiran; las recientes se quedan', async () => {
+    const vieja = insumo('ing-vieja');
+    const reciente = insumo('ing-reciente');
+    const haceCienDias = AHORA - 100 * 24 * 60 * 60 * 1000;
+
+    const plan = await run({
+      snapshot: snapshotOf(
+        remoteTable(INSUMOS, [
+          cellsOf(INSUMOS, vieja, {
+            huella: await fingerprintFor(INSUMOS, vieja),
+            borrado: 'TRUE',
+            version: RowVersion.of(haceCienDias, 0, 'otro').toString(),
+          }),
+          cellsOf(INSUMOS, reciente, {
+            huella: await fingerprintFor(INSUMOS, reciente),
+            borrado: 'TRUE',
+            version: RowVersion.of(AHORA - 1000, 0, 'otro').toString(),
+          }),
+        ]),
+      ),
+    });
+
+    expect(plan.purge).toEqual([{ table: 'supplies', rowId: 'ing-vieja', index: 2 }]);
+  });
+
+  it('una lápida sin versión legible NO se tira: no se sabe de cuándo es', async () => {
+    const fila = insumo('ing-1');
+
+    const plan = await run({
+      snapshot: snapshotOf(
+        remoteTable(INSUMOS, [
+          cellsOf(INSUMOS, fila, {
+            huella: await fingerprintFor(INSUMOS, fila),
+            borrado: 'TRUE',
+          }),
+        ]),
+      ),
+    });
+
+    expect(plan.purge).toEqual([]);
+  });
+
   it('una fila con la lápida puesta se borra aquí', async () => {
     const fila = insumo('ing-1');
     const huella = await fingerprintFor(INSUMOS, fila);

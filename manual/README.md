@@ -10,6 +10,7 @@ marcha. Aquí no hay nada de producto ni de negocio — eso vive en [`.claude/do
 |---|---|
 | [`google-setup.md`](google-setup.md) | **El cómo.** Lo que hay que montar una vez para que la integración con Google Sheets funcione: proyecto de Cloud, pantalla de consentimiento, Client ID y la única clave de `config.json`. Incluye la lista de comprobación y el diagnóstico de fallos. La hoja de cada usuario la crea la app sola. |
 | [`google-integration.md`](google-integration.md) | **El porqué.** Modelo mental de la integración con Google, las restricciones de la plataforma que la fuerzan (sin refresh token en un navegador, el alcance real de `drive.file`), las arquitecturas descartadas y los datos medidos que respaldan cada decisión. |
+| [`sync-architecture.md`](sync-architecture.md) | **Cómo se mantienen iguales la app y la hoja.** Las tres copias y por qué no bastan dos, el reloj lógico y su tope, qué pasa cuando alguien edita la hoja a mano, las barreras que impiden que un clic derecho borre el catálogo, cuándo se sincroniza, los límites aceptados y qué mirar en la consola cuando algo no cuadra. |
 
 ## Documentación que NO está aquí, y por qué
 

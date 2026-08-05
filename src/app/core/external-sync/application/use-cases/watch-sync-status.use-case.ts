@@ -17,6 +17,7 @@ export interface SyncStatusView {
 
 const LABELS: Readonly<Record<SyncPhase, string>> = {
   disconnected: 'Sin conectar',
+  reconnect: 'Reconectar',
   idle: 'Al día',
   syncing: 'Sincronizando…',
   error: 'Error',

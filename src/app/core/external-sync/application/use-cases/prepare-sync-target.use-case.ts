@@ -5,6 +5,7 @@ import { UseCase } from '@core/_common/use-case';
 import { SyncTargetRepository } from '../../domain/repositories/sync-target.repository';
 import { SyncGateway } from '../../domain/services/sync.gateway';
 import { SyncError } from '../../domain/services/sync.gateway.types';
+import { SyncShadow } from '../../domain/services/sync-shadow';
 
 export interface PrepareSyncTargetResult {
   /** Dirección donde el usuario puede abrir su copia. */
@@ -36,6 +37,7 @@ export class PrepareSyncTarget extends UseCase<void, PrepareSyncTargetResult> {
   private readonly credentials = inject(CredentialsProvider);
   private readonly targets = inject(SyncTargetRepository);
   private readonly gateway = inject(SyncGateway);
+  private readonly shadow = inject(SyncShadow);
   private readonly log = inject(Logger).scoped('external-sync/prepare-sync-target');
 
   async execute(): Promise<PrepareSyncTargetResult> {
@@ -59,7 +61,7 @@ export class PrepareSyncTarget extends UseCase<void, PrepareSyncTargetResult> {
       this.log.debug('la hoja recordada ya no existe, se olvidará y se creará otra', {
         targetId: remembered.id,
       });
-      await this.targets.remove(credentials.accountId);
+      await this.forget(credentials.accountId);
     }
 
     const target = await this.gateway.create({ credential: credentials.token });
@@ -80,8 +82,22 @@ export class PrepareSyncTarget extends UseCase<void, PrepareSyncTargetResult> {
     const credentials = await this.credentials.current();
     if (credentials) {
       this.log.debug('olvidando la hoja anterior para crear otra');
-      await this.targets.remove(credentials.accountId);
+      await this.forget(credentials.accountId);
     }
     return this.execute();
+  }
+
+  /**
+   * Olvida la hoja de una cuenta **y su base de comparación**. Las dos cosas, siempre.
+   *
+   * La base dice «esto es lo que había en la hoja», y **no apunta a cuál**. Si sobreviviera al
+   * reemplazo, la hoja nueva —que nace vacía— se compararía contra una base llena: cada fila parecería
+   * borrada a mano, el tope de borrado masivo abortaría el ciclo, y como el motivo no se arregla solo, lo
+   * abortaría **en todos los ciclos siguientes**. El usuario se quedaría con una hoja nueva vacía, un
+   * error permanente y sus recetas sin subir.
+   */
+  private async forget(accountId: string): Promise<void> {
+    await this.targets.remove(accountId);
+    await this.shadow.clear();
   }
 }

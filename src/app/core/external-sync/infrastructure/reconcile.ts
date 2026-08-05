@@ -73,6 +73,18 @@ const MASS_DELETE_RATIO = 0.3;
 const MASS_DELETE_FLOOR = 4;
 
 /**
+ * Cuánto se conserva una lápida en el destino antes de tirarla.
+ *
+ * Una lápida existe para que un dispositivo desconectado se entere del borrado al volver. Pasado un
+ * tiempo razonable, todos se han enterado y la fila solo estorba en la hoja que el usuario mira.
+ *
+ * **El precio de tirarlas está aceptado y documentado**: un dispositivo que llevara más de este plazo sin
+ * conectarse *y* que además hubiera perdido su base (datos del sitio borrados) resubiría cosas borradas
+ * hace mucho. Con la base intacta no puede pasar, porque el borrado ya está en ella.
+ */
+const TOMBSTONE_TTL_MS = 90 * 24 * 60 * 60 * 1000;
+
+/**
  * Separadores para juntar valores sin que se puedan confundir. Se construyen con `fromCharCode` y no
  * como carácter literal porque un carácter de control es invisible en el fuente, y algo que nadie ve es
  * algo que cualquiera borra sin enterarse. Ver `sheet-hash.ts`, que hace lo mismo y por lo mismo.
@@ -212,12 +224,34 @@ export interface Drift {
   readonly remote: string;
 }
 
+/**
+ * Una fila que se borró **aquí** y hay que marcar como borrada en el destino.
+ *
+ * Lleva el índice porque se marca sobre la fila que ya está: su contenido se conserva (el usuario la ve
+ * y tiene que poder saber qué se borró) y solo se le pone la marca y una versión nueva.
+ */
+export interface PlannedTombstone {
+  readonly table: string;
+  readonly rowId: string;
+  readonly index: number;
+  readonly version: string;
+}
+
+/** Una lápida tan vieja en el destino que ya no hace falta guardarla. Ver `TOMBSTONE_TTL_MS`. */
+export interface PlannedPurge {
+  readonly table: string;
+  readonly rowId: string;
+  readonly index: number;
+}
+
 export interface MergePlan {
   readonly aborted: AbortReason | null;
   readonly adopt: readonly PlannedAdopt[];
   readonly apply: readonly PlannedApply[];
   readonly remove: readonly PlannedRemove[];
   readonly push: readonly PlannedPush[];
+  readonly tombstones: readonly PlannedTombstone[];
+  readonly purge: readonly PlannedPurge[];
   readonly handAdds: readonly HandAdd[];
   readonly reids: readonly Reid[];
   readonly duplicates: readonly DuplicateIds[];
@@ -291,6 +325,8 @@ export async function reconcile(input: ReconcileInput): Promise<MergePlan> {
     apply: [],
     remove: [],
     push: [],
+    tombstones: [],
+    purge: [],
     handAdds: [],
     reids: [],
     duplicates: [],
@@ -360,6 +396,8 @@ export async function reconcile(input: ReconcileInput): Promise<MergePlan> {
     // La fila que recibió el id cambiado no se trae como si fuera nueva: lo que toca es devolverle el
     // suyo. Traerla dejaría dos filas para el mismo dato, una con cada id.
     const renamedTo = new Set(renamed.reids.map((reid) => reid.rowId));
+
+    plan.purge.push(...purgeableOf(table.name, remote.rows, input.now));
 
     const removals: PlannedRemove[] = [];
     for (const rowId of union(remoteById, localById, base)) {
@@ -459,6 +497,21 @@ function massDeleteOf(
     return { kind: 'mass-delete', table, rows: byHand, base };
   }
   return null;
+}
+
+/**
+ * Las lápidas que ya se pueden tirar del destino.
+ *
+ * Solo se miran las que llevan **versión legible**: sin versión no se sabe de cuándo son, y tirar algo
+ * cuya antigüedad no se conoce es tirar a ciegas. Una lápida sin versión se queda, que es lo prudente y
+ * lo barato (una fila más en la hoja).
+ */
+function purgeableOf(table: string, rows: readonly ParsedRemote[], now: number): PlannedPurge[] {
+  return rows
+    .filter(
+      (row) => row.deleted && row.version !== null && now - row.version.millis > TOMBSTONE_TTL_MS,
+    )
+    .map((row) => ({ table, rowId: row.rowId, index: row.index }));
 }
 
 function duplicatesOf(table: string, rows: readonly ParsedRemote[]): DuplicateIds[] {
@@ -767,6 +820,26 @@ function decide(decision: Decision): void {
       rowId,
       version: clock.next(input.now).toString(),
       byHand: true,
+    });
+    return;
+  }
+
+  /**
+   * Está en el destino y en la base, pero **ya no está aquí**: se borró en este dispositivo.
+   *
+   * Antes esto no se podía saber y se dejaba pasar. Ahora sí: el modelo local borra con lápida, así que
+   * lo que el origen no entrega es lo que de verdad se borró. Se marca en el destino en vez de quitar la
+   * fila, porque una fila que desaparece la resube el primer dispositivo que estuviera desconectado.
+   *
+   * Una fila en **cuarentena** no cuenta: no está aquí porque no se pudo leer, no porque nadie la
+   * quisiera. Borrarla del destino por eso destruiría el dato que su dueño está intentando arreglar.
+   */
+  if (!local && base && !remote.deleted && base.rejected === undefined) {
+    plan.tombstones.push({
+      table: table.name,
+      rowId,
+      index: remote.index,
+      version: clock.next(input.now).toString(),
     });
     return;
   }

@@ -24,6 +24,22 @@ export interface MigrateRequest extends TargetRequest {
   readonly snapshot: RemoteSnapshot;
 }
 
+/** Una fila del destino señalada por su tabla y su posición. */
+export interface RemoteRowRef {
+  readonly table: string;
+  readonly index: number;
+}
+
+/** Marcar filas como borradas, sin quitarlas. */
+export interface MarkDeletedRequest extends TargetRequest {
+  readonly rows: readonly (RemoteRowRef & { readonly version: string })[];
+}
+
+/** Quitar filas del destino. Solo para lápidas viejas. */
+export interface PurgeRequest extends TargetRequest {
+  readonly rows: readonly RemoteRowRef[];
+}
+
 export interface SyncRequest extends TargetRequest {
   batch: SyncBatch;
 }

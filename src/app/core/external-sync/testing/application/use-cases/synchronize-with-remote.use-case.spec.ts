@@ -88,6 +88,28 @@ describe('SynchronizeWithRemote', () => {
       expect(gateway.sent).toEqual([]);
     });
 
+    it('si la hoja se reemplaza mientras se lee, no se escribe en la abandonada y se repite contra la nueva', async () => {
+      /*
+       * La carrera es real y su desenlace era grave: al conectar la cuenta se dispara un ciclo y, en
+       * paralelo, la pantalla descubre que la hoja estaba en la papelera y crea otra. Sin esta guarda, el
+       * ciclo escribía en la hoja abandonada y dejaba la base describiendo filas que la hoja nueva no
+       * tiene — con lo que el tope de borrado masivo abortaba todos los ciclos siguientes y la hoja nueva
+       * se quedaba vacía para siempre.
+       */
+      source.rows = { ...source.rows, supplies: [insumo('ing-harina')] };
+      vi.spyOn(reader, 'read').mockImplementationOnce(async () => {
+        await targets.save('cuenta-1', SyncTarget.of('hoja-2', 'https://example.test/hoja-2'));
+        return remote();
+      });
+
+      const result = await cycle.execute();
+
+      // Quien pidió el ciclo recibe uno de verdad, ya contra la hoja nueva.
+      expect(result.synced).toBe(true);
+      expect(gateway.migrated.map((request) => request.target.id)).toEqual(['hoja-2']);
+      expect(gateway.sent.map((request) => request.target.id)).toEqual(['hoja-2']);
+    });
+
     it('sin destino no lee ni escribe nada', async () => {
       await targets.remove('cuenta-1');
 

@@ -1,9 +1,11 @@
 import { SyncTarget } from '../value-objects/sync-target';
 import {
   CredentialRequest,
+  MarkDeletedRequest,
   MigrateRequest,
   ProbeOutcome,
   ProbeRequest,
+  PurgeRequest,
   SyncOutcome,
   SyncRequest,
   TargetRequest,
@@ -47,6 +49,23 @@ export abstract class SyncGateway {
    * hace nada y no cuesta ninguna llamada.
    */
   abstract migrate(request: MigrateRequest): Promise<void>;
+
+  /**
+   * Marca en el destino las filas que se borraron aquí, **conservando su contenido**.
+   *
+   * No se quita la fila: una fila que desaparece la vuelve a subir el primer dispositivo que estuviera
+   * desconectado, y lo borrado reaparecería. Y se conserva lo que decía porque el usuario la ve: una fila
+   * marcada como borrada y además vacía no le diría qué fue lo que se borró.
+   */
+  abstract markDeleted(request: MarkDeletedRequest): Promise<void>;
+
+  /**
+   * Tira del destino las filas que se le indiquen, por su posición.
+   *
+   * Es lo único de todo el puerto que **quita** algo, y existe solo para las lápidas viejas: pasado un
+   * tiempo todos los dispositivos se enteraron del borrado y la fila solo estorba en la hoja.
+   */
+  abstract purge(request: PurgeRequest): Promise<void>;
 
   /**
    * Escribe el dato de prueba en el destino y **lo vuelve a leer de allí**, devolviendo lo leído.

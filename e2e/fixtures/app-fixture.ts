@@ -1,5 +1,8 @@
 import { test as base, expect } from '@playwright/test';
 import { DISABLE_WEBGL_SCRIPT } from '../support/webgl';
+import { GoogleDouble } from '../support/google-double';
+import { AccountPage } from '../pages/account.page';
+import { SyncBadgePage } from '../pages/sync-badge.page';
 import { HomePage } from '../pages/home.page';
 import { RecipeBook3dPage } from '../pages/recipe-book-3d.page';
 import { RecipeBookFallbackPage } from '../pages/recipe-book-fallback.page';
@@ -39,6 +42,21 @@ export interface AppFixtures {
   priceCapture: PriceCapturePage;
   supplies: SuppliesDialogPage;
   supplyList: SupplyListPage;
+  account: AccountPage;
+  /** El aviso de sincronización que el armazón monta sobre cualquier vista. */
+  syncBadge: SyncBadgePage;
+
+  /**
+   * El doble de Google (Identity Services + Sheets + Drive) enganchado a la página.
+   *
+   * **Solo lo tienen los tests que lo piden**: el resto de la suite carga el `config.json` de verdad,
+   * que trae el `googleClientId` vacío, así que la integración está apagada y no se toca nada de red.
+   *
+   * Pedirlo instala las rutas **antes de cualquier navegación** (Playwright resuelve los fixtures del
+   * test antes del cuerpo), y su estado es la hoja del usuario: se lee y se edita desde el test como lo
+   * haría una persona. Ver `support/google-double.ts`.
+   */
+  google: GoogleDouble;
 
   /** Abre `/home` y espera a que el dock esté operable. */
   openHome: () => Promise<HomePage>;
@@ -48,6 +66,12 @@ export interface AppFixtures {
   openBook3d: () => Promise<RecipeBook3dPage>;
   /** Abre `/home` → libro (ruta DOM) → botón `Insumos` → diálogo de insumos listo. */
   openSuppliesDialog: () => Promise<SuppliesDialogPage>;
+
+  /**
+   * Abre `/cuenta`, conecta la cuenta contra el doble y espera a que la hoja esté creada y el
+   * recetario subido. A partir de ahí `google.sheet` es la hoja del usuario.
+   */
+  connectAccount: () => Promise<AccountPage>;
 }
 
 export const test = base.extend<AppOptions & AppFixtures>({
@@ -105,6 +129,17 @@ export const test = base.extend<AppOptions & AppFixtures>({
   priceCapture: async ({ page }, use) => use(new PriceCapturePage(page)),
   supplies: async ({ page }, use) => use(new SuppliesDialogPage(page)),
   supplyList: async ({ page }, use) => use(new SupplyListPage(page)),
+  account: async ({ page }, use) => use(new AccountPage(page)),
+  syncBadge: async ({ page }, use) => use(new SyncBadgePage(page)),
+
+  google: async ({ page }, use) => {
+    const google = new GoogleDouble();
+    await google.install(page);
+    await use(google);
+    // Que no quede una petición retenida cuando el test acaba: la página se está cerrando y una
+    // promesa colgada aquí retrasaría el cierre del contexto.
+    google.resume();
+  },
 
   openHome: async ({ home }, use) => {
     await use(async () => {
@@ -139,6 +174,18 @@ export const test = base.extend<AppOptions & AppFixtures>({
       await catalog.suppliesButton.click();
       await supplies.waitReady();
       return supplies;
+    });
+  },
+
+  // Depende de `google`, así que pedirlo garantiza que el doble esté enganchado antes de navegar.
+  connectAccount: async ({ google, account }, use) => {
+    await use(async () => {
+      await account.goto();
+      await account.connectAndWait();
+      // La hoja tiene que existir a partir de aquí. Se comprueba en el atajo para que un fallo del
+      // doble se lea como «no se creó la hoja» y no como un `expect` raro a mitad del journey.
+      expect(google.sheet.titles.length, 'conectar debe haber creado la hoja').toBeGreaterThan(0);
+      return account;
     });
   },
 });

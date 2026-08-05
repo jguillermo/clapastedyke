@@ -5,7 +5,15 @@ import { SyncTarget } from '../value-objects/sync-target';
  * Estados posibles de la sincronización. `disconnected` no es un error: es el estado normal de la
  * app mientras el usuario no ha conectado ninguna cuenta.
  */
-export type SyncPhase = 'disconnected' | 'idle' | 'syncing' | 'error';
+/**
+ * `disconnected` no es un error: es el estado normal mientras el usuario no ha conectado ninguna cuenta.
+ *
+ * `reconnect` **sí** pide algo: había sesión y ya no la hay. Es distinto de `disconnected` porque lo que
+ * el usuario tiene que hacer es distinto —volver a entrar, no «conectar por primera vez»— y distinto de
+ * `error` porque no se ha roto nada: el token de Google dura una hora y en un navegador no hay forma de
+ * renovarlo indefinidamente. Confundirlo con un error haría pensar que se perdió algo.
+ */
+export type SyncPhase = 'disconnected' | 'reconnect' | 'idle' | 'syncing' | 'error';
 
 export interface SyncStatusSnapshot {
   phase: SyncPhase;
@@ -51,6 +59,14 @@ export abstract class SyncStatus {
 
   /** No hay sesión: se olvidan el destino, la fecha y el error. */
   abstract markDisconnected(): void;
+
+  /**
+   * Había sesión y ya no la hay: hay que volver a entrar.
+   *
+   * **Conserva el destino y la fecha**, al contrario que `markDisconnected()`: la hoja sigue siendo la
+   * de esa persona y su enlace le sigue sirviendo. Borrarlos daría a entender que se perdió algo.
+   */
+  abstract markNeedsReconnect(): void;
 
   abstract markSyncing(): void;
 

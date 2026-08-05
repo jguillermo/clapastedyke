@@ -43,6 +43,10 @@ export class InMemorySyncStatus extends SyncStatus {
     this.state.set(DISCONNECTED);
   }
 
+  markNeedsReconnect(): void {
+    this.state.update((current) => ({ ...current, phase: 'reconnect', lastError: null }));
+  }
+
   markSyncing(): void {
     this.state.update((current) => ({ ...current, phase: 'syncing', lastError: null }));
   }
