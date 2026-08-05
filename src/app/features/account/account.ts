@@ -20,7 +20,7 @@ import {
   ReconcileWithRemote,
   ReconcileWithRemoteResult,
 } from '@core/external-sync/application/use-cases/reconcile-with-remote.use-case';
-import { Synchronize } from '@core/external-sync/application/use-cases/synchronize.use-case';
+import { SynchronizeWithRemote } from '@core/external-sync/application/use-cases/synchronize-with-remote.use-case';
 import { VerifySyncConnection } from '@core/external-sync/application/use-cases/verify-sync-connection.use-case';
 import { WatchSyncStatus } from '@core/external-sync/application/use-cases/watch-sync-status.use-case';
 
@@ -55,7 +55,7 @@ interface StepRemedy {
   deployerHint?: string;
   /**
    * Ofrece «Reinstalar desde cero». Solo en los pasos donde reintentar no puede bastar: lo que hay
-   * guardado apunta a una hoja o a un sincronizador que ya no sirven.
+   * guardado apunta a una hoja que ya no sirve.
    */
   offerReinstall?: boolean;
 }
@@ -92,14 +92,18 @@ interface ConnectFailure {
  *
  * ## Conectar lo hace todo, y se cuenta paso a paso
  *
- * Al pulsar «Conectar con Google» la app crea la hoja en el Drive del usuario **e instala allí su
- * propio sincronizador**, con su secreto. Son unos segundos y cinco llamadas a Google, así que se
- * cuenta por pasos en vez de dejar un spinner mudo.
+ * Al pulsar «Conectar con Google» la app crea la hoja en el Drive del usuario y la pone al día. Son
+ * unos segundos y varias llamadas a Google, así que se cuenta por pasos en vez de dejar un spinner
+ * mudo.
  *
  * «Conectado» tampoco significa «funciona»: entre identificarse y «mis recetas se guardan» está el
- * permiso que no se concedió y el sincronizador que contesta pero no escribe. Por eso el penúltimo
- * paso es **mandar un dato de prueba y volver a leerlo de la hoja**: hasta que ese vuelve igual, la
+ * permiso que no se concedió y la hoja que se puede crear pero no escribir. Por eso el penúltimo paso
+ * es **mandar un dato de prueba y volver a leerlo de la hoja**: hasta que ese vuelve igual, la
  * conexión no está lista.
+ *
+ * El último paso es el **ciclo completo**, no una subida: baja lo que haya en la hoja, lo fusiona con
+ * lo de aquí y sube lo que toque. Es el mismo que la app corre sola cada dos minutos — el botón solo
+ * lo adelanta.
  *
  * La feature solo orquesta casos de uso y traduce cada uno a un paso de la lista; ninguna de las
  * operaciones sabe que hay una lista.
@@ -144,7 +148,7 @@ export class Account {
   private readonly signOut = inject(SignOut);
   private readonly prepareTarget = inject(PrepareSyncTarget);
   private readonly verifyConnection = inject(VerifySyncConnection);
-  private readonly sync = inject(Synchronize);
+  private readonly sync = inject(SynchronizeWithRemote);
   private readonly reconcile = inject(ReconcileWithRemote);
   private readonly log = inject(Logger).scoped('ui/account');
 
@@ -202,7 +206,7 @@ export class Account {
       doing: 'Esperando a que elijas cuenta y aceptes los permisos…',
       run: () => this.authenticate(),
       remedy: {
-        what: 'Le pido a Google que te identifique y me dé permiso para crear tu hoja y dejar en tu cuenta el pequeño programa que la mantiene al día. El permiso sobre tu Drive es el más estrecho que existe: solo alcanza los archivos que crea esta app.',
+        what: 'Le pido a Google que te identifique y me dé permiso para crear tu hoja y escribirla. El permiso sobre tu Drive es el más estrecho que existe: solo alcanza los archivos que crea esta app.',
         userActions: [
           {
             text: 'Si no llegaste a ver la ventana de Google, la bloqueó el navegador: permite las ventanas emergentes de este sitio y vuelve a intentarlo.',
@@ -237,7 +241,7 @@ export class Account {
         what: 'Escribo un dato de usar y tirar en tu hoja y lo leo de vuelta. Es lo único que demuestra que todo funciona antes de mandar nada tuyo.',
         userActions: [
           {
-            text: 'Si borraste la hoja o su sincronizador, reinstálalos: se crean otra vez desde cero y no pierdes nada.',
+            text: 'Si borraste la hoja, créala otra vez: se hace desde cero y no pierdes nada de este dispositivo.',
           },
         ],
         offerReinstall: true,
@@ -245,10 +249,10 @@ export class Account {
     },
     {
       label: 'Sincronizando tu recetario',
-      doing: 'Mandando tus recetas e insumos a la hoja…',
+      doing: 'Comparando tu hoja con este dispositivo y poniendo los dos al día…',
       run: () => this.pushEverything(),
       remedy: {
-        what: 'Mando todas tus recetas e insumos a la hoja de una vez. Repetirlo no duplica nada.',
+        what: 'Leo tu hoja, la comparo con lo que hay en este dispositivo y pongo los dos al día: lo que falte aquí baja, y lo que falte allí sube. Repetirlo no duplica nada.',
         userActions: [
           { text: 'Comprueba tu conexión y pulsa Reintentar.' },
           {
@@ -326,12 +330,21 @@ export class Account {
     await this.run('desconectar cuenta', () => this.signOut.execute());
   }
 
-  /** Empuja el recetario completo. Idempotente: repetirlo no duplica nada en la hoja. */
+  /**
+   * Sincroniza en las dos direcciones: baja lo de la hoja, lo fusiona y sube lo que toque.
+   *
+   * Idempotente: repetirlo no duplica nada ni deshace nada. Y no hace falta pulsarlo — la app ya
+   * sincroniza sola; esto es para cuando alguien quiere que pase **ahora**.
+   */
   protected async syncAll(): Promise<void> {
     this.running.set('sync');
     try {
-      await this.run('sincronizar todo', async () => {
-        await this.sync.execute({ scope: 'all' });
+      await this.run('sincronizar', async () => {
+        const result = await this.sync.execute();
+        if (!result.synced && result.reason !== 'disconnected') {
+          // El ciclo no lanza: informa del desenlace y deja el motivo en el estado.
+          throw new Error(this.status().lastError ?? 'No se ha podido sincronizar con tu hoja.');
+        }
       });
     } finally {
       this.running.set(null);
@@ -379,12 +392,12 @@ export class Account {
   }
 
   private async pushEverything(): Promise<string> {
-    const result = await this.sync.execute({ scope: 'all' });
+    const result = await this.sync.execute();
     if (!result.synced) {
-      // `Synchronize` no lanza: informa del desenlace y deja el motivo en el estado.
-      throw new Error(this.status().lastError ?? 'No se ha podido subir el recetario.');
+      // El ciclo no lanza: informa del desenlace y deja el motivo en el estado.
+      throw new Error(this.status().lastError ?? 'No se ha podido sincronizar tu recetario.');
     }
-    return result.rows === 1 ? '1 fila enviada' : `${result.rows} filas enviadas`;
+    return movements(result.applied, result.pushed, result.removed, result.rejected);
   }
 
   // ── Apoyo ────────────────────────────────────────────────────────────────────────────────────
@@ -468,6 +481,24 @@ function summaryOf(result: ReconcileWithRemoteResult): string {
   const head = problems.length > 0 ? `Hay que revisar: ${problems.join(', ')}. ` : '';
   const body = moves.length > 0 ? moves.join(', ') : 'todo está al día';
   return `${head}${body}. El detalle está en la consola.`;
+}
+
+/**
+ * Lo que se movió en un ciclo, en una frase.
+ *
+ * Se cuentan las cuatro cosas porque ahora la sincronización va en las dos direcciones: decir solo «12
+ * filas enviadas» esconde que además bajaron ocho de otro dispositivo, que es justo lo que a alguien le
+ * interesa saber la primera vez que conecta un segundo aparato.
+ */
+function movements(applied: number, pushed: number, removed: number, rejected: number): string {
+  const parts = [
+    count(pushed, 'fila subida', 'filas subidas'),
+    count(applied, 'fila bajada', 'filas bajadas'),
+    count(removed, 'fila borrada', 'filas borradas'),
+    count(rejected, 'fila ilegible', 'filas ilegibles'),
+  ].filter((text) => text !== '');
+
+  return parts.length === 0 ? 'Ya estaba todo al día' : parts.join(', ');
 }
 
 /** `''` cuando no hay ninguno, para que el resumen no se llene de ceros. */

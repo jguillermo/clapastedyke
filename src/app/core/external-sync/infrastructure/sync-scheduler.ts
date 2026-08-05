@@ -2,6 +2,7 @@ import { inject, Injectable } from '@angular/core';
 import { Logger } from '@core/_common/logger/logger';
 import { SynchronizeWithRemote } from '../application/use-cases/synchronize-with-remote.use-case';
 import { SyncCoordinator } from '../domain/services/sync-coordinator';
+import { SyncStatus } from '../domain/services/sync-status';
 
 /** Lo que espera un cambio local antes de salir. Corto: el usuario acaba de guardar. */
 const AFTER_CHANGE_MS = 5_000;
@@ -66,6 +67,7 @@ const MAX_BACKOFF_MS = 5 * 60_000;
 export class SyncScheduler {
   private readonly cycle = inject(SynchronizeWithRemote);
   private readonly coordinator = inject(SyncCoordinator);
+  private readonly status = inject(SyncStatus);
   private readonly log = inject(Logger).scoped('external-sync/scheduler');
 
   private timer: ReturnType<typeof setTimeout> | null = null;
@@ -76,9 +78,6 @@ export class SyncScheduler {
   private lastRunAt = 0;
   private failures = 0;
   private started = false;
-
-  /** Qué hacer cuando los datos locales cambian (los aplica el ciclo, o los aplicó otra pestaña). */
-  private reload: (() => void) | null = null;
 
   /**
    * Arranca los disparadores. Idempotente: dos llamadas no ponen dos intervalos.
@@ -93,7 +92,8 @@ export class SyncScheduler {
     this.started = true;
 
     this.coordinator.claim();
-    this.coordinator.onAnnounced(() => this.reload?.());
+    // Otra pestaña ha sincronizado: los datos ya están en IndexedDB, así que aquí solo hay que releer.
+    this.coordinator.onAnnounced(() => this.status.markDataChanged());
 
     this.poll = setInterval(() => this.request('intervalo'), POLL_MS);
 
@@ -110,11 +110,6 @@ export class SyncScheduler {
     this.log.debug('planificador en marcha', { cada: POLL_MS, minimo: MIN_GAP_MS });
   }
 
-  /** Qué releer cuando hay datos nuevos, sea de este ciclo o del de otra pestaña. */
-  onDataChanged(reload: () => void): void {
-    this.reload = reload;
-  }
-
   /**
    * Un cambio local acaba de guardarse: se sube en cuanto pase el rebote.
    *
@@ -129,12 +124,14 @@ export class SyncScheduler {
     this.timer = setTimeout(() => void this.run('cambio local', true), AFTER_CHANGE_MS);
   }
 
-  /** Fuerza un ciclo ya, sin esperar el mínimo ambiental. Es lo que hace el botón de la pantalla. */
-  now(): Promise<void> {
-    return this.run('a mano', true);
-  }
-
-  /** Un disparador ambiental pide un ciclo. Puede que no toque todavía, y entonces no pasa nada. */
+  /**
+   * Un disparador ambiental pide un ciclo. Puede que no toque todavía, y entonces no pasa nada.
+   *
+   * **El botón de la pantalla no pasa por aquí**: una feature solo puede inyectar casos de uso, no esto,
+   * así que llama al ciclo directamente. La única consecuencia es que un disparo ambiental puede llegar
+   * justo después de un ciclo hecho a mano, porque el mínimo no se enteró. Es una petición de más cada
+   * vez que alguien pulsa el botón, y no compensa romper la regla de capas por eso.
+   */
   private request(trigger: string): void {
     void this.run(trigger, false);
   }
@@ -163,9 +160,10 @@ export class SyncScheduler {
 
       if (result.synced) {
         this.failures = 0;
-        // Los datos locales pueden haber cambiado: se relee aquí y se avisa a las demás pestañas.
+        // Los datos locales han cambiado: hay que releerlos aquí y avisar a las demás pestañas. Si no,
+        // el usuario editaría sobre lo viejo y su guardado ganaría con contenido antiguo.
         if (result.applied > 0 || result.removed > 0) {
-          this.reload?.();
+          this.status.markDataChanged();
           this.coordinator.announce();
         }
       } else if (result.reason === 'failed' || result.reason === 'blocked') {

@@ -9,6 +9,7 @@
  * uso corren contra estas implementaciones en memoria en lugar de IndexedDB.
  */
 import { Provider } from '@angular/core';
+import { AccountHistory } from '../../_common/credentials/account-history';
 import { EntityId } from '../../_common/entity-id';
 import { BaseUnit, Quantity } from '../../_common/quantity';
 import { DomainEvent } from '../../_common/eventbus/domain-event';
@@ -164,6 +165,17 @@ export class FakeSeedDataSource extends SeedDataSource {
   load = async () => this.doc;
 }
 
+/**
+ * Historial de cuenta falso. Por defecto **nunca se conectó nadie**, que es el caso de una instalación
+ * nueva y el que deja sembrar; `everConnected = true` simula un navegador que ya tuvo cuenta.
+ */
+export class FakeAccountHistory extends AccountHistory {
+  constructor(public connected = false) {
+    super();
+  }
+  everConnected = async () => this.connected;
+}
+
 /** Doble in-memory de SeedState: recuerda la versión aplicada por cada clave. */
 export class FakeSeedState extends SeedState {
   private readonly versions = new Map<string, number>();
@@ -177,6 +189,8 @@ export interface RecipeBookFakes {
   bus: RecordingEventBus;
   /** El doble de SeedDataSource; muta `.doc` para cambiar el sembrado entre corridas. */
   seedSource: FakeSeedDataSource;
+  /** El historial de cuenta; muta `.connected` para simular un navegador que ya tuvo una. */
+  accountHistory: FakeAccountHistory;
   providers: Provider[];
 }
 
@@ -189,13 +203,15 @@ export function makeRecipeBookFakes(
 ): RecipeBookFakes {
   const bus = new RecordingEventBus();
   const seedSource = new FakeSeedDataSource(seedDoc);
+  const accountHistory = new FakeAccountHistory();
   const providers: Provider[] = [
     ...recipeBookRepositoryProviders,
     { provide: EventBus, useValue: bus },
     { provide: SeedDataSource, useValue: seedSource },
     { provide: SeedState, useClass: FakeSeedState },
+    { provide: AccountHistory, useValue: accountHistory },
   ];
-  return { bus, seedSource, providers };
+  return { bus, seedSource, accountHistory, providers };
 }
 
 /** Helper de test: un literal de petición de precio de compra para SaveSupply. */

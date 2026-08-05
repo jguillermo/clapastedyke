@@ -32,6 +32,28 @@ describe('RecipeBookSeed · categorías', () => {
     expect(categories.map((c) => c.name).sort()).toEqual(['Coberturas', 'Queques', 'Rellenos']);
   });
 
+  it('NO siembra si este navegador ya tuvo cuenta: su catálogo está en su hoja', async () => {
+    // Sin esto, los datos de ejemplo no solo ensucian la app: viajan a la hoja en el primer ciclo.
+    const fakes = makeRecipeBookFakes(doc());
+    fakes.accountHistory.connected = true;
+    TestBed.configureTestingModule({ providers: fakes.providers });
+
+    await TestBed.inject(RecipeBookSeed).run();
+
+    expect(await TestBed.inject(RecipeCategoryRepository).all()).toEqual([]);
+  });
+
+  it('no marca nada como sembrado si no sembró: al desconectarse podrá sembrar', async () => {
+    const fakes = makeRecipeBookFakes(doc());
+    fakes.accountHistory.connected = true;
+    TestBed.configureTestingModule({ providers: fakes.providers });
+    const seed = TestBed.inject(RecipeBookSeed);
+
+    await seed.run();
+
+    expect(await seed.hasSeeded()).toBe(false);
+  });
+
   it('is idempotent: running again does not duplicate', async () => {
     configure(doc());
     const seed = TestBed.inject(RecipeBookSeed);

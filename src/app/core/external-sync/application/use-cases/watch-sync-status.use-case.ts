@@ -45,6 +45,18 @@ export class WatchSyncStatus extends UseCase<void, SyncStatusView> {
     };
   });
 
+  /**
+   * Cuántas veces la sincronización ha cambiado los datos locales. Sube y nunca baja.
+   *
+   * Va **aparte de `state`** a propósito: una vista que quiera recargarse cuando llegan datos nuevos
+   * solo debe reaccionar a eso, no a que el rótulo pase de «Sincronizando…» a «Al día». Metido en el
+   * mismo objeto, cualquier cambio de fase provocaría una recarga de más — y en el libro 3D eso es
+   * releer el catálogo entero y volver a pintar las páginas.
+   *
+   * Se lee comparando con el último valor visto; no hay que suscribirse a nada. Ver `SyncStatus`.
+   */
+  readonly revision: Signal<number> = this.status.revision;
+
   async execute(): Promise<SyncStatusView> {
     return this.state();
   }

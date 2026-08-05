@@ -24,6 +24,28 @@ export interface SyncStatusSnapshot {
 export abstract class SyncStatus {
   abstract readonly snapshot: Signal<SyncStatusSnapshot>;
 
+  /**
+   * Cuántas veces han cambiado los datos locales por una sincronización. Sube y nunca baja.
+   *
+   * ## Por qué hace falta un contador
+   *
+   * Cuando un ciclo trae filas del destino, las escribe en IndexedDB — y **nadie observa IndexedDB**.
+   * Las vistas guardan lo que leyeron al montarse, así que seguirían mostrando lo de antes hasta que el
+   * usuario navegara a otro sitio y volviera.
+   *
+   * Eso no es solo cosmético: si edita sobre un catálogo viejo, lo que guarde saldrá **con contenido
+   * antiguo y una versión nueva**, y le ganará al cambio legítimo del otro dispositivo. La vista
+   * desactualizada se convierte en pérdida de datos.
+   *
+   * Es un número y no un booleano ni un evento porque así una vista solo tiene que comparar con el que
+   * vio la última vez: no hay que suscribirse, ni desuscribirse, ni preocuparse por perderse un aviso
+   * ocurrido antes de montar.
+   */
+  abstract readonly revision: Signal<number>;
+
+  /** Los datos locales acaban de cambiar por una sincronización (de esta pestaña o de otra). */
+  abstract markDataChanged(): void;
+
   /** Hay sesión: ya se puede sincronizar. */
   abstract markConnected(): void;
 

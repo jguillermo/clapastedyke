@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { SynchronizeWithRemote } from '../../application/use-cases/synchronize-with-remote.use-case';
+import { SyncStatus } from '../../domain/services/sync-status';
 import { SyncTarget } from '../../domain/value-objects/sync-target';
 import { SyncScheduler } from '../../infrastructure/sync-scheduler';
 import { SHEET_TABLES } from '../../infrastructure/sheet-schema';
@@ -21,6 +22,7 @@ import {
 describe('SyncScheduler', () => {
   let scheduler: SyncScheduler;
   let coordinator: FakeSyncCoordinator;
+  let status: SyncStatus;
   let cycles: number;
 
   beforeEach(async () => {
@@ -28,6 +30,7 @@ describe('SyncScheduler', () => {
 
     TestBed.configureTestingModule({ providers: makeExternalSyncFakes().providers });
     coordinator = TestBed.inject(FakeSyncCoordinator);
+    status = TestBed.inject(SyncStatus);
 
     // El ciclo se dobla contando llamadas: aquí no se prueba lo que hace, sino cuándo se llama.
     cycles = 0;
@@ -112,11 +115,12 @@ describe('SyncScheduler', () => {
       expect(cycles).toBe(2);
     });
 
-    it('el botón de la pantalla NO espera el mínimo', async () => {
+    it('un cambio local NO espera el mínimo: ya lo limita su propio rebote', async () => {
       scheduler.start();
       await vi.advanceTimersByTimeAsync(0);
 
-      await scheduler.now();
+      scheduler.afterLocalChange();
+      await vi.advanceTimersByTimeAsync(5_000);
 
       expect(cycles).toBe(2);
     });
@@ -174,23 +178,19 @@ describe('SyncScheduler', () => {
   });
 
   describe('las demás pestañas', () => {
-    it('cuando otra avisa, se relee y NO se sincroniza', async () => {
+    it('cuando otra avisa, sube la revisión y NO se sincroniza', async () => {
       // Los datos ya están en IndexedDB: volver a hablar con la hoja no aportaría nada y gastaría cuota.
-      let reloads = 0;
-      scheduler.onDataChanged(() => {
-        reloads += 1;
-      });
       scheduler.start();
       await vi.advanceTimersByTimeAsync(0);
-      const antes = cycles;
+      const antes = { ciclos: cycles, revision: status.revision() };
 
       coordinator.otherTabAnnounced();
 
-      expect(reloads).toBe(1);
-      expect(cycles).toBe(antes);
+      expect(status.revision()).toBe(antes.revision + 1);
+      expect(cycles).toBe(antes.ciclos);
     });
 
-    it('un ciclo que aplicó algo avisa a las demás y relee aquí', async () => {
+    it('un ciclo que aplicó algo avisa a las demás y sube la revisión aquí', async () => {
       const cycle = TestBed.inject(SynchronizeWithRemote);
       vi.spyOn(cycle, 'execute').mockResolvedValue({
         synced: true,
@@ -199,23 +199,21 @@ describe('SyncScheduler', () => {
         removed: 0,
         rejected: 0,
       });
-      let reloads = 0;
-      scheduler.onDataChanged(() => {
-        reloads += 1;
-      });
 
       scheduler.start();
       await vi.advanceTimersByTimeAsync(0);
 
-      expect(reloads).toBe(1);
+      expect(status.revision()).toBe(1);
       expect(coordinator.announces).toBe(1);
     });
 
-    it('un ciclo que no cambió nada no avisa: sería despertar a las demás para nada', async () => {
+    it('un ciclo que no cambió nada no avisa ni sube la revisión', async () => {
+      // Sin esta condición, cada dos minutos se repintaría el libro entero para dejarlo igual.
       scheduler.start();
       await vi.advanceTimersByTimeAsync(0);
 
       expect(coordinator.announces).toBe(0);
+      expect(status.revision()).toBe(0);
     });
   });
 });
