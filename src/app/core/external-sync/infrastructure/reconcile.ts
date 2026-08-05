@@ -136,6 +136,16 @@ export interface PlannedPush {
   readonly rowId: string;
   /** Dónde está en el destino, o `null` si todavía no está y hay que añadirla. */
   readonly index: number | null;
+  /**
+   * La huella del contenido que se va a escribir, y la versión con la que se escribe.
+   *
+   * Van en el plan y no las calcula quien escribe porque **el contenido y su huella tienen que salir
+   * juntos, de la misma decisión**. Si quien escribe recalculara la huella por su cuenta, cualquier
+   * discrepancia entre las dos formas de calcularla haría que la fila pareciera editada a mano en el
+   * ciclo siguiente — y así para siempre.
+   */
+  readonly fingerprint: string;
+  readonly version: string;
 }
 
 /** Una fila del destino que pasa a ser la base, sin aplicarse ni subirse. */
@@ -745,7 +755,7 @@ function decide(decision: Decision): void {
   if (!remote) {
     if (!base) {
       // Solo está aquí y el destino nunca la vio: hay que subirla.
-      plan.push.push({ table: table.name, rowId, index: null });
+      pushLocal(decision, null);
       return;
     }
     if (movedTo) {
@@ -774,7 +784,7 @@ function decide(decision: Decision): void {
     if (!local) {
       plan.apply.push(applyOf(table.name, remote, RowVersion.adopted().toString()));
     } else if (local.fingerprint !== remote.fingerprint) {
-      plan.push.push({ table: table.name, rowId, index: remote.index });
+      pushLocal(decision, remote.index);
     }
     return;
   }
@@ -818,7 +828,7 @@ function decide(decision: Decision): void {
   }
 
   if (!remoteChanged && localChanged) {
-    plan.push.push({ table: table.name, rowId, index: remote.index });
+    pushLocal(decision, remote.index);
     return;
   }
 
@@ -832,10 +842,34 @@ function decide(decision: Decision): void {
   });
 
   if (localWins) {
-    plan.push.push({ table: table.name, rowId, index: remote.index });
+    pushLocal(decision, remote.index);
     return;
   }
   applyRemote(decision, remoteVersion);
+}
+
+/**
+ * Apunta que hay que subir la fila local, con **la huella de lo que se va a escribir y una versión
+ * nueva**.
+ *
+ * La versión se emite aquí y no en el momento de escribir para que salga del mismo reloj que ya observó
+ * todo lo que había en el destino: así una subida nunca nace por detrás de algo que ya estaba escrito, y
+ * el conflicto que resuelva el otro dispositivo lo resuelve a favor de esto, que es lo más reciente.
+ */
+function pushLocal(decision: Decision, index: number | null): void {
+  const { table, rowId, local, clock, input, plan } = decision;
+  if (!local) {
+    // No puede pasar —todas las ramas que llegan aquí tienen fila local—, pero subir una fila que no
+    // existe escribiría una vacía sobre la del destino, así que se calla en vez de arriesgarlo.
+    return;
+  }
+  plan.push.push({
+    table: table.name,
+    rowId,
+    index,
+    fingerprint: local.fingerprint,
+    version: clock.next(input.now).toString(),
+  });
 }
 
 function applyRemote(decision: Decision, version: RowVersion): void {

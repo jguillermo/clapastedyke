@@ -53,6 +53,14 @@ export const INITIAL_ROWS = 2000;
 export interface SheetTable {
   /** Cómo la llama el lote que manda el origen. */
   name: string;
+  /**
+   * Qué agregado guarda, con el nombre que usa el origen en sus eventos y en sus referencias.
+   *
+   * Es lo que permite decirle a quien posee los datos «borra este» sin conocer su modelo: el contrato
+   * del shared kernel habla de `{ aggregate, id }`, y esta es la traducción entre eso y una pestaña.
+   * La tabla de líneas no lo lleva: no es un agregado, es parte de su receta.
+   */
+  aggregate?: string;
   /** Cómo se llama la pestaña en la hoja del usuario. */
   title: string;
   fields: readonly string[];
@@ -77,6 +85,7 @@ export interface SheetTable {
 const TABLES: readonly SheetTable[] = [
   {
     name: 'supplies',
+    aggregate: 'supply',
     title: 'Insumos',
     key: 'id',
     fields: [
@@ -104,6 +113,7 @@ const TABLES: readonly SheetTable[] = [
   },
   {
     name: 'recipes',
+    aggregate: 'recipe',
     title: 'Recetas',
     key: 'id',
     fields: [
@@ -152,6 +162,7 @@ const TABLES: readonly SheetTable[] = [
   },
   {
     name: 'categories',
+    aggregate: 'category',
     title: 'Categorias',
     key: 'id',
     fields: ['id', 'name', 'syncedAt'],
@@ -159,6 +170,7 @@ const TABLES: readonly SheetTable[] = [
   },
   {
     name: 'flavors',
+    aggregate: 'flavor',
     title: 'Sabores',
     key: 'id',
     fields: ['id', 'label', 'syncedAt'],
@@ -166,6 +178,7 @@ const TABLES: readonly SheetTable[] = [
   },
   {
     name: 'capacities',
+    aggregate: 'capacity',
     title: 'Capacidades',
     key: 'id',
     fields: ['id', 'group', 'label', 'factor', 'syncedAt'],

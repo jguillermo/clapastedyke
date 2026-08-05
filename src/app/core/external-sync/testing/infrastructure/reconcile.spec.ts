@@ -316,7 +316,7 @@ describe('reconcile · adopción de un destino que ya existía', () => {
       local: localOf({ supplies: [aqui] }),
     });
 
-    expect(plan.push).toEqual([{ table: 'supplies', rowId: 'ing-1', index: 2 }]);
+    expect(plan.push).toMatchObject([{ table: 'supplies', rowId: 'ing-1', index: 2 }]);
     expect(plan.apply).toEqual([]);
   });
 
@@ -543,7 +543,16 @@ describe('reconcile · las dos caras cambiaron', () => {
     expect(plan.conflicts).toEqual([
       { table: 'supplies', rowId: 'ing-1', winner: 'local', blind: false },
     ]);
-    expect(plan.push).toEqual([{ table: 'supplies', rowId: 'ing-1', index: 2 }]);
+    // La huella y la versión salen del plan: el contenido y su huella se escriben juntos.
+    expect(plan.push).toMatchObject([
+      {
+        table: 'supplies',
+        rowId: 'ing-1',
+        index: 2,
+        fingerprint: expect.any(String),
+        version: expect.any(String),
+      },
+    ]);
   });
 
   it('con una versión local más vieja, gana el destino', async () => {

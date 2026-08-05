@@ -1,6 +1,7 @@
 import { SyncBatch } from '../value-objects/sync-batch';
 import { SyncProbe } from '../value-objects/sync-probe';
 import { SyncTarget } from '../value-objects/sync-target';
+import { RemoteSnapshot } from './sync-reader.types';
 
 /** Lo mínimo para actuar contra el destino: con qué se autoriza. */
 export interface CredentialRequest {
@@ -16,6 +17,11 @@ export interface CredentialRequest {
 export interface TargetRequest extends CredentialRequest {
   /** Dónde está la copia de esta cuenta. */
   target: SyncTarget;
+}
+
+/** Poner al día la forma del destino, a partir de lo que ya se leyó de él. */
+export interface MigrateRequest extends TargetRequest {
+  readonly snapshot: RemoteSnapshot;
 }
 
 export interface SyncRequest extends TargetRequest {

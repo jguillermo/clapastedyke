@@ -1,6 +1,7 @@
 import { SyncTarget } from '../value-objects/sync-target';
 import {
   CredentialRequest,
+  MigrateRequest,
   ProbeOutcome,
   ProbeRequest,
   SyncOutcome,
@@ -34,6 +35,18 @@ export abstract class SyncGateway {
   abstract exists(request: TargetRequest): Promise<boolean>;
 
   abstract send(request: SyncRequest): Promise<SyncOutcome>;
+
+  /**
+   * Pone la **forma** del destino al día con la del esquema actual, sin tocar ningún dato.
+   *
+   * Existe porque un destino escrito por una versión anterior de la app le falta la forma que la
+   * versión de ahora espera —columnas de servicio, rótulos— y escribir sin arreglarla antes dejaría
+   * columnas nuevas debajo de celdas en blanco: el usuario vería aparecer columnas sin nombre.
+   *
+   * Recibe lo que ya se leyó para no volver a leerlo, y es **idempotente**: con un destino al día no
+   * hace nada y no cuesta ninguna llamada.
+   */
+  abstract migrate(request: MigrateRequest): Promise<void>;
 
   /**
    * Escribe el dato de prueba en el destino y **lo vuelve a leer de allí**, devolviendo lo leído.

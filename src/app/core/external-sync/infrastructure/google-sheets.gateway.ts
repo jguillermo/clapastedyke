@@ -3,6 +3,7 @@ import { Logger } from '@core/_common/logger/logger';
 import { SyncGateway } from '../domain/services/sync.gateway';
 import {
   CredentialRequest,
+  MigrateRequest,
   ProbeOutcome,
   ProbeRequest,
   SyncError,
@@ -12,6 +13,7 @@ import {
 } from '../domain/services/sync.gateway.types';
 import { SyncTarget } from '../domain/value-objects/sync-target';
 import { googleFetch } from './google-api';
+import { schemaMigrationFor } from './schema-migration';
 import { mergeByKey, replaceByParent, toRow } from './sheet-merge';
 import {
   ALL_TABS,
@@ -335,6 +337,31 @@ export class GoogleSheetsGateway extends SyncGateway {
         })),
       );
     }
+  }
+
+  /**
+   * Pone al día las cabeceras de la hoja. Nada más: los datos no se tocan.
+   *
+   * Adoptar las filas de una hoja antigua **no se hace aquí** — lo decide `reconcile` por la ausencia de
+   * huella, que es una señal mejor porque vale igual para una hoja de la v3 y para una fila que alguien
+   * añadió a mano ayer. Ver `schema-migration.ts`.
+   */
+  async migrate({ credential, target, snapshot }: MigrateRequest): Promise<void> {
+    const migration = schemaMigrationFor(snapshot);
+    if (migration.writes.length === 0) {
+      return;
+    }
+
+    this.log.debug('poniendo al día la forma de la hoja', {
+      desde: migration.from,
+      hasta: SCHEMA_VERSION,
+      pestañas: migration.writes.length,
+    });
+    await this.write(
+      credential,
+      target,
+      migration.writes.map((header) => ({ range: header.range, values: [[...header.headers]] })),
+    );
   }
 
   private write(

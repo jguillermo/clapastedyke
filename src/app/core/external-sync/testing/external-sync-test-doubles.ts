@@ -13,13 +13,20 @@ import {
   CredentialsProvider,
   UserCredentials,
 } from '../../_common/credentials/credentials-provider';
-import { ExportableData, ExportedRows, ExportQuery } from '../../_common/export/exportable-data';
+import {
+  ExportableData,
+  ExportedRows,
+  ExportQuery,
+  ExportRef,
+} from '../../_common/export/exportable-data';
+import { ApplyOutcome, ImportableData, ImportChange } from '../../_common/import/importable-data';
 import { DeviceIdentity } from '../domain/services/device-identity';
 import { SyncReader } from '../domain/services/sync-reader';
 import { RemoteSnapshot } from '../domain/services/sync-reader.types';
 import { ShadowRow, SyncShadow } from '../domain/services/sync-shadow';
 import { SyncGateway } from '../domain/services/sync.gateway';
 import {
+  MigrateRequest,
   ProbeOutcome,
   ProbeRequest,
   SyncOutcome,
@@ -168,6 +175,13 @@ export class FakeSyncGateway extends SyncGateway {
     return { applied: {} };
   }
 
+  /** Cuántas veces se ha puesto al día la forma del destino, y con qué se llamó. */
+  readonly migrated: MigrateRequest[] = [];
+
+  async migrate(request: MigrateRequest): Promise<void> {
+    this.migrated.push(request);
+  }
+
   async probe(request: ProbeRequest): Promise<ProbeOutcome> {
     this.probed.push(request);
     if (this.failWith) {
@@ -285,6 +299,48 @@ export class FakeExportableData extends ExportableData {
   }
 }
 
+/**
+ * Destino falso de lo que se trae de fuera. Por defecto acepta todo; `rejectIds` fuerza el caso
+ * interesante: una fila que el origen no puede leer.
+ */
+@Injectable()
+export class FakeImportableData extends ImportableData {
+  readonly changes: ImportChange[] = [];
+  /** Ids que se rechazan, para ejercitar la cuarentena. */
+  rejectIds: string[] = [];
+
+  async apply(change: ImportChange): Promise<ApplyOutcome> {
+    this.changes.push(change);
+
+    const refs: ExportRef[] = Object.entries(change.tables).flatMap(([table, rows]) =>
+      rows.map((row) => ({
+        aggregate: aggregateOf(table),
+        id: String((row as Record<string, unknown>)['id'] ?? ''),
+      })),
+    );
+
+    return {
+      applied: [...refs.filter((ref) => !this.rejectIds.includes(ref.id)), ...change.deleted],
+      rejected: refs
+        .filter((ref) => this.rejectIds.includes(ref.id))
+        .map((ref) => ({ ref, reason: 'la fila del test se rechaza a propósito' })),
+    };
+  }
+}
+
+/** Los nombres que usa el recetario, para que el doble hable como el de verdad. */
+function aggregateOf(table: string): string {
+  return (
+    {
+      supplies: 'supply',
+      recipes: 'recipe',
+      categories: 'category',
+      flavors: 'flavor',
+      capacities: 'capacity',
+    }[table] ?? table
+  );
+}
+
 /** Providers listos para el TestBed de cualquier spec del contexto. */
 export function makeExternalSyncFakes(): { providers: Provider[] } {
   return {
@@ -298,6 +354,8 @@ export function makeExternalSyncFakes(): { providers: Provider[] } {
       FakeDeviceIdentity,
       FakeSyncReader,
       FakeSyncShadow,
+      FakeImportableData,
+      { provide: ImportableData, useExisting: FakeImportableData },
       { provide: SyncOutbox, useExisting: FakeSyncOutbox },
       { provide: SyncGateway, useExisting: FakeSyncGateway },
       { provide: SyncReader, useExisting: FakeSyncReader },
