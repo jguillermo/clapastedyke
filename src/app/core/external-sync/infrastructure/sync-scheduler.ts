@@ -1,4 +1,5 @@
 import { inject, Injectable } from '@angular/core';
+import { AppConfig } from '@core/_common/infrastructure/config/app-config';
 import { Logger } from '@core/_common/logger/logger';
 import { SynchronizeWithRemote } from '../application/use-cases/synchronize-with-remote.use-case';
 import { SyncCoordinator } from '../domain/services/sync-coordinator';
@@ -6,9 +7,6 @@ import { SyncStatus } from '../domain/services/sync-status';
 
 /** Lo que espera un cambio local antes de salir. Corto: el usuario acaba de guardar. */
 const AFTER_CHANGE_MS = 5_000;
-
-/** Cada cuánto se mira el destino por si otro dispositivo escribió. */
-const POLL_MS = 2 * 60_000;
 
 /**
  * Lo mínimo entre dos ciclos, para los disparadores **ambientales**.
@@ -45,7 +43,7 @@ const MAX_BACKOFF_MS = 5 * 60_000;
  * |---|---|
  * | al arrancar | para empezar con lo que hay en el destino |
  * | ~5 s tras un cambio local | subir pronto, pero no en cada tecla |
- * | cada ~2 min | por si otro dispositivo escribió |
+ * | cada N, configurable (`public/config.json` → `syncPollSeconds`, por defecto 120 s) | por si otro dispositivo escribió |
  * | al recuperar el foco | el momento en que el usuario vuelve a mirar |
  * | al volver la conexión | lo que estaba pendiente sale enseguida |
  * | al avisar otra pestaña | **no** dispara ciclo: solo hay que releer |
@@ -69,6 +67,9 @@ export class SyncScheduler {
   private readonly coordinator = inject(SyncCoordinator);
   private readonly status = inject(SyncStatus);
   private readonly log = inject(Logger).scoped('external-sync/scheduler');
+
+  /** Cada cuánto se mira el destino por si otro dispositivo escribió. De despliegue, no de código. */
+  private readonly pollMs = inject(AppConfig).sync.pollSeconds * 1000;
 
   private timer: ReturnType<typeof setTimeout> | null = null;
   private poll: ReturnType<typeof setInterval> | null = null;
@@ -95,7 +96,7 @@ export class SyncScheduler {
     // Otra pestaña ha sincronizado: los datos ya están en IndexedDB, así que aquí solo hay que releer.
     this.coordinator.onAnnounced(() => this.status.markDataChanged());
 
-    this.poll = setInterval(() => this.request('intervalo'), POLL_MS);
+    this.poll = setInterval(() => this.request('intervalo'), this.pollMs);
 
     // El foco: el momento en que el usuario vuelve a mirar. Es también el disparador que más veces
     // salta, y por eso todos comparten el intervalo mínimo.
@@ -107,7 +108,7 @@ export class SyncScheduler {
     window.addEventListener('online', () => this.request('vuelve la conexión'));
 
     this.request('arranque');
-    this.log.debug('planificador en marcha', { cada: POLL_MS, minimo: MIN_GAP_MS });
+    this.log.debug('planificador en marcha', { cada: this.pollMs, minimo: MIN_GAP_MS });
   }
 
   /**

@@ -79,14 +79,16 @@ El Client ID va a `public/config.json`, y es lo único que hay que configurar:
 ```json
 {
   "debug": false,
-  "googleClientId": "123456-abc.apps.googleusercontent.com"
+  "googleClientId": "123456-abc.apps.googleusercontent.com",
+  "syncPollSeconds": 120
 }
 ```
 
 Se lee **en runtime**, así que se puede cambiar sin recompilar: basta editar el fichero dentro de
 `dist/misaevol/browser/` en el servidor. `"debug"` controla el registro en consola; el repositorio lo
 trae en `true` para desarrollar, y en un despliegue publicado va en `false` (los `warn` y `error` se
-ven igual: eso no se puede apagar).
+ven igual: eso no se puede apagar). `"syncPollSeconds"` es opcional (por defecto 120, o sea 2
+minutos): cada cuántos segundos se comprueba si otro dispositivo escribió en la hoja.
 
 ---
 

@@ -102,7 +102,7 @@ sitio** antes (el pie del diálogo o la propia celda), sin diálogo encima del d
   a este dispositivo» y el primer dispositivo desconectado lo resucitaría.
 - **No hay evento de borrado**, y no hace falta: la lápida sale de comparar lo que hay aquí con la base. La
   única consecuencia es de cadencia — sin evento no hay rebote de cinco segundos, así que sube con el ciclo
-  siguiente (≤ 2 min, o antes si se toca cualquier otra cosa).
+  siguiente (≤ el intervalo configurado, 2 min por defecto, o antes si se toca cualquier otra cosa).
 
 ## La regla que evita la tormenta: huella vacía = adoptar
 
@@ -193,7 +193,7 @@ Así que se contesta **fila a fila**. Una fila que no se puede leer:
 |---|---|
 | Arranque | Con plazo de 8 s: con conexión se trabaja sobre la hoja; sin ella, se entra con lo local |
 | Cambio local | ~5 s después del último (se reinicia con cada cambio) |
-| Intervalo | Cada ~2 min |
+| Intervalo | Cada N, configurable (`syncPollSeconds` en `public/config.json`, por defecto 120 s) |
 | Foco, vuelve la conexión | Al recuperarlos |
 | Entrar / reanudar sesión | Inmediato |
 

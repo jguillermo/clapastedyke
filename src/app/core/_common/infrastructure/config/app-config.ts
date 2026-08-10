@@ -12,6 +12,8 @@ export interface ConfigDocument {
   debug?: boolean;
   /** Client ID de OAuth de la app ante Google. */
   googleClientId?: string;
+  /** Cada cuántos segundos se comprueba si hay cambios remotos. Ausente o inválido = 120 (2 min). */
+  syncPollSeconds?: number;
 }
 
 /**
@@ -27,6 +29,18 @@ export interface IntegrationConfig {
 }
 
 /**
+ * Cadencia del motor de sincronización, resuelta al arrancar.
+ *
+ * **Un solo valor**: cada cuánto se comprueba el destino por si otro dispositivo escribió. Es de
+ * despliegue, no de usuario, por la misma razón que `IntegrationConfig`: cambiarlo no debería
+ * exigir recompilar.
+ */
+export interface SyncConfig {
+  /** Segundos entre dos comprobaciones del destino. */
+  pollSeconds: number;
+}
+
+/**
  * Configuración de despliegue leída en runtime. **Es la única que hay.**
  *
  * **El build es uno solo.** No hay `src/environments/` ni `fileReplacements` en `angular.json`:
@@ -37,8 +51,8 @@ export interface IntegrationConfig {
  *
  * Vive en **infraestructura** del shared kernel, y no en una capa de dominio, porque sus claves son
  * tecnología pura (si se registra el detalle, con qué Client ID de Google se identifica la app). Solo
- * la consumen adaptadores: el repositorio de ajustes de `auth` y el adaptador del `Logger`. Ni un
- * caso de uso ni una entidad la importan.
+ * la consumen adaptadores: el repositorio de ajustes de `auth`, el `SyncScheduler` de `external-sync`
+ * y el adaptador del `Logger`. Ni un caso de uso ni una entidad la importan.
  *
  * **Se lee antes de arrancar** (`main.ts`), no en un app-initializer: así todo lo que se inyecta
  * después la encuentra ya resuelta, y ninguna traza del arranque se pierde por ocurrir antes de que
@@ -48,4 +62,5 @@ export abstract class AppConfig {
   /** ¿Se emite `debug`? Lo consume el adaptador del `Logger`, nadie más. */
   abstract get debug(): boolean;
   abstract get integration(): IntegrationConfig;
+  abstract get sync(): SyncConfig;
 }

@@ -1,5 +1,11 @@
 import { Injectable, InjectionToken, inject } from '@angular/core';
-import { AppConfig, ConfigDocument, CONFIG_DOCUMENT_URL, IntegrationConfig } from './app-config';
+import {
+  AppConfig,
+  ConfigDocument,
+  CONFIG_DOCUMENT_URL,
+  IntegrationConfig,
+  SyncConfig,
+} from './app-config';
 
 /**
  * El documento ya leído, tal cual venía del fichero. `null` significa **no se pudo leer** —no
@@ -38,6 +44,9 @@ export async function readConfigDocument(): Promise<ConfigDocument | null> {
 
 const EMPTY: IntegrationConfig = { googleClientId: null };
 
+/** El intervalo de siempre, para no cambiar el comportamiento cuando la clave está ausente. */
+const DEFAULT_SYNC_POLL_SECONDS = 120;
+
 /**
  * {@link AppConfig} sobre el documento servido en `public/config.json`.
  *
@@ -62,9 +71,20 @@ export class PublicFileAppConfig extends AppConfig {
     }
     return { googleClientId: trimmedOrNull(this.document.googleClientId) };
   }
+
+  get sync(): SyncConfig {
+    return { pollSeconds: positiveOrDefault(this.document?.syncPollSeconds) };
+  }
 }
 
 function trimmedOrNull(value: string | undefined): string | null {
   const trimmed = (value ?? '').trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+/** La misma tolerancia que `trimmedOrNull`: el fichero lo escribe una persona a mano. */
+function positiveOrDefault(value: number | undefined): number {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0
+    ? value
+    : DEFAULT_SYNC_POLL_SECONDS;
 }

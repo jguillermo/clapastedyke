@@ -7,6 +7,11 @@
  * implementaciones en memoria, así que doblarlos solo añadiría una mentira que mantener.
  */
 import { Injectable, Provider, signal, Signal } from '@angular/core';
+import {
+  AppConfig,
+  IntegrationConfig,
+  SyncConfig,
+} from '../../_common/infrastructure/config/app-config';
 import { DomainEvent } from '../../_common/eventbus/domain-event';
 import { EventBus, EventHandler } from '../../_common/eventbus/event-bus';
 import {
@@ -418,11 +423,31 @@ export class FakeSyncCoordinator extends SyncCoordinator {
   }
 }
 
+/**
+ * Config de despliegue falsa. `pollSeconds` empieza en el mismo valor que el default de producción
+ * para no alterar los tiempos que ya prueban los specs existentes de `SyncScheduler`.
+ */
+@Injectable()
+export class FakeAppConfig extends AppConfig {
+  pollSeconds = 120;
+
+  readonly debug = false;
+
+  get integration(): IntegrationConfig {
+    return { googleClientId: null };
+  }
+
+  get sync(): SyncConfig {
+    return { pollSeconds: this.pollSeconds };
+  }
+}
+
 /** Providers listos para el TestBed de cualquier spec del contexto. */
 export function makeExternalSyncFakes(): { providers: Provider[] } {
   return {
     providers: [
       { provide: Logger, useClass: ConsoleLogger },
+      FakeAppConfig,
       FakeSyncOutbox,
       FakeSyncGateway,
       FakeSyncTargetRepository,
@@ -445,6 +470,7 @@ export function makeExternalSyncFakes(): { providers: Provider[] } {
       { provide: DeviceIdentity, useExisting: FakeDeviceIdentity },
       { provide: SyncStatus, useClass: InMemorySyncStatus },
       { provide: EventBus, useClass: FakeEventBus },
+      { provide: AppConfig, useExisting: FakeAppConfig },
     ],
   };
 }
