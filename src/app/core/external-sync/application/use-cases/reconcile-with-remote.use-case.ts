@@ -41,8 +41,8 @@ export interface ReconcileWithRemoteResult {
  *
  * ## Nunca lanza
  *
- * Informa del desenlace y deja el motivo en el resultado, como `Synchronize`. Un diagnóstico que tumba
- * la app no es un diagnóstico.
+ * Informa del desenlace y deja el motivo en el resultado. Un diagnóstico que tumba la app no es un
+ * diagnóstico.
  */
 @Injectable({ providedIn: 'root' })
 export class ReconcileWithRemote extends UseCase<void, ReconcileWithRemoteResult> {

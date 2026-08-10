@@ -46,8 +46,8 @@ export interface SynchronizeWithRemoteResult {
 /**
  * **El ciclo**: bajar, fusionar y subir. En ese orden, siempre.
  *
- * Es lo que convierte el destino en la fuente de la verdad. El anterior `Synchronize` solo subía la
- * cola; este mira antes lo que hay al otro lado y decide fila a fila.
+ * Es lo que convierte el destino en la fuente de la verdad: mira antes lo que hay al otro lado y
+ * decide fila a fila, en vez de subir la cola a ciegas.
  *
  * ## Nunca se sube a ciegas
  *
@@ -79,8 +79,8 @@ export interface SynchronizeWithRemoteResult {
  *
  * ## Nunca lanza
  *
- * Informa del desenlace y deja el motivo en el resultado y en el estado, como `Synchronize`. Un ciclo
- * que lanza deja al usuario con un error y sin saber si sus datos están.
+ * Informa del desenlace y deja el motivo en el resultado y en el estado. Un ciclo que lanza deja al
+ * usuario con un error y sin saber si sus datos están.
  */
 @Injectable({ providedIn: 'root' })
 export class SynchronizeWithRemote extends UseCase<void, SynchronizeWithRemoteResult> {

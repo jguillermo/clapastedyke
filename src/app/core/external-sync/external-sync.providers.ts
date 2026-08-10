@@ -4,10 +4,7 @@ import {
   makeEnvironmentProviders,
   provideAppInitializer,
 } from '@angular/core';
-import { provideEventHandlers } from '@core/_common/eventbus/event-bus.providers';
 import { BootSync } from './application/use-cases/boot-sync.use-case';
-import { NotifyRecipeSaved } from './application/use-cases/notify-recipe-saved.use-case';
-import { NotifySupplySaved } from './application/use-cases/notify-supply-saved.use-case';
 import { SyncTargetRepository } from './domain/repositories/sync-target.repository';
 import { DeviceIdentity } from './domain/services/device-identity';
 import { SyncCoordinator } from './domain/services/sync-coordinator';
@@ -50,13 +47,6 @@ import { RecipeBookChangedSubscriber } from './infrastructure/recipe-book-change
  * solo que sin sincronizar — la integración es un añadido desacoplado, no una dependencia del
  * recetario.
  */
-/**
- * Los casos de uso de este contexto que se disparan con un evento. Se exporta para que el test de
- * integración enganche **exactamente esta lista**: si alguien añade uno aquí y se olvida del test —o
- * al revés— el test deja de demostrar lo que dice demostrar.
- */
-export const EVENT_DRIVEN_USE_CASES = [NotifyRecipeSaved, NotifySupplySaved];
-
 export function provideExternalSync(): EnvironmentProviders {
   return makeEnvironmentProviders([
     { provide: SyncGateway, useClass: GoogleSheetsGateway },
@@ -78,8 +68,5 @@ export function provideExternalSync(): EnvironmentProviders {
     // en la hoja y no sobre lo de la última vez. Trae su propio plazo, así que no puede colgar el
     // arranque, y nunca lanza. Ver `BootSync`.
     provideAppInitializer(() => inject(BootSync).execute()),
-    // Los casos de uso que reaccionan a un evento: aquí solo se registra la suscripción que cada uno
-    // declaró con `@OnEvent`. Ninguno se construye hasta que llega su evento.
-    provideEventHandlers(...EVENT_DRIVEN_USE_CASES),
   ]);
 }
