@@ -48,13 +48,6 @@ const MILLIS_WIDTH = 13;
 /** Ancho del contador. Son escrituras dentro de un mismo milisegundo: 9999 es un techo generoso. */
 const COUNTER_WIDTH = 4;
 
-/**
- * Identificador de origen para lo que se **adopta** de un destino que todavía no tenía versiones. No
- * es ningún origen real; solo hace falta para que la versión mínima tenga las tres partes y se pueda
- * leer como cualquier otra.
- */
-const ADOPTED_ORIGIN = '0';
-
 export class LogicalVersion {
   private constructor(
     readonly millis: number,
@@ -88,15 +81,6 @@ export class LogicalVersion {
 
   static of(millis: number, counter: number, originId: string): LogicalVersion {
     return new LogicalVersion(millis, counter, originId);
-  }
-
-  /**
-   * La versión más baja que existe. Se le pone a cada registro que ya estaba en el destino antes de
-   * que hubiera versión: así el diagnóstico normal decide qué hacer con él, en vez de tratar la
-   * colección entera como recién editada a mano.
-   */
-  static adopted(): LogicalVersion {
-    return new LogicalVersion(0, 0, ADOPTED_ORIGIN);
   }
 
   /**

@@ -1,7 +1,7 @@
 /**
  * El contrato del motor: qué recibe y qué devuelve. Ver `README.md` de esta carpeta para la
  * explicación completa de cómo se usa; aquí solo están los tipos, documentados en el sitio donde
- * import a quien los usa.
+ * importa a quien los usa.
  *
  * Nada de lo que hay aquí sabe qué es Google, qué es una hoja de cálculo, ni qué es HTTP. El único
  * conocimiento que el motor tiene de "cómo se ve un dato" es que tiene un `id` y una `fingerprint`
@@ -14,7 +14,8 @@ export type RecordId = string;
  * Un registro tal como está **aquí**.
  *
  * El motor nunca interpreta `value`: solo lo transporta si gana. Quien arma este objeto ya calculó su
- * huella — el motor jamás canonicaliza ni hashea contenido.
+ * huella — el motor jamás canonicaliza ni hashea contenido. Su ausencia (que no aparezca para un id
+ * que sí está en `base`) ES la señal de que se borró aquí — no lleva un `deleted` propio.
  */
 export interface LocalItem<TValue = unknown> {
   readonly id: RecordId;
@@ -26,15 +27,15 @@ export interface LocalItem<TValue = unknown> {
    * Cuándo se cambió **aquí**, como versión comparable con `RemoteItem.version` (mismo formato:
    * ver `hybrid-clock.ts`), o `null` si no se sabe.
    *
-   * Sin este dato, un conflicto se resuelve **a ciegas**: gana el destino y queda marcado como tal.
-   * Poner una versión de "ahora" cuando no se sabe sería peor que no tener ninguna — haría ganar
-   * siempre a lo local, incluso frente a una edición remota posterior.
+   * Sin este dato, un conflicto se resuelve **a ciegas**: gana `base` (el destino) y queda marcado
+   * como tal. Poner una versión de "ahora" cuando no se sabe sería peor que no tener ninguna — haría
+   * ganar siempre a lo local, incluso frente a una edición remota posterior.
    */
   readonly changedAt: string | null;
 }
 
 /**
- * Un registro tal como está **en el destino**.
+ * Un registro tal como está **en el destino** — la fuente de verdad.
  *
  * Quien arma este objeto (el adaptador) ya resolvió la identidad: `id` nunca es un valor inventado a
  * medias ni una posición — si el destino permite escrituras sin identidad (una persona tecleando
@@ -44,18 +45,8 @@ export interface LocalItem<TValue = unknown> {
 export interface RemoteItem<TValue = unknown> {
   readonly id: RecordId;
   readonly value: TValue;
-  /** Huella recalculada del contenido actual, con el mismo criterio que `LocalItem.fingerprint`. */
+  /** Huella del contenido, con el mismo criterio que `LocalItem.fingerprint`. */
   readonly fingerprint: string;
-  /**
-   * La huella tal como estaba **escrita** en el destino antes de este ciclo. `''` si el destino nunca
-   * llevó huella para este registro — la señal de que hay que **adoptarlo** en vez de tratarlo como
-   * una edición reciente (ver `README.md` § "La regla que evita la tormenta").
-   *
-   * Si no coincide con `fingerprint`, alguien tocó el contenido sin pasar por un escritor que
-   * mantenga las dos en sincronía — el motor lo trata como una edición fuera de proceso y no confía
-   * en `version` para ese registro (ver `README.md` § "Ediciones fuera de proceso").
-   */
-  readonly writtenFingerprint: string;
   /** La versión tal como está escrita, o `null` si no se pudo leer. */
   readonly version: string | null;
   readonly deleted: boolean;
@@ -78,52 +69,25 @@ export interface CollectionSnapshot<TValue = unknown> {
   readonly items: readonly RemoteItem<TValue>[];
 }
 
-/** Lo último que se vio coincidir entre aquí y el destino, por colección e id. La "base" del three-way merge. */
-export interface BaseItem {
-  readonly collection: string;
-  readonly id: RecordId;
-  readonly fingerprint: string;
-  readonly version: string;
-  readonly deleted: boolean;
-  /**
-   * Por qué no se pudo aplicar la última vez, si no se pudo. Un registro con esto puesto no se
-   * tombstonea solo por faltar aquí: no falta porque nadie lo quisiera, falta porque no se pudo leer.
-   */
-  readonly rejected?: string;
-}
-
-/** Umbrales de la guarda de borrado masivo. */
-export interface MassDeleteGuard {
-  /** Por debajo de esto no se aplica el tope: en una colección de 3, borrar 1 ya es el 33%. */
-  readonly floor: number;
-  readonly maxCount: number;
-  readonly maxRatio: number;
-}
-
 export interface EngineInput<TValue = unknown> {
   /**
-   * Todas las colecciones que el adaptador espera que existan, con su contenido remoto. Una colección
-   * que no aparece aquí no se toca, aunque haya datos locales para ella.
+   * Lo que hay en el destino, por colección — la fuente de verdad. Una colección que no aparece aquí
+   * no se toca, aunque haya datos locales para ella.
    */
-  readonly remote: readonly CollectionSnapshot<TValue>[];
-  readonly base: readonly BaseItem[];
-  readonly local: Readonly<Record<string, readonly LocalItem<TValue>[]>>;
+  readonly base: readonly CollectionSnapshot<TValue>[];
+  /** Lo que hay aquí, por colección. */
+  readonly data: Readonly<Record<string, readonly LocalItem<TValue>[]>>;
   readonly now: number;
   /** Identidad de este origen (dispositivo, proceso...), para desempatar conflictos de forma estable. */
   readonly originId: string;
-  readonly massDeleteGuard?: MassDeleteGuard;
   readonly tombstoneTtlMs?: number;
 }
 
-/** Por qué un ciclo se niega a seguir. Ninguna se aplica a medias: o todo, o nada. */
-export type AbortReason =
-  | { readonly kind: 'missing-collection'; readonly collection: string }
-  | {
-      readonly kind: 'mass-delete';
-      readonly collection: string;
-      readonly count: number;
-      readonly base: number;
-    };
+/** Por qué un ciclo se niega a seguir. No se aplica a medias: o todo, o nada. */
+export interface AbortReason {
+  readonly kind: 'missing-collection';
+  readonly collection: string;
+}
 
 /** Un registro local que hay que llevar al destino. */
 export interface Push<TValue = unknown> {
@@ -151,27 +115,11 @@ export interface Apply<TValue = unknown> {
   readonly version: string;
 }
 
-/** Un registro que ya no está en el destino, o que llegó marcado como borrado. */
+/** Un registro que el destino marca como borrado y que hay que quitar aquí también. */
 export interface Remove {
   readonly collection: string;
   readonly id: RecordId;
   readonly version: string;
-  /**
-   * `'vanished'`: desapareció del destino sin dejar lápida — cuenta para la guarda de borrado masivo,
-   * porque una lectura a medias se ve exactamente igual. `'tombstoned'`: el destino ya trae la marca
-   * de borrado explícita — es la vía normal y no cuenta para esa guarda.
-   */
-  readonly reason: 'vanished' | 'tombstoned';
-}
-
-/** Un registro del destino que pasa a ser la base, sin aplicarse ni subirse (o ambas cosas, ver decide()). */
-export interface Adopt {
-  readonly collection: string;
-  readonly id: RecordId;
-  readonly ref: unknown;
-  readonly fingerprint: string;
-  readonly version: string;
-  readonly deleted: boolean;
 }
 
 /** Un id que aparece en más de un registro remoto de la misma colección. No se toca por ningún lado. */
@@ -207,7 +155,6 @@ export interface Conflict {
 
 export interface EnginePlan<TValue = unknown> {
   readonly aborted: AbortReason | null;
-  readonly adopt: readonly Adopt[];
   readonly apply: readonly Apply<TValue>[];
   readonly remove: readonly Remove[];
   readonly push: readonly Push<TValue>[];
