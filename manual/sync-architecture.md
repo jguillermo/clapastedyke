@@ -247,6 +247,10 @@ hoja y se emparejan sin duplicar nada; lo único que podría reaparecer es lo qu
   que la unidad de fusión es la receta entera — la misma con la que la app ya guarda. Dos dispositivos
   editando líneas distintas de la misma receta: uno pierde.
 - **LWW de agregado completo.** Dos dispositivos editando campos distintos del mismo insumo: uno pierde.
+  Límite del motor de Sheets (`infrastructure/reconcile.ts`), que esta nota no cambia: el motor genérico
+  nuevo (`core/external-sync/domain/services/engine/`, ver su README) ya sabe fusionar campos no
+  solapados en vez de descartar un lado entero, pero solo aplicará aquí cuando el adaptador de Sheets se
+  mueva a ese motor — hoy sigue siendo trabajo pendiente.
 - **Una `version` forjada a mano dentro del margen de 5 min gana.** Las columnas están visibles a propósito.
 - **Las columnas `(auto)` no se pueden editar.**
 - **Las lápidas se tiran a los ~90 días.** Un dispositivo que llevara más tiempo sin conectarse *y* que

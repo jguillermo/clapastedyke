@@ -2,12 +2,26 @@ import { reconcile } from './reconcile';
 import { Registro } from './engine.types';
 
 /**
+ * EXCEPCIÓN DELIBERADA a la regla dura de `unit-tests-conventions.md` ("los specs viven en
+ * `testing/`, nunca junto al fuente"): este spec vive aquí, junto a `reconcile.ts`, y no bajo
+ * `testing/domain/services/engine/`. El motor es un módulo autocontenido y portable — una función
+ * pura sin `TestBed`, sin dobles, sin nada que inyectar — que se documenta y se prueba como una
+ * sola pieza (`reconcile.ts` + `engine.types.ts` + `hybrid-clock.ts` + este spec + `README.md`).
+ * Separar el test a `testing/` rompería esa unidad sin ganar nada: no hay dobles que compartir con
+ * el resto del contexto, ni un `TestBed` que aislar. Es la única excepción de todo `external-sync/`
+ * — cualquier otro spec de `domain/`/`application/` de este contexto sigue yendo en `testing/`.
+ *
  * El motor no depende de ninguna librería, ni hace red ni I/O: es una función pura, así que estos son
  * tests unitarios en el sentido más estricto — sin `TestBed`, sin dobles, sin async.
  *
- * El motor compara solo dos copias: `data` (aquí) contra `base` (el destino, la fuente de verdad).
- * No hay una tercera copia ancestral que persistir entre ciclos, y siempre es UNA sola colección:
- * `base`/`data` son arrays planos de `Registro` (`{ values, auditoria }`), no colecciones anidadas.
+ * El motor compara dos copias, `data` (aquí) contra `base` (el destino, la fuente de verdad), y no
+ * necesita una tercera colección aparte que alguien mantenga sincronizada. Lo que SÍ puede llevar
+ * cada registro de `data` es su propio ancestro embebido (`auditoria.syncedValues`): el `values` que
+ * ese registro sabía que coincidía con el destino la última vez que convergieron. Es opcional — sin
+ * él, el motor cae en "gana un lado entero por versión"; con él, y sin solapamiento de campos, el
+ * motor fusiona en vez de descartar un lado completo (ver el describe "fusión de campos no
+ * solapados" más abajo). Siempre es UNA sola colección: `base`/`data` son arrays planos de
+ * `Registro` (`{ values, auditoria }`), no colecciones anidadas.
  *
  * `auditoria.id` no es el valor del identificador: es el NOMBRE del campo de `values` donde vive
  * (por defecto `'id'`). Estos tests usan siempre `values.id` y omiten `auditoria.id` para dejar el
@@ -46,7 +60,8 @@ describe('reconcile engine', () => {
 
       expect(plan.push).toEqual([
         {
-          values: { id: '1', contenido: 'x' },
+          id: '1',
+          contenido: 'x',
           auditoria: {
             id: undefined,
             keyfinder: 'fp',
@@ -56,7 +71,7 @@ describe('reconcile engine', () => {
           },
         },
       ]);
-      expect(plan.apply).toEqual([]);
+      expect(plan.pull).toEqual([]);
     });
   });
 
@@ -65,13 +80,14 @@ describe('reconcile engine', () => {
      * Caso: primera sincronización, o simplemente un registro que este dispositivo nunca ha visto —
      * el destino ya lo tiene y aquí no aparece en el snapshot local completo.
      * Entrada: `base` trae el registro vivo; `data` no tiene nada para ese id.
-     * Salida: `apply` — se trae. No hay ninguna acción de "borrado por ausencia": eso ya no existe.
+     * Salida: `pull` — se trae. No hay ninguna acción de "borrado por ausencia": eso ya no existe.
      */
     it('un registro que el destino tiene y aquí no aparece en el snapshot local se trae', () => {
       const plan = reconcile({
         base: [
           {
-            values: { id: '1', contenido: 'remoto' },
+            id: '1',
+            contenido: 'remoto',
             auditoria: {
               keyfinder: 'fp',
               deleted: false,
@@ -85,9 +101,10 @@ describe('reconcile engine', () => {
         originId: 'origina',
       });
 
-      expect(plan.apply).toEqual([
+      expect(plan.pull).toEqual([
         {
-          values: { id: '1', contenido: 'remoto' },
+          id: '1',
+          contenido: 'remoto',
           auditoria: {
             id: undefined,
             keyfinder: 'fp',
@@ -105,7 +122,7 @@ describe('reconcile engine', () => {
      * Caso: lo mismo, pero el destino no trae ninguna versión escrita en absoluto (ni `createdAt` ni
      * `updatedAt` legibles) — hay que sintetizar una para poder traerlo con una versión válida.
      * Entrada: `base` sin `updatedAt` y con `createdAt` ilegible; `data` vacío.
-     * Salida: `apply` con una versión recién emitida por el reloj del ciclo.
+     * Salida: `pull` con una versión recién emitida por el reloj del ciclo.
      */
     it('si el destino no trae ninguna fecha legible, se sintetiza una versión al traerlo', () => {
       const plan = reconcile({
@@ -120,7 +137,7 @@ describe('reconcile engine', () => {
         originId: 'origina',
       });
 
-      expect(plan.apply[0]?.auditoria.updatedAt).toBe('1700000000000-0000-origina');
+      expect(plan.pull[0]?.auditoria.updatedAt).toBe('1700000000000-0000-origina');
     });
   });
 
@@ -130,7 +147,7 @@ describe('reconcile engine', () => {
      * seguía presente — el destino es la fuente de verdad, así que gana sin comparar nada: ni
      * huella, ni fecha.
      * Entrada: `base` con `deleted: true`; `data` todavía activo, con contenido y huella distintos.
-     * Salida: `apply` con el registro borrado; nada se sube, no hay conflicto.
+     * Salida: `pull` con el registro borrado; nada se sube, no hay conflicto.
      */
     it('un registro borrado en el destino se trae aquí también, aunque siga presente localmente', () => {
       const plan = reconcile({
@@ -160,7 +177,7 @@ describe('reconcile engine', () => {
         originId: 'origina',
       });
 
-      expect(plan.apply).toEqual([
+      expect(plan.pull).toEqual([
         {
           values: { id: '1', contenido: 'x' },
           auditoria: {
@@ -180,7 +197,7 @@ describe('reconcile engine', () => {
      * Caso: igual que arriba, pero el destino no trae ninguna versión escrita para el borrado — hay
      * que sintetizar una nueva para poder confirmarlo aquí.
      * Entrada: `base` con `deleted: true` y sin `updatedAt`/`createdAt` legibles; `data` activo.
-     * Salida: `apply` con una versión recién emitida por el reloj.
+     * Salida: `pull` con una versión recién emitida por el reloj.
      */
     it('si el destino no trae versión al borrar, se sintetiza una nueva al confirmarlo aquí', () => {
       const plan = reconcile({
@@ -204,14 +221,14 @@ describe('reconcile engine', () => {
         originId: 'origina',
       });
 
-      expect(plan.apply[0]?.auditoria.updatedAt).toBe('1700000000000-0000-origina');
+      expect(plan.pull[0]?.auditoria.updatedAt).toBe('1700000000000-0000-origina');
     });
 
     /**
      * Caso: el destino manda incluso cuando el contenido de aquí es idéntico al que tenía el destino
      * antes de borrarse — no es la huella la que decide este caso, es el `deleted` de `base`.
      * Entrada: `base` con `deleted: true` y la MISMA huella que `data`.
-     * Salida: `apply` de todos modos; nada de `push` ni conflicto.
+     * Salida: `pull` de todos modos; nada de `push` ni conflicto.
      */
     it('un registro borrado en el destino se trae aquí también aunque la huella coincida', () => {
       const plan = reconcile({
@@ -241,8 +258,8 @@ describe('reconcile engine', () => {
         originId: 'origina',
       });
 
-      expect(plan.apply).toHaveLength(1);
-      expect(plan.apply[0]?.auditoria.deleted).toBe(true);
+      expect(plan.pull).toHaveLength(1);
+      expect(plan.pull[0]?.auditoria.deleted).toBe(true);
       expect(plan.push).toEqual([]);
       expect(plan.conflicts).toEqual([]);
     });
@@ -298,7 +315,7 @@ describe('reconcile engine', () => {
           },
         },
       ]);
-      expect(plan.apply).toEqual([]);
+      expect(plan.pull).toEqual([]);
     });
 
     /**
@@ -336,7 +353,7 @@ describe('reconcile engine', () => {
       });
 
       expect(plan.conflicts).toEqual([{ id: '1', winner: 'remote', blind: false }]);
-      expect(plan.apply).toEqual([
+      expect(plan.pull).toEqual([
         {
           values: { id: '1', contenido: 'remoto-revivido' },
           auditoria: {
@@ -349,6 +366,46 @@ describe('reconcile engine', () => {
         },
       ]);
       expect(plan.push).toEqual([]);
+    });
+
+    /**
+     * Caso: aunque el registro local borrado traiga un ancestro embebido (`syncedValues`), un
+     * borrado NUNCA se fusiona campo a campo — es un evento de todo el registro. Debe seguir
+     * compitiendo por fecha exactamente igual que sin ancestro.
+     * Entrada: igual que "gana el destino, revive aquí", pero `data.auditoria.syncedValues` trae un
+     * `values` que, de mirarse campo a campo, permitiría "fusionar" — el motor no debe ni intentarlo.
+     * Salida: conflicto a favor del destino (por fecha, como siempre); nunca `winner: 'merged'`.
+     */
+    it('un borrado local con ancestro embebido sigue compitiendo por fecha, nunca se fusiona', () => {
+      const plan = reconcile({
+        base: [
+          {
+            values: { id: '1', contenido: 'remoto-revivido' },
+            auditoria: {
+              keyfinder: 'fp-remoto',
+              deleted: false,
+              createdAt: '0000000000100-0000-origina',
+              updatedAt: '0000000009000-0000-origina',
+            },
+          },
+        ],
+        data: [
+          {
+            values: { id: '1', contenido: 'remoto-revivido' },
+            auditoria: {
+              keyfinder: 'fp-remoto',
+              deleted: true,
+              createdAt: '0000000000100-0000-origina',
+              updatedAt: '0000000003000-0000-origina',
+              syncedValues: { id: '1', contenido: 'orig' },
+            },
+          },
+        ],
+        now: 1_700_000_000_000,
+        originId: 'origina',
+      });
+
+      expect(plan.conflicts).toEqual([{ id: '1', winner: 'remote', blind: false }]);
     });
   });
 
@@ -382,7 +439,7 @@ describe('reconcile engine', () => {
       });
 
       expect(plan.push).toEqual([]);
-      expect(plan.apply).toEqual([]);
+      expect(plan.pull).toEqual([]);
       expect(plan.conflicts).toEqual([]);
     });
   });
@@ -390,11 +447,13 @@ describe('reconcile engine', () => {
   describe('reconcile · conflicto de contenido: gana la fecha más reciente', () => {
     /**
      * Caso: el dato cambió en los dos lados desde la última vez y hay que desempatar por fecha; la
-     * edición de aquí es más reciente que la del destino.
-     * Entrada: `base` viva con versión 2000; `data` con huella distinta y `updatedAt` = 3000.
+     * edición de aquí es más reciente que la del destino. Sin ancestro embebido, así que no hay
+     * información para fusionar: gana un lado entero, como siempre.
+     * Entrada: `base` viva con versión 2000; `data` con huella distinta y `updatedAt` = 3000, sin
+     * `syncedValues`.
      * Salida: conflicto a favor de lo local; se sube el registro de aquí.
      */
-    it('huella distinta y local más reciente: gana lo local, se sube', () => {
+    it('huella distinta y local más reciente, sin ancestro: gana lo local, se sube', () => {
       const plan = reconcile({
         base: [
           {
@@ -435,7 +494,7 @@ describe('reconcile engine', () => {
           },
         },
       ]);
-      expect(plan.apply).toEqual([]);
+      expect(plan.pull).toEqual([]);
     });
 
     /**
@@ -473,7 +532,7 @@ describe('reconcile engine', () => {
       });
 
       expect(plan.conflicts).toEqual([{ id: '1', winner: 'remote', blind: false }]);
-      expect(plan.apply).toEqual([
+      expect(plan.pull).toEqual([
         {
           values: { id: '1', contenido: 'remoto' },
           auditoria: {
@@ -518,8 +577,8 @@ describe('reconcile engine', () => {
       });
 
       expect(plan.conflicts).toEqual([{ id: '1', winner: 'remote', blind: true }]);
-      expect(plan.apply).toHaveLength(1);
-      expect(plan.apply[0]?.values).toEqual({ id: '1', contenido: 'remoto' });
+      expect(plan.pull).toHaveLength(1);
+      expect(plan.pull[0]?.values).toEqual({ id: '1', contenido: 'remoto' });
       expect(plan.push).toEqual([]);
     });
 
@@ -550,7 +609,292 @@ describe('reconcile engine', () => {
       });
 
       expect(plan.conflicts).toEqual([{ id: '1', winner: 'remote', blind: true }]);
-      expect(plan.apply[0]?.auditoria.updatedAt).toBe('1700000000000-0000-origina');
+      expect(plan.pull[0]?.auditoria.updatedAt).toBe('1700000000000-0000-origina');
+    });
+  });
+
+  describe('reconcile · fusión de campos no solapados', () => {
+    /**
+     * Caso central del feature: el destino cambió un campo, local cambió OTRO campo distinto desde
+     * la última vez que ambos coincidían. Con el ancestro común embebido (`syncedValues`), el motor
+     * puede atribuir cada cambio a su lado y fusionarlos, en vez de descartar uno de los dos enteros.
+     * Entrada: `syncedValues` = `{ a: 'orig-a', b: 'orig-b' }`; `base.values.a` cambió a
+     * `'remoto-a'` (b intacto); `data.values.b` cambió a `'local-b'` (a intacto).
+     * Salida: se generan DOS comandos — `push` y `pull` — con el MISMO registro fusionado
+     * (`{ a: 'remoto-a', b: 'local-b' }`), huella vacía a propósito, y un conflicto diagnóstico
+     * `winner: 'merged'` con `mergedFrom` indicando qué campo vino de cada lado.
+     */
+    it('destino y local cambiaron campos distintos: se fusionan, no se descarta ninguno', () => {
+      const plan = reconcile({
+        base: [
+          {
+            values: { id: '1', a: 'remoto-a', b: 'orig-b' },
+            auditoria: {
+              keyfinder: 'fp-remoto',
+              deleted: false,
+              createdAt: '0000000000100-0000-origina',
+              updatedAt: '0000000000500-0000-origina',
+            },
+          },
+        ],
+        data: [
+          {
+            values: { id: '1', a: 'orig-a', b: 'local-b' },
+            auditoria: {
+              keyfinder: 'fp-local',
+              deleted: false,
+              createdAt: '0000000000100-0000-origina',
+              syncedValues: { id: '1', a: 'orig-a', b: 'orig-b' },
+            },
+          },
+        ],
+        now: 1_700_000_000_000,
+        originId: 'origina',
+      });
+
+      const merged = {
+        values: { id: '1', a: 'remoto-a', b: 'local-b' },
+        auditoria: {
+          id: undefined,
+          keyfinder: '',
+          deleted: false,
+          createdAt: '0000000000100-0000-origina',
+          updatedAt: '1700000000000-0000-origina',
+        },
+      };
+      expect(plan.push).toEqual([merged]);
+      expect(plan.pull).toEqual([merged]);
+      expect(plan.conflicts).toEqual([
+        { id: '1', winner: 'merged', blind: false, mergedFrom: { remote: ['a'], local: ['b'] } },
+      ]);
+    });
+
+    /**
+     * Caso: los dos lados cambiaron el MISMO campo a valores distintos — un solapamiento real, no
+     * atribuible sin pérdida. Aunque haya ancestro, la fusión se aborta entera y se cae al criterio
+     * de siempre (gana la fecha más reciente, registro completo).
+     * Entrada: `syncedValues.a = 'orig'`; `base.values.a = 'remoto'`; `data.values.a = 'local'`
+     * (mismo campo, valores distintos), con `data` más reciente.
+     * Salida: NUNCA `winner: 'merged'` — gana lo local entero, exactamente como sin ancestro.
+     */
+    it('mismo campo cambiado a valores distintos en los dos lados: no se fusiona, gana un lado entero', () => {
+      const plan = reconcile({
+        base: [
+          {
+            values: { id: '1', a: 'remoto' },
+            auditoria: {
+              keyfinder: 'fp-remoto',
+              deleted: false,
+              createdAt: '0000000000100-0000-origina',
+              updatedAt: '0000000002000-0000-origina',
+            },
+          },
+        ],
+        data: [
+          {
+            values: { id: '1', a: 'local' },
+            auditoria: {
+              keyfinder: 'fp-local',
+              deleted: false,
+              createdAt: '0000000000100-0000-origina',
+              updatedAt: '0000000003000-0000-origina',
+              syncedValues: { id: '1', a: 'orig' },
+            },
+          },
+        ],
+        now: 1_700_000_000_000,
+        originId: 'origina',
+      });
+
+      expect(plan.conflicts).toEqual([{ id: '1', winner: 'local', blind: false }]);
+      expect(plan.push).toEqual([
+        {
+          values: { id: '1', a: 'local' },
+          auditoria: {
+            id: undefined,
+            keyfinder: 'fp-local',
+            deleted: false,
+            createdAt: '0000000000100-0000-origina',
+            updatedAt: '1700000000000-0000-origina',
+          },
+        },
+      ]);
+      expect(plan.pull).toEqual([]);
+    });
+
+    /**
+     * Caso: los dos lados cambiaron el MISMO campo, pero al MISMO valor nuevo (p. ej. dos
+     * dispositivos que capturaron la misma corrección) — no hay nada que perder ahí, así que no
+     * cuenta como solapamiento y no bloquea la fusión del resto de campos que sí cambiaron en un
+     * solo lado.
+     * Entrada: `syncedValues = { a: 'orig-a', b: 'orig-b' }`; `base.values.a` y `data.values.a`
+     * cambiaron los dos a `'nuevo'` (coinciden); `data.values.b` cambió a `'local-b'` (solo local).
+     * Salida: fusiona; `mergedFrom.local` incluye `b` pero no `a` (nadie "entregó" `a` en exclusiva).
+     */
+    it('mismo campo al mismo valor nuevo en los dos lados no bloquea la fusión del resto', () => {
+      const plan = reconcile({
+        base: [
+          {
+            values: { id: '1', a: 'nuevo', b: 'orig-b' },
+            auditoria: {
+              keyfinder: 'fp-remoto',
+              deleted: false,
+              createdAt: '0000000000100-0000-origina',
+            },
+          },
+        ],
+        data: [
+          {
+            values: { id: '1', a: 'nuevo', b: 'local-b' },
+            auditoria: {
+              keyfinder: 'fp-local',
+              deleted: false,
+              createdAt: '0000000000100-0000-origina',
+              syncedValues: { id: '1', a: 'orig-a', b: 'orig-b' },
+            },
+          },
+        ],
+        now: 1_700_000_000_000,
+        originId: 'origina',
+      });
+
+      expect(plan.conflicts).toEqual([
+        { id: '1', winner: 'merged', blind: false, mergedFrom: { remote: [], local: ['b'] } },
+      ]);
+      expect(plan.push).toEqual([
+        {
+          values: { id: '1', a: 'nuevo', b: 'local-b' },
+          auditoria: {
+            id: undefined,
+            keyfinder: '',
+            deleted: false,
+            createdAt: '0000000000100-0000-origina',
+            updatedAt: '1700000000000-0000-origina',
+          },
+        },
+      ]);
+    });
+
+    /**
+     * Caso: sin ancestro embebido (registro nunca sincronizado antes, o escrito por código previo a
+     * este campo), el motor no tiene forma de atribuir un campo divergente a un lado — aunque los dos
+     * cambios caigan en campos distintos, no puede saber que no se pisan. Cae al criterio de
+     * siempre.
+     * Entrada: igual que el caso central de fusión (campos `a`/`b` distintos), pero SIN
+     * `syncedValues` en `data.auditoria`.
+     * Salida: NUNCA `winner: 'merged'` — gana un lado entero por versión.
+     */
+    it('sin ancestro embebido, campos distintos cambiados no se fusionan: no hay forma de atribuirlos', () => {
+      const plan = reconcile({
+        base: [
+          {
+            values: { id: '1', a: 'remoto-a', b: 'orig-b' },
+            auditoria: {
+              keyfinder: 'fp-remoto',
+              deleted: false,
+              createdAt: '0000000000100-0000-origina',
+              updatedAt: '0000000002000-0000-origina',
+            },
+          },
+        ],
+        data: [
+          {
+            values: { id: '1', a: 'orig-a', b: 'local-b' },
+            auditoria: {
+              keyfinder: 'fp-local',
+              deleted: false,
+              createdAt: '0000000000100-0000-origina',
+              updatedAt: '0000000003000-0000-origina',
+              // Sin syncedValues.
+            },
+          },
+        ],
+        now: 1_700_000_000_000,
+        originId: 'origina',
+      });
+
+      expect(plan.conflicts).toEqual([{ id: '1', winner: 'local', blind: false }]);
+    });
+
+    /**
+     * Caso: el ancestro embebido no es un objeto plano (un dato corrupto, o de una forma que no
+     * encaja) — no hay "campos" que comparar, así que la fusión ni se intenta.
+     * Entrada: `data.auditoria.syncedValues` es un string, no un objeto; `base`/`data` difieren en
+     * contenido.
+     * Salida: cae al criterio de siempre, sin lanzar ninguna excepción.
+     */
+    it('un ancestro que no es un objeto plano no se puede usar para fusionar', () => {
+      const plan = reconcile({
+        base: [
+          {
+            values: { id: '1', a: 'remoto' },
+            auditoria: {
+              keyfinder: 'fp-remoto',
+              deleted: false,
+              createdAt: '0000000000100-0000-origina',
+              updatedAt: '0000000002000-0000-origina',
+            },
+          },
+        ],
+        data: [
+          {
+            values: { id: '1', a: 'local' },
+            auditoria: {
+              keyfinder: 'fp-local',
+              deleted: false,
+              createdAt: '0000000000100-0000-origina',
+              updatedAt: '0000000003000-0000-origina',
+              syncedValues: 'no-es-un-objeto' as unknown as { id: string; a: string },
+            },
+          },
+        ],
+        now: 1_700_000_000_000,
+        originId: 'origina',
+      });
+
+      expect(plan.conflicts).toEqual([{ id: '1', winner: 'local', blind: false }]);
+    });
+
+    /**
+     * Caso: local añadió un campo que no existía ni en el ancestro ni en el destino (p. ej. una
+     * columna nueva del esquema, capturada aquí antes de que el destino la vea). Debe incluirse en la
+     * fusión igual que cualquier otro cambio exclusivo de un lado.
+     * Entrada: `syncedValues = { a: 'orig-a' }` (sin `b`); `base.values` cambió `a`, sin `b`;
+     * `data.values` no tocó `a` pero añadió `b: 'nuevo-local'`.
+     * Salida: fusiona; el resultado incluye `b`, y `mergedFrom.local` lo lista.
+     */
+    it('un campo nuevo solo en local, ausente en el ancestro y en el destino, se incluye en la fusión', () => {
+      const plan = reconcile({
+        base: [
+          {
+            values: { id: '1', a: 'remoto-a' },
+            auditoria: {
+              keyfinder: 'fp-remoto',
+              deleted: false,
+              createdAt: '0000000000100-0000-origina',
+            },
+          },
+        ],
+        data: [
+          {
+            values: { id: '1', a: 'orig-a', b: 'nuevo-local' },
+            auditoria: {
+              keyfinder: 'fp-local',
+              deleted: false,
+              createdAt: '0000000000100-0000-origina',
+              syncedValues: { id: '1', a: 'orig-a' },
+            },
+          },
+        ],
+        now: 1_700_000_000_000,
+        originId: 'origina',
+      });
+
+      expect(plan.conflicts).toEqual([
+        { id: '1', winner: 'merged', blind: false, mergedFrom: { remote: ['a'], local: ['b'] } },
+      ]);
+      expect(plan.push[0]?.values).toEqual({ id: '1', a: 'remoto-a', b: 'nuevo-local' });
+      expect(plan.pull[0]?.values).toEqual({ id: '1', a: 'remoto-a', b: 'nuevo-local' });
     });
   });
 
@@ -705,10 +1049,10 @@ describe('reconcile engine', () => {
         originId: 'origina',
       });
 
-      const applied = plan.apply.find((registro) => registro.values['id'] === '1');
+      const pulled = plan.pull.find((registro) => registro.values['id'] === '1');
       const pushed = plan.push.find((registro) => registro.values['id'] === '2');
-      expect(applied?.auditoria.updatedAt).not.toBe('1700000600000-0000-origina');
-      expect(applied?.auditoria.updatedAt).toBe('1700000000000-0000-origina');
+      expect(pulled?.auditoria.updatedAt).not.toBe('1700000600000-0000-origina');
+      expect(pulled?.auditoria.updatedAt).toBe('1700000000000-0000-origina');
       expect(pushed?.auditoria.updatedAt).toBe('1700000000000-0001-origina');
     });
   });
@@ -744,7 +1088,7 @@ describe('reconcile engine', () => {
         originId: 'origina',
       });
 
-      expect(plan.apply).toEqual([]);
+      expect(plan.pull).toEqual([]);
       expect(plan.push).toEqual([]);
     });
 
@@ -799,8 +1143,8 @@ describe('reconcile engine', () => {
 
       expect(plan.push).toHaveLength(1);
       expect(plan.push[0]?.values['id']).toBe('1');
-      expect(plan.apply).toHaveLength(1);
-      expect(plan.apply[0]?.values['id']).toBe('2');
+      expect(plan.pull).toHaveLength(1);
+      expect(plan.pull[0]?.values['id']).toBe('2');
     });
   });
 
@@ -931,9 +1275,7 @@ describe('reconcile engine', () => {
       });
 
       const byId = (plan: typeof first) =>
-        [...plan.apply].sort((x, y) =>
-          String(x.values['id']).localeCompare(String(y.values['id'])),
-        );
+        [...plan.pull].sort((x, y) => String(x.values['id']).localeCompare(String(y.values['id'])));
       expect(byId(first)).toEqual(byId(second));
     });
 
@@ -953,11 +1295,11 @@ describe('reconcile engine', () => {
     /**
      * Caso: cualquier forma de contenido (un objeto anidado, lo que sea) tiene que poder viajar por el
      * motor sin que lo interprete ni lo transforme. El motor nunca inspecciona `values` más allá de
-     * leer el campo identificador — por eso `push[0].values` y `apply[0].values` son EXACTAMENTE
+     * leer el campo identificador — por eso `push[0].values` y `pull[0].values` son EXACTAMENTE
      * (`===`) los mismos objetos que llegaron en `data`/`base`.
      * Entrada: un objeto local con un campo anidado arbitrario, en un alta local; y un objeto remoto
-     * anidado, en un registro que se aplica.
-     * Salida: `push[0].values` y `apply[0].values` son el mismo objeto, sin copiar ni transformar.
+     * anidado, en un registro que se trae.
+     * Salida: `push[0].values` y `pull[0].values` son el mismo objeto, sin copiar ni transformar.
      */
     it('el contenido de un registro nunca se inspecciona, solo se transporta', () => {
       interface Contenido {
@@ -966,7 +1308,7 @@ describe('reconcile engine', () => {
         anidado: { x: number };
       }
       const pushedValues: Contenido = { id: '1', compuesto: true, anidado: { x: 1 } };
-      const appliedValues: Contenido = { id: '1', compuesto: false, anidado: { x: 2 } };
+      const pulledValues: Contenido = { id: '1', compuesto: false, anidado: { x: 2 } };
 
       const pushPlan = reconcile<Contenido>({
         base: [],
@@ -981,10 +1323,10 @@ describe('reconcile engine', () => {
       });
       expect(pushPlan.push[0]?.values).toBe(pushedValues);
 
-      const applyPlan = reconcile<Contenido>({
+      const pullPlan = reconcile<Contenido>({
         base: [
           {
-            values: appliedValues,
+            values: pulledValues,
             auditoria: {
               keyfinder: 'fp-remoto',
               deleted: false,
@@ -1001,7 +1343,7 @@ describe('reconcile engine', () => {
         now: 1_700_000_000_000,
         originId: 'origina',
       });
-      expect(applyPlan.apply[0]?.values).toBe(appliedValues);
+      expect(pullPlan.pull[0]?.values).toBe(pulledValues);
     });
   });
 
@@ -1014,7 +1356,7 @@ describe('reconcile engine', () => {
     it('una entrada completamente vacía no hace nada y no falla', () => {
       const plan = reconcile({ base: [], data: [], now: 1_700_000_000_000, originId: 'origina' });
 
-      expect(plan).toEqual({ push: [], apply: [], duplicates: [], conflicts: [] });
+      expect(plan).toEqual({ push: [], pull: [], duplicates: [], conflicts: [] });
     });
 
     /**
@@ -1023,7 +1365,7 @@ describe('reconcile engine', () => {
      * que se ignora: ni sube, ni provoca que el resto de la colección falle.
      * Entrada: `base` trae el id '1' vivo; `data` trae un objeto sin campo `id`.
      * Salida: el objeto sin id no genera ningún efecto — el id '1' de `base` se trata como "aquí no
-     * se tiene todavía" (el objeto inválido no cuenta como su reemplazo) y se trae con `apply`.
+     * se tiene todavía" (el objeto inválido no cuenta como su reemplazo) y se trae con `pull`.
      */
     it('un registro de `data` sin id legible se ignora, sin hacer fallar al resto', () => {
       const plan = reconcile({
@@ -1043,8 +1385,8 @@ describe('reconcile engine', () => {
         originId: 'origina',
       });
 
-      expect(plan.apply).toHaveLength(1);
-      expect(plan.apply[0]?.values).toEqual({ id: '1', contenido: 'x' });
+      expect(plan.pull).toHaveLength(1);
+      expect(plan.pull[0]?.values).toEqual({ id: '1', contenido: 'x' });
       expect(plan.push).toEqual([]);
     });
 

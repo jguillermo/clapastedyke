@@ -14,7 +14,7 @@ export type RecordId = string;
  * Metadatos de sincronización/auditoría que acompañan a `values` en cada registro — los mismos que
  * ya se guardan junto al dato en el almacén, no algo que haya que mapear por fuera.
  */
-export interface Auditoria {
+export interface Auditoria<TValues = unknown> {
   /**
    * Nombre del campo de `values` que es el identificador del registro. **No es el valor del id**:
    * es el nombre del campo donde vive (p. ej. `'sku'` ⇒ la identidad real está en `values.sku`).
@@ -32,6 +32,18 @@ export interface Auditoria {
    * registro nunca editado no tiene `updatedAt`, y su fecha de cambio es la de su creación.
    */
   readonly updatedAt?: string;
+  /**
+   * Snapshot de `values` que este registro LOCAL sabía que coincidía con el destino la última vez
+   * que convergieron — el ancestro común que hace falta para una fusión de tres vías (el mismo
+   * papel que el *merge base* en `git`). Solo tiene sentido en un registro de `data`; el motor lo
+   * ignora en `base`.
+   *
+   * Ausente (primera sincronización de este registro, o escrito antes de que este campo
+   * existiera) ⇒ el motor no puede atribuir un campo divergente a un lado concreto y cae en el
+   * criterio de siempre: gana un lado entero por versión. Ver "Fusión de campos no solapados" en
+   * el `README.md` de esta carpeta.
+   */
+  readonly syncedValues?: TValues;
 }
 
 /**
@@ -40,7 +52,7 @@ export interface Auditoria {
  */
 export interface Registro<TValues = unknown> {
   readonly values: TValues;
-  readonly auditoria: Auditoria;
+  readonly auditoria: Auditoria<TValues>;
 }
 
 export interface EngineInput<TValues = unknown> {
@@ -53,12 +65,23 @@ export interface EngineInput<TValues = unknown> {
   readonly originId: string;
 }
 
-/** Los dos lados cambiaron y hubo que elegir. */
+/** Los dos lados cambiaron y hubo que decidir qué hacer. */
 export interface Conflict {
   readonly id: RecordId;
-  readonly winner: 'remote' | 'local';
-  /** `true` si se eligió sin poder leer una fecha local con la que comparar. */
+  /**
+   * `'merged'` cuando los dos lados cambiaron campos distintos y no hizo falta descartar ninguno
+   * (ver "Fusión de campos no solapados" en `README.md`). `'remote'`/`'local'` cuando hubo que
+   * elegir un lado entero — por solapamiento real (el mismo campo, valores distintos) o por no
+   * tener ancestro con el que fusionar.
+   */
+  readonly winner: 'remote' | 'local' | 'merged';
+  /** `true` si se eligió sin poder leer una fecha local con la que comparar. Siempre `false` si `winner` es `'merged'` — una fusión no es una apuesta a ciegas. */
   readonly blind: boolean;
+  /** Solo presente cuando `winner` es `'merged'`: qué claves de `values` vinieron de cada lado. */
+  readonly mergedFrom?: {
+    readonly remote: readonly string[];
+    readonly local: readonly string[];
+  };
 }
 
 /** Un id que aparece en más de un registro remoto. No se toca por ningún lado. */
@@ -68,10 +91,17 @@ export interface DuplicateIdentity<TValues = unknown> {
 }
 
 export interface EnginePlan<TValues = unknown> {
-  /** Registros que hay que escribir en el destino: ganó lo local, incluidos los borrados marcados. */
+  /**
+   * Registros que hay que escribir en el destino: ganó lo local (incluidos los borrados
+   * marcados), o son el resultado de una fusión — en ese caso, el MISMO registro aparece también
+   * en `pull` (ver "Fusión de campos no solapados" en `README.md`).
+   */
   readonly push: readonly Registro<TValues>[];
-  /** Registros que hay que escribir aquí: ganó el destino, incluidos los que el destino borró. */
-  readonly apply: readonly Registro<TValues>[];
+  /**
+   * Registros que hay que escribir aquí: ganó el destino (incluidos los que el destino borró), o
+   * son el resultado de una fusión — en ese caso, el MISMO registro aparece también en `push`.
+   */
+  readonly pull: readonly Registro<TValues>[];
   readonly duplicates: readonly DuplicateIdentity<TValues>[];
   readonly conflicts: readonly Conflict[];
 }
