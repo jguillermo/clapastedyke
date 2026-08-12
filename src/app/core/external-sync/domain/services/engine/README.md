@@ -23,16 +23,16 @@ cubre.
 
 - **No sabe qué es Google, ni Sheets, ni HTTP.** Nunca hace una petición de red.
 - **No sabe qué es una tabla, una fila ni una posición.** Un registro tiene un identificador (leído
-  de `values`, ver más abajo) y un contenido opaco. El destino se asume un almacén con clave real —
-  no hace falta un puntero de ubicación (fila, ETag…) aparte del propio id.
-- **No canonicaliza ni hashea contenido.** Recibe la huella (`auditoria.keyfinder`) ya calculada.
-  Compara cadenas de texto, nunca interpreta qué significan los campos de `values`.
+  de sus propios campos, ver más abajo) y un contenido de negocio opaco. El destino se asume un
+  almacén con clave real — no hace falta un puntero de ubicación (fila, ETag…) aparte del propio id.
+- **No canonicaliza ni hashea contenido.** Recibe la huella (`sync.keyfinder`) ya calculada. Compara
+  cadenas de texto, nunca interpreta qué significan los campos de negocio.
 - **No decide cuándo ejecutarse.** No hay temporizadores, ni debounce, ni intervalo — eso es
   responsabilidad de quien lo llama (en esta app, `SyncScheduler`).
 - **No recuerda nada entre llamadas.** No tiene memoria propia ni persiste nada: cada ciclo compara
   `data` contra el `base` que le pasen, sin más estado que ese. El único "recuerdo" posible —el
   ancestro que hace falta para fusionar (ver más abajo)— no lo guarda el motor: viaja embebido en el
-  propio registro de `data` que lo necesite (`auditoria.syncedValues`), y es responsabilidad de quien
+  propio registro de `data` que lo necesite (`sync.syncedValues`), y es responsabilidad de quien
   llama mantenerlo actualizado entre ciclos.
 - **No reconcilia varias colecciones a la vez.** Quien tenga varias (recetas, insumos…) llama a
   `reconcile()` una vez por cada una.
@@ -42,25 +42,29 @@ cubre.
 ### Forma de un registro
 
 Tanto `base` como `data` son arrays de **registros con la misma forma** — la misma que ya tienen en
-el almacén (IndexedDB, lo que sea), sin envoltorio aparte:
+el almacén (IndexedDB, lo que sea). Los campos de negocio van **aplanados al nivel superior** del
+objeto (nada de un envoltorio `values` aparte); lo único que el motor añade es un campo `sync` con
+los metadatos de sincronización:
 
 ```ts
-interface Registro<TValues> {
-  values: TValues;   // el contenido de negocio, opaco para el motor
-  auditoria: {
-    id?: string;        // nombre del campo de `values` que es el identificador; por defecto 'id'
-    keyfinder: string;  // huella/hash de `values`, para saber si el contenido cambió
+type Registro<TValues> = TValues & {  // TValues: los campos de negocio, opacos para el motor
+  sync: {
+    id?: string;        // nombre del campo de negocio que es el identificador; por defecto 'id'
+    keyfinder: string;  // huella/hash del contenido, para saber si cambió
     deleted: boolean;    // borrado lógico — nunca se elimina físicamente el dato
     createdAt: string;   // formato de reloj lógico híbrido, ver hybrid-clock.ts
     updatedAt?: string;  // mismo formato; se usa antes que createdAt si está
   };
-}
+};
 ```
 
-`auditoria.id` **no es el valor del identificador**: es el nombre del campo de `values` donde vive.
-Con el default (`'id'`), un registro `{ values: { id: 'r1', nombre: 'Bizcocho' }, auditoria: {...} }`
-tiene identificador `'r1'`. Si el identificador vive en otro campo (`values.sku`, por ejemplo),
-`auditoria.id: 'sku'` se lo dice al motor.
+`sync` y no "auditoría": estos campos no llevan un historial de quién hizo qué, existen para que el
+motor pueda **comparar y versionar**.
+
+`sync.id` **no es el valor del identificador**: es el nombre del campo de negocio donde vive. Con el
+default (`'id'`), un registro `{ id: 'r1', nombre: 'Bizcocho', sync: {...} }` tiene identificador
+`'r1'`. Si el identificador vive en otro campo (`sku`, por ejemplo), `sync.id: 'sku'` se lo dice al
+motor.
 
 ### Entrada
 
@@ -74,17 +78,17 @@ interface EngineInput<TValues> {
 ```
 
 `data` es el snapshot local **completo** en cada ciclo, no solo lo que cambió: un registro borrado
-aquí sigue apareciendo en `data`, con `auditoria.deleted: true`. No hay ninguna regla de "ausencia
-implica borrado" — un id de `base` que no aparece en `data` significa simplemente que aquí todavía
-no se tiene, y el motor lo trae.
+aquí sigue apareciendo en `data`, con `sync.deleted: true`. No hay ninguna regla de "ausencia implica
+borrado" — un id de `base` que no aparece en `data` significa simplemente que aquí todavía no se
+tiene, y el motor lo trae.
 
 ```ts
 reconcile({
   base: [
-    { values: { id: 'r1', nombre: 'Bizcocho' }, auditoria: { keyfinder: 'fp', deleted: false, createdAt: '…' } },
+    { id: 'r1', nombre: 'Bizcocho', sync: { keyfinder: 'fp', deleted: false, createdAt: '…' } },
   ],
   data: [
-    { values: { id: 'r1', nombre: 'Bizcocho E2E' }, auditoria: { keyfinder: 'fp2', deleted: false, createdAt: '…', updatedAt: '…' } },
+    { id: 'r1', nombre: 'Bizcocho E2E', sync: { keyfinder: 'fp2', deleted: false, createdAt: '…', updatedAt: '…' } },
   ],
   now: Date.now(),
   originId: 'este-dispositivo',
@@ -96,9 +100,8 @@ reconcile({
 Un `EnginePlan` con dos listas de acción y dos de diagnóstico:
 
 - **`push`** — registros que hay que escribir en el destino porque ganó lo local, o porque son el
-  resultado de una fusión (ver más abajo). Incluye los borrados: un registro con
-  `auditoria.deleted: true` en `push` se escribe tal cual, el adaptador no distingue "contenido" de
-  "borrado".
+  resultado de una fusión (ver más abajo). Incluye los borrados: un registro con `sync.deleted: true`
+  en `push` se escribe tal cual, el adaptador no distingue "contenido" de "borrado".
 - **`pull`** — registros que hay que escribir aquí porque ganó el destino (por ausencia local, por
   borrado incondicional del destino, o por conflicto), o porque son el resultado de una fusión. Misma
   regla: si trae `deleted: true`, se escribe tal cual.
@@ -117,7 +120,7 @@ No hay `remove`, `tombstones`, `purge` ni `aborted`: borrar es solo otro `push`/
 
 ## La tabla de decisión
 
-Por cada id, resuelto en `base` y en `data` leyendo `values[auditoria.id ?? 'id']`:
+Por cada id, resuelto en `base` y en `data` leyendo `registro[sync.id ?? 'id']`:
 
 | en `base` | en `data` | qué se hace |
 | --- | --- | --- |
@@ -130,7 +133,7 @@ Por cada id, resuelto en `base` y en `data` leyendo `values[auditoria.id ?? 'id'
 
 Dos asimetrías deliberadas:
 
-- **El borrado del destino no se discute.** Si `base.auditoria.deleted` es `true`, gana siempre, sin
+- **El borrado del destino no se discute.** Si `base.sync.deleted` es `true`, gana siempre, sin
   mirar fechas ni huellas — el destino es la fuente de verdad y su borrado es un hecho consumado.
 - **El borrado local sí compite por fecha**, como cualquier otro cambio de contenido: si aquí se
   borró pero el destino cambió después (lo revivió, lo editó), el destino gana y el registro vuelve
@@ -152,21 +155,20 @@ Dos asimetrías deliberadas:
 
 Cuando `base` y `data` divergen, antes de rendirse a "gana un lado entero" el motor intenta algo más
 fino: si el destino cambió unos campos y local cambió otros campos **distintos**, se pueden combinar
-los dos sin perder ninguno. Solo hace falta un tercer punto de referencia: el **ancestro común**, el
-`values` que los dos lados sabían que coincidía la última vez que convergieron — el mismo papel que
-el *merge base* en `git merge`. Sin ese tercer punto, ver que un campo difiere entre `base` y `data`
-no dice **quién** lo cambió, así que no se puede atribuir con seguridad.
+los dos sin perder ninguno. Solo hace falta un tercer punto de referencia: el **ancestro común**, los
+campos de negocio que los dos lados sabían que coincidían la última vez que convergieron — el mismo
+papel que el *merge base* en `git merge`. Sin ese tercer punto, ver que un campo difiere entre `base`
+y `data` no dice **quién** lo cambió, así que no se puede atribuir con seguridad.
 
 ### De dónde sale el ancestro: embebido en el propio registro local
 
 El motor sigue sin tener memoria propia entre llamadas (ver más arriba). El ancestro no viaja como
-una tercera lista aparte en `EngineInput` — viaja **dentro de `data`**, en
-`auditoria.syncedValues`:
+una tercera lista aparte en `EngineInput` — viaja **dentro de `data`**, en `sync.syncedValues`:
 
 ```ts
-interface Auditoria<TValues> {
+interface Sync<TValues> {
   // ...los campos de siempre (id, keyfinder, deleted, createdAt, updatedAt)...
-  syncedValues?: TValues; // el `values` que ESTE registro local sabía que coincidía con el destino
+  syncedValues?: TValues; // los campos de negocio que ESTE registro local sabía que coincidían con el destino
 }
 ```
 
@@ -178,8 +180,9 @@ interface Auditoria<TValues> {
 
 ### Cómo decide qué fusionar
 
-Con el ancestro disponible, y solo cuando `base.values`/`data.values`/`syncedValues` son los tres un
-objeto plano (si no, no hay "campos" que comparar y se cae al criterio de siempre), por cada clave:
+Con el ancestro disponible, y solo cuando los campos de negocio de `base`/`data`/`syncedValues` son
+los tres un objeto plano (si no, no hay "campos" que comparar y se cae al criterio de siempre), por
+cada clave:
 
 | `base` vs ancestro | `data` vs ancestro | qué pasa con esa clave |
 | --- | --- | --- |
@@ -207,16 +210,16 @@ Que el mismo id aparezca en las dos listas a la vez **es** la señal de que fue 
 falta ningún campo booleano nuevo en `Registro` para saberlo.
 
 `plan.conflicts` también recibe una entrada, con `winner: 'merged'`, `blind: false`, y
-`mergedFrom: { remote: string[], local: string[] }` listando qué claves vinieron de cada lado (las
-claves que ningún lado cambió, o que los dos cambiaron al mismo valor, no aparecen en ninguna de las
-dos listas).
+`mergedFrom: { remote: string[], local: string[] }` listando qué campos vinieron de cada lado (los
+que ningún lado cambió, o que los dos cambiaron al mismo valor, no aparecen en ninguna de las dos
+listas).
 
 ### La huella del registro fusionado viene vacía A PROPÓSITO
 
-`merged.auditoria.keyfinder` es `''`. Los valores fusionados son contenido **nuevo** que no coincide
-con la huella de ningún lado, y el motor no calcula huellas — nunca lo ha hecho, no es su trabajo
-(ver "Qué NO es" más arriba). **Quien aplique el plan debe recalcular la huella real de `values`
-antes de escribirla, en el destino y en local — nunca persistir esa cadena vacía.**
+`merged.sync.keyfinder` es `''`. Los valores fusionados son contenido **nuevo** que no coincide con
+la huella de ningún lado, y el motor no calcula huellas — nunca lo ha hecho, no es su trabajo (ver
+"Qué NO es" más arriba). **Quien aplique el plan debe recalcular la huella real antes de escribirla,
+en el destino y en local — nunca persistir esa cadena vacía.**
 
 ### Lo que le toca al adaptador (trabajo nuevo, sobre lo que ya hacía)
 
@@ -224,12 +227,12 @@ Además de lo de siempre (leer el destino, calcular la huella, aplicar `push`/`p
 que quiera aprovechar la fusión:
 
 1. **Tras cada ciclo con éxito** —haya escrito por `push`, por `pull` o por una fusión—, guarda junto
-   al registro local una copia de los `values` que en ese momento coinciden con el destino, como su
-   nuevo `auditoria.syncedValues`. Ese es el ancestro que hará posible fusionar la próxima vez que
+   al registro local una copia de los campos de negocio que en ese momento coinciden con el destino,
+   como su nuevo `sync.syncedValues`. Ese es el ancestro que hará posible fusionar la próxima vez que
    algo diverja. Sin este paso, el ancestro nunca aparece y el motor sigue funcionando exactamente
    como antes de este feature (gana un lado entero).
-2. **Al recibir un registro con `keyfinder: ''`** (viene de una fusión), recalcula la huella real de
-   `values` antes de escribirla en cualquiera de los dos lados.
+2. **Al recibir un registro con `keyfinder: ''`** (viene de una fusión), recalcula la huella real
+   antes de escribirla en cualquiera de los dos lados.
 
 Un borrado (de cualquiera de los dos lados) **nunca** pasa por aquí: sigue siendo un evento de todo
 el registro, resuelto por fecha como siempre — la fusión ni se intenta.
@@ -238,14 +241,15 @@ el registro, resuelto por fecha como siempre — la fusión ni se intenta.
 
 El motor no sabe nada de "cómo se ve" un destino — eso es enteramente trabajo del adaptador, que:
 
-1. **Lee el destino** y lo traduce a `Registro[]` (el `base` de la entrada): cada registro con su
-   `values` y su `auditoria` (`keyfinder`, `deleted`, `createdAt`/`updatedAt`) ya resueltos.
+1. **Lee el destino** y lo traduce a `Registro[]` (el `base` de la entrada): cada registro con sus
+   campos de negocio aplanados y su `sync` (`keyfinder`, `deleted`, `createdAt`/`updatedAt`) ya
+   resueltos.
 2. **Calcula la huella** (`keyfinder`) con el criterio que tenga sentido para ese destino (qué campos
-   cuentan, cómo se serializa un número, qué se excluye — los campos de auditoría nunca deben entrar
-   en la huella, para que escribirlos no parezca una edición). El motor no tiene opinión sobre esto.
+   cuentan, cómo se serializa un número, qué se excluye — los campos de `sync` nunca deben entrar en
+   la huella, para que escribirlos no parezca una edición). El motor no tiene opinión sobre esto.
 3. **Llama a `reconcile(...)`** con eso más el snapshot local completo (`data`), una vez por cada
    colección — si quiere fusión de campos, cada registro de `data` lleva su propio
-   `auditoria.syncedValues` (ver "Fusión de campos no solapados" arriba).
+   `sync.syncedValues` (ver "Fusión de campos no solapados" arriba).
 4. **Aplica el plan**: escribe en el destino lo que diga `push` (usando el id de cada registro para
    ubicarlo — el motor asume que basta con eso), y escribe aquí lo que diga `pull`. Si un registro
    trae `keyfinder: ''`, recalcula la huella real antes de escribirlo, en cualquiera de los dos

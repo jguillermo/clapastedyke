@@ -11,13 +11,15 @@ import { HybridClock, LogicalVersion } from './hybrid-clock';
  * y sin destino real, que es la única forma de cubrirlos de verdad.
  */
 
-type Mutable<TValues> = {
+type Mutable<TValues extends object> = {
   -readonly [
     Key in keyof EnginePlan<TValues>
   ]: EnginePlan<TValues>[Key] extends readonly (infer Item)[] ? Item[] : EnginePlan<TValues>[Key];
 };
 
-export function reconcile<TValues = unknown>(input: EngineInput<TValues>): EnginePlan<TValues> {
+export function reconcile<TValues extends object = Record<string, unknown>>(
+  input: EngineInput<TValues>,
+): EnginePlan<TValues> {
   const plan: Mutable<TValues> = { push: [], pull: [], duplicates: [], conflicts: [] };
 
   const clock = new HybridClock(input.originId);
@@ -71,21 +73,17 @@ export function reconcile<TValues = unknown>(input: EngineInput<TValues>): Engin
 }
 
 /**
- * El id real de un registro — el valor de `values[auditoria.id ?? 'id']`. `auditoria.id` no es el
- * valor del identificador: es el NOMBRE del campo de `values` donde vive. Un registro sin un id
- * resoluble no puede indexarse ni compararse contra nada, así que se ignora.
+ * El id real de un registro — el valor de `registro[sync.id ?? 'id']`. `sync.id` no es el valor del
+ * identificador: es el NOMBRE del campo donde vive. Un registro sin un id resoluble no puede
+ * indexarse ni compararse contra nada, así que se ignora.
  */
-function resolveId<TValues>(registro: Registro<TValues>): RecordId | null {
-  const { values } = registro;
-  if (values === null || typeof values !== 'object') {
-    return null;
-  }
-  const field = registro.auditoria.id ?? 'id';
-  const raw = (values as Record<string, unknown>)[field];
+function resolveId<TValues extends object>(registro: Registro<TValues>): RecordId | null {
+  const field = registro.sync.id ?? 'id';
+  const raw = (registro as Record<string, unknown>)[field];
   return typeof raw === 'string' && raw.length > 0 ? raw : null;
 }
 
-function groupById<TValues>(
+function groupById<TValues extends object>(
   registros: readonly Registro<TValues>[],
 ): Map<RecordId, Registro<TValues>[]> {
   const byId = new Map<RecordId, Registro<TValues>[]>();
@@ -104,12 +102,12 @@ function union(...maps: readonly Map<RecordId, unknown>[]): RecordId[] {
 }
 
 /** `updatedAt` si está; si no, `createdAt` — nunca se inventa una fecha. */
-function versionOf<TValues>(registro: Registro<TValues>): LogicalVersion | null {
-  const raw = registro.auditoria.updatedAt ?? registro.auditoria.createdAt;
+function versionOf<TValues extends object>(registro: Registro<TValues>): LogicalVersion | null {
+  const raw = registro.sync.updatedAt ?? registro.sync.createdAt;
   return raw ? LogicalVersion.parse(raw) : null;
 }
 
-interface Decision<TValues> {
+interface Decision<TValues extends object> {
   id: RecordId;
   base: Registro<TValues> | undefined;
   data: Registro<TValues> | undefined;
@@ -127,15 +125,15 @@ interface Decision<TValues> {
  * | sí | no | aquí no se tiene todavía: `pull` |
  * | sí, `deleted: true` | sí o no | el destino manda de forma INCONDICIONAL: `pull` |
  * | sí, activo | sí, misma huella y sin borrar aquí | nada, convergido |
- * | sí, activo | sí, huella distinta, con ancestro y sin campos solapados | fusiona: `push` Y `pull` a la vez |
+ * | sí, activo | sí, huella distinta, con ancestro embebido y sin campos solapados | fusiona: `push` Y `pull` a la vez |
  * | sí, activo | sí, huella distinta o borrado aquí (resto de casos) | conflicto: gana la fecha más reciente |
  *
- * Un borrado LOCAL (`data.auditoria.deleted: true` con `base` activo) entra por la última fila:
- * compite por fecha como cualquier otro cambio de contenido, sin privilegio, y NUNCA se intenta
- * fusionar (un borrado es un evento de todo el registro, no de un campo). Solo el borrado del
- * destino es incondicional — es la fuente de verdad y su borrado no se discute.
+ * Un borrado LOCAL (`data.sync.deleted: true` con `base` activo) entra por la última fila: compite
+ * por fecha como cualquier otro cambio de contenido, sin privilegio, y NUNCA se intenta fusionar (un
+ * borrado es un evento de todo el registro, no de un campo). Solo el borrado del destino es
+ * incondicional — es la fuente de verdad y su borrado no se discute.
  */
-function decide<TValues>(decision: Decision<TValues>): void {
+function decide<TValues extends object>(decision: Decision<TValues>): void {
   const { id, base, data, clock, now, plan } = decision;
 
   if (!base) {
@@ -150,14 +148,13 @@ function decide<TValues>(decision: Decision<TValues>): void {
     return;
   }
 
-  if (base.auditoria.deleted) {
+  if (base.sync.deleted) {
     // El destino manda: se borró allí, y su borrado no se discute aunque `data` siguiera activo.
     plan.pull.push(pullOf(base, effectiveVersion(base, clock, now)));
     return;
   }
 
-  const converged =
-    base.auditoria.keyfinder === data.auditoria.keyfinder && !data.auditoria.deleted;
+  const converged = base.sync.keyfinder === data.sync.keyfinder && !data.sync.deleted;
   if (converged) {
     return; // Coinciden: nada que hacer.
   }
@@ -165,7 +162,7 @@ function decide<TValues>(decision: Decision<TValues>): void {
   // Los dos lados difieren en contenido. Antes de rendirse a "gana un lado entero", se intenta
   // fusionar campo a campo — pero nunca si el borrado local es lo que causó la divergencia: un
   // borrado no tiene "campos", así que sigue compitiendo por fecha más abajo, sin pasar por aquí.
-  if (!data.auditoria.deleted) {
+  if (!data.sync.deleted) {
     const merge = tryMerge(base, data, clock, now);
     if (merge) {
       // Dos comandos, no uno: al destino le falta lo que cambió local, a local le falta lo que
@@ -201,43 +198,46 @@ function decide<TValues>(decision: Decision<TValues>): void {
   plan.pull.push(pullOf(base, baseVersion));
 }
 
+/** Los campos de negocio de un registro, sin `sync` — lo que viaja como `TValues`. */
+function omitSync<TValues extends object>(registro: Registro<TValues>): TValues {
+  const { sync: _sync, ...values } = registro;
+  return values as TValues;
+}
+
 /**
- * Intenta fusionar `base.values` y `data.values` campo a campo usando `data.auditoria.syncedValues`
- * como ancestro común. Devuelve `null` — nunca lanza — cuando no se puede fusionar con seguridad:
- * sin ancestro, con contenido que no es un objeto plano, o con un solapamiento real (el mismo campo
+ * Intenta fusionar los campos de negocio de `base` y `data` usando `data.sync.syncedValues` como
+ * ancestro común. Devuelve `null` — nunca lanza — cuando no se puede fusionar con seguridad: sin
+ * ancestro, con contenido que no es un objeto plano, o con un solapamiento real (el mismo campo
  * cambiado a valores distintos en los dos lados). En cualquiera de esos casos, quien llama cae al
  * criterio de "gana un lado entero" de siempre.
  */
-function tryMerge<TValues>(
+function tryMerge<TValues extends object>(
   base: Registro<TValues>,
   data: Registro<TValues>,
   clock: HybridClock,
   now: number,
 ): { registro: Registro<TValues>; fromRemote: string[]; fromLocal: string[] } | null {
-  const ancestor = data.auditoria.syncedValues;
-  const baseValues = base.values;
-  const dataValues = data.values;
-  if (
-    ancestor === undefined ||
-    !isRecord(ancestor) ||
-    !isRecord(baseValues) ||
-    !isRecord(dataValues)
-  ) {
+  const ancestor = data.sync.syncedValues;
+  if (ancestor === undefined || !isRecord(ancestor)) {
     return null;
   }
 
+  const baseValues = omitSync(base) as Record<string, unknown>;
+  const dataValues = omitSync(data) as Record<string, unknown>;
+  const ancestorValues = ancestor as Record<string, unknown>;
+
   const keys = new Set([
-    ...Object.keys(ancestor),
+    ...Object.keys(ancestorValues),
     ...Object.keys(baseValues),
     ...Object.keys(dataValues),
   ]);
-  const merged: Record<string, unknown> = { ...ancestor };
+  const merged: Record<string, unknown> = { ...ancestorValues };
   const fromRemote: string[] = [];
   const fromLocal: string[] = [];
 
   for (const key of keys) {
-    const remoteChanged = !deepEqual(baseValues[key], ancestor[key]);
-    const localChanged = !deepEqual(dataValues[key], ancestor[key]);
+    const remoteChanged = !deepEqual(baseValues[key], ancestorValues[key]);
+    const localChanged = !deepEqual(dataValues[key], ancestorValues[key]);
 
     if (remoteChanged && localChanged) {
       if (!deepEqual(baseValues[key], dataValues[key])) {
@@ -263,19 +263,19 @@ function tryMerge<TValues>(
 
   return {
     registro: {
-      values: merged as TValues,
-      auditoria: {
-        id: base.auditoria.id,
+      ...(merged as TValues),
+      sync: {
+        id: base.sync.id,
         // Vacía A PROPÓSITO. `merged` es contenido nuevo que no coincide con la huella de ningún
         // lado, y el motor no calcula huellas — no es su trabajo (ver README). Quien aplique este
-        // plan DEBE recalcular la huella real de `values` antes de escribirla, en el destino y en
-        // local; nunca persistir esta cadena vacía.
+        // plan DEBE recalcular la huella real antes de escribirla, en el destino y en local; nunca
+        // persistir esta cadena vacía.
         keyfinder: '',
         deleted: false,
-        createdAt: base.auditoria.createdAt,
+        createdAt: base.sync.createdAt,
         updatedAt: clock.next(now).toString(),
       },
-    },
+    } as Registro<TValues>,
     fromRemote,
     fromLocal,
   };
@@ -288,8 +288,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 /**
  * Igualdad estructural simple: primitivos por `Object.is`, y recursiva en arrays/objetos planos.
- * Cubre de sobra lo que hoy viaja por `values` (filas planas de primitivos) sin romperse si algún
- * campo resulta ser un objeto o un array anidado.
+ * Cubre de sobra lo que hoy viaja como campos de negocio (filas planas de primitivos) sin romperse
+ * si algún campo resulta ser un objeto o un array anidado.
  */
 function deepEqual(a: unknown, b: unknown): boolean {
   if (Object.is(a, b)) {
@@ -308,10 +308,10 @@ function deepEqual(a: unknown, b: unknown): boolean {
 /**
  * Apunta que hay que subir el registro local, con **una versión nueva**, emitida por el mismo reloj
  * que ya observó todo lo que había en el destino: así una subida nunca nace por detrás de algo que
- * ya estaba escrito. El resto de `auditoria` (id, huella, borrado, fecha de creación) viaja tal cual
+ * ya estaba escrito. El resto de `sync` (id, huella, borrado, fecha de creación) viaja tal cual
  * traía el registro local — el motor solo re-estampa cuándo se escribe, no qué ni si está borrado.
  */
-function pushLocal<TValues>(decision: Decision<TValues>): void {
+function pushLocal<TValues extends object>(decision: Decision<TValues>): void {
   const { data, clock, now, plan } = decision;
   if (!data) {
     // No puede pasar —todas las ramas que llegan aquí tienen registro local—, pero subir uno que no
@@ -319,28 +319,31 @@ function pushLocal<TValues>(decision: Decision<TValues>): void {
     return;
   }
   plan.push.push({
-    values: data.values,
-    auditoria: {
-      id: data.auditoria.id,
-      keyfinder: data.auditoria.keyfinder,
-      deleted: data.auditoria.deleted,
-      createdAt: data.auditoria.createdAt,
+    ...omitSync(data),
+    sync: {
+      id: data.sync.id,
+      keyfinder: data.sync.keyfinder,
+      deleted: data.sync.deleted,
+      createdAt: data.sync.createdAt,
       updatedAt: clock.next(now).toString(),
     },
-  });
+  } as Registro<TValues>);
 }
 
-function pullOf<TValues>(base: Registro<TValues>, version: LogicalVersion): Registro<TValues> {
+function pullOf<TValues extends object>(
+  base: Registro<TValues>,
+  version: LogicalVersion,
+): Registro<TValues> {
   return {
-    values: base.values,
-    auditoria: {
-      id: base.auditoria.id,
-      keyfinder: base.auditoria.keyfinder,
-      deleted: base.auditoria.deleted,
-      createdAt: base.auditoria.createdAt,
+    ...omitSync(base),
+    sync: {
+      id: base.sync.id,
+      keyfinder: base.sync.keyfinder,
+      deleted: base.sync.deleted,
+      createdAt: base.sync.createdAt,
       updatedAt: version.toString(),
     },
-  };
+  } as Registro<TValues>;
 }
 
 /**
@@ -351,7 +354,7 @@ function pullOf<TValues>(base: Registro<TValues>, version: LogicalVersion): Regi
  * a TODO `pull`, sea por ausencia local, por borrado incondicional, o por conflicto — nunca se
  * escribe aquí una versión que no se pueda confiar.
  */
-function effectiveVersion<TValues>(
+function effectiveVersion<TValues extends object>(
   base: Registro<TValues>,
   clock: HybridClock,
   now: number,

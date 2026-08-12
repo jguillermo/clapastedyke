@@ -11,17 +11,20 @@
 export type RecordId = string;
 
 /**
- * Metadatos de sincronización/auditoría que acompañan a `values` en cada registro — los mismos que
- * ya se guardan junto al dato en el almacén, no algo que haya que mapear por fuera.
+ * Metadatos de sincronización que acompañan a los campos de negocio de cada registro — los mismos
+ * que ya se guardan junto al dato en el almacén, no algo que haya que mapear por fuera. Se llama
+ * `sync` y no "auditoría": estos campos no existen para llevar un historial de quién hizo qué, sino
+ * para que el motor pueda comparar y versionar (`keyfinder`, `deleted`, `createdAt`/`updatedAt`,
+ * `syncedValues`).
  */
-export interface Auditoria<TValues = unknown> {
+export interface Sync<TValues = unknown> {
   /**
-   * Nombre del campo de `values` que es el identificador del registro. **No es el valor del id**:
-   * es el nombre del campo donde vive (p. ej. `'sku'` ⇒ la identidad real está en `values.sku`).
-   * Por defecto `'id'` (⇒ `values.id`).
+   * Nombre del campo de negocio que es el identificador del registro. **No es el valor del id**:
+   * es el nombre del campo donde vive (p. ej. `'sku'` ⇒ la identidad real está en `registro.sku`).
+   * Por defecto `'id'` (⇒ `registro.id`).
    */
   readonly id?: string;
-  /** Huella/hash de `values`, para saber si el contenido cambió. Valor real, no un nombre de campo. */
+  /** Huella/hash del contenido, para saber si cambió. Valor real, no un nombre de campo. */
   readonly keyfinder: string;
   /** Si este registro está borrado (borrado lógico — nunca se elimina físicamente el dato). */
   readonly deleted: boolean;
@@ -33,10 +36,10 @@ export interface Auditoria<TValues = unknown> {
    */
   readonly updatedAt?: string;
   /**
-   * Snapshot de `values` que este registro LOCAL sabía que coincidía con el destino la última vez
-   * que convergieron — el ancestro común que hace falta para una fusión de tres vías (el mismo
-   * papel que el *merge base* en `git`). Solo tiene sentido en un registro de `data`; el motor lo
-   * ignora en `base`.
+   * Snapshot de los campos de negocio (sin `sync`) que este registro LOCAL sabía que coincidía con
+   * el destino la última vez que convergieron — el ancestro común que hace falta para una fusión de
+   * tres vías (el mismo papel que el *merge base* en `git`). Solo tiene sentido en un registro de
+   * `data`; el motor lo ignora en `base`.
    *
    * Ausente (primera sincronización de este registro, o escrito antes de que este campo
    * existiera) ⇒ el motor no puede atribuir un campo divergente a un lado concreto y cae en el
@@ -47,15 +50,18 @@ export interface Auditoria<TValues = unknown> {
 }
 
 /**
- * Un registro tal como vive en la base de datos: contenido de negocio (`values`, opaco para el
- * motor) más los metadatos de sincronización (`auditoria`). Misma forma en `base` y en `data`.
+ * Un registro tal como vive en la base de datos: los campos de negocio **aplanados al nivel
+ * superior** (opacos para el motor, sin envoltorio `values` aparte) junto con sus metadatos de
+ * sincronización en `sync`. Misma forma en `base` y en `data`.
+ *
+ * `TValues` es el tipo de los campos de negocio **solos**, sin `sync` — `Registro<TValues>` es
+ * la intersección de los dos: `{ ...camposDeNegocio, sync }`.
  */
-export interface Registro<TValues = unknown> {
-  readonly values: TValues;
-  readonly auditoria: Auditoria<TValues>;
-}
+export type Registro<TValues extends object = Record<string, unknown>> = TValues & {
+  readonly sync: Sync<TValues>;
+};
 
-export interface EngineInput<TValues = unknown> {
+export interface EngineInput<TValues extends object = Record<string, unknown>> {
   /** Lo que hay en el destino — la fuente de verdad. */
   readonly base: readonly Registro<TValues>[];
   /** Lo que hay aquí — snapshot local COMPLETO de esta colección (incluye los borrados marcados). */
@@ -77,7 +83,7 @@ export interface Conflict {
   readonly winner: 'remote' | 'local' | 'merged';
   /** `true` si se eligió sin poder leer una fecha local con la que comparar. Siempre `false` si `winner` es `'merged'` — una fusión no es una apuesta a ciegas. */
   readonly blind: boolean;
-  /** Solo presente cuando `winner` es `'merged'`: qué claves de `values` vinieron de cada lado. */
+  /** Solo presente cuando `winner` es `'merged'`: qué campos de negocio vinieron de cada lado. */
   readonly mergedFrom?: {
     readonly remote: readonly string[];
     readonly local: readonly string[];
@@ -85,12 +91,12 @@ export interface Conflict {
 }
 
 /** Un id que aparece en más de un registro remoto. No se toca por ningún lado. */
-export interface DuplicateIdentity<TValues = unknown> {
+export interface DuplicateIdentity<TValues extends object = Record<string, unknown>> {
   readonly id: RecordId;
   readonly registros: readonly Registro<TValues>[];
 }
 
-export interface EnginePlan<TValues = unknown> {
+export interface EnginePlan<TValues extends object = Record<string, unknown>> {
   /**
    * Registros que hay que escribir en el destino: ganó lo local (incluidos los borrados
    * marcados), o son el resultado de una fusión — en ese caso, el MISMO registro aparece también
