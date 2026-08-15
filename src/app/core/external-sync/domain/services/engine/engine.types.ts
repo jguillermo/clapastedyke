@@ -21,9 +21,13 @@ export interface Sync<TValues = unknown> {
   /**
    * Nombre del campo de negocio que es el identificador del registro. **No es el valor del id**:
    * es el nombre del campo donde vive (p. ej. `'sku'` ⇒ la identidad real está en `registro.sku`).
-   * Por defecto `'id'` (⇒ `registro.id`).
+   *
+   * **Obligatorio, sin default.** Sin él no hay forma de validar qué campo leer como identidad —
+   * dejarlo opcional con un valor por defecto silencioso escondería el error de quien construye el
+   * registro sin pensarlo (p. ej. una colección cuyo id vive en `sku` que se indexara por `id` sin
+   * que nada avisara). El caso común (`registro.id`) se escribe explícito: `sync: { id: 'id', ... }`.
    */
-  readonly id?: string;
+  readonly id: string;
   /** Huella/hash del contenido, para saber si cambió. Valor real, no un nombre de campo. */
   readonly keyfinder: string;
   /** Si este registro está borrado (borrado lógico — nunca se elimina físicamente el dato). */

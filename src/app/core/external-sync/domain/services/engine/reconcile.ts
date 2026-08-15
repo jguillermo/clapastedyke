@@ -73,12 +73,14 @@ export function reconcile<TValues extends object = Record<string, unknown>>(
 }
 
 /**
- * El id real de un registro — el valor de `registro[sync.id ?? 'id']`. `sync.id` no es el valor del
- * identificador: es el NOMBRE del campo donde vive. Un registro sin un id resoluble no puede
+ * El id real de un registro — el valor de `registro[sync.id]`. `sync.id` no es el valor del
+ * identificador: es el NOMBRE del campo donde vive, y es **obligatorio** (sin default): quien
+ * construye el registro tiene que decir explícitamente qué campo leer, para que se pueda validar
+ * que es el correcto en vez de asumirlo en silencio. Un registro sin un id resoluble no puede
  * indexarse ni compararse contra nada, así que se ignora.
  */
 function resolveId<TValues extends object>(registro: Registro<TValues>): RecordId | null {
-  const field = registro.sync.id ?? 'id';
+  const field = registro.sync.id;
   const raw = (registro as Record<string, unknown>)[field];
   return typeof raw === 'string' && raw.length > 0 ? raw : null;
 }

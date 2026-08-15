@@ -49,7 +49,7 @@ los metadatos de sincronización:
 ```ts
 type Registro<TValues> = TValues & {  // TValues: los campos de negocio, opacos para el motor
   sync: {
-    id?: string;        // nombre del campo de negocio que es el identificador; por defecto 'id'
+    id: string;          // nombre del campo de negocio que es el identificador — OBLIGATORIO, sin default
     keyfinder: string;  // huella/hash del contenido, para saber si cambió
     deleted: boolean;    // borrado lógico — nunca se elimina físicamente el dato
     createdAt: string;   // formato de reloj lógico híbrido, ver hybrid-clock.ts
@@ -61,10 +61,13 @@ type Registro<TValues> = TValues & {  // TValues: los campos de negocio, opacos 
 `sync` y no "auditoría": estos campos no llevan un historial de quién hizo qué, existen para que el
 motor pueda **comparar y versionar**.
 
-`sync.id` **no es el valor del identificador**: es el nombre del campo de negocio donde vive. Con el
-default (`'id'`), un registro `{ id: 'r1', nombre: 'Bizcocho', sync: {...} }` tiene identificador
-`'r1'`. Si el identificador vive en otro campo (`sku`, por ejemplo), `sync.id: 'sku'` se lo dice al
-motor.
+`sync.id` **no es el valor del identificador**: es el nombre del campo de negocio donde vive. Es
+**obligatorio, sin valor por defecto**: quien construye el registro tiene que decir explícitamente
+qué campo leer, porque un default silencioso escondería el error de una colección cuyo identificador
+vive en otro campo y nadie se acuerda de decírselo al motor. El caso común se escribe explícito —
+`{ id: 'r1', nombre: 'Bizcocho', sync: { id: 'id', ... } }` tiene identificador `'r1'`, leído de
+`registro.id` porque `sync.id` así lo dice. Si el identificador vive en otro campo (`sku`, por
+ejemplo), `sync.id: 'sku'` se lo dice al motor.
 
 ### Entrada
 
@@ -85,10 +88,10 @@ tiene, y el motor lo trae.
 ```ts
 reconcile({
   base: [
-    { id: 'r1', nombre: 'Bizcocho', sync: { keyfinder: 'fp', deleted: false, createdAt: '…' } },
+    { id: 'r1', nombre: 'Bizcocho', sync: { id: 'id', keyfinder: 'fp', deleted: false, createdAt: '…' } },
   ],
   data: [
-    { id: 'r1', nombre: 'Bizcocho E2E', sync: { keyfinder: 'fp2', deleted: false, createdAt: '…', updatedAt: '…' } },
+    { id: 'r1', nombre: 'Bizcocho E2E', sync: { id: 'id', keyfinder: 'fp2', deleted: false, createdAt: '…', updatedAt: '…' } },
   ],
   now: Date.now(),
   originId: 'este-dispositivo',
@@ -120,7 +123,7 @@ No hay `remove`, `tombstones`, `purge` ni `aborted`: borrar es solo otro `push`/
 
 ## La tabla de decisión
 
-Por cada id, resuelto en `base` y en `data` leyendo `registro[sync.id ?? 'id']`:
+Por cada id, resuelto en `base` y en `data` leyendo `registro[sync.id]`:
 
 | en `base` | en `data` | qué se hace |
 | --- | --- | --- |

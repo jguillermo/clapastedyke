@@ -24,9 +24,11 @@ import { Registro } from './engine.types';
  * `Registro` — los campos de negocio **aplanados** al nivel superior del objeto, junto con sus
  * metadatos de sincronización en `sync` — no colecciones anidadas.
  *
- * `sync.id` no es el valor del identificador: es el NOMBRE del campo de negocio donde vive (por
- * defecto `'id'`). Estos tests usan siempre un campo `id` propio y omiten `sync.id` para dejar el
- * default en juego, salvo el caso que ejercita explícitamente un nombre de campo distinto.
+ * `sync.id` no es el valor del identificador: es el NOMBRE del campo de negocio donde vive, y es
+ * **obligatorio, sin default** — quien construye el registro tiene que decirlo explícitamente, o
+ * no hay forma de validar que se está leyendo el campo correcto. Estos tests usan siempre un campo
+ * `id` propio y escriben `sync.id: 'id'` en cada registro, salvo el caso que ejercita
+ * explícitamente un nombre de campo distinto (`sku`).
  *
  * Cada `it(...)` lleva un comentario con tres partes:
  * - **Caso**: la situación real que representa, en lenguaje llano, sin jerga del código.
@@ -53,7 +55,12 @@ describe('reconcile engine', () => {
           {
             id: '1',
             contenido: 'x',
-            sync: { keyfinder: 'fp', deleted: false, createdAt: '0000000000100-0000-origina' },
+            sync: {
+              id: 'id',
+              keyfinder: 'fp',
+              deleted: false,
+              createdAt: '0000000000100-0000-origina',
+            },
           },
         ],
         now: 1_700_000_000_000,
@@ -65,7 +72,7 @@ describe('reconcile engine', () => {
           id: '1',
           contenido: 'x',
           sync: {
-            id: undefined,
+            id: 'id',
             keyfinder: 'fp',
             deleted: false,
             createdAt: '0000000000100-0000-origina',
@@ -91,6 +98,7 @@ describe('reconcile engine', () => {
             id: '1',
             contenido: 'remoto',
             sync: {
+              id: 'id',
               keyfinder: 'fp',
               deleted: false,
               createdAt: '0000000000100-0000-origina',
@@ -108,7 +116,7 @@ describe('reconcile engine', () => {
           id: '1',
           contenido: 'remoto',
           sync: {
-            id: undefined,
+            id: 'id',
             keyfinder: 'fp',
             deleted: false,
             createdAt: '0000000000100-0000-origina',
@@ -132,7 +140,7 @@ describe('reconcile engine', () => {
           {
             id: '1',
             contenido: 'remoto',
-            sync: { keyfinder: 'fp', deleted: false, createdAt: 'no-es-una-version' },
+            sync: { id: 'id', keyfinder: 'fp', deleted: false, createdAt: 'no-es-una-version' },
           },
         ],
         data: [],
@@ -159,6 +167,7 @@ describe('reconcile engine', () => {
             id: '1',
             contenido: 'x',
             sync: {
+              id: 'id',
               keyfinder: 'fp',
               deleted: true,
               createdAt: '0000000000100-0000-origina',
@@ -171,6 +180,7 @@ describe('reconcile engine', () => {
             id: '1',
             contenido: 'x-local',
             sync: {
+              id: 'id',
               keyfinder: 'fp-local',
               deleted: false,
               createdAt: '0000000000100-0000-origina',
@@ -187,7 +197,7 @@ describe('reconcile engine', () => {
           id: '1',
           contenido: 'x',
           sync: {
-            id: undefined,
+            id: 'id',
             keyfinder: 'fp',
             deleted: true,
             createdAt: '0000000000100-0000-origina',
@@ -211,7 +221,7 @@ describe('reconcile engine', () => {
           {
             id: '1',
             contenido: 'x',
-            sync: { keyfinder: 'fp', deleted: true, createdAt: 'no-es-una-version' },
+            sync: { id: 'id', keyfinder: 'fp', deleted: true, createdAt: 'no-es-una-version' },
           },
         ],
         data: [
@@ -219,6 +229,7 @@ describe('reconcile engine', () => {
             id: '1',
             contenido: 'y',
             sync: {
+              id: 'id',
               keyfinder: 'fp2',
               deleted: false,
               createdAt: '0000000000100-0000-origina',
@@ -245,6 +256,7 @@ describe('reconcile engine', () => {
             id: '1',
             contenido: 'x',
             sync: {
+              id: 'id',
               keyfinder: 'fp',
               deleted: true,
               createdAt: '0000000000100-0000-origina',
@@ -257,6 +269,7 @@ describe('reconcile engine', () => {
             id: '1',
             contenido: 'x',
             sync: {
+              id: 'id',
               keyfinder: 'fp',
               deleted: false,
               createdAt: '0000000000100-0000-origina',
@@ -291,6 +304,7 @@ describe('reconcile engine', () => {
             id: '1',
             contenido: 'remoto',
             sync: {
+              id: 'id',
               keyfinder: 'fp-remoto',
               deleted: false,
               createdAt: '0000000000100-0000-origina',
@@ -303,6 +317,7 @@ describe('reconcile engine', () => {
             id: '1',
             contenido: 'remoto',
             sync: {
+              id: 'id',
               keyfinder: 'fp-remoto',
               deleted: true,
               createdAt: '0000000000100-0000-origina',
@@ -320,7 +335,7 @@ describe('reconcile engine', () => {
           id: '1',
           contenido: 'remoto',
           sync: {
-            id: undefined,
+            id: 'id',
             keyfinder: 'fp-remoto',
             deleted: true,
             createdAt: '0000000000100-0000-origina',
@@ -344,6 +359,7 @@ describe('reconcile engine', () => {
             id: '1',
             contenido: 'remoto-revivido',
             sync: {
+              id: 'id',
               keyfinder: 'fp-remoto',
               deleted: false,
               createdAt: '0000000000100-0000-origina',
@@ -356,6 +372,7 @@ describe('reconcile engine', () => {
             id: '1',
             contenido: 'remoto-revivido',
             sync: {
+              id: 'id',
               keyfinder: 'fp-remoto',
               deleted: true,
               createdAt: '0000000000100-0000-origina',
@@ -373,7 +390,7 @@ describe('reconcile engine', () => {
           id: '1',
           contenido: 'remoto-revivido',
           sync: {
-            id: undefined,
+            id: 'id',
             keyfinder: 'fp-remoto',
             deleted: false,
             createdAt: '0000000000100-0000-origina',
@@ -400,6 +417,7 @@ describe('reconcile engine', () => {
             id: '1',
             contenido: 'remoto-revivido',
             sync: {
+              id: 'id',
               keyfinder: 'fp-remoto',
               deleted: false,
               createdAt: '0000000000100-0000-origina',
@@ -412,6 +430,7 @@ describe('reconcile engine', () => {
             id: '1',
             contenido: 'remoto-revivido',
             sync: {
+              id: 'id',
               keyfinder: 'fp-remoto',
               deleted: true,
               createdAt: '0000000000100-0000-origina',
@@ -441,6 +460,7 @@ describe('reconcile engine', () => {
             id: '1',
             contenido: 'x',
             sync: {
+              id: 'id',
               keyfinder: 'fp',
               deleted: false,
               createdAt: '0000000000100-0000-origina',
@@ -452,7 +472,12 @@ describe('reconcile engine', () => {
           {
             id: '1',
             contenido: 'x',
-            sync: { keyfinder: 'fp', deleted: false, createdAt: '0000000000100-0000-origina' },
+            sync: {
+              id: 'id',
+              keyfinder: 'fp',
+              deleted: false,
+              createdAt: '0000000000100-0000-origina',
+            },
           },
         ],
         now: 1_700_000_000_000,
@@ -481,6 +506,7 @@ describe('reconcile engine', () => {
             id: '1',
             contenido: 'remoto',
             sync: {
+              id: 'id',
               keyfinder: 'fp-remote',
               deleted: false,
               createdAt: '0000000000100-0000-origina',
@@ -493,6 +519,7 @@ describe('reconcile engine', () => {
             id: '1',
             contenido: 'local',
             sync: {
+              id: 'id',
               keyfinder: 'fp-local',
               deleted: false,
               createdAt: '0000000000100-0000-origina',
@@ -510,7 +537,7 @@ describe('reconcile engine', () => {
           id: '1',
           contenido: 'local',
           sync: {
-            id: undefined,
+            id: 'id',
             keyfinder: 'fp-local',
             deleted: false,
             createdAt: '0000000000100-0000-origina',
@@ -534,6 +561,7 @@ describe('reconcile engine', () => {
             id: '1',
             contenido: 'remoto',
             sync: {
+              id: 'id',
               keyfinder: 'fp-remote',
               deleted: false,
               createdAt: '0000000000100-0000-origina',
@@ -546,6 +574,7 @@ describe('reconcile engine', () => {
             id: '1',
             contenido: 'local',
             sync: {
+              id: 'id',
               keyfinder: 'fp-local',
               deleted: false,
               createdAt: '0000000000100-0000-origina',
@@ -563,7 +592,7 @@ describe('reconcile engine', () => {
           id: '1',
           contenido: 'remoto',
           sync: {
-            id: undefined,
+            id: 'id',
             keyfinder: 'fp-remote',
             deleted: false,
             createdAt: '0000000000100-0000-origina',
@@ -587,6 +616,7 @@ describe('reconcile engine', () => {
             id: '1',
             contenido: 'remoto',
             sync: {
+              id: 'id',
               keyfinder: 'fp-remote',
               deleted: false,
               createdAt: '0000000000100-0000-origina',
@@ -598,7 +628,12 @@ describe('reconcile engine', () => {
           {
             id: '1',
             contenido: 'local',
-            sync: { keyfinder: 'fp-local', deleted: false, createdAt: 'no-es-una-version' },
+            sync: {
+              id: 'id',
+              keyfinder: 'fp-local',
+              deleted: false,
+              createdAt: 'no-es-una-version',
+            },
           },
         ],
         now: 1_700_000_000_000,
@@ -626,14 +661,24 @@ describe('reconcile engine', () => {
           {
             id: '1',
             contenido: 'remoto',
-            sync: { keyfinder: 'fp-remote', deleted: false, createdAt: 'no-es-una-version' },
+            sync: {
+              id: 'id',
+              keyfinder: 'fp-remote',
+              deleted: false,
+              createdAt: 'no-es-una-version',
+            },
           },
         ],
         data: [
           {
             id: '1',
             contenido: 'local',
-            sync: { keyfinder: 'fp-local', deleted: false, createdAt: 'no-es-una-version' },
+            sync: {
+              id: 'id',
+              keyfinder: 'fp-local',
+              deleted: false,
+              createdAt: 'no-es-una-version',
+            },
           },
         ],
         now: 1_700_000_000_000,
@@ -665,6 +710,7 @@ describe('reconcile engine', () => {
             a: 'remoto-a',
             b: 'orig-b',
             sync: {
+              id: 'id',
               keyfinder: 'fp-remoto',
               deleted: false,
               createdAt: '0000000000100-0000-origina',
@@ -678,6 +724,7 @@ describe('reconcile engine', () => {
             a: 'orig-a',
             b: 'local-b',
             sync: {
+              id: 'id',
               keyfinder: 'fp-local',
               deleted: false,
               createdAt: '0000000000100-0000-origina',
@@ -694,7 +741,7 @@ describe('reconcile engine', () => {
         a: 'remoto-a',
         b: 'local-b',
         sync: {
-          id: undefined,
+          id: 'id',
           keyfinder: '',
           deleted: false,
           createdAt: '0000000000100-0000-origina',
@@ -723,6 +770,7 @@ describe('reconcile engine', () => {
             id: '1',
             a: 'remoto',
             sync: {
+              id: 'id',
               keyfinder: 'fp-remoto',
               deleted: false,
               createdAt: '0000000000100-0000-origina',
@@ -735,6 +783,7 @@ describe('reconcile engine', () => {
             id: '1',
             a: 'local',
             sync: {
+              id: 'id',
               keyfinder: 'fp-local',
               deleted: false,
               createdAt: '0000000000100-0000-origina',
@@ -753,7 +802,7 @@ describe('reconcile engine', () => {
           id: '1',
           a: 'local',
           sync: {
-            id: undefined,
+            id: 'id',
             keyfinder: 'fp-local',
             deleted: false,
             createdAt: '0000000000100-0000-origina',
@@ -781,6 +830,7 @@ describe('reconcile engine', () => {
             a: 'nuevo',
             b: 'orig-b',
             sync: {
+              id: 'id',
               keyfinder: 'fp-remoto',
               deleted: false,
               createdAt: '0000000000100-0000-origina',
@@ -793,6 +843,7 @@ describe('reconcile engine', () => {
             a: 'nuevo',
             b: 'local-b',
             sync: {
+              id: 'id',
               keyfinder: 'fp-local',
               deleted: false,
               createdAt: '0000000000100-0000-origina',
@@ -813,7 +864,7 @@ describe('reconcile engine', () => {
           a: 'nuevo',
           b: 'local-b',
           sync: {
-            id: undefined,
+            id: 'id',
             keyfinder: '',
             deleted: false,
             createdAt: '0000000000100-0000-origina',
@@ -840,6 +891,7 @@ describe('reconcile engine', () => {
             a: 'remoto-a',
             b: 'orig-b',
             sync: {
+              id: 'id',
               keyfinder: 'fp-remoto',
               deleted: false,
               createdAt: '0000000000100-0000-origina',
@@ -853,6 +905,7 @@ describe('reconcile engine', () => {
             a: 'orig-a',
             b: 'local-b',
             sync: {
+              id: 'id',
               keyfinder: 'fp-local',
               deleted: false,
               createdAt: '0000000000100-0000-origina',
@@ -882,6 +935,7 @@ describe('reconcile engine', () => {
             id: '1',
             a: 'remoto',
             sync: {
+              id: 'id',
               keyfinder: 'fp-remoto',
               deleted: false,
               createdAt: '0000000000100-0000-origina',
@@ -894,6 +948,7 @@ describe('reconcile engine', () => {
             id: '1',
             a: 'local',
             sync: {
+              id: 'id',
               keyfinder: 'fp-local',
               deleted: false,
               createdAt: '0000000000100-0000-origina',
@@ -924,6 +979,7 @@ describe('reconcile engine', () => {
             id: '1',
             a: 'remoto-a',
             sync: {
+              id: 'id',
               keyfinder: 'fp-remoto',
               deleted: false,
               createdAt: '0000000000100-0000-origina',
@@ -936,6 +992,7 @@ describe('reconcile engine', () => {
             a: 'orig-a',
             b: 'nuevo-local',
             sync: {
+              id: 'id',
               keyfinder: 'fp-local',
               deleted: false,
               createdAt: '0000000000100-0000-origina',
@@ -971,12 +1028,18 @@ describe('reconcile engine', () => {
           {
             id: '1',
             contenido: 'x',
-            sync: { keyfinder: 'fp', deleted: false, createdAt: '0000000000100-0000-origina' },
+            sync: {
+              id: 'id',
+              keyfinder: 'fp',
+              deleted: false,
+              createdAt: '0000000000100-0000-origina',
+            },
           },
           {
             id: '2',
             contenido: 'y',
             sync: {
+              id: 'id',
               keyfinder: 'fp2',
               deleted: false,
               createdAt: '0000000000100-0000-origina',
@@ -1005,6 +1068,7 @@ describe('reconcile engine', () => {
             id: '1',
             contenido: 'remoto',
             sync: {
+              id: 'id',
               keyfinder: 'fp-remote',
               deleted: false,
               createdAt: '0000000005000-0000-deviceb',
@@ -1016,6 +1080,7 @@ describe('reconcile engine', () => {
             id: '1',
             contenido: 'local',
             sync: {
+              id: 'id',
               keyfinder: 'fp-local',
               deleted: false,
               createdAt: '0000000005000-0000-devicea',
@@ -1046,6 +1111,7 @@ describe('reconcile engine', () => {
             id: 'semilla',
             contenido: 'x',
             sync: {
+              id: 'id',
               keyfinder: 'fp',
               deleted: false,
               createdAt: '1700000200000-0003-otroorigen',
@@ -1056,12 +1122,18 @@ describe('reconcile engine', () => {
           {
             id: 'semilla',
             contenido: 'x',
-            sync: { keyfinder: 'fp', deleted: false, createdAt: '0000000000100-0000-origina' },
+            sync: {
+              id: 'id',
+              keyfinder: 'fp',
+              deleted: false,
+              createdAt: '0000000000100-0000-origina',
+            },
           },
           {
             id: 'empuje',
             contenido: 'y',
             sync: {
+              id: 'id',
               keyfinder: 'fp2',
               deleted: false,
               createdAt: '0000000000100-0000-origina',
@@ -1092,6 +1164,7 @@ describe('reconcile engine', () => {
             id: '1',
             contenido: 'remoto',
             sync: {
+              id: 'id',
               keyfinder: 'fp-remoto',
               deleted: false,
               createdAt: '1700000600000-0000-origina',
@@ -1102,12 +1175,18 @@ describe('reconcile engine', () => {
           {
             id: '1',
             contenido: 'local',
-            sync: { keyfinder: 'fp-local', deleted: false, createdAt: 'no-es-una-version' },
+            sync: {
+              id: 'id',
+              keyfinder: 'fp-local',
+              deleted: false,
+              createdAt: 'no-es-una-version',
+            },
           },
           {
             id: '2',
             contenido: 'x',
             sync: {
+              id: 'id',
               keyfinder: 'fp2',
               deleted: false,
               createdAt: '0000000000100-0000-origina',
@@ -1141,19 +1220,24 @@ describe('reconcile engine', () => {
           {
             id: '1',
             contenido: 'uno',
-            sync: { keyfinder: 'fp-uno', deleted: false, createdAt: 'no-es-una-version' },
+            sync: { id: 'id', keyfinder: 'fp-uno', deleted: false, createdAt: 'no-es-una-version' },
           },
           {
             id: '1',
             contenido: 'dos',
-            sync: { keyfinder: 'fp-dos', deleted: false, createdAt: 'no-es-una-version' },
+            sync: { id: 'id', keyfinder: 'fp-dos', deleted: false, createdAt: 'no-es-una-version' },
           },
         ],
         data: [
           {
             id: '1',
             contenido: 'local',
-            sync: { keyfinder: 'fp-local', deleted: false, createdAt: 'no-es-una-version' },
+            sync: {
+              id: 'id',
+              keyfinder: 'fp-local',
+              deleted: false,
+              createdAt: 'no-es-una-version',
+            },
           },
         ],
         now: 1_700_000_000_000,
@@ -1173,12 +1257,12 @@ describe('reconcile engine', () => {
       const uno: Registro<{ id: string; contenido: string }> = {
         id: '1',
         contenido: 'x',
-        sync: { keyfinder: 'fp', deleted: false, createdAt: 'no-es-una-version' },
+        sync: { id: 'id', keyfinder: 'fp', deleted: false, createdAt: 'no-es-una-version' },
       };
       const dos: Registro<{ id: string; contenido: string }> = {
         id: '1',
         contenido: 'y',
-        sync: { keyfinder: 'fp', deleted: false, createdAt: 'no-es-una-version' },
+        sync: { id: 'id', keyfinder: 'fp', deleted: false, createdAt: 'no-es-una-version' },
       };
 
       const plan = reconcile({ base: [uno, dos], data: [], now: 1_700_000_000_000, originId: 'a' });
@@ -1199,7 +1283,12 @@ describe('reconcile engine', () => {
           {
             id: '2',
             contenido: 'x',
-            sync: { keyfinder: 'fp', deleted: false, createdAt: '0000000000100-0000-origina' },
+            sync: {
+              id: 'id',
+              keyfinder: 'fp',
+              deleted: false,
+              createdAt: '0000000000100-0000-origina',
+            },
           },
         ],
         data: [
@@ -1207,6 +1296,7 @@ describe('reconcile engine', () => {
             id: '1',
             contenido: 'y',
             sync: {
+              id: 'id',
               keyfinder: 'fp2',
               deleted: false,
               createdAt: '0000000000100-0000-origina',
@@ -1238,6 +1328,7 @@ describe('reconcile engine', () => {
             id: '1',
             contenido: 'remoto',
             sync: {
+              id: 'id',
               keyfinder: 'fp-remoto',
               deleted: false,
               createdAt: '0000000002000-0000-origina',
@@ -1249,6 +1340,7 @@ describe('reconcile engine', () => {
             id: '1',
             contenido: 'local',
             sync: {
+              id: 'id',
               keyfinder: 'fp-otra',
               deleted: false,
               createdAt: '0000000000100-0000-origina',
@@ -1276,6 +1368,7 @@ describe('reconcile engine', () => {
             id: '1',
             contenido: 'remoto',
             sync: {
+              id: 'id',
               keyfinder: 'fp-remoto',
               deleted: false,
               createdAt: '0000000002000-0000-origina',
@@ -1287,6 +1380,7 @@ describe('reconcile engine', () => {
             id: '1',
             contenido: 'local',
             sync: {
+              id: 'id',
               keyfinder: 'fp-otra',
               deleted: false,
               createdAt: '0000000000100-0000-origina',
@@ -1318,6 +1412,7 @@ describe('reconcile engine', () => {
         id: 'a',
         contenido: 'remoto-a',
         sync: {
+          id: 'id',
           keyfinder: 'fp-remoto-a',
           deleted: false,
           createdAt: '0000000000500-0000-origina',
@@ -1327,6 +1422,7 @@ describe('reconcile engine', () => {
         id: 'b',
         contenido: 'remoto-b',
         sync: {
+          id: 'id',
           keyfinder: 'fp-remoto-b',
           deleted: false,
           createdAt: '0000000000600-0000-origina',
@@ -1336,12 +1432,22 @@ describe('reconcile engine', () => {
         {
           id: 'a',
           contenido: 'local-a',
-          sync: { keyfinder: 'fp-local-a', deleted: false, createdAt: 'no-es-una-version' },
+          sync: {
+            id: 'id',
+            keyfinder: 'fp-local-a',
+            deleted: false,
+            createdAt: 'no-es-una-version',
+          },
         },
         {
           id: 'b',
           contenido: 'local-b',
-          sync: { keyfinder: 'fp-local-b', deleted: false, createdAt: 'no-es-una-version' },
+          sync: {
+            id: 'id',
+            keyfinder: 'fp-local-b',
+            deleted: false,
+            createdAt: 'no-es-una-version',
+          },
         },
       ];
 
@@ -1404,7 +1510,12 @@ describe('reconcile engine', () => {
             id: '1',
             compuesto: true,
             anidado: pushedAnidado,
-            sync: { keyfinder: 'fp', deleted: false, createdAt: '0000000000100-0000-origina' },
+            sync: {
+              id: 'id',
+              keyfinder: 'fp',
+              deleted: false,
+              createdAt: '0000000000100-0000-origina',
+            },
           },
         ],
         now: 1_700_000_000_000,
@@ -1419,6 +1530,7 @@ describe('reconcile engine', () => {
             compuesto: false,
             anidado: pulledAnidado,
             sync: {
+              id: 'id',
               keyfinder: 'fp-remoto',
               deleted: false,
               createdAt: '0000000002000-0000-origina',
@@ -1430,7 +1542,12 @@ describe('reconcile engine', () => {
             id: '1',
             compuesto: true,
             anidado: { x: 9 },
-            sync: { keyfinder: 'fp-local', deleted: false, createdAt: 'no-es-una-version' },
+            sync: {
+              id: 'id',
+              keyfinder: 'fp-local',
+              deleted: false,
+              createdAt: 'no-es-una-version',
+            },
           },
         ],
         now: 1_700_000_000_000,
@@ -1466,13 +1583,23 @@ describe('reconcile engine', () => {
           {
             id: '1',
             contenido: 'x',
-            sync: { keyfinder: 'fp', deleted: false, createdAt: '0000000000100-0000-origina' },
+            sync: {
+              id: 'id',
+              keyfinder: 'fp',
+              deleted: false,
+              createdAt: '0000000000100-0000-origina',
+            },
           },
         ],
         data: [
           {
             contenido: 'huerfano',
-            sync: { keyfinder: 'fp-huerfano', deleted: false, createdAt: 'no-es-una-version' },
+            sync: {
+              id: 'id',
+              keyfinder: 'fp-huerfano',
+              deleted: false,
+              createdAt: 'no-es-una-version',
+            },
           },
         ],
         now: 1_700_000_000_000,
