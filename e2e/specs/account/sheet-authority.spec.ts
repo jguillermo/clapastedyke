@@ -90,19 +90,25 @@ test.describe('Cuenta · la hoja es la fuente de la verdad', () => {
     // dejarle llegar.
     await expect.poll(() => insumos.dataRowCount, { timeout: 20_000 }).toBe(SUPPLY_COUNT + 2);
 
-    const manteca = insumos.rowOf('name', 'Manteca E2E');
+    const manteca = insumos.rowOfField('name', 'Manteca E2E');
     expect(manteca).toBeGreaterThan(1);
-    expect(insumos.rowOf('name', 'Coco E2E')).toBeGreaterThan(1);
-    expect(insumos.cell(manteca, 'purchasePrice.amount')).toBe(9.9);
-    expect(insumos.cell(manteca, 'purchasePrice.per.value')).toBe(500);
-    expect(insumos.cell(manteca, 'purchasePrice.per.unit')).toBe('g');
+    expect(insumos.rowOfField('name', 'Coco E2E')).toBeGreaterThan(1);
+    // El precio llega entero y con sus tipos, porque viaja dentro del JSON del registro.
+    expect(insumos.record(manteca)['purchasePrice']).toMatchObject({
+      amount: 9.9,
+      per: { value: 500, unit: 'g' },
+    });
 
     // ── Caso 2 · dos ediciones a mano en la hoja, y la app se pone al día ────────────────────────
     // Se toca SOLO la celda del dato, como haría una persona: ni la versión ni la huella. Es esa
     // discrepancia —la huella escrita ya no cuadra con el contenido— la que hace que la hoja gane.
     const harina = insumos.rowOf('id', SUPPLIES.harina.id);
-    insumos.setCell(harina, 'name', 'Harina E2E');
-    insumos.setCell(manteca, 'purchasePrice.amount', '12.5');
+    insumos.editRecord(harina, (record) => {
+      record['name'] = 'Harina E2E';
+    });
+    insumos.editRecord(manteca, (record) => {
+      (record['purchasePrice'] as Record<string, unknown>)['amount'] = 12.5;
+    });
 
     await sync(account);
 
@@ -115,14 +121,14 @@ test.describe('Cuenta · la hoja es la fuente de la verdad', () => {
     await expect(supplies.list.priceInput(mantecaRow)).toHaveValue('12.5');
 
     // Leer la hoja no la reescribe: la corrección de quien la editó se queda tal cual.
-    expect(insumos.cell(harina, 'name')).toBe('Harina E2E');
+    expect(insumos.record(harina)['name']).toBe('Harina E2E');
 
     // ── Caso 3 · borrar en la hoja, de las dos formas posibles, borra aquí ───────────────────────
     await backToAccount(supplies, catalog, home, account);
 
     // Una lápida (así la escribe la app) y una fila que simplemente desaparece.
-    insumos.setCell(insumos.rowOf('name', 'Manteca E2E'), 'borrado', 'TRUE');
-    insumos.deleteRow(insumos.rowOf('name', 'Coco E2E'));
+    insumos.setCell(insumos.rowOfField('name', 'Manteca E2E'), 'borrado', 'TRUE');
+    insumos.deleteRow(insumos.rowOfField('name', 'Coco E2E'));
 
     await sync(account);
 
@@ -138,14 +144,14 @@ test.describe('Cuenta · la hoja es la fuente de la verdad', () => {
 
     // ── Caso 4 · una fila escrita a mano SIN id se adopta ────────────────────────────────────────
     await backToAccount(supplies, catalog, home, account);
+    // Sin id, y con el registro tecleado como JSON: es lo que hace ahora quien añade una fila a mano.
     const nueva = insumos.appendRow({
-      name: 'Cardamomo E2E',
-      baseUnit: 'g',
-      usage: 'recipe',
-      'purchasePrice.amount': '18',
-      'purchasePrice.per.value': '100',
-      'purchasePrice.per.unit': 'g',
-      'purchasePrice.currency': 'PEN',
+      datos: JSON.stringify({
+        name: 'Cardamomo E2E',
+        baseUnit: 'g',
+        usage: 'recipe',
+        purchasePrice: { amount: 18, per: { value: 100, unit: 'g' }, currency: 'PEN' },
+      }),
     });
 
     await sync(account);
@@ -161,7 +167,7 @@ test.describe('Cuenta · la hoja es la fuente de la verdad', () => {
     const adoptado = String(insumos.cell(nueva, 'id'));
     expect(String(insumos.cell(nueva, 'huella'))).not.toBe('');
     expect(String(insumos.cell(nueva, 'version'))).not.toBe('');
-    expect(insumos.cell(nueva, 'name')).toBe('Cardamomo E2E');
+    expect(insumos.record(nueva)['name']).toBe('Cardamomo E2E');
 
     await openSupplies(account, home, catalog, supplies);
     expect(await supplies.list.names()).toContain('Cardamomo E2E');

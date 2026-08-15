@@ -49,8 +49,11 @@ export interface RemoteTable {
    * derecho en «Eliminar hoja» no puede costar eso.
    */
   readonly present: boolean;
-  /** Las columnas que el destino tiene hoy, en su orden. */
-  readonly columns: readonly string[];
+  /**
+   * La cabecera tal y como está escrita. Se compara contra la que este sincronizador escribe: si no
+   * coincide, la pestaña no es suya y no se toca. Vacía = pestaña recién creada, sin cabecera todavía.
+   */
+  readonly header: readonly string[];
   readonly rows: readonly RemoteRow[];
   /** Filas cuyo contenido no se puede leer. No entran en la decisión y no se sobrescriben nunca. */
   readonly unreadable: readonly UnreadableRemoteRow[];
@@ -74,6 +77,7 @@ export interface RemoteTable {
 export interface RawRow {
   /** Su id, o cadena vacía si no lo tiene. */
   readonly id: string;
+  /** Las celdas tal como vinieron. Todas texto: el tipo del dato vive dentro del JSON de `datos`. */
   readonly cells: Readonly<Record<string, string>>;
 }
 
@@ -113,9 +117,12 @@ export type RemoteWrite =
   | {
       readonly kind: 'upsert';
       readonly table: string;
-      /** La cabecera: columnas de datos y, al final, las de servicio. */
+      /** La cabecera. Fija: `id · datos · version · origen · huella · borrado`. */
       readonly columns: readonly string[];
-      /** Las filas, con sus celdas **alineadas a `columns`**. */
+      /**
+       * Las filas, con sus celdas alineadas a `columns`. **Todas texto**: el tipo del dato viaja
+       * dentro del JSON de `datos`, así que no hay nada que tipar al enviar ni al recibir.
+       */
       readonly rows: readonly (readonly string[])[];
     }
   /**

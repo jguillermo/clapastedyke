@@ -17,7 +17,7 @@
  *
  * | Comportamiento de Sheets | Por qué importa |
  * |---|---|
- * | **`RAW` convierte a número lo que parece un número** | La app escribe `'2.5'` (texto) y lo lee de vuelta como `2.5` (número). Si la canonización no diera la misma cadena en los dos casos, cada fila parecería editada a mano en cada ciclo. Un doble que devolviera el texto tal cual **esconderría** ese fallo, que es el peor del motor |
+ * | **`RAW` guarda tal cual; quien convierte es la UI** | Escribir por la API con `RAW` **no** parsea nada: un `'2.5'` escrito así vuelve como el texto `'2.5'`. Quien convierte «lo que parece un número» en número es la interfaz cuando una persona teclea, y por eso `setCell`/`appendRow` —que simulan a una persona— sí lo hacen. Un doble que convirtiera también en la API escondería el peor fallo posible: escribir tipos por texto y guardar en la base de datos un precio que no es un número |
  * | **`TRUE`/`FALSE` se vuelven booleanos** | La lápida se escribe como texto `TRUE` y vuelve como `true` |
  * | **Recorta por la derecha y por abajo** | Una fila con las últimas celdas vacías vuelve corta, y las filas finales vacías no vuelven. El lector depende de eso |
  * | **La cuadrícula no crece sola** | Escribir fuera de ella falla. Es lo que hace que `grow()` tenga sentido |
@@ -126,6 +126,38 @@ export class FakeTab {
 
   cell(row: number, header: string): unknown {
     return this.grid[row - 1]?.[this.columnOf(header)] ?? '';
+  }
+
+  /**
+   * El registro de una fila: el JSON de la celda `datos`, ya parseado.
+   *
+   * La hoja guarda cada registro **entero en una celda**, que es lo que hace que un número siga siendo
+   * un número al bajarlo. Estos tres ayudantes existen para que los tests hablen de registros y no de
+   * comillas: sin ellos, cada aserción tendría que parsear a mano.
+   */
+  record(row: number): Record<string, unknown> {
+    const parsed: unknown = JSON.parse(asText(this.cell(row, 'datos')) || '{}');
+    return parsed as Record<string, unknown>;
+  }
+
+  /**
+   * Edita el registro de una fila **como quien edita el JSON a mano**: se toca `datos` y nada más — ni
+   * la versión, ni la huella. Esa discrepancia es justo lo que delata una edición manual.
+   */
+  editRecord(row: number, mutate: (record: Record<string, unknown>) => void): void {
+    const record = this.record(row);
+    mutate(record);
+    this.setCell(row, 'datos', JSON.stringify(record));
+  }
+
+  /** La fila cuyo registro tiene ese campo con ese valor. `-1` si no está. */
+  rowOfField(field: string, value: unknown): number {
+    for (let row = HEADER_ROW; row < this.grid.length; row += 1) {
+      if (asText(this.cell(row + 1, 'datos')).length > 0 && this.record(row + 1)[field] === value) {
+        return row + 1;
+      }
+    }
+    return -1;
   }
 
   /** Edita **una celda**, como quien la teclea: nada más se toca. */
@@ -660,7 +692,10 @@ function writeRange(file: FakeSpreadsheet, range: string, values: readonly unkno
   let cells = 0;
   values.forEach((row, offset) => {
     row.forEach((value, column) => {
-      setCell(tab, firstRow + offset - 1, firstColumn + column, coerce(value));
+      // **Sin `coerce`**: `valueInputOption: RAW` guarda tal cual. Quien convierte un texto en número
+      // es la interfaz cuando **una persona** teclea, no la API. Un doble que convirtiera aquí
+      // escondería el fallo de escribir un número como texto — que es exactamente lo que pasó.
+      setCell(tab, firstRow + offset - 1, firstColumn + column, value);
       cells += 1;
     });
   });
@@ -702,8 +737,12 @@ function trimTrailing(row: readonly unknown[]): unknown[] {
 }
 
 /**
- * Lo que hace `valueInputOption: RAW` con un texto: si parece un número, **es** un número; si parece un
- * sí/no, es un booleano. Es la conversión que la app no ve venir y de la que depende su huella.
+ * Lo que hace **la interfaz** cuando una persona teclea: si parece un número, es un número; si parece
+ * un sí/no, es un booleano.
+ *
+ * Solo se aplica donde el test simula a alguien escribiendo en la hoja (`setCell`, `appendRow`).
+ * **Nunca en el camino de la API**: `valueInputOption: RAW` guarda tal cual, y un doble que convirtiera
+ * ahí haría pasar por bueno el escribir un número como texto.
  */
 function coerce(value: unknown): unknown {
   if (typeof value !== 'string') {

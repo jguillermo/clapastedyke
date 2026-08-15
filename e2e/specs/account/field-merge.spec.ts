@@ -68,7 +68,9 @@ test.describe('Cuenta · fusión de campos', () => {
     // ── El cambio de la hoja: alguien corrige el precio ───────────────────────────────────────────
     // Se toca SOLO la celda del precio, como haría una persona: ni la versión ni la huella. Esa
     // discrepancia es lo que delata que la fila la editó alguien.
-    insumos.setCell(harina, 'purchasePrice.amount', '7.25');
+    insumos.editRecord(harina, (record) => {
+      (record['purchasePrice'] as Record<string, unknown>)['amount'] = 7.25;
+    });
 
     // ── El cambio de la app: aquí se renombra el mismo insumo ────────────────────────────────────
     await openSupplies(account, home, catalog, supplies);
@@ -85,9 +87,9 @@ test.describe('Cuenta · fusión de campos', () => {
     // ── Los dos cambios, en los dos lados ────────────────────────────────────────────────────────
     // En la hoja: el nombre que se puso aquí y el precio que se puso allí, en la misma fila.
     await expect
-      .poll(() => insumos.cell(harina, 'name'), { timeout: 20_000 })
+      .poll(() => insumos.record(harina)['name'], { timeout: 20_000 })
       .toBe('Harina fusionada');
-    expect(insumos.cell(harina, 'purchasePrice.amount')).toBe(7.25);
+    expect(insumos.record(harina)['purchasePrice']).toMatchObject({ amount: 7.25 });
 
     // Y en la app, lo mismo: el precio de la hoja no se perdió al subir el nombre.
     await openSupplies(account, home, catalog, supplies);

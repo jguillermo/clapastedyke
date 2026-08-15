@@ -30,9 +30,9 @@ import { RawRow, RemoteWrite } from '../../domain/repositories/remote.repository
 import { ShadowRow } from '../../domain/services/sync-shadow';
 import { canonicalCode, canonicalText, FLAG_TRUE } from '../sheet-canonical';
 import { fingerprintOf } from '../sheet-hash';
+import { DATA_COLUMN, ID_COLUMN, SHEET_HEADERS } from '../sheet-schema';
 import { mergeRows } from './merge-rows';
-import { Cells, flatten, rebuild } from './row-shape';
-import { canonicalCells, ID_COLUMN, SERVICE_COLUMNS, TableShape } from './table-columns';
+import { canonicalJson, Payload, recordFrom } from './record-json';
 import { TranslatedTable } from './remote-registros';
 
 export interface TableWrites {
@@ -59,22 +59,17 @@ export async function planToWrites({
   deviceId,
   now,
 }: PlanToWritesInput): Promise<TableWrites> {
-  const { table, shape } = translated;
+  const { table } = translated;
   const apply: TableRow[] = [];
   const remember: ShadowRow[] = [];
   let deletions = 0;
 
   for (const registro of plan.pull) {
-    const flat = valuesOf(registro);
-    // Lo que se guarda aquí es un **documento**, con sus objetos anidados, no la fila plana con la que
-    // se compara: escribirlo plano dejaría `purchasePrice.amount` como una clave literal y el
-    // repositorio que lo lea no encontraría el precio por ningún lado — el insumo desaparecería de la
-    // lista sin que nada avisara.
-    apply.push(asRecord(tombstoned(flat, registro.sync.deleted, now)));
-    // Y lo que se recuerda es lo que hay **en el destino**, sin la lápida que se acaba de añadir aquí:
-    // el shadow describe la hoja, y apuntarle un campo que la hoja no tiene haría creer, al ciclo
-    // siguiente, que alguien le ha borrado esa columna.
-    remember.push(await shadowOf(table, shape, registro, flat));
+    const payload = payloadOfRegistro(registro);
+    // Lo que se guarda aquí es el **documento**, con su fecha de guardado y su lápida puestas: ni una
+    // ni otra viajan, así que se sintetizan de la versión y de la columna `borrado`.
+    apply.push(recordFrom(payload, versionOf(registro), registro.sync.deleted, now));
+    remember.push(await shadowOf(table, registro, payload));
     if (registro.sync.deleted) {
       deletions += 1;
     }
@@ -82,10 +77,9 @@ export async function planToWrites({
 
   const pushed: RawRow[] = [];
   for (const registro of plan.push) {
-    const values = valuesOf(registro);
-    const row = await sheetRow(shape, registro, values, deviceId);
-    pushed.push(row);
-    remember.push(await shadowOf(table, shape, registro, values));
+    const payload = payloadOfRegistro(registro);
+    pushed.push(await sheetRow(registro, payload, deviceId));
+    remember.push(await shadowOf(table, registro, payload));
   }
 
   const writes: RemoteWrite[] = [];
@@ -93,17 +87,17 @@ export async function planToWrites({
     writes.push({
       kind: 'upsert',
       table,
-      columns: [...shape.headers],
-      rows: renderAll(shape, mergeRows(translated.existing, pushed)),
+      columns: [...SHEET_HEADERS],
+      rows: renderAll(mergeRows(translated.existing, pushed)),
     });
   }
 
   // El estampado de una fila que alguien tecleó sin id, y la devolución de un id que alguien cambió,
   // van **en su propia fila**: reescribir el bloque las movería de sitio, y las puso ahí una persona.
   //
-  // Y con las columnas que la hoja tiene AHORA, no con las que tendrá: estampar es escribir en una
-  // posición, y la posición la fija la cabecera escrita.
-  const stampColumns = [...translated.remoteColumns, ...SERVICE_COLUMNS];
+  // Las posiciones salen de la cabecera fija: ya no hay columnas que descubrir, así que estampar no
+  // puede caer una celda a la derecha como pasaba cuando la cabecera podía crecer a mitad de ciclo.
+  const stampColumns = [...SHEET_HEADERS];
   for (const handAdd of translated.handAdds) {
     writes.push({
       kind: 'stamp',
@@ -135,86 +129,45 @@ export async function planToWrites({
   return { writes, apply, remember, deletions };
 }
 
-/**
- * La fila plana convertida en el documento que se guarda: `purchasePrice.amount` vuelve a ser un
- * objeto dentro de otro.
- *
- * Es el reverso exacto de `flatten`, y por eso la comparación y el almacenamiento pueden usar formas
- * distintas: **plana para comparar** —así dos dispositivos que cambian campos anidados distintos del
- * mismo precio se pueden fusionar en vez de chocar— y **anidada para guardar**, que es como la
- * entiende quien la lee.
- */
-function asRecord(flat: TableRow): TableRow {
-  const armed = rebuild(flat);
-  return 'values' in armed ? (armed.values as TableRow) : flat;
-}
-
 /** Los campos de negocio de un registro, sin sus metadatos de sincronización. */
-function valuesOf(registro: Registro): TableRow {
+function payloadOfRegistro(registro: Registro): Payload {
   const { sync: _sync, ...values } = registro;
-  return values as TableRow;
+  return values as Payload;
 }
 
 /**
- * Una fila que baja borrada tiene que **llegar borrada**.
+ * Una fila lista para el destino: su id, el registro en JSON y las columnas de servicio. **Todo texto**
+ * — el tipo del dato viaja dentro del JSON, así que no hay nada que tipar al enviar.
  *
- * El borrado viaja en la columna de servicio `borrado`, que es lo que lee el motor, pero aquí lo que
- * marca un documento como borrado es su propio `deletedAt`. Casi siempre viene en los datos —porque el
- * documento local lo tiene y la hoja lo espeja—, pero no cuando la lápida se sintetizó a partir de lo
- * que el shadow recordaba de una fila que alguien borró a mano: ahí no hay `deletedAt` que copiar.
- *
- * Sin esto, esa fila se guardaría **viva** y el ciclo siguiente la volvería a subir: el borrado que
- * alguien hizo en la hoja no se aplicaría nunca.
+ * La huella se calcula **aquí y ahora**, sobre el JSON que se va a escribir. Es la condición para que
+ * «la huella no cuadra ⇒ lo tocó una persona» sea cierto: si el contenido y su huella pudieran salir de
+ * dos momentos distintos, cualquier fila propia parecería editada a mano.
  */
-function tombstoned(values: TableRow, deleted: boolean, now: number): TableRow {
-  if (!deleted || canonicalText(values['deletedAt']).length > 0) {
-    return values;
-  }
-  return { ...values, deletedAt: new Date(now).toISOString() };
-}
-
-/**
- * Una fila lista para el destino: sus celdas de datos y, al final, las de servicio.
- *
- * La huella se calcula **aquí y ahora**, sobre el contenido que se va a escribir. Es la condición para
- * que «la huella no cuadra ⇒ lo tocó una persona» sea cierto: si el contenido y su huella pudieran
- * salir de dos momentos distintos, cualquier fila propia parecería editada a mano.
- */
-async function sheetRow(
-  shape: TableShape,
-  registro: Registro,
-  values: TableRow,
-  deviceId: string,
-): Promise<RawRow> {
-  const cells = flatten(values);
-  const fingerprint = (await fingerprintFor(shape, cells)) ?? '';
+async function sheetRow(registro: Registro, payload: Payload, deviceId: string): Promise<RawRow> {
+  const datos = canonicalJson(payload);
 
   return {
-    id: canonicalText(cells[ID_COLUMN]),
+    id: canonicalText(payload[ID_COLUMN]),
     cells: {
-      ...textOf(cells),
+      [ID_COLUMN]: canonicalText(payload[ID_COLUMN]),
+      [DATA_COLUMN]: datos,
       version: versionOf(registro),
       origen: deviceId,
-      huella: fingerprint,
+      huella: await fingerprintOf([datos]),
       borrado: registro.sync.deleted ? FLAG_TRUE : '',
     },
   };
 }
 
 /** Lo que se recordará de esta fila: es el ancestro con el que se fusionará la próxima vez. */
-async function shadowOf(
-  table: string,
-  shape: TableShape,
-  registro: Registro,
-  values: TableRow,
-): Promise<ShadowRow> {
+async function shadowOf(table: string, registro: Registro, payload: Payload): Promise<ShadowRow> {
   return {
     table,
-    rowId: canonicalCode(values.id),
-    fingerprint: (await fingerprintFor(shape, flatten(values))) ?? '',
+    rowId: canonicalCode(payload.id),
+    fingerprint: await fingerprintOf([canonicalJson(payload)]),
     version: versionOf(registro),
     deleted: registro.sync.deleted,
-    values,
+    values: payload,
   };
 }
 
@@ -223,22 +176,6 @@ function versionOf(registro: Registro): string {
 }
 
 /** Las filas fusionadas, con sus celdas puestas en el orden de la cabecera. */
-function renderAll(shape: TableShape, rows: readonly RawRow[]): string[][] {
-  return rows.map((row) => shape.headers.map((column) => row.cells[column] ?? ''));
+function renderAll(rows: readonly RawRow[]): string[][] {
+  return rows.map((row) => SHEET_HEADERS.map((column) => row.cells[column] ?? ''));
 }
-
-function textOf(cells: Cells): Record<string, string> {
-  const text: Record<string, string> = {};
-  for (const [column, value] of Object.entries(cells)) {
-    text[column] = value === null || value === undefined ? '' : String(value);
-  }
-  return text;
-}
-
-async function fingerprintFor(shape: TableShape, cells: Cells): Promise<string | null> {
-  const canonical = canonicalCells(shape, cells);
-  return 'values' in canonical ? await fingerprintOf(canonical.values) : null;
-}
-
-/** Las columnas de servicio, expuestas para quien componga cabeceras fuera de aquí. */
-export { SERVICE_COLUMNS };

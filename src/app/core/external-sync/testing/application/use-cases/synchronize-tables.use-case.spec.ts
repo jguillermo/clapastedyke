@@ -10,8 +10,8 @@ import {
 } from '../../../domain/repositories/remote.repository';
 import { SyncStatus } from '../../../domain/services/sync-status';
 import { SyncTarget } from '../../../domain/value-objects/sync-target';
-import { rebuild } from '../../../infrastructure/sheets/row-shape';
-import { SERVICE_COLUMNS } from '../../../infrastructure/sheets/table-columns';
+import { SHEET_HEADERS } from '../../../infrastructure/sheet-schema';
+import { canonicalJson, parsePayload } from '../../../infrastructure/sheets/record-json';
 import {
   FakeCredentialsProvider,
   FakeLocalRepository,
@@ -106,10 +106,12 @@ describe('SynchronizeTables', () => {
 
     const [upsert] = remote.writesOf('upsert');
     expect(upsert.table).toBe(TABLE);
-    expect(upsert.columns).toEqual(['id', 'name', 'updatedAt', ...SERVICE_COLUMNS]);
+    expect(upsert.columns).toEqual([...SHEET_HEADERS]);
     expect(upsert.rows).toHaveLength(1);
-    const [id, name, updatedAt, version, origen, huella, borrado] = upsert.rows[0];
-    expect([id, name, updatedAt]).toEqual(['ing-1', 'Harina', '2026-08-14T10:00:00.000Z']);
+    const [id, datos, version, origen, huella, borrado] = upsert.rows[0];
+    expect(id).toBe('ing-1');
+    // El registro entero en una celda, **sin** su fecha de guardado: esa viaja en `version`.
+    expect(parsePayload(datos)).toEqual({ id: 'ing-1', name: 'Harina' });
     expect(version.length).toBeGreaterThan(0);
     expect(origen).toBe('dev00001');
     expect(huella.length).toBeGreaterThan(0);
@@ -119,7 +121,7 @@ describe('SynchronizeTables', () => {
     const recordado = await shadow.all();
     expect(recordado).toHaveLength(1);
     expect(recordado[0]).toMatchObject({ table: TABLE, rowId: 'ing-1', deleted: false });
-    expect(recordado[0].values).toMatchObject({ id: 'ing-1', name: 'Harina' });
+    expect(recordado[0].values).toEqual({ id: 'ing-1', name: 'Harina' });
   });
 
   /**
@@ -154,32 +156,63 @@ describe('SynchronizeTables', () => {
    */
   it('baja lo que falta aquí en una sola transacción', async () => {
     remote.snapshot = snapshotWith(
-      tableWith(
-        TABLE,
-        ['id', 'name'],
-        [
-          {
-            index: 2,
-            values: { id: 'ing-remoto', name: 'Manteca' },
-            version: '0000000000500-0000-otro',
-          },
-          {
-            index: 3,
-            values: { id: 'ing-otro', name: 'Azúcar' },
-            version: '0000000000500-0000-otro',
-          },
-        ],
-      ),
+      tableWith(TABLE, [
+        {
+          index: 2,
+          values: { id: 'ing-remoto', name: 'Manteca' },
+          version: '0000000000500-0000-otro',
+        },
+        {
+          index: 3,
+          values: { id: 'ing-otro', name: 'Azúcar' },
+          version: '0000000000500-0000-otro',
+        },
+      ]),
     );
 
     const result = await cycle.execute({});
 
     expect(result.movements.applied).toBe(2);
     expect(local.writes).toBe(1);
+    // La fecha de guardado no viaja: se sintetiza del instante que lleva dentro la versión, así que la
+    // que queda aquí es **la del cambio** y el ciclo siguiente deriva de ella la misma versión que hay
+    // en la hoja — que es lo que deja la fila convergida en vez de volver a competir.
+    const guardadoAt = new Date(500).toISOString();
     expect(await local.all(TABLE)).toEqual([
-      { id: 'ing-remoto', name: 'Manteca' },
-      { id: 'ing-otro', name: 'Azúcar' },
+      { id: 'ing-remoto', name: 'Manteca', updatedAt: guardadoAt },
+      { id: 'ing-otro', name: 'Azúcar', updatedAt: guardadoAt },
     ]);
+  });
+
+  /**
+   * **Lo que baja se guarda con su tipo.**
+   *
+   * Es el fallo que dejó el catálogo de insumos vacío: con una columna por campo, una hoja escrita con
+   * `valueInputOption: RAW` devolvía los números como texto y se guardaban tal cual; con el precio como
+   * `'7.25'` en vez de `7.25`, el repositorio del recetario lo descartaba como documento sin precio y
+   * el insumo desaparecía de la lista — sin error, y con un aviso que nadie mira.
+   *
+   * Guardando el registro en JSON esto es cierto **por construcción**, y este caso es lo que lo
+   * mantiene cierto de punta a punta: de la celda a la base de datos, pasando por el motor.
+   */
+  it('una fila que solo está en la hoja se guarda con sus tipos', async () => {
+    local.tables.set(TABLE, [{ id: 'ing-1', precio: 4.5 }]);
+    remote.snapshot = snapshotWith(
+      tableWith(TABLE, [
+        { index: 2, values: { id: 'ing-1', precio: 4.5 }, version: '0000000000100-0000-otro' },
+        { index: 3, values: { id: 'ing-2', precio: 7.25 }, version: '0000000000500-0000-otro' },
+      ]),
+    );
+
+    await cycle.execute({});
+
+    const guardado = (await local.all(TABLE)).find((row) => row.id === 'ing-2');
+    expect(guardado).toEqual({
+      id: 'ing-2',
+      precio: 7.25,
+      updatedAt: new Date(500).toISOString(),
+    });
+    expect(typeof guardado?.['precio']).toBe('number');
   });
 
   /**
@@ -203,7 +236,7 @@ describe('SynchronizeTables', () => {
       },
     ]);
     remote.snapshot = {
-      tables: [{ table: TABLE, present: false, columns: [], rows: [], unreadable: [], raw: [] }],
+      tables: [{ table: TABLE, present: false, header: [], rows: [], unreadable: [], raw: [] }],
     };
 
     const result = await cycle.execute({});
@@ -335,18 +368,17 @@ function snapshotWith(...tables: RemoteTable[]): RemoteSnapshot {
 }
 
 function emptyTable(table: string): RemoteTable {
-  return { table, present: true, columns: [], rows: [], unreadable: [], raw: [] };
+  return { table, present: true, header: [...SHEET_HEADERS], rows: [], unreadable: [], raw: [] };
 }
 
 function tableWith(
   table: string,
-  columns: readonly string[],
   rows: readonly { index: number; values: Record<string, unknown>; version: string }[],
 ): RemoteTable {
   return {
     table,
     present: true,
-    columns: [...columns],
+    header: [...SHEET_HEADERS],
     rows: rows.map((row) => ({
       index: row.index,
       values: row.values,
@@ -355,9 +387,14 @@ function tableWith(
     unreadable: [],
     raw: rows.map((row) => ({
       id: String(row.values['id'] ?? ''),
-      cells: Object.fromEntries(
-        Object.entries(row.values).map(([key, value]) => [key, String(value)]),
-      ),
+      cells: {
+        id: String(row.values['id'] ?? ''),
+        datos: canonicalJson(row.values as never),
+        version: row.version,
+        origen: 'otro',
+        huella: '',
+        borrado: '',
+      },
     })),
   };
 }
@@ -365,20 +402,16 @@ function tableWith(
 /**
  * La hoja tal y como queda **después** de una escritura: es lo que el ciclo siguiente leería.
  *
- * Se reconstruye con las mismas piezas que usa el adaptador de verdad (`rebuild`), porque probar la
- * idempotencia contra una hoja inventada a mano no probaría nada: lo que tiene que cerrar es el
+ * Se reconstruye con las mismas piezas que usa el adaptador de verdad (`parsePayload`), porque probar
+ * la idempotencia contra una hoja inventada a mano no probaría nada: lo que tiene que cerrar es el
  * círculo completo escribir → leer → decidir.
  */
 function tableFromWrite(write: Extract<RemoteWrite, { kind: 'upsert' }>): RemoteTable {
-  const service = new Set<string>(SERVICE_COLUMNS);
-  const data = write.columns.filter((column) => !service.has(column));
   const rows = write.rows.map((cells, offset) => {
     const named = Object.fromEntries(write.columns.map((column, index) => [column, cells[index]]));
-    const armed = rebuild(Object.fromEntries(data.map((column) => [column, named[column]])));
-
     return {
       index: 2 + offset,
-      values: 'values' in armed ? armed.values : {},
+      values: parsePayload(named['datos']) ?? { id: named['id'] ?? '' },
       meta: {
         version: named['version'] ?? '',
         origin: named['origen'] ?? '',
@@ -392,7 +425,7 @@ function tableFromWrite(write: Extract<RemoteWrite, { kind: 'upsert' }>): Remote
   return {
     table: write.table,
     present: true,
-    columns: data,
+    header: [...write.columns],
     rows: rows.map(({ index, values, meta }) => ({ index, values, meta })),
     unreadable: [],
     raw: rows.map((row) => row.raw),

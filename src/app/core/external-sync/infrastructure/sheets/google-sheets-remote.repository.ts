@@ -12,11 +12,18 @@ import {
 } from '../../domain/repositories/remote.repository';
 import { SyncTarget } from '../../domain/value-objects/sync-target';
 import { googleFetch } from '../google-api';
-import { canonicalFlag, canonicalText, FLAG_TRUE } from '../sheet-canonical';
-import { META_TAB, rangeOf, SCHEMA_VERSION } from '../sheet-schema';
-import { Cells, rebuild } from './row-shape';
+import { canonicalText, isTombstone } from '../sheet-canonical';
+import {
+  columnLetter,
+  DATA_COLUMN,
+  ID_COLUMN,
+  META_TAB,
+  rangeOf,
+  SCHEMA_VERSION,
+  SHEET_HEADERS,
+} from '../sheet-schema';
+import { parsePayload } from './record-json';
 import { SheetWriteBatch } from './sheet-write-batch';
-import { ID_COLUMN, SERVICE_COLUMNS } from './table-columns';
 
 const SHEETS_API = 'https://sheets.googleapis.com/v4/spreadsheets';
 
@@ -88,23 +95,25 @@ export class GoogleSheetsRemoteRepository extends RemoteRepository {
     const titles = new Set(tabs.map((tab) => tab.title));
 
     const present = tables.filter((table) => titles.has(table));
-    // Desde la fila 1 —la cabecera— hasta donde llegue: las columnas no se saben de antemano, así que
-    // se pide un ancho holgado y Sheets recorta por donde de verdad acabe la tabla.
+    // Desde la fila 1 —la cabecera— hasta la última columna de un esquema que ahora es **fijo**: seis
+    // columnas, siempre las mismas. Antes había que pedir un ancho holgado porque las columnas se
+    // deducían de los datos; ya no hay nada que deducir.
     //
     // La pestaña de servicio **no se lee**: la versión del esquema se escribe para que quede dicha en
     // la hoja, pero hoy no hay ninguna decisión que dependa de ella. Leerla sería un rango más en cada
     // ciclo a cambio de un dato que nadie mira.
+    const last = columnLetter(SHEET_HEADERS.length);
     const read = await this.fetchRanges(
       credential,
       target,
-      present.map((table) => rangeOf(table, 'A1:ZZ')),
+      present.map((table) => rangeOf(table, `A1:${last}`)),
     );
 
     const readByTable = new Map(present.map((table, index) => [table, read[index]?.values ?? []]));
     const remoteTables: RemoteTable[] = tables.map((table) =>
       titles.has(table)
         ? tableFrom(table, readByTable.get(table) ?? [])
-        : { table, present: false, columns: [], rows: [], unreadable: [], raw: [] },
+        : { table, present: false, header: [], rows: [], unreadable: [], raw: [] },
     );
 
     this.log.debug('destino leído', {
@@ -271,40 +280,49 @@ function sheet(target: SyncTarget): string {
 }
 
 /**
- * Una pestaña leída: su cabecera, sus filas con la posición real, y las que no se pudieron armar.
+ * Una pestaña leída: su cabecera, sus filas con la posición real, y las que no se pudieron leer.
  *
  * Sheets **recorta por la derecha y por abajo**: una fila cuyas últimas celdas están vacías vuelve
  * corta, y las filas finales vacías no vuelven. Lo primero lo absorbe leer por nombre de columna (una
  * celda que no está es una celda vacía); lo segundo no importa, porque una fila que no existe no puede
  * haber cambiado. Los huecos **de en medio** sí se conservan, y con ellos la posición de todo lo que
  * hay debajo.
+ *
+ * El `id` sale de **su columna**, no del JSON: es lo que ve una persona, lo que empareja las filas y
+ * lo que el adaptador sabe corregir cuando alguien lo cambia a mano.
  */
 function tableFrom(table: string, values: readonly unknown[][]): RemoteTable {
-  const columns = (values[0] ?? []).map((cell) => canonicalText(cell));
-  const dataColumns = columns.filter((column) => column.length > 0 && !isService(column));
+  const header = (values[0] ?? []).map((cell) => canonicalText(cell));
   const rows: RemoteRow[] = [];
   const unreadable: UnreadableRemoteRow[] = [];
   const data = values.slice(1);
 
   data.forEach((cells, offset) => {
     const index = FIRST_DATA_ROW + offset;
-    const named = cellsOf(columns, cells);
+    const named = cellsOf(header, cells);
     if (isBlank(named)) {
       return;
     }
 
-    const armed = rebuild(pick(named, dataColumns));
-    if ('unreadable' in armed) {
-      unreadable.push({ index, id: idOf(named), column: armed.unreadable.column });
+    const payload = parsePayload(named[DATA_COLUMN]);
+    if (payload === null) {
+      // Una celda que alguien estropeó: la fila no entra en la decisión y **no se sobrescribe nunca**,
+      // porque escribirle nuestro valor encima borraría su intento de corrección.
+      unreadable.push({ index, id: idOf(named), column: DATA_COLUMN });
       return;
     }
-    rows.push({ index, values: armed.values, meta: metaOf(named) });
+
+    rows.push({
+      index,
+      values: { ...payload, [ID_COLUMN]: idOf(named) ?? payload[ID_COLUMN] },
+      meta: metaOf(named),
+    });
   });
 
   return {
     table,
     present: true,
-    columns: dataColumns,
+    header,
     rows,
     unreadable,
     /*
@@ -319,61 +337,47 @@ function tableFrom(table: string, values: readonly unknown[][]): RemoteTable {
      * no moverle a nadie lo que puso donde lo puso.
      */
     raw: data
-      .map((cells) => cellsOf(columns, cells))
-      .map((named) => ({ id: idOf(named) ?? '', cells: textOf(named) })),
+      .map((cells) => cellsOf(header, cells))
+      .map((named) => ({ id: idOf(named) ?? '', cells: named })),
   };
 }
 
-/** Las celdas de una fila, por nombre de columna. Lo que no vino es una celda vacía. */
-function cellsOf(columns: readonly string[], cells: readonly unknown[]): Cells {
-  const row: Cells = {};
-  columns.forEach((column, index) => {
+/** Las celdas de una fila, por nombre de columna y **como texto**: en esta hoja todo lo es. */
+function cellsOf(header: readonly string[], cells: readonly unknown[]): Record<string, string> {
+  const row: Record<string, string> = {};
+  header.forEach((column, index) => {
     if (column.length > 0) {
-      row[column] = cells[index] ?? '';
+      row[column] = canonicalText(cells[index]);
     }
   });
   return row;
-}
-
-function pick(row: Cells, columns: readonly string[]): Cells {
-  const picked: Cells = {};
-  for (const column of columns) {
-    picked[column] = row[column];
-  }
-  return picked;
 }
 
 /**
  * Una fila **completamente** en blanco es el hueco de una tabla que encogió, no un dato. Se salta, y
  * la posición de las de abajo no se toca: quien escriba una fila concreta sigue acertando.
  */
-function isBlank(row: Cells): boolean {
-  return Object.values(row).every((value) => canonicalText(value).length === 0);
+function isBlank(row: Readonly<Record<string, string>>): boolean {
+  return Object.values(row).every((value) => value.length === 0);
 }
 
-function idOf(row: Cells): string | null {
-  const id = canonicalText(row[ID_COLUMN]);
+function idOf(row: Readonly<Record<string, string>>): string | null {
+  const id = row[ID_COLUMN] ?? '';
   return id.length > 0 ? id : null;
 }
 
-function metaOf(row: Cells): RemoteRow['meta'] {
+/**
+ * Los metadatos de servicio de una fila.
+ *
+ * La lápida se lee **estricta** (ver `isTombstone`): una celda con algo que no se entiende como un sí
+ * ni como un no se trata como **viva**. Al revés —dar por borrado lo que no se entiende— una celda
+ * descolocada bastaría para vaciar el catálogo en todos los dispositivos.
+ */
+function metaOf(row: Readonly<Record<string, string>>): RemoteRow['meta'] {
   return {
-    version: canonicalText(row['version']),
-    origin: canonicalText(row['origen']),
-    fingerprint: canonicalText(row['huella']),
-    deleted: canonicalFlag(row['borrado']) === FLAG_TRUE,
+    version: row['version'] ?? '',
+    origin: row['origen'] ?? '',
+    fingerprint: row['huella'] ?? '',
+    deleted: isTombstone(row['borrado']),
   };
-}
-
-/** Las celdas como texto: lo que se vuelve a escribir es texto, no el tipo que devolvió Sheets. */
-function textOf(row: Cells): Record<string, string> {
-  const cells: Record<string, string> = {};
-  for (const [column, value] of Object.entries(row)) {
-    cells[column] = value === null || value === undefined ? '' : String(value);
-  }
-  return cells;
-}
-
-function isService(column: string): boolean {
-  return (SERVICE_COLUMNS as readonly string[]).includes(column);
 }

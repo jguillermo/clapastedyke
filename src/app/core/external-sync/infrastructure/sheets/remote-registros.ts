@@ -7,13 +7,18 @@
  * **Todo eso se resuelve aquí**, antes de que el motor vea nada, porque el motor no sabe —ni tiene que
  * saber— qué es una hoja.
  *
+ * Lo que **no** pasa aquí es ninguna transformación del dato. La celda `datos` lleva el registro en
+ * JSON, así que basta con parsearlo: lo que hay escrito es, literalmente, lo que se le pasa al motor.
+ * Antes había que aplanarlo a columnas, adivinar el tipo de cada una y volver a montarlo — y de ahí
+ * salió el fallo que dejó el catálogo de insumos vacío.
+ *
  * ## Las cinco cosas que hace una persona, y cómo se detecta cada una
  *
  * | Lo que hizo | Cómo se sabe | Qué se hace |
  * |---|---|---|
- * | Editó una celda | la huella escrita no cuadra con la del contenido | se le da versión de **ahora**: gana |
+ * | Editó el JSON | la huella escrita no cuadra con la del contenido | se le da versión de **ahora**: gana |
  * | Borró la fila entera | su id está en el shadow y ya no está en la hoja | lápida incondicional: el destino manda |
- * | Tecleó una fila sin id | la fila tiene contenido y la celda del id está vacía | se **adopta**: id nuevo, y se le estampa de vuelta |
+ * | Tecleó una fila sin id | la fila tiene datos y la celda del id está vacía | se **adopta**: id nuevo, y se le estampa de vuelta |
  * | Le cambió el id a una fila | su contenido sin id coincide con el de una fila local que ya no está en la hoja | se le **devuelve** el suyo |
  * | Escribió una versión imposible | la fecha viene del futuro | se re-estampa (lo hace el motor) |
  *
@@ -28,15 +33,15 @@
  * Se adoptan: se toma su versión si la traen y se deja que la comparación normal decida.
  */
 
-import { LogicalVersion } from '../../domain/services/engine/hybrid-clock';
-import { Registro } from '../../domain/services/engine/engine.types';
-import { RawRow, RemoteRow, RemoteTable } from '../../domain/repositories/remote.repository';
 import { TableRow } from '../../domain/repositories/local.repository';
+import { RawRow, RemoteRow, RemoteTable } from '../../domain/repositories/remote.repository';
+import { Registro } from '../../domain/services/engine/engine.types';
+import { LogicalVersion } from '../../domain/services/engine/hybrid-clock';
 import { ShadowRow } from '../../domain/services/sync-shadow';
 import { canonicalCode, canonicalText } from '../sheet-canonical';
 import { fingerprintOf } from '../sheet-hash';
-import { Cells, flatten } from './row-shape';
-import { canonicalCells, ID_COLUMN, shapeOf, TableShape } from './table-columns';
+import { ID_COLUMN, SHEET_HEADERS } from '../sheet-schema';
+import { canonicalJson, Payload, payloadOf } from './record-json';
 
 /** Cuánto vive una lápida antes de tirarse de la hoja. */
 export const TOMBSTONE_TTL_MS = 90 * 24 * 60 * 60 * 1000;
@@ -58,7 +63,6 @@ export interface Reid {
 
 export interface TranslatedTable {
   readonly table: string;
-  readonly shape: TableShape;
   /** Lo que hay en el destino, en la forma que el motor entiende. */
   readonly base: readonly Registro[];
   /** Lo que hay aquí, en la misma forma. */
@@ -67,15 +71,6 @@ export interface TranslatedTable {
   readonly positions: ReadonlyMap<string, number>;
   /** El contenido crudo de la pestaña, para poder reescribirla conservando lo ajeno. */
   readonly existing: readonly RawRow[];
-  /**
-   * Las columnas que la pestaña tiene **ahora mismo**, no las que tendrá.
-   *
-   * Escribir una celda suelta es escribir en una posición, y la posición la fija la cabecera que hay
-   * escrita. `shape` puede traer columnas nuevas —un campo que ningún ciclo ha subido todavía— que
-   * aún no están en la hoja: usar `shape` para estampar correría la celda una columna a la derecha y
-   * escribiría la versión encima del origen.
-   */
-  readonly remoteColumns: readonly string[];
   readonly handAdds: readonly HandAdd[];
   readonly reids: readonly Reid[];
   /** Lápidas lo bastante viejas como para tirarlas. */
@@ -109,18 +104,13 @@ export interface TranslateInput {
  */
 export async function translateTable(input: TranslateInput): Promise<TranslatedTable> {
   const { remote, local, shadow, now, deviceId } = input;
-  const shape = shapeOf(
-    remote.columns,
-    local.map(flatten),
-    remote.rows.map((row) => flatten(row.values)),
-  );
 
   const barrier = barrierFor(remote, shadow);
   if (barrier !== null) {
-    return empty(remote.table, shape, barrier);
+    return empty(remote.table, barrier);
   }
 
-  const localCells = new Map(local.map((row) => [canonicalCode(row.id), flatten(row)]));
+  const localIds = new Set(local.map((row) => canonicalCode(row.id)));
   const remoteIds = new Set<string>();
   const positions = new Map<string, number>();
   const base: Registro[] = [];
@@ -131,20 +121,15 @@ export async function translateTable(input: TranslateInput): Promise<TranslatedT
 
   // Las filas locales que la hoja ya no menciona son las candidatas a «alguien le cambió el id»: se
   // compara su contenido SIN el id, que es lo único que sobrevive a ese cambio.
-  const identityless = await identitylessIndex(shape, local);
+  const identityless = await identitylessIndex(local);
 
   for (const row of remote.rows) {
-    const cells = flatten(row.values);
-    const fingerprint = await fingerprintFor(shape, cells);
-    if (fingerprint === null) {
-      // Una celda que no se puede leer: la fila no entra en la decisión y no se sobrescribe nunca —
-      // escribirle nuestro valor encima borraría el intento de corrección de una persona.
-      continue;
-    }
+    const payload = row.values as Payload;
+    const fingerprint = await fingerprintOf([canonicalJson(payload)]);
 
-    const id = canonicalText(cells[ID_COLUMN]);
+    const id = canonicalText(payload[ID_COLUMN]);
     if (id.length === 0) {
-      const adopted = await adopt(input, row, cells, shape);
+      const adopted = await adopt(input, row, payload);
       base.push(adopted.registro);
       handAdds.push(adopted.handAdd);
       remoteIds.add(canonicalCode(adopted.handAdd.id));
@@ -153,9 +138,7 @@ export async function translateTable(input: TranslateInput): Promise<TranslatedT
     }
 
     const key = canonicalCode(id);
-    const previous = localCells.has(key)
-      ? null
-      : identityless.get(await identitylessOf(shape, cells));
+    const previous = localIds.has(key) ? null : identityless.get(await identitylessOf(payload));
     const resolved = previous ?? id;
 
     if (previous !== null && previous !== undefined) {
@@ -164,7 +147,7 @@ export async function translateTable(input: TranslateInput): Promise<TranslatedT
 
     remoteIds.add(canonicalCode(resolved));
     positions.set(canonicalCode(resolved), row.index);
-    base.push(registroFrom(resolved, row, cells, fingerprint, now, deviceId));
+    base.push(registroFrom(resolved, row, payload, fingerprint, now, deviceId));
 
     if (row.meta.deleted && isOldTombstone(row.meta.version, now)) {
       purge.push(row.index);
@@ -175,8 +158,7 @@ export async function translateTable(input: TranslateInput): Promise<TranslatedT
   // deduce un borrado de una ausencia —y hace bien, porque «no está» también es «nunca llegó»—, así
   // que la lápida se sintetiza aquí, que es el único sitio que sabe lo que había antes.
   for (const remembered of shadow) {
-    const key = canonicalCode(remembered.rowId);
-    if (remoteIds.has(key)) {
+    if (remoteIds.has(canonicalCode(remembered.rowId))) {
       continue;
     }
     base.push(tombstone(remembered, now, deviceId));
@@ -188,17 +170,15 @@ export async function translateTable(input: TranslateInput): Promise<TranslatedT
   }
 
   const data = await Promise.all(
-    local.map((row) => localRegistro(shape, row, shadowOf(shadow, row.id), deviceId)),
+    local.map((row) => localRegistro(row, shadowOf(shadow, row.id), deviceId)),
   );
 
   return {
     table: remote.table,
-    shape,
     base,
     data,
     positions,
     existing: remote.raw,
-    remoteColumns: remote.columns,
     handAdds,
     reids,
     purge,
@@ -208,52 +188,37 @@ export async function translateTable(input: TranslateInput): Promise<TranslatedT
 }
 
 /**
- * Por qué una tabla no se puede tocar. Dos barreras, y las dos existen porque el coste de
- * equivocarse es borrar datos en todos los dispositivos a la vez.
+ * Por qué una tabla no se puede tocar. Dos barreras, y las dos existen porque el coste de equivocarse
+ * es borrar datos en todos los dispositivos a la vez.
  *
- * **La pestaña no está.** «No hay filas» combinado con «lo que estaba y ya no está, se borró» borra la
- * tabla entera. Un clic derecho en «Eliminar hoja» no puede costar eso.
+ * **La pestaña no está** y el shadow la conocía. «No hay filas» combinado con «lo que estaba y ya no
+ * está, se borró» borra la tabla entera. Un clic derecho en «Eliminar hoja» no puede costar eso. Una
+ * pestaña que nunca ha existido —una hoja recién creada, una tabla recién añadida al array— no la ha
+ * borrado nadie: la crea la primera escritura.
  *
- * **Falta una columna que antes estaba.** Si alguien borra el rótulo de una columna, sus celdas dejan
- * de tener nombre y no vuelven: la fila parecería editada a mano con ese campo en blanco, y el campo
- * se borraría en todas partes. Se sabe porque el shadow guarda los valores de la última fila remota
- * conocida, así que se ve qué columnas había.
+ * **La cabecera no es la nuestra.** Con un esquema fijo esto es una comparación directa, y sustituye a
+ * la barrera anterior —que miraba, columna a columna, si el shadow recordaba alguna que ya no
+ * estuviera— por algo más simple y que no depende de lo que se recuerde. Una pestaña sin cabecera
+ * todavía no cuenta: la escribe la primera escritura.
  */
 function barrierFor(remote: RemoteTable, shadow: readonly ShadowRow[]): string | null {
   if (!remote.present) {
-    // Solo es una barrera si **se sabía que tenía contenido**. Una pestaña que nunca ha existido —una
-    // hoja recién creada, o una tabla que se acaba de añadir al array— no la ha borrado nadie: la
-    // crea la primera escritura. Sin esta distinción, conectar una cuenta nueva fallaría siempre.
     return shadow.length > 0 ? `falta la pestaña «${remote.table}»` : null;
   }
 
-  if (remote.columns.length === 0) {
-    // Una pestaña sin cabecera no es «han borrado una columna»: es que está vacía, o que nunca se ha
-    // escrito. Quien tiene que hablar entonces es el tope de borrado masivo, que además dice cuántas
-    // filas se perderían — mucho más útil que señalar una columna al azar.
+  const written = remote.header.filter((column) => column.length > 0);
+  if (written.length === 0) {
     return null;
   }
-
-  // Las columnas que el shadow recuerda. Sus valores se guardan ya planos —es la forma con la que se
-  // compara— así que sus claves SON los nombres de columna.
-  const known = new Set<string>();
-  for (const row of shadow) {
-    for (const column of Object.keys(row.values ?? {})) {
-      known.add(column);
-    }
-  }
-  const present = new Set(remote.columns);
-  const missing = [...known].filter((column) => !present.has(column));
-
-  return missing.length > 0
-    ? `la pestaña «${remote.table}» ha perdido la columna «${missing[0]}»`
-    : null;
+  const expected = SHEET_HEADERS.join(' · ');
+  return written.join(' · ') === expected
+    ? null
+    : `la cabecera de «${remote.table}» no es la que escribe la sincronización (${expected})`;
 }
 
-function empty(table: string, shape: TableShape, barrier: string): TranslatedTable {
+function empty(table: string, barrier: string): TranslatedTable {
   return {
     table,
-    shape,
     base: [],
     data: [],
     positions: new Map(),
@@ -262,7 +227,6 @@ function empty(table: string, shape: TableShape, barrier: string): TranslatedTab
     reids: [],
     purge: [],
     handDeletes: 0,
-    remoteColumns: [],
     barrier,
   };
 }
@@ -272,13 +236,16 @@ function empty(table: string, shape: TableShape, barrier: string): TranslatedTab
  *
  * Aquí está la detección de edición manual, que es lo que hace que la hoja sea de verdad la fuente de
  * la verdad: la app escribe **siempre** el contenido y su huella juntos, así que si al recalcularla no
- * coincide, esa fila la tocó una persona. Y una persona que corrige un precio no actualiza la columna
- * de versión — sin esto, la resolución por versión pisaría su corrección sin dejar rastro.
+ * coincide, esa fila la tocó una persona. Y una persona que corrige un dato no actualiza la columna de
+ * versión — sin esto, la resolución por versión pisaría su corrección.
+ *
+ * La huella se calcula sobre el JSON **canónico**, no sobre el texto de la celda: así reformatear el
+ * JSON o reordenar sus claves no cuenta como edición, pero cambiar un valor sí.
  */
 function registroFrom(
   id: string,
   row: RemoteRow,
-  cells: Cells,
+  payload: Payload,
   fingerprint: string,
   now: number,
   deviceId: string,
@@ -287,18 +254,16 @@ function registroFrom(
   const adopted = written.length === 0;
   const handEdited = !adopted && written.toLowerCase() !== fingerprint;
 
-  const version = handEdited
-    ? LogicalVersion.of(now, 0, deviceId).toString()
-    : canonicalText(row.meta.version);
-
   return {
-    ...cells,
+    ...payload,
     [ID_COLUMN]: id,
     sync: {
       id: ID_COLUMN,
       keyfinder: fingerprint,
       deleted: row.meta.deleted,
-      createdAt: version,
+      createdAt: handEdited
+        ? LogicalVersion.of(now, 0, deviceId).toString()
+        : canonicalText(row.meta.version),
     },
   } as Registro;
 }
@@ -317,13 +282,12 @@ function registroFrom(
 async function adopt(
   input: TranslateInput,
   row: RemoteRow,
-  cells: Cells,
-  shape: TableShape,
+  payload: Payload,
 ): Promise<{ registro: Registro; handAdd: HandAdd }> {
   const id = input.newIdentity();
   const version = LogicalVersion.of(input.now, 0, input.deviceId).toString();
-  const withId = { ...cells, [ID_COLUMN]: id };
-  const fingerprint = (await fingerprintFor(shape, withId)) ?? '';
+  const withId = { ...payload, [ID_COLUMN]: id };
+  const fingerprint = await fingerprintOf([canonicalJson(withId)]);
 
   return {
     registro: {
@@ -354,27 +318,29 @@ function tombstone(remembered: ShadowRow, now: number, deviceId: string): Regist
 }
 
 /**
- * Un registro de aquí.
+ * Un registro de aquí, en la misma forma en que viaja: **sin** su fecha de guardado ni su lápida.
+ *
+ * Se quitan porque no viajan (ver `record-json.ts`), y quitarlas **en los dos lados** es lo que evita
+ * que el motor las vea como campos que solo existen aquí y suba esa fila en cada ciclo.
  *
  * Su versión sale de la fecha de guardado del propio documento, que es lo único que este lado sabe de
- * cuándo cambió. Sin ella el motor decide a ciegas y gana el destino — que es lo prudente, pero
- * pierde una edición local legítima, así que se aprovecha siempre que se pueda leer.
+ * cuándo cambió. Sin ella el motor decide a ciegas y gana el destino — que es lo prudente, pero pierde
+ * una edición local legítima, así que se aprovecha siempre que se pueda leer.
  *
  * Y el ancestro (`syncedValues`) es lo que el shadow recuerda de la última vez que los dos lados
  * coincidieron: sin él no se puede fusionar campo a campo y gana un lado entero.
  */
 async function localRegistro(
-  shape: TableShape,
   row: TableRow,
   remembered: ShadowRow | undefined,
   deviceId: string,
 ): Promise<Registro> {
-  const cells = flatten(row);
-  const fingerprint = await fingerprintFor(shape, cells);
+  const payload = payloadOf(row);
+  const fingerprint = await fingerprintOf([canonicalJson(payload)]);
   const changedAt = Date.parse(canonicalText(row['updatedAt']));
 
   return {
-    ...cells,
+    ...payload,
     sync: {
       id: ID_COLUMN,
       keyfinder: fingerprint,
@@ -400,27 +366,16 @@ function shadowOf(shadow: readonly ShadowRow[], id: string): ShadowRow | undefin
  * id viejo desaparece (se daría por borrado el agregado), el nuevo parece un alta, y todo lo que
  * apuntaba al viejo queda colgando mientras la hoja parece perfecta.
  */
-async function identitylessIndex(
-  shape: TableShape,
-  local: readonly TableRow[],
-): Promise<Map<string, string>> {
+async function identitylessIndex(local: readonly TableRow[]): Promise<Map<string, string>> {
   const index = new Map<string, string>();
   for (const row of local) {
-    index.set(await identitylessOf(shape, flatten(row)), row.id);
+    index.set(await identitylessOf(payloadOf(row)), row.id);
   }
   return index;
 }
 
-async function identitylessOf(shape: TableShape, cells: Cells): Promise<string> {
-  const withoutId = { ...cells, [ID_COLUMN]: '' };
-  const canonical = canonicalCells(shape, withoutId);
-  return 'values' in canonical ? await fingerprintOf(canonical.values) : '';
-}
-
-/** La huella del contenido, o `null` si alguna celda no se puede leer. */
-async function fingerprintFor(shape: TableShape, cells: Cells): Promise<string | null> {
-  const canonical = canonicalCells(shape, cells);
-  return 'values' in canonical ? await fingerprintOf(canonical.values) : null;
+async function identitylessOf(payload: Payload): Promise<string> {
+  return fingerprintOf([canonicalJson({ ...payload, [ID_COLUMN]: '' })]);
 }
 
 /** `true` si una lápida es lo bastante vieja como para tirarla de la hoja. */

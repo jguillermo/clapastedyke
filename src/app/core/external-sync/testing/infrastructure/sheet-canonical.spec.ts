@@ -1,65 +1,16 @@
 import {
   canonicalCode,
-  canonicalFlag,
-  canonicalNumber,
   canonicalText,
+  isTombstone,
+  isUnrecognisedTombstone,
 } from '../../infrastructure/sheet-canonical';
 /**
- * El canonizador es el cimiento del motor de sincronización, y su fallo es invisible: si la ida y la
- * vuelta no dan la misma cadena, cada fila parece editada a mano en cada ciclo y dos dispositivos se
- * pisan para siempre. Con un solo dispositivo no se nota, y en un test normal los dos lados pasan por
- * el mismo código y coinciden por accidente.
+ * Lo que queda de la canonización después de pasar a guardar el registro como JSON: la forma canónica
+ * del **texto** —porque las celdas de servicio lo son— y la lectura de la lápida.
  *
- * Por eso lo que se prueba aquí es **la ida y la vuelta**: el mismo dato entrando por los dos caminos
- * que existen de verdad —el modelo de la app (números) y una celda leída de la hoja (texto o número)—
- * tiene que dar el mismo canónico.
+ * La canonización de números y banderas se fue con las columnas por campo: el tipo viaja ahora dentro
+ * del JSON, y su determinismo lo cubre `record-json.spec.ts`.
  */
-describe('canonicalNumber · ida y vuelta', () => {
-  // [qué es, como lo da el modelo, como puede volver de la hoja, canónico esperado]
-  const casos: [string, unknown, unknown, string][] = [
-    ['un entero', 0, '0', '0'],
-    ['un precio con céntimos', 2.5, '2.5', '2.5'],
-    ['un precio que la hoja devuelve como número', 2.5, 2.5, '2.5'],
-    ['un entero grande', 1000, '1000', '1000'],
-    ['la suma que no cierra en binario', 0.1 + 0.2, '0.30000000000000004', '0.30000000000000004'],
-    ['un número enorme, en notación científica', 1e21, '1e+21', '1e+21'],
-    ['un número diminuto', 1e-7, '1e-7', '1e-7'],
-    ['un factor con muchos decimales', 1 / 3, '0.3333333333333333', '0.3333333333333333'],
-    ['un negativo', -5.25, '-5.25', '-5.25'],
-    ['el cero negativo, que es el mismo cero', -0, '0', '0'],
-  ];
-
-  it.each(casos)('%s da lo mismo por los dos caminos', (_caso, local, remoto, esperado) => {
-    expect(canonicalNumber(local)).toBe(esperado);
-    expect(canonicalNumber(remoto)).toBe(esperado);
-  });
-
-  it('acepta la coma decimal de quien teclea en español', () => {
-    expect(canonicalNumber('2,50')).toBe('2.5');
-    expect(canonicalNumber('0,333')).toBe('0.333');
-  });
-
-  it('ignora los espacios que deja una copia y pega', () => {
-    expect(canonicalNumber('  2.5  ')).toBe('2.5');
-    expect(canonicalNumber('1 000')).toBe('1000');
-  });
-
-  it.each([
-    ['vacío', ''],
-    ['solo espacios', '   '],
-    ['nada', null],
-    ['sin definir', undefined],
-    ['texto', 'dos y medio'],
-    ['un número a medias', '2.5.3'],
-    ['infinito', Infinity],
-    ['no un número', NaN],
-    ['con separador de miles ambiguo', '1.234,56'],
-    ['con separador de miles ambiguo al revés', '1,234.56'],
-  ])('devuelve null si el valor no es un número (%s)', (_caso, value) => {
-    expect(canonicalNumber(value)).toBeNull();
-  });
-});
-
 describe('canonicalText', () => {
   it('recorta, porque la hoja añade espacios sola', () => {
     expect(canonicalText('  Harina  ')).toBe('Harina');
@@ -98,13 +49,26 @@ describe('canonicalCode', () => {
   });
 });
 
-describe('canonicalFlag', () => {
-  it('escribe TRUE y lee permisivo: nadie teclea TRUE', () => {
-    expect(canonicalFlag(true)).toBe('TRUE');
-    expect(canonicalFlag('TRUE')).toBe('TRUE');
-    expect(canonicalFlag('Sí')).toBe('TRUE');
-    expect(canonicalFlag('x')).toBe('TRUE');
-    expect(canonicalFlag(1)).toBe('TRUE');
+/**
+ * La lápida se lee **estricta**, al revés que el resto de los sí/no, y la razón es la asimetría del
+ * daño: un falso «no borrado» no se nota —la fila sigue ahí y alguien la vuelve a borrar— pero un
+ * falso «borrado» hace desaparecer el dato en todos los dispositivos a la vez, y para cuando alguien
+ * se da cuenta la lápida ya viajó.
+ *
+ * Basta con que una celda de servicio quede descolocada para que ahí acabe una huella, y una huella no
+ * está en la lista de «noes» de `canonicalFlag`: con la lectura permisiva, contaría como borrado.
+ */
+describe('isTombstone', () => {
+  it.each([
+    ['lo que escribe la app', 'TRUE'],
+    ['en minúsculas', 'true'],
+    ['un sí con tilde', 'Sí'],
+    ['un sí sin tilde', 'si'],
+    ['una equis', 'x'],
+    ['un uno', '1'],
+    ['booleano', true],
+  ])('borra si dice que sí (%s)', (_caso, value) => {
+    expect(isTombstone(value)).toBe(true);
   });
 
   it.each([
@@ -112,12 +76,22 @@ describe('canonicalFlag', () => {
     ['espacios', '  '],
     ['nada', null],
     ['FALSE', 'FALSE'],
-    ['false', 'false'],
     ['no', 'NO'],
     ['cero', '0'],
-    ['falso', 'Falso'],
     ['booleano', false],
-  ])('cuenta como «no» si viene %s', (_caso, value) => {
-    expect(canonicalFlag(value)).toBe('');
+    ['una huella descolocada', '6caf629b5035fb41'],
+    ['una versión descolocada', '1786772542466-0001-200e3f2d'],
+    ['un identificador de dispositivo', '200e3f2d'],
+    ['cualquier texto', 'pendiente de revisar'],
+  ])('NO borra si no lo dice claramente (%s)', (_caso, value) => {
+    expect(isTombstone(value)).toBe(false);
+  });
+
+  /** Lo que no se entiende no borra, pero tampoco se calla: hay una celda que alguien debería mirar. */
+  it('distingue «dice que no» de «no se entiende»', () => {
+    expect(isUnrecognisedTombstone('')).toBe(false);
+    expect(isUnrecognisedTombstone('no')).toBe(false);
+    expect(isUnrecognisedTombstone('TRUE')).toBe(false);
+    expect(isUnrecognisedTombstone('6caf629b5035fb41')).toBe(true);
   });
 });

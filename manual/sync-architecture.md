@@ -63,37 +63,64 @@ y no deben estar: son el andamiaje del propio sincronizador.
 
 ## Cómo se ve una fila en la hoja
 
-La pestaña se llama como la tabla y las columnas como los campos. No hay rótulos traducidos ni
-columnas calculadas: es un espejo.
+Seis columnas fijas, siempre las mismas, y **todas texto**:
 
-| Valor del registro | Celda |
+| Columna | Contenido |
 |---|---|
-| primitivo (`name`, `baseUnit`, `factor`) | una columna con su nombre |
-| objeto anidado | una columna por hoja del árbol: `purchasePrice.amount`, `purchasePrice.per.unit` |
-| lista (`recipes.lines`) | **una** columna con JSON, marcada `lines[]` |
-
-El objeto se despliega y la lista no, y no es una inconsistencia: un objeto tiene un juego de claves
-fijo, así que sus columnas son estables y una persona puede corregir un precio en su celda. Una lista
-tiene longitud variable — desplegarla daría un número de columnas distinto por fila, o una tabla hija
-sin identidad propia, que es el caso especial que este diseño eliminó.
-
-La marca `[]` no es decorativa: al leer, una celda con `["a","b"]` es indistinguible de alguien que
-escribió ese texto, y adivinarlo con un `JSON.parse` de prueba convertiría en lista cualquier texto que
-se le pareciera.
-
-**Las columnas se leen por NOMBRE, nunca por posición.** Mover una columna en la hoja no rompe nada, y
-el orden es estable: las que ya están conservan su sitio y las nuevas se añaden al final.
-
-### Las columnas de servicio
-
-Cada pestaña lleva cuatro al final:
-
-| Columna | Para qué |
-|---|---|
+| `id` | La identidad. **Manda esta**, no el `id` que vaya dentro del JSON |
+| `datos` | El registro entero, en JSON canónico |
 | `version` | Reloj lógico: decide quién gana un conflicto |
 | `origen` | Qué dispositivo la escribió (desempate y diagnóstico) |
-| `huella` | Detectar que una persona editó la fila |
-| `borrado` | La lápida |
+| `huella` | Hash del JSON canónico: detecta que una persona editó la fila |
+| `borrado` | La lápida. Se lee **estricta**: ver abajo |
+
+```
+id            datos                                                          version  origen  huella  borrado
+ing-harina    {"baseUnit":"g","id":"ing-harina","name":"Harina",…}             …        …       …
+```
+
+### Por qué el registro entero en una celda
+
+Porque **una celda no tiene tipo**. Hubo una versión de esto con una columna por campo
+(`purchasePrice.amount`, `purchasePrice.per.unit`…), y como se escribe con `valueInputOption: RAW`
+—que guarda tal cual— un precio subía como número y volvía como texto. Y lo que baja se guarda **tal
+cual** en la base de datos: con `purchasePrice.amount: '4.5'` en vez de `4.5`, el repositorio del
+recetario descartaba ese insumo como documento sin precio y desaparecía del catálogo, sin más rastro
+que un aviso en consola.
+
+Se llegó a construir una capa que **adivinaba** el tipo de cada columna a partir del valor local para
+compensarlo. Era un parche sobre un formato que pierde información. Con JSON el tipo viaja dentro del
+dato: un número es un número porque el JSON lo dice.
+
+### Lo único que se transforma
+
+```
+registro local ──(quitar updatedAt/deletedAt)──▶ payload ──JSON──▶ celda
+celda ──JSON──▶ payload ──(id de su columna)──▶ lo que ve el motor
+lo que decidió el motor ──(añadir updatedAt/deletedAt)──▶ registro local
+```
+
+1. **`updatedAt` y `deletedAt` no viajan.** Su información ya va en `version` y `borrado`; al bajar se
+   sintetizan, y `updatedAt` sale del instante que lleva dentro la versión, no de «ahora», así que la
+   fecha guardada es la del cambio y el ciclo siguiente deriva de ella la misma versión que hay en la
+   hoja. Se quitan **en los dos lados**: si el registro local los llevara y el remoto no, el motor los
+   vería como campos que solo existen aquí y subiría esa fila para siempre.
+2. **El `id` sale de su columna.** Al escribir, columna y JSON salen del mismo registro.
+
+Ni se aplana, ni se tipa, ni se reconstruye: lo que hay en la celda es, parseado, exactamente lo que se
+le pasa al motor.
+
+### El JSON canónico
+
+De su determinismo depende que la huella signifique «esto lo escribí yo»: claves **ordenadas** en todos
+los niveles, textos en **NFC**, sin nulos y sin espacios. Al leer se parsea y se vuelve a serializar
+canónicamente antes de comparar, así que reformatear el JSON o reordenar sus claves **no** cuenta como
+edición; cambiar un valor, sí.
+
+La lápida es la única columna de servicio que no se lee de forma permisiva. Para un sí/no cualquiera
+vale lo que teclee una persona, pero aquí el daño es asimétrico: un falso «no borrado» no se nota, y un
+falso «borrado» hace desaparecer el dato en todos los dispositivos a la vez. Solo borra lo que se
+reconoce como una orden de borrar.
 
 **El `id` no se edita.** De él depende que las referencias entre pestañas signifiquen algo. Si se
 cambia, la app lo devuelve a su sitio.
@@ -116,12 +143,12 @@ siempre **y envenenaría el reloj de todos los dispositivos** al leerla.
 Cinco detecciones, todas en el adaptador (`infrastructure/sheets/remote-registros.ts`). Sin ellas la
 edición manual se pierde en silencio:
 
-1. **Editó una celda** → se recalcula la huella de las celdas de datos; si no coincide con la celda
-   `huella`, lo tocó un humano (la app escribe contenido y huella **juntos**). Se le da versión de
-   *ahora*, así que **gana**. Sin esto, la resolución por versión pisaría su corrección: quien edita
-   una celda no actualiza la columna de versión.
+1. **Editó el JSON** → se recalcula la huella del contenido; si no coincide con la celda `huella`, lo
+   tocó un humano (la app escribe contenido y huella **juntos**). Se le da versión de *ahora*, así que
+   **gana**. Sin esto, la resolución por versión pisaría su corrección: quien edita un dato no
+   actualiza la columna de versión.
 2. **Borró una fila** → estaba en la base, no está en la hoja ⇒ lápida incondicional.
-3. **Añadió una fila sin id** → se **adopta**: se le asigna identidad, se importa, y se le **escriben
+3. **Añadió una fila sin id** (con su JSON tecleado en `datos`) → se **adopta**: se le asigna identidad, se importa, y se le **escriben
    de vuelta** el id, la huella y la versión *en su propia fila* (sin moverla: el usuario la puso donde
    quería). Sin ese último paso el ciclo siguiente le inventaría otra identidad — un agregado nuevo
    cada dos minutos.
@@ -188,15 +215,15 @@ Un ciclo se **niega a seguir entero** —sin aplicar ni escribir nada— en dos 
 | Barrera | Por qué |
 |---|---|
 | Falta una pestaña **que la base conocía** | «No hay filas» + «lo que no está, se borró» = borrar la tabla entera en todos los dispositivos. Un clic derecho en «Eliminar hoja» no puede costar eso. Una pestaña que nunca existió no cuenta: la crea la primera escritura |
-| Falta una **columna** que la base conocía | Si alguien borra el rótulo de una columna, sus celdas dejan de tener nombre y no vuelven: la fila parecería editada a mano con ese campo en blanco y el campo se borraría en todas partes |
+| La **cabecera** no es la nuestra | Con seis columnas fijas, comprobarlo es comparar. Una pestaña cuya cabecera no coincide no se toca: sus filas no se pueden interpretar, y escribir sobre ellas destruiría lo que haya puesto quien la tenga así |
 | Se borrarían más de 20 filas o más del 30 % de una tabla | Una lectura a medias es indistinguible de un borrado real. El tope no distingue el accidente, pero convierte la pérdida total en una pregunta |
 
 Un **id repetido** ya no aborta el ciclo: se pone en cuarentena **ese id** y el resto de la colección
 sincroniza con normalidad. El motivo de la barrera (no se sabe cuál de las dos filas es la buena) se
 cumple igual sin castigar al catálogo entero.
 
-Y la barrera de «columnas movidas» desapareció, porque ya no hace falta: las columnas se leen por
-nombre.
+Y la barrera de «columna conocida que ha desaparecido» se fue con el esquema deducido: con una cabecera
+fija, la comprobación es directa y no depende de lo que la base recuerde.
 
 ## Una celda mal escrita no atasca nada
 
@@ -271,11 +298,15 @@ plataforma, no un defecto. Primero se intenta renovar en silencio; si no se pued
   decide la fecha: uno de los dos pierde. Fusionar ahí perdería un cambio en silencio, que es peor.
 - **Una `version` forjada a mano dentro del margen de 5 min gana.** Las columnas están visibles a
   propósito.
-- **Una lista se fusiona entera, no elemento a elemento.** Las líneas de una receta van en una celda
-  con JSON, así que dos dispositivos editando líneas distintas de la misma receta: uno pierde. Y
-  corregir una cantidad a mano en la hoja es editar ese JSON — se puede, pero el sitio para hacerlo es
-  la app. Es el precio de que toda tabla replicada tenga identidad propia y ninguna necesite un caso
-  especial.
+- **La fusión es de campos de primer nivel.** Dos personas editando `amount` y `per.unit` del mismo
+  precio ya no se mezclan: gana una. Es una pérdida de granularidad y a la vez una ganancia de
+  seguridad — mezclarlos fabricaría un precio que **nadie escribió** (4,5 «por kilo» cuando uno dijo
+  4,5 por 1000 g y el otro 9 por 1 kg).
+- **La hoja deja de ser cómoda de editar.** Corregir un precio es editar el JSON de su celda. Sigue
+  funcionando —la huella lo detecta y esa fila gana— pero deja de hacerse de un vistazo. Es el precio
+  de que el tipo viaje con el dato.
+- **Una celda de Sheets aguanta 50.000 caracteres.** De sobra para una receta; queda dicho por si algún
+  día una tabla guarda documentos grandes.
 - **Un campo cuyo valor es la cadena vacía vuelve como ausente.** Una hoja no distingue «la celda está
   vacía» de «este campo no está»; se elige la interpretación que no inventa datos.
 - **Se reescribe la pestaña entera al subir**, no fila a fila. Es lo que la hace idempotente y conserva
@@ -294,7 +325,8 @@ Con `"debug": true` en `public/config.json`, la consola trae el detalle:
 
 | Lo que se ve | Qué significa |
 |---|---|
-| la hoja se reescribe sola cada dos minutos | La representación de una fila no es reversible. Es el fallo más grave; lo cubre el spec de ida y vuelta de `row-shape` |
+| la hoja se reescribe sola cada dos minutos | El JSON canónico no es determinista. Es el fallo más grave; lo cubre `record-json.spec.ts` |
+| un insumo desaparece del catálogo y sale `insumos legacy sin precio` | Un número llegó como texto. Con JSON no puede pasar; si pasara, el spec de ida y vuelta de `record-json` es el que lo caza |
 | `el ciclo se ha negado a seguir` | Una barrera. El motivo dice qué pestaña o qué columna |
 | `el lote no cupo en una petición y se partió` | La escritura **no fue atómica**: si falló el segundo trozo, el primero ya está escrito |
 | `ids repetidos`, `filas ilegibles` | Lo que hay que arreglar **a mano** en la hoja |
@@ -335,12 +367,12 @@ Lo que sigue siendo comprobación a mano: dos navegadores contra la **misma hoja
 | El array de tablas y el ciclo | `…/application/use-cases/synchronize-tables.use-case.ts` |
 | Las tablas de aquí | `…/domain/repositories/local.repository.ts` · `…/infrastructure/indexeddb-local.repository.ts` |
 | Las tablas de la hoja | `…/domain/repositories/remote.repository.ts` · `…/infrastructure/sheets/google-sheets-remote.repository.ts` |
-| Fila ⇄ celdas | `…/infrastructure/sheets/row-shape.ts` |
-| Columnas y su clase | `…/infrastructure/sheets/table-columns.ts` |
+| Registro ⇄ celda (JSON canónico) | `…/infrastructure/sheets/record-json.ts` |
+| La cabecera fija | `…/infrastructure/sheet-schema.ts` |
 | Lo que hace una persona en la hoja | `…/infrastructure/sheets/remote-registros.ts` |
 | Del plan a las escrituras | `…/infrastructure/sheets/plan-to-writes.ts` |
 | El lote | `…/infrastructure/sheets/sheet-write-batch.ts` |
-| Canonización y huella | `…/infrastructure/sheet-canonical.ts` · `sheet-hash.ts` |
+| Celdas de servicio y huella | `…/infrastructure/sheet-canonical.ts` · `sheet-hash.ts` |
 | Ciclo de vida del fichero (crear, localizar, probar) | `…/infrastructure/google-sheets.gateway.ts` |
 | Cuándo | `…/infrastructure/sync-scheduler.ts` |
 | Pestañas del navegador | `…/infrastructure/web-locks-sync-coordinator.ts` |

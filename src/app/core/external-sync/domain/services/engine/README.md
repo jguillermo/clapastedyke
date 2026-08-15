@@ -330,8 +330,7 @@ lo es vive en `infrastructure/sheets/`, y todo lo que decide vive aquí:
 
 | Qué | Dónde |
 |---|---|
-| Fila de la base de datos ⇄ celdas (rutas con punto, listas en JSON) | `sheets/row-shape.ts` |
-| Qué columnas tiene una pestaña y de qué clase es cada una | `sheets/table-columns.ts` |
+| Registro ⇄ celda (JSON canónico) | `sheets/record-json.ts` |
 | Lo que hace una persona en la hoja: editar, borrar, teclear sin id, cambiar un id | `sheets/remote-registros.ts` |
 | Del plan de este motor a escrituras concretas | `sheets/plan-to-writes.ts` |
 | Todas las escrituras de un ciclo, en una petición | `sheets/sheet-write-batch.ts` |

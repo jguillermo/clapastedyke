@@ -31,6 +31,28 @@ export const PROBE_KEY = 'pruebaConexion';
  */
 export const SCHEMA_VERSION = 5;
 
+/** La columna que lleva la identidad. **Manda ella**, no el `id` que vaya dentro del JSON. */
+export const ID_COLUMN = 'id';
+
+/** La columna que lleva el registro entero, en JSON canónico. */
+export const DATA_COLUMN = 'datos';
+
+/**
+ * Las columnas de servicio de la sincronización. **Nunca** entran en la huella: una fila cuya huella
+ * cambiara al escribir su propia huella no convergería jamás.
+ */
+export const SERVICE_COLUMNS = ['version', 'origen', 'huella', 'borrado'] as const;
+
+/**
+ * La cabecera de toda pestaña replicada, **fija y siempre la misma**.
+ *
+ * Que sea fija es lo que sustituye a todo el descubrimiento de columnas que hubo antes: no hay nada que
+ * deducir, ni un orden estable que mantener, ni una clase de dato que adivinar. Y hace posible una
+ * comprobación directa —si la cabecera no es esta, la pestaña no es nuestra— en lugar de una barrera
+ * que dependía de lo que el shadow recordara.
+ */
+export const SHEET_HEADERS: readonly string[] = [ID_COLUMN, DATA_COLUMN, ...SERVICE_COLUMNS];
+
 /**
  * Cuántas filas se le piden a una pestaña al crearla. Sheets no crece sola cuando se escribe fuera
  * de la cuadrícula: o cabe, o la petición falla. Con este colchón, un recetario normal no obliga

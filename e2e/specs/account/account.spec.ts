@@ -72,9 +72,9 @@ test.describe('Cuenta · conexión y sincronización', () => {
       'conversion_options',
     ]);
 
-    // Las columnas de servicio van al final, y son las que hacen posible la fusión.
+    // Seis columnas fijas: la identidad, el registro entero en JSON, y las de servicio.
     const insumos = sheet.tab('ingredients');
-    expect(insumos.headers.slice(-4)).toEqual(['version', 'origen', 'huella', 'borrado']);
+    expect(insumos.headers).toEqual(['id', 'datos', 'version', 'origen', 'huella', 'borrado']);
 
     // El catálogo entero, tabla por tabla: nada se queda por el camino.
     expect(insumos.dataRowCount).toBe(SUPPLY_COUNT);
@@ -83,26 +83,36 @@ test.describe('Cuenta · conexión y sincronización', () => {
     expect(sheet.tab('flavors').dataRowCount).toBe(FLAVORS.length);
     expect(sheet.tab('conversion_options').dataRowCount).toBe(PORTIONS.length + MOLDS.length);
 
-    // Una fila concreta, con su precio anidado desplegado en columnas con ruta y su huella escrita:
-    // sin huella, el ciclo siguiente la tomaría por editada a mano.
+    /*
+     * Una fila concreta, con el registro entero en su celda y **con sus tipos**: el precio es un
+     * número porque el JSON dice que lo es. Con una columna por campo volvía como texto, el
+     * repositorio lo descartaba como documento sin precio y el insumo desaparecía del catálogo.
+     *
+     * Y con su huella escrita: sin ella, el ciclo siguiente la tomaría por editada a mano.
+     */
     const harina = insumos.rowOf('id', SUPPLIES.harina.id);
     expect(harina).toBeGreaterThan(1);
-    expect(insumos.cell(harina, 'name')).toBe(SUPPLIES.harina.name);
-    expect(insumos.cell(harina, 'purchasePrice.amount')).toBe(Number(SUPPLIES.harina.price));
+    const registro = insumos.record(harina);
+    expect(registro['name']).toBe(SUPPLIES.harina.name);
+    expect(registro['purchasePrice']).toMatchObject({ amount: Number(SUPPLIES.harina.price) });
+    // La fecha de guardado no viaja: su información va en la columna `version`.
+    expect(registro).not.toHaveProperty('updatedAt');
     expect(String(insumos.cell(harina, 'huella'))).not.toBe('');
     expect(String(insumos.cell(harina, 'version'))).not.toBe('');
     expect(insumos.cell(harina, 'borrado')).toBe('');
 
-    // Las líneas de una receta viajan **dentro de su receta**, en una celda marcada como lista: ya no
-    // hay una pestaña hija sin identidad propia.
-    const recetas = sheet.tab('recipes');
-    expect(recetas.headers).toContain('lines[]');
+    // Las líneas de una receta viajan **dentro de su receta**: ya no hay una pestaña hija sin
+    // identidad propia, ni una columna por campo.
+    const receta = sheet.tab('recipes').record(2);
+    expect(Array.isArray(receta['lines'])).toBe(true);
     expect(sheet.find('RecetaInsumos')).toBeUndefined();
 
     // La versión del esquema queda apuntada en la pestaña de servicio. Hoy nadie la lee: está ahí para
     // el día que haya una migración, que necesitará saber con qué forma se escribió lo que encuentre.
     const meta = sheet.tab('_meta');
-    expect(meta.cell(meta.rowOf('Clave', 'schemaVersion'), 'Valor')).toBe(5);
+    // Texto, y no número: la pestaña de servicio no son datos del usuario, es una nota para quien mire
+    // la hoja. Lo que sí viaja con su tipo son las celdas de las tablas (ver el precio de arriba).
+    expect(meta.cell(meta.rowOf('Clave', 'schemaVersion'), 'Valor')).toBe('5');
 
     // ── Caso 3 · un ciclo más para asentar, y la comprobación no encuentra nada que mover ────────
     await account.syncAll.click();

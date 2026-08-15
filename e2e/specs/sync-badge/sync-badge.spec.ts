@@ -66,7 +66,7 @@ test.describe('Aviso de sincronización', () => {
     // La cola se vacía con el primero, así que el aviso puede irse un instante antes que la fila llegue.
     const insumos = google.sheet.tab('ingredients');
     await expect
-      .poll(() => insumos.rowOf('name', 'Tocino E2E'), { timeout: 20_000 })
+      .poll(() => insumos.rowOfField('name', 'Tocino E2E'), { timeout: 20_000 })
       .toBeGreaterThan(1);
     expect(insumos.dataRowCount).toBe(SUPPLY_COUNT + 1);
   });

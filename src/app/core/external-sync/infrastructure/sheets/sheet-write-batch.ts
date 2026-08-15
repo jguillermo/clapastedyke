@@ -36,7 +36,8 @@ import { columnLetter, rangeOf } from '../sheet-schema';
 /** Un rango de valores tal y como lo espera `values:batchUpdate`. */
 export interface ValueRange {
   readonly range: string;
-  readonly values: readonly (readonly string[])[];
+  /** Las celdas **con su tipo**: un número va como número, o el destino lo guardaría como texto. */
+  readonly values: readonly (readonly unknown[])[];
 }
 
 /** Lo que hay que mandar, ya troceado. Cada elemento de `values` es UNA petición. */
@@ -65,7 +66,7 @@ interface TabWrites {
   readonly title: string;
   readonly headers: readonly string[];
   /** El bloque de datos completo, desde la fila 2. */
-  block: string[][] | null;
+  block: unknown[][] | null;
   /** Estampados sueltos, por número de fila real de la hoja. */
   readonly cells: Map<number, Record<string, string>>;
   /** Desde qué fila hay que limpiar la cola. */
@@ -83,7 +84,7 @@ export class SheetWriteBatch {
    * el mismo bloque deja la hoja igual— y lo que conserva el orden de filas que tenga el usuario, que
    * viene decidido por quien construyó `rows`.
    */
-  block(title: string, headers: readonly string[], rows: readonly (readonly string[])[]): void {
+  block(title: string, headers: readonly string[], rows: readonly (readonly unknown[])[]): void {
     const tab = this.tabFor(title, headers);
     tab.block = rows.map((row) => [...row]);
   }
@@ -195,7 +196,7 @@ export class SheetWriteBatch {
  * Se parte **por filas y en orden**, así que cada trozo es un rango contiguo que se puede escribir por
  * su cuenta. Una fila nunca se parte por la mitad: media fila escrita es una fila corrupta.
  */
-function blockRanges(tab: TabWrites, block: readonly (readonly string[])[]): ValueRange[] {
+function blockRanges(tab: TabWrites, block: readonly (readonly unknown[])[]): ValueRange[] {
   const width = Math.max(tab.headers.length, 1);
   const rowsPerChunk = Math.max(1, Math.floor(MAX_CELLS_PER_REQUEST / width));
   const ranges: ValueRange[] = [];

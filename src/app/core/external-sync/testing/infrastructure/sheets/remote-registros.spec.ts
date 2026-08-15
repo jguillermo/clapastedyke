@@ -2,9 +2,9 @@ import { RemoteRow, RemoteTable } from '../../../domain/repositories/remote.repo
 import { reconcile } from '../../../domain/services/engine/reconcile';
 import { ShadowRow } from '../../../domain/services/sync-shadow';
 import { fingerprintOf } from '../../../infrastructure/sheet-hash';
+import { SHEET_HEADERS } from '../../../infrastructure/sheet-schema';
+import { canonicalJson, payloadOf } from '../../../infrastructure/sheets/record-json';
 import { translateTable } from '../../../infrastructure/sheets/remote-registros';
-import { flatten } from '../../../infrastructure/sheets/row-shape';
-import { canonicalCells, shapeOf } from '../../../infrastructure/sheets/table-columns';
 
 /**
  * El adaptador: lo que convierte «una pestaña que una persona puede editar» en las dos listas que el
@@ -20,17 +20,6 @@ import { canonicalCells, shapeOf } from '../../../infrastructure/sheets/table-co
  */
 describe('la traducción de una pestaña', () => {
   const AHORA = 1_800_000_000_000;
-  /** Las columnas que tiene la pestaña de insumos una vez escrita. */
-  const COLUMNAS = [
-    'id',
-    'name',
-    'baseUnit',
-    'purchasePrice.amount',
-    'purchasePrice.per.value',
-    'purchasePrice.per.unit',
-    'purchasePrice.currency',
-    'updatedAt',
-  ];
   const TABLE = 'ingredients';
   const DEVICE = 'dev00001';
 
@@ -48,26 +37,29 @@ describe('la traducción de una pestaña', () => {
 
   /** La huella que la app habría escrito para esa fila: lo que hace creíble «esto lo escribí yo». */
   async function huellaDe(
-    rows: readonly Record<string, unknown>[],
+    _rows: readonly Record<string, unknown>[],
     row: Record<string, unknown>,
   ): Promise<string> {
-    const shape = shapeOf([], rows.map(flatten), []);
-    const canonical = canonicalCells(shape, flatten(row));
-    return 'values' in canonical ? fingerprintOf(canonical.values) : '';
+    return fingerprintOf([canonicalJson(payloadOf(row as never))]);
   }
 
-  function tabla(rows: readonly RemoteRow[], columns: readonly string[]): RemoteTable {
+  function tabla(rows: readonly RemoteRow[]): RemoteTable {
     return {
       table: TABLE,
       present: true,
-      columns: [...columns],
+      header: [...SHEET_HEADERS],
       rows,
       unreadable: [],
       raw: rows.map((row) => ({
         id: String(row.values['id'] ?? ''),
-        cells: Object.fromEntries(
-          Object.entries(flatten(row.values)).map(([key, value]) => [key, String(value)]),
-        ),
+        cells: {
+          id: String(row.values['id'] ?? ''),
+          datos: canonicalJson(row.values as never),
+          version: row.meta.version,
+          origen: row.meta.origin,
+          huella: row.meta.fingerprint,
+          borrado: row.meta.deleted ? 'TRUE' : '',
+        },
       })),
     };
   }
@@ -75,7 +67,8 @@ describe('la traducción de una pestaña', () => {
   function fila(values: Record<string, unknown>, meta: Partial<RemoteRow['meta']>): RemoteRow {
     return {
       index: 2,
-      values,
+      // Lo que el repositorio entrega ya es el payload parseado: sin fecha de guardado ni lápida.
+      values: payloadOf(values as never),
       meta: { version: '', origin: 'otro', fingerprint: '', deleted: false, ...meta },
     };
   }
@@ -87,8 +80,8 @@ describe('la traducción de una pestaña', () => {
       fingerprint,
       version: '0000000000500-0000-otro',
       deleted: false,
-      // El shadow guarda los valores **planos**: es la forma con la que el motor compara campo a campo.
-      values: flatten(values),
+      // El shadow guarda el payload: la misma forma con la que el motor compara.
+      values: payloadOf(values as never),
     };
   }
 
@@ -130,10 +123,7 @@ describe('la traducción de una pestaña', () => {
 
     const { plan } = await decidir({
       // La huella escrita es la del contenido ANTERIOR: es la discrepancia lo que delata la edición.
-      remote: tabla(
-        [fila(editada, { version: '0000000000500-0000-otro', fingerprint: huella })],
-        COLUMNAS,
-      ),
+      remote: tabla([fila(editada, { version: '0000000000500-0000-otro', fingerprint: huella })]),
       local: [local],
     });
 
@@ -154,10 +144,7 @@ describe('la traducción de una pestaña', () => {
     const huella = await huellaDe([local], local);
 
     const { plan } = await decidir({
-      remote: tabla(
-        [fila(local, { version: '0000000000500-0000-otro', fingerprint: huella })],
-        COLUMNAS,
-      ),
+      remote: tabla([fila(local, { version: '0000000000500-0000-otro', fingerprint: huella })]),
       local: [local],
     });
 
@@ -178,10 +165,7 @@ describe('la traducción de una pestaña', () => {
     const local = insumo();
 
     const { plan } = await decidir({
-      remote: tabla(
-        [fila(local, { version: '0000000000500-0000-otro', fingerprint: '' })],
-        COLUMNAS,
-      ),
+      remote: tabla([fila(local, { version: '0000000000500-0000-otro', fingerprint: '' })]),
       local: [local],
     });
 
@@ -201,7 +185,7 @@ describe('la traducción de una pestaña', () => {
     const aMano = { name: 'Cardamomo', baseUnit: 'g' };
 
     const { translated, plan } = await decidir({
-      remote: tabla([fila(aMano, {})], ['id', 'name', 'baseUnit']),
+      remote: tabla([fila(aMano, {})]),
       local: [],
     });
 
@@ -232,7 +216,7 @@ describe('la traducción de una pestaña', () => {
     const conOtroId = { ...local, id: 'id-cambiado-a-mano' };
 
     const { translated } = await decidir({
-      remote: tabla([fila(conOtroId, { version: '0000000000500-0000-otro' })], COLUMNAS),
+      remote: tabla([fila(conOtroId, { version: '0000000000500-0000-otro' })]),
       local: [local],
     });
 
@@ -254,7 +238,7 @@ describe('la traducción de una pestaña', () => {
     const huella = await huellaDe([local], local);
 
     const { translated, plan } = await decidir({
-      remote: tabla([], COLUMNAS),
+      remote: tabla([]),
       local: [local],
       shadow: [recordado(local, huella)],
     });
@@ -287,21 +271,21 @@ describe('la traducción de una pestaña', () => {
     };
 
     const { plan } = await decidir({
-      remote: tabla(
-        [fila(enLaHoja, { version: '0000000000500-0000-otro', fingerprint: huella })],
-        COLUMNAS,
-      ),
+      remote: tabla([fila(enLaHoja, { version: '0000000000500-0000-otro', fingerprint: huella })]),
       local: [local],
       shadow: [recordado(acordado, huella)],
     });
 
     expect(plan.conflicts).toHaveLength(1);
     expect(plan.conflicts[0].winner).toBe('merged');
-    // Los registros que ve el motor llevan las celdas **planas**, así que `purchasePrice.amount` es un
-    // campo por su cuenta: por eso dos dispositivos que tocan partes distintas del mismo precio se
-    // pueden fusionar en vez de chocar. Al guardarlo aquí se vuelve a armar el objeto.
+    // El motor ve el registro tal cual: `purchasePrice` es **un** campo, no cuatro. Se fusiona a nivel
+    // de campo de primer nivel, y el precio llega entero y con su tipo.
     const fusionado = plan.push[0];
     expect(fusionado['name']).toBe('Harina especial');
-    expect(fusionado['purchasePrice.amount']).toBe(5.25);
+    expect(fusionado['purchasePrice']).toEqual({
+      amount: 5.25,
+      per: { value: 1000, unit: 'g' },
+      currency: 'PEN',
+    });
   });
 });
