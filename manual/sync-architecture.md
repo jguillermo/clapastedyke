@@ -138,6 +138,56 @@ Y tiene **tope de cinco minutos** hacia el futuro, en los dos lados. La columna 
 proteger: alguien puede teclear el año 3000, o arrastrarla al ordenar. Sin tope, esa fila ganaría para
 siempre **y envenenaría el reloj de todos los dispositivos** al leerla.
 
+## Sin fecha de actualización = dato de fábrica = lo más antiguo que hay
+
+Toda escritura en la base local deja **fecha de actualización**, y la pone el repositorio al guardar:
+por ahí pasan todas. Hay **una excepción, y solo una**:
+
+> **El seed no pone fecha.** Por tanto, una fila sin fecha es dato de fábrica que nadie ha tocado, y
+> se considera anterior a cualquier otra.
+
+No es un detalle de implementación: es lo que permite que un aparato nuevo se una a una hoja que ya
+tiene meses de trabajo sin destrozarla.
+
+### Lo que pasaba cuando el seed sí fechaba
+
+Un navegador recién abierto siembra el catálogo de fábrica, y lo sellaba con **la hora de arranque**
+—o sea, la fecha más reciente de todo el sistema—. Como los ids del seed son **fijos a propósito**
+(para que las filas de dos aparatos se emparejen en vez de duplicarse), esas filas se emparejaban con
+las de la hoja… y le ganaban por fecha.
+
+Resultado: abrir la app en el móvil revertía a valores de fábrica lo que llevabas tiempo ajustando en
+el ordenador. En la primera sincronización, sin un aviso, y con el agravante de que en ese primer
+ciclo **no hay ancestro** (el shadow está vacío), así que tampoco hay fusión campo a campo que
+amortigüe: se pierde la fila entera.
+
+El aviso ya estaba escrito en `synced-record.ts`, sobre por qué existe `updatedAt`:
+
+> «poner «ahora» al cambio local sería peor que no tener nada: haría ganar siempre a lo local, incluso
+> frente a una edición remota posterior — justo lo contrario de que la hoja sea la fuente de la verdad»
+
+### Por qué ausencia y no una fecha antigua
+
+Se consideró darle al seed una fecha fija muy vieja. Es peor: hay que elegir cuánto de vieja, hay que
+acordarse de no moverla nunca, y sobre todo **es mentira** — el seed no sabe cuándo cambió ese dato,
+porque no cambió: viene con la app. La ausencia dice exactamente eso, y no hay que mantenerla.
+
+El motor ya lo lee así sin que haya que enseñarle nada: una versión que no se puede interpretar es
+`null`, y frente a un lado que sí tiene fecha, **gana el que la tiene**. Ese conflicto además queda
+marcado como `blind`, que es lo que es: se decidió sin saber la fecha de un lado.
+
+### Y en cuanto se sincroniza, deja de ser de fábrica
+
+Una vez que los dos lados coinciden sobre una fila, cuándo cambió **ya se sabe**: es lo que lleva la
+versión acordada. El ciclo se la escribe (`plan-to-writes.ts`), y a partir de ahí esa fila compite con
+fecha propia como cualquier otra.
+
+Esa fecha sale **de la versión, nunca de «ahora»**. Ponerle la hora del ciclo repetiría el fallo
+entero: la fila quedaría más nueva que la hoja y el ciclo siguiente la subiría, pisando el trabajo del
+otro aparato. Es un relleno de metadato puro —`updatedAt` no viaja ni entra en la huella—, así que no
+cambia contenido ni provoca escrituras, y por eso **no se cuenta como datos que bajan**: si se
+contara, la app anunciaría un cambio de catálogo en cada primera sincronización.
+
 ## Lo que hace una persona en la hoja
 
 Cinco detecciones, todas en el adaptador (`infrastructure/sheets/remote-registros.ts`). Sin ellas la
@@ -224,6 +274,19 @@ cumple igual sin castigar al catálogo entero.
 
 Y la barrera de «columna conocida que ha desaparecido» se fue con el esquema deducido: con una cabecera
 fija, la comprobación es directa y no depende de lo que la base recuerde.
+
+## Una fila ilegible sigue estando en la hoja
+
+Una celda que no se puede parsear aparta esa fila de la decisión —no se puede saber qué dice— pero
+**cuenta como presente**. La distinción parece pedante y no lo es: lo que el shadow recuerda y la hoja
+ya no tiene se da por borrado, así que si una fila ilegible no contara, una celda que alguien estropeó
+**borraría ese dato en todos los aparatos**. Y como la celda seguiría ahí, lo borraría otra vez en cada
+ciclo.
+
+Por la misma familia de razones, devolverle su id a una fila a la que se lo cambiaron exige que el id
+viejo **ya no esté en la hoja**. Reconocerla solo por que el contenido coincida no basta: cualquier
+fila remota con un id que este aparato no conozca —todas, la primera vez que sincroniza— podría
+robarle la identidad a una fila local que está en su sitio.
 
 ## Una celda mal escrita no atasca nada
 
@@ -358,6 +421,15 @@ no crece sola, y el desplazamiento de filas al borrar una.
 | `e2e/specs/sync-badge/sync-badge.spec.ts` | El aviso: no existe al día, aparece con un cambio sin subir, desaparece al volver la red |
 
 Lo que sigue siendo comprobación a mano: dos navegadores contra la **misma hoja de verdad**.
+
+### Dos aparatos, una hoja
+
+`e2e/specs/account/two-devices.spec.ts` es el único test que abre **dos contextos de navegador**
+—cada uno con su IndexedDB y su identidad— contra el mismo doble de Google. Es la única forma de
+probar las dos cosas que no se pueden fingir desde un navegador: que cada aparato tiene su propio
+reloj, y que **cada uno siembra su propio catálogo de fábrica con los mismos ids**. Del cruce de esas
+dos salió la pérdida de datos, y este journey la reproduce: sin el arreglo falla justo donde el
+segundo aparato debería ver el precio que puso el primero.
 
 ## Dónde está cada cosa
 

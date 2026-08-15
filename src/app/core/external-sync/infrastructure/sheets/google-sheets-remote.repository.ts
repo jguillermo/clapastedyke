@@ -135,6 +135,12 @@ export class GoogleSheetsRemoteRepository extends RemoteRepository {
         batch.block(write.table, write.columns, write.rows);
         applied[write.table] = write.rows.length;
         this.grow(batch, byTitle.get(write.table), write.table, write.rows.length);
+        // El bloque solo pisa las filas que ocupa. Si ahora hay menos que antes, lo que sobra abajo se
+        // quedaría escrito y volvería en la lectura siguiente como ids repetidos, que acaban en
+        // cuarentena. `+2` porque la fila 1 es la cabecera y los datos empiezan en la 2.
+        if (write.rows.length < write.previousRows) {
+          batch.clearFrom(write.table, write.columns, write.rows.length + 2);
+        }
         continue;
       }
       if (write.kind === 'stamp') {

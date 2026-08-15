@@ -1,4 +1,5 @@
 import { EntityId } from '../../../_common/entity-id';
+import { SaveOptions } from './save-options';
 import { Supply } from '../entities/supply';
 
 /**
@@ -11,7 +12,7 @@ export abstract class SupplyRepository {
   abstract nextIdentity(): EntityId;
   abstract byId(id: EntityId): Promise<Supply | null>;
   abstract byName(name: string): Promise<Supply | null>;
-  abstract save(supply: Supply): Promise<void>;
+  abstract save(supply: Supply, options?: SaveOptions): Promise<void>;
   abstract all(): Promise<Supply[]>;
   /**
    * Borra el insumo.

@@ -111,7 +111,31 @@ export async function translateTable(input: TranslateInput): Promise<TranslatedT
   }
 
   const localIds = new Set(local.map((row) => canonicalCode(row.id)));
-  const remoteIds = new Set<string>();
+
+  /*
+   * Los ids que la hoja contiene, mirados ANTES de interpretar nada. Sirven para dos cosas, y las dos
+   * son la diferencia entre corregir la hoja y destrozarla:
+   *
+   * 1. Una fila **ilegible** cuenta como presente. No entra en la decisión —no se puede leer— pero
+   *    está ahí, y si no se contara, el shadow la daría por desaparecida y sintetizaría su lápida: una
+   *    celda que alguien estropeó borraría el dato en todos los dispositivos, y como la celda seguiría
+   *    en la hoja, lo borraría otra vez en cada ciclo.
+   * 2. Una fila local solo es candidata a «le cambiaron el id» si **su id ya no está en la hoja**. Sin
+   *    esa comprobación, cualquier fila remota con un id que este dispositivo no conozca podía robarle
+   *    la identidad a una fila local que seguía ahí, con su id, tan tranquila.
+   */
+  const idsInSheet = new Set<string>(
+    [
+      ...remote.rows.map((row) => canonicalText(row.values[ID_COLUMN])),
+      ...remote.unreadable.map((row) => canonicalText(row.id)),
+    ]
+      .filter((id) => id.length > 0)
+      .map((id) => canonicalCode(id)),
+  );
+
+  const remoteIds = new Set<string>(
+    remote.unreadable.map((row) => canonicalCode(row.id)).filter((id) => id.length > 0),
+  );
   const positions = new Map<string, number>();
   const base: Registro[] = [];
   const handAdds: HandAdd[] = [];
@@ -121,7 +145,7 @@ export async function translateTable(input: TranslateInput): Promise<TranslatedT
 
   // Las filas locales que la hoja ya no menciona son las candidatas a «alguien le cambió el id»: se
   // compara su contenido SIN el id, que es lo único que sobrevive a ese cambio.
-  const identityless = await identitylessIndex(local);
+  const identityless = await identitylessIndex(local, idsInSheet);
 
   for (const row of remote.rows) {
     const payload = row.values as Payload;
@@ -359,16 +383,29 @@ function shadowOf(shadow: readonly ShadowRow[], id: string): ShadowRow | undefin
 }
 
 /**
- * El índice de «contenido sin id» → id, solo de las filas locales.
+ * El índice de «contenido sin id» → id, de las filas locales que **ya no están en la hoja**.
  *
  * Es lo que reconoce que a una fila le cambiaron el id: el id es lo único que cambió, así que
  * comparando lo demás se sabe cuál era. Es el desenlace más silencioso de todos si no se corrige — el
  * id viejo desaparece (se daría por borrado el agregado), el nuevo parece un alta, y todo lo que
  * apuntaba al viejo queda colgando mientras la hoja parece perfecta.
+ *
+ * **La condición de ausencia no es opcional.** Que a una fila le cambiaran el id significa que su id
+ * viejo ya no aparece en la hoja; si sigue apareciendo, no le cambiaron nada y esta otra fila es otra
+ * cosa. Sin la comprobación, cualquier fila remota con un id desconocido para este dispositivo —todas
+ * las de la hoja, la primera vez que se sincroniza— podía robarle la identidad a una fila local que
+ * seguía en su sitio, y entonces el id robado desaparecía de la hoja y el ciclo siguiente lo daba por
+ * borrado. Un renombre de identidad no puede salir de una coincidencia de contenido a secas.
  */
-async function identitylessIndex(local: readonly TableRow[]): Promise<Map<string, string>> {
+async function identitylessIndex(
+  local: readonly TableRow[],
+  idsInSheet: ReadonlySet<string>,
+): Promise<Map<string, string>> {
   const index = new Map<string, string>();
   for (const row of local) {
+    if (idsInSheet.has(canonicalCode(row.id))) {
+      continue;
+    }
     index.set(await identitylessOf(payloadOf(row)), row.id);
   }
   return index;

@@ -280,7 +280,10 @@ export class SynchronizeTables extends UseCase<SynchronizeRequest, SynchronizeRe
       remember.push(...resolved.remember);
       byTable[table.table] = {
         pushed: plan.push.length,
-        applied: resolved.apply.length - resolved.deletions,
+        // Las filas que solo reciben su fecha NO cuentan como datos que bajan: su contenido no ha
+        // cambiado. Contarlas anunciaría un cambio de catálogo cada vez que se rellena una fecha de
+        // fábrica, y la primera sincronización de un dispositivo nuevo las rellena todas de golpe.
+        applied: resolved.apply.length - resolved.deletions - resolved.restamped,
         removed: resolved.deletions,
         merged: plan.conflicts.filter((conflict) => conflict.winner === 'merged').length,
       };

@@ -124,6 +124,15 @@ export type RemoteWrite =
        * dentro del JSON de `datos`, así que no hay nada que tipar al enviar ni al recibir.
        */
       readonly rows: readonly (readonly string[])[];
+      /**
+       * Cuántas filas de datos había antes de esta escritura.
+       *
+       * Está para poder **limpiar la cola cuando el bloque encoge**. Escribir el bloque solo pisa las
+       * filas que ocupa: si ahora hay menos —dos filas que compartían id se funden en una—, las de
+       * abajo se quedan tal cual, y en la lectura siguiente vuelven como ids repetidos que acaban en
+       * cuarentena. Ese id dejaría de sincronizarse sin que se entere nadie.
+       */
+      readonly previousRows: number;
     }
   /**
    * Algunas celdas de una fila que ya existe, **sin moverla de sitio**.

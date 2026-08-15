@@ -125,6 +125,35 @@ describe('RecipeBookSeed · contenido desde JSON', () => {
   const configure = (doc: RecipeBookSeedDocument | null) =>
     TestBed.configureTestingModule({ providers: makeRecipeBookFakes(doc).providers });
 
+  /**
+   * **Sembrar no pone fecha de actualización, y esto es lo que lo vigila.**
+   *
+   * Es la única excepción a «toda escritura local pone fecha», y de ella depende que un navegador
+   * recién abierto no le gane a la hoja. Cuando el seed sellaba con la hora de arranque, sus filas eran
+   * las más recientes del sistema; y como los ids del seed son fijos, se emparejaban con las de la hoja
+   * y **las pisaban** — el catálogo de ejemplo borraba lo que el usuario llevaba tiempo construyendo en
+   * otro dispositivo, en su primera sincronización y sin decir nada.
+   *
+   * Se comprueba sobre **todos** los guardados y no sobre uno de muestra: basta con que una de las
+   * cinco tablas se quede sellando para que su parte del catálogo vuelva a ganar.
+   */
+  it('siembra SIN fecha de actualización, en las cinco tablas', async () => {
+    configure(sampleDoc());
+    await TestBed.inject(RecipeBookSeed).run();
+
+    const repos = [
+      TestBed.inject(RecipeFlavorRepository),
+      TestBed.inject(RecipeCapacityRepository),
+      TestBed.inject(RecipeCategoryRepository),
+      TestBed.inject(SupplyRepository),
+      TestBed.inject(RecipeRepository),
+    ] as unknown as { saves: { id: string; stamped: boolean }[] }[];
+
+    const guardados = repos.flatMap((repo) => repo.saves);
+    expect(guardados.length).toBeGreaterThan(0);
+    expect(guardados.filter((save) => save.stamped)).toEqual([]);
+  });
+
   it('seeds flavors, conversion options, categories, ingredients and recipes from the document', async () => {
     configure(sampleDoc());
     await TestBed.inject(RecipeBookSeed).run();

@@ -6,7 +6,8 @@ import { RecipeCategory } from '../../domain/entities/recipe-category';
 import { RecipeCategoryRepository } from '../../domain/repositories/recipe-category.repository';
 import { RecipeCategoryMapper } from './recipe-category.mapper';
 import { RecipeCategoryRecord } from '../records';
-import { isAlive, stamped, tombstoned } from '../synced-record';
+import { SaveOptions } from '../../domain/repositories/save-options';
+import { isAlive, persisted, tombstoned } from '../synced-record';
 
 /**
  * Implementación IndexedDB de `RecipeCategoryRepository` sobre `IndexedDbStore` (store
@@ -34,10 +35,8 @@ export class IndexedDbRecipeCategoryRepository extends RecipeCategoryRepository 
     return record ? RecipeCategoryMapper.toDomain(record) : null;
   }
 
-  async save(category: RecipeCategory): Promise<void> {
-    await this.store.put(
-      stamped(RecipeCategoryMapper.toRecord(category), new Date().toISOString()),
-    );
+  async save(category: RecipeCategory, options?: SaveOptions): Promise<void> {
+    await this.store.put(persisted(RecipeCategoryMapper.toRecord(category), options));
     this.log.debug('categoría guardada', { id: category.id.value });
   }
 

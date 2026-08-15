@@ -6,7 +6,8 @@ import { CapacityGroup, RecipeCapacity } from '../../domain/entities/recipe-capa
 import { RecipeCapacityRepository } from '../../domain/repositories/recipe-capacity.repository';
 import { RecipeCapacityMapper } from './recipe-capacity.mapper';
 import { RecipeCapacityRecord } from '../records';
-import { isAlive, stamped, tombstoned } from '../synced-record';
+import { SaveOptions } from '../../domain/repositories/save-options';
+import { isAlive, persisted, tombstoned } from '../synced-record';
 
 /**
  * Implementación IndexedDB de `RecipeCapacityRepository` sobre `IndexedDbStore` (store
@@ -39,10 +40,8 @@ export class IndexedDbRecipeCapacityRepository extends RecipeCapacityRepository 
     return capacities;
   }
 
-  async save(capacity: RecipeCapacity): Promise<void> {
-    await this.store.put(
-      stamped(RecipeCapacityMapper.toRecord(capacity), new Date().toISOString()),
-    );
+  async save(capacity: RecipeCapacity, options?: SaveOptions): Promise<void> {
+    await this.store.put(persisted(RecipeCapacityMapper.toRecord(capacity), options));
     this.log.debug('capacidad guardada', { id: capacity.id.value, group: capacity.group });
   }
 

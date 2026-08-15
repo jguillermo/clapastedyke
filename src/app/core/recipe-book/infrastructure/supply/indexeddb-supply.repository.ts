@@ -6,7 +6,8 @@ import { Supply } from '../../domain/entities/supply';
 import { SupplyRepository } from '../../domain/repositories/supply.repository';
 import { SupplyMapper } from './supply.mapper';
 import { SupplyRecord } from '../records';
-import { isAlive, stamped, tombstoned } from '../synced-record';
+import { SaveOptions } from '../../domain/repositories/save-options';
+import { isAlive, persisted, tombstoned } from '../synced-record';
 
 /**
  * Implementación IndexedDB de `SupplyRepository` sobre `IndexedDbStore` (store `ingredients`, nombre
@@ -35,10 +36,13 @@ export class IndexedDbSupplyRepository extends SupplyRepository {
     return record ? SupplyMapper.toDomain(record) : null;
   }
 
-  async save(supply: Supply): Promise<void> {
+  async save(supply: Supply, options?: SaveOptions): Promise<void> {
     // La hora se estampa aquí, que es por donde pasan TODAS las escrituras: ni el caso de uso ni el
     // agregado tienen que acordarse. Guardar además resucita un insumo que estuviera borrado.
-    await this.store.put(stamped(SupplyMapper.toRecord(supply), new Date().toISOString()));
+    //
+    // `options` solo lo usa el seed, para guardar SIN fecha: los datos de fábrica no los cambió
+    // nadie, y fecharlos con la hora de arranque hacía que le ganaran a la hoja. Ver `SaveOptions`.
+    await this.store.put(persisted(SupplyMapper.toRecord(supply), options));
     this.log.debug('insumo guardado', { id: supply.id.value });
   }
 

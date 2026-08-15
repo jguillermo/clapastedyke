@@ -1,4 +1,5 @@
 import { EntityId } from '../../../_common/entity-id';
+import { SaveOptions } from './save-options';
 import { CapacityGroup, RecipeCapacity } from '../entities/recipe-capacity';
 
 /**
@@ -12,6 +13,6 @@ export abstract class RecipeCapacityRepository {
   abstract byId(id: EntityId): Promise<RecipeCapacity | null>;
   abstract byGroup(group: CapacityGroup): Promise<RecipeCapacity[]>;
   abstract all(): Promise<RecipeCapacity[]>;
-  abstract save(capacity: RecipeCapacity): Promise<void>;
+  abstract save(capacity: RecipeCapacity, options?: SaveOptions): Promise<void>;
   abstract delete(id: EntityId): Promise<void>;
 }

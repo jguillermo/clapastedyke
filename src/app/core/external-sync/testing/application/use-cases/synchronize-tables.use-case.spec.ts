@@ -360,6 +360,146 @@ describe('SynchronizeTables', () => {
 
 // ── Utilidades para armar lo que devuelve el destino ────────────────────────────────────────────
 
+describe('SynchronizeTables · la cola de la tabla cuando el bloque encoge', () => {
+  const TABLE = 'ingredients';
+
+  /**
+   * **Reescribir menos filas de las que había tiene que limpiar lo que sobra.**
+   *
+   * El bloque solo pisa las filas que ocupa. Si la hoja trae dos filas con el mismo id, se funden en
+   * una y el bloque sale más corto — y lo de abajo se quedaría escrito tal cual. En la lectura
+   * siguiente volvería como un id repetido, el motor lo pondría en cuarentena, y ese id **dejaría de
+   * sincronizarse sin que se entere nadie**.
+   *
+   * Aquí se fija el dato con el que se decide: cuántas filas había antes, tomado de la hoja tal y como
+   * estaba escrita y no de lo que se decidió escribir.
+   */
+  it('la escritura dice cuántas filas había, para poder limpiar lo que sobre', async () => {
+    TestBed.configureTestingModule({ providers: makeExternalSyncFakes().providers });
+    const cycle = TestBed.inject(SynchronizeTables);
+    const remote = TestBed.inject(FakeRemoteRepository);
+    const local = TestBed.inject(FakeLocalRepository);
+    await TestBed.inject(FakeSyncTargetRepository).save(
+      'cuenta-1',
+      SyncTarget.of('hoja-1', 'https://example.test/hoja-1'),
+    );
+
+    remote.snapshot = snapshotWith(
+      tableWith(TABLE, [
+        { index: 2, values: { id: 'ing-1', name: 'Harina' }, version: '0000000000500-0000-otro' },
+        { index: 3, values: { id: 'ing-1', name: 'Harina' }, version: '0000000000500-0000-otro' },
+        { index: 4, values: { id: 'ing-2', name: 'Azúcar' }, version: '0000000000500-0000-otro' },
+      ]),
+    );
+    local.tables.set(TABLE, [
+      { id: 'ing-2', name: 'Azúcar rubia', updatedAt: '2026-08-14T10:00:00.000Z' },
+    ]);
+
+    await cycle.execute({});
+
+    const [upsert] = remote.writesOf('upsert');
+    expect(upsert.previousRows).toBe(3);
+    expect(upsert.rows.length).toBeLessThan(upsert.previousRows);
+  });
+});
+
+/**
+ * **El fallo que dejó un ingrediente perdido, y el que estos tres casos existen para que no vuelva.**
+ *
+ * Un navegador recién abierto siembra el catálogo de fábrica. Antes lo sellaba con la hora de arranque
+ * —la fecha más reciente que hay en el sistema— y como los ids del seed son fijos, sus filas se
+ * emparejaban con las de la hoja y **le ganaban**: el catálogo de ejemplo pisaba lo que el usuario
+ * llevaba tiempo construyendo en otro dispositivo, en su primera sincronización y sin decir nada.
+ *
+ * Ahora el seed guarda **sin fecha**, y la ausencia significa algo: dato de fábrica que nadie ha
+ * tocado, anterior a cualquier otra cosa. El motor ya lo leía así —una versión que no se puede
+ * interpretar es `null`, y frente a un lado con fecha gana el que la tiene—, así que lo que se
+ * comprueba aquí es el ciclo entero de punta a punta.
+ */
+describe('SynchronizeTables · un catálogo recién sembrado no pisa la hoja', () => {
+  const TABLE = 'ingredients';
+  let cycle: SynchronizeTables;
+  let remote: FakeRemoteRepository;
+  let local: FakeLocalRepository;
+
+  /** Tal y como lo deja el seed: sin `updatedAt`. */
+  const DE_FABRICA = { id: 'ing-harina', name: 'Harina sin preparar', precio: 4.5 };
+  /** La misma fila en la hoja, con el precio que el usuario corrigió en otro dispositivo. */
+  const EN_LA_HOJA = { id: 'ing-harina', name: 'Harina sin preparar', precio: 9.9 };
+  const VERSION = '1786772542466-0000-otro';
+
+  beforeEach(async () => {
+    TestBed.configureTestingModule({ providers: makeExternalSyncFakes().providers });
+    cycle = TestBed.inject(SynchronizeTables);
+    remote = TestBed.inject(FakeRemoteRepository);
+    local = TestBed.inject(FakeLocalRepository);
+    await TestBed.inject(FakeSyncTargetRepository).save(
+      'cuenta-1',
+      SyncTarget.of('hoja-1', 'https://example.test/hoja-1'),
+    );
+  });
+
+  /**
+   * El caso reportado, exactamente: la hoja tiene el dato bueno y aquí solo hay fábrica. **No se sube
+   * nada**, y lo que baja es lo de la hoja.
+   */
+  it('la hoja tiene fecha y lo de aquí no → gana la hoja y no se sube nada', async () => {
+    local.tables.set(TABLE, [{ ...DE_FABRICA }]);
+    remote.snapshot = snapshotWith(
+      tableWith(TABLE, [{ index: 2, values: EN_LA_HOJA, version: VERSION }]),
+    );
+
+    const result = await cycle.execute({});
+
+    expect(result.synced).toBe(true);
+    expect(result.movements.pushed).toBe(0);
+    expect(remote.writesOf('upsert')).toHaveLength(0);
+
+    const [fila] = local.tables.get(TABLE) ?? [];
+    expect(fila['precio']).toBe(9.9);
+    // Y se queda con la fecha de la hoja, no con la de ahora: así el ciclo siguiente converge en vez
+    // de volver a competir — y sobre todo, no vuelve a ser la fila más nueva del sistema.
+    expect(fila['updatedAt']).toBe(new Date(1786772542466).toISOString());
+  });
+
+  /**
+   * Dos dispositivos con el mismo seed: **contenido idéntico, los dos sin fecha**. No hay nada que
+   * decidir y no se escribe en la hoja. Antes competían, y ganaba el que hubiera arrancado más tarde.
+   */
+  it('sembrado a los dos lados → convergido, sin escribir en la hoja', async () => {
+    local.tables.set(TABLE, [{ ...DE_FABRICA }]);
+    remote.snapshot = snapshotWith(
+      tableWith(TABLE, [{ index: 2, values: DE_FABRICA, version: VERSION }]),
+    );
+
+    const result = await cycle.execute({});
+
+    expect(remote.writesOf('upsert')).toHaveLength(0);
+    // Rellenar una fecha no es un cambio de datos, y no puede contarse como tal: si lo hiciera, la
+    // app le anunciaría al usuario que su catálogo cambió en cada primera sincronización.
+    expect(result.movements).toMatchObject({ pushed: 0, applied: 0, removed: 0 });
+  });
+
+  /**
+   * Y al terminar, **ninguna fila se queda sin fecha**: en cuanto los dos lados coinciden, cuándo
+   * cambió deja de ser desconocido. Es lo que hace que «sin fecha» siga significando «de fábrica» en
+   * vez de convertirse en un estado permanente que haya que volver a resolver cada dos minutos.
+   */
+  it('una fila que sube sin fecha se queda con la que se acaba de escribir', async () => {
+    local.tables.set(TABLE, [{ ...DE_FABRICA }]);
+    remote.snapshot = snapshotWith(emptyTable(TABLE));
+
+    await cycle.execute({});
+
+    const [subida] = remote.writesOf('upsert');
+    const version = subida.rows[0][subida.columns.indexOf('version')];
+    const [fila] = local.tables.get(TABLE) ?? [];
+
+    expect(fila['updatedAt']).toBe(new Date(Number(version.split('-')[0])).toISOString());
+    expect(fila['precio']).toBe(4.5);
+  });
+});
+
 function snapshotWith(...tables: RemoteTable[]): RemoteSnapshot {
   const rest = SYNCED_TABLES.filter((name) => !tables.some((table) => table.table === name)).map(
     emptyTable,

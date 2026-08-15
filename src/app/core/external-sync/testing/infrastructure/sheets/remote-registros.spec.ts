@@ -110,6 +110,73 @@ describe('la traducción de una pestaña', () => {
   }
 
   /**
+   * **Una fila que no se puede leer NO es una fila borrada.**
+   *
+   * Las filas ilegibles se apartan antes de decidir —no se puede saber qué dicen— y ahí estaba la
+   * trampa: al no entrar en la lista de lo que la hoja contiene, el shadow las daba por desaparecidas y
+   * les sintetizaba una lápida. O sea que **una celda que alguien estropeó borraba el dato en todos los
+   * dispositivos**; y como la celda seguía en la hoja, lo volvía a borrar en cada ciclo.
+   *
+   * Estar en la hoja y poder interpretarse son cosas distintas. Esta fila está.
+   */
+  it('una fila ilegible sigue contando como presente: no se sintetiza su lápida', async () => {
+    const harina = insumo();
+    const remote: RemoteTable = {
+      ...tabla([]),
+      unreadable: [{ index: 2, id: 'ing-harina', column: 'datos' }],
+      raw: [
+        {
+          id: 'ing-harina',
+          cells: {
+            id: 'ing-harina',
+            datos: '{roto',
+            version: '',
+            origen: '',
+            huella: '',
+            borrado: '',
+          },
+        },
+      ],
+    };
+
+    const { translated, plan } = await decidir({
+      remote,
+      local: [harina],
+      shadow: [recordado(harina, await huellaDe([], harina))],
+    });
+
+    expect(translated.base.filter((registro) => registro.sync.deleted)).toEqual([]);
+    expect(translated.handDeletes).toBe(0);
+    expect(plan.pull.filter((registro) => registro.sync.deleted)).toEqual([]);
+  });
+
+  /**
+   * **Un id no se hereda por parecerse.**
+   *
+   * Reconocer que a una fila le cambiaron el id se hace comparando su contenido sin el id, que es lo
+   * único que sobrevive a ese cambio. Pero eso solo tiene sentido si el id viejo **ya no está en la
+   * hoja**: si sigue ahí, con su fila, entonces nadie le cambió nada y esta otra fila es otra cosa.
+   *
+   * Sin esa condición, cualquier fila remota con un id que este dispositivo no conociera —todas, la
+   * primera vez que se sincroniza— podía robarle la identidad a una fila local que estaba en su sitio.
+   * Y el id robado desaparecía de la hoja, así que el ciclo siguiente lo daba por borrado.
+   */
+  it('no se re-identifica una fila local cuyo id sigue estando en la hoja', async () => {
+    const harina = insumo();
+    const gemela = { ...insumo(), id: 'ing-copia' };
+
+    const { translated } = await decidir({
+      remote: {
+        ...tabla([fila(harina, {}), { ...fila(gemela, {}), index: 3 }]),
+      },
+      local: [harina],
+    });
+
+    expect(translated.reids).toEqual([]);
+    expect([...translated.positions.keys()].sort()).toEqual(['ing-copia', 'ing-harina']);
+  });
+
+  /**
    * **La edición a mano gana**, y es lo que convierte la hoja en la fuente de la verdad.
    *
    * La app escribe siempre el contenido y su huella **juntos**, así que si al recalcularla no cuadra,

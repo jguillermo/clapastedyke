@@ -6,7 +6,8 @@ import { RecipeFlavor } from '../../domain/entities/recipe-flavor';
 import { RecipeFlavorRepository } from '../../domain/repositories/recipe-flavor.repository';
 import { RecipeFlavorMapper } from './recipe-flavor.mapper';
 import { RecipeFlavorRecord } from '../records';
-import { isAlive, stamped, tombstoned } from '../synced-record';
+import { SaveOptions } from '../../domain/repositories/save-options';
+import { isAlive, persisted, tombstoned } from '../synced-record';
 
 /**
  * Implementación IndexedDB de `RecipeFlavorRepository` sobre `IndexedDbStore` (store `flavors`);
@@ -32,8 +33,8 @@ export class IndexedDbRecipeFlavorRepository extends RecipeFlavorRepository {
     return flavors;
   }
 
-  async save(flavor: RecipeFlavor): Promise<void> {
-    await this.store.put(stamped(RecipeFlavorMapper.toRecord(flavor), new Date().toISOString()));
+  async save(flavor: RecipeFlavor, options?: SaveOptions): Promise<void> {
+    await this.store.put(persisted(RecipeFlavorMapper.toRecord(flavor), options));
     this.log.debug('sabor guardado', { id: flavor.id.value });
   }
 

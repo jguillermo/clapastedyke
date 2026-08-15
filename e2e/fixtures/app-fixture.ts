@@ -1,4 +1,4 @@
-import { test as base, expect } from '@playwright/test';
+import { test as base, expect, type Page } from '@playwright/test';
 import { DISABLE_WEBGL_SCRIPT } from '../support/webgl';
 import { GoogleDouble } from '../support/google-double';
 import { AccountPage } from '../pages/account.page';
@@ -24,7 +24,32 @@ export interface AppOptions {
 }
 
 /** Page objects y helpers disponibles en cada test. */
+/**
+ * **Un segundo aparato**: otro navegador, con su propia base de datos, contra la MISMA hoja.
+ *
+ * Es la única forma de probar de verdad que sincronizar sirve para algo. Todo lo demás se puede fingir
+ * desde un solo navegador —editar la hoja a mano imita al otro aparato—, pero hay dos cosas que no:
+ * que cada aparato tiene **su propia identidad** y **su propio catálogo sembrado**, y es justo del
+ * cruce de esas dos de donde salió la pérdida de datos que motivó este fixture.
+ *
+ * El contexto es nuevo, así que su IndexedDB está vacía y la app arranca como en un móvil recién
+ * estrenado: siembra, conecta, y se encuentra una hoja que ya tiene el trabajo del otro.
+ */
+export interface SecondDevice {
+  readonly page: Page;
+  readonly account: AccountPage;
+  readonly home: HomePage;
+  readonly catalog: RecipeBookFallbackPage;
+  readonly supplies: SuppliesDialogPage;
+  readonly supplyList: SupplyListPage;
+  readonly form: RecipeFormPage;
+  readonly grid: SupplyGridPage;
+}
+
 export interface AppFixtures {
+  /** Otro navegador, con su propia base local, contra la misma hoja. Ver {@link SecondDevice}. */
+  secondDevice: SecondDevice;
+
   /** Errores no capturados de la página; el test falla si hay alguno. */
   pageErrors: Error[];
 
@@ -139,6 +164,38 @@ export const test = base.extend<AppOptions & AppFixtures>({
     // Que no quede una petición retenida cuando el test acaba: la página se está cerrando y una
     // promesa colgada aquí retrasaría el cierre del contexto.
     google.resume();
+  },
+
+  secondDevice: async ({ browser, contextOptions, google, webgl }, use) => {
+    const context = await browser.newContext(contextOptions);
+    const page = await context.newPage();
+    if (!webgl) {
+      await page.addInitScript(DISABLE_WEBGL_SCRIPT);
+    }
+    // El MISMO doble: los dos aparatos hablan con el mismo Google, que es lo que se está probando.
+    await google.install(page);
+
+    // La misma guarda que el aparato principal: un error en consola de este también rompe el test.
+    const errors: string[] = [];
+    page.on('console', (message) => {
+      if (message.type() === 'error') {
+        errors.push(message.text());
+      }
+    });
+
+    await use({
+      page,
+      account: new AccountPage(page),
+      home: new HomePage(page),
+      catalog: new RecipeBookFallbackPage(page),
+      supplies: new SuppliesDialogPage(page),
+      supplyList: new SupplyListPage(page),
+      form: new RecipeFormPage(page),
+      grid: new SupplyGridPage(page),
+    });
+
+    await context.close();
+    expect(errors, 'el segundo aparato no debe registrar ningún error en consola').toEqual([]);
   },
 
   openHome: async ({ home }, use) => {
