@@ -99,8 +99,8 @@ test.describe('Cuenta · conexión y sincronización', () => {
     expect(recetas.headers).toContain('lines[]');
     expect(sheet.find('RecetaInsumos')).toBeUndefined();
 
-    // La versión del esquema queda apuntada en la pestaña de servicio: es lo que dispara el retiro de
-    // las pestañas de una hoja escrita con una versión anterior.
+    // La versión del esquema queda apuntada en la pestaña de servicio. Hoy nadie la lee: está ahí para
+    // el día que haya una migración, que necesitará saber con qué forma se escribió lo que encuentre.
     const meta = sheet.tab('_meta');
     expect(meta.cell(meta.rowOf('Clave', 'schemaVersion'), 'Valor')).toBe(5);
 

@@ -262,18 +262,6 @@ El token de Google dura ~1 h y **en un navegador no hay refresh token** — es u
 plataforma, no un defecto. Primero se intenta renovar en silencio; si no se puede, el estado pasa a
 **`reconnect`** y no a `error`, porque lo que hay que hacer es distinto y no se ha roto nada.
 
-## Migración de las hojas escritas con el esquema anterior
-
-`SCHEMA_VERSION` es **5**. Al encontrar una hoja de la v4, las pestañas viejas (`Insumos`, `Recetas`,
-`RecetaInsumos`, `Categorias`, `Sabores`, `Capacidades`) **se renombran** con el sufijo ` (v4)` y se
-quedan en el mismo fichero como respaldo; las nuevas se crean con sus columnas reales en la primera
-escritura. No se borra nada: son datos del usuario, y borrarle una pestaña de su Drive no es una
-decisión que este código pueda tomar.
-
-**Límite aceptado**: una edición hecha a mano en la hoja v4 y **todavía sin sincronizar** no se recoge
-en la migración — se queda en la pestaña de respaldo. Recogerla obligaría a mantener vivo el lector v4
-entero para un caso de una sola vez.
-
 ## Límites aceptados (se documentan, no se arreglan)
 
 - **No hay escritura condicional en Sheets.** Una escritura de otro dispositivo entre nuestra bajada y
@@ -283,8 +271,11 @@ entero para un caso de una sola vez.
   decide la fecha: uno de los dos pierde. Fusionar ahí perdería un cambio en silencio, que es peor.
 - **Una `version` forjada a mano dentro del margen de 5 min gana.** Las columnas están visibles a
   propósito.
-- **Una lista se fusiona entera, no elemento a elemento.** Las líneas de una receta van en una celda,
-  así que dos dispositivos editando líneas distintas de la misma receta: uno pierde.
+- **Una lista se fusiona entera, no elemento a elemento.** Las líneas de una receta van en una celda
+  con JSON, así que dos dispositivos editando líneas distintas de la misma receta: uno pierde. Y
+  corregir una cantidad a mano en la hoja es editar ese JSON — se puede, pero el sitio para hacerlo es
+  la app. Es el precio de que toda tabla replicada tenga identidad propia y ninguna necesite un caso
+  especial.
 - **Un campo cuyo valor es la cadena vacía vuelve como ausente.** Una hoja no distingue «la celda está
   vacía» de «este campo no está»; se elige la interpretación que no inventa datos.
 - **Se reescribe la pestaña entera al subir**, no fila a fila. Es lo que la hace idempotente y conserva

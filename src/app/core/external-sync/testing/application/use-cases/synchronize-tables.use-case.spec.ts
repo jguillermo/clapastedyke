@@ -203,7 +203,6 @@ describe('SynchronizeTables', () => {
       },
     ]);
     remote.snapshot = {
-      schemaVersion: 5,
       tables: [{ table: TABLE, present: false, columns: [], rows: [], unreadable: [], raw: [] }],
     };
 
@@ -332,7 +331,7 @@ function snapshotWith(...tables: RemoteTable[]): RemoteSnapshot {
   const rest = SYNCED_TABLES.filter((name) => !tables.some((table) => table.table === name)).map(
     emptyTable,
   );
-  return { schemaVersion: 5, tables: [...tables, ...rest] };
+  return { tables: [...tables, ...rest] };
 }
 
 function emptyTable(table: string): RemoteTable {

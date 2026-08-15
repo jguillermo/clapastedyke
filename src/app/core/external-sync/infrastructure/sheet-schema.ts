@@ -21,14 +21,13 @@ export const PROBE_KEY = 'pruebaConexion';
 /**
  * La versión del esquema con la que se escribe la hoja.
  *
- * | v | qué trajo |
- * |---|---|
- * | 3 | seis pestañas con rótulos en español, escritas en una sola dirección |
- * | 4 | las columnas de servicio (versión, origen, huella, borrado) y el rótulo `(auto)` |
- * | 5 | una pestaña por tabla, columnas deducidas de los datos, sin columnas derivadas |
+ * Se **escribe** en `_meta` en cada ciclo y hoy **nadie la lee**: no hay ninguna decisión que dependa
+ * de ella. Está ahí para el día que la haya — una migración necesita saber con qué forma se escribió
+ * lo que se encuentra, y ese dato hay que haberlo estado guardando desde antes.
  *
- * Se apunta en `_meta` y **se lee**: es lo que dispara el retiro de las pestañas de la versión
- * anterior (ver `GoogleSheetsRemoteRepository`).
+ * Las versiones 3 y 4 (pestañas con rótulos en español, columnas derivadas, una tabla hija para las
+ * líneas) existieron solo en el repositorio: ninguna hoja de nadie llegó a escribirse con ellas, así
+ * que no hay migración que mantener. Si algún día la hay, se lee este número y se decide.
  */
 export const SCHEMA_VERSION = 5;
 

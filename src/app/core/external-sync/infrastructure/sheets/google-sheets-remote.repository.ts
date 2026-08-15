@@ -47,19 +47,6 @@ const INITIAL_ROWS = 2000;
 /** Holgura al ampliar, para no repetir la llamada en cada ciclo. */
 const GROWTH_SLACK = 200;
 
-/**
- * Las pestañas de la versión anterior del esquema, con sus rótulos en español.
- *
- * En la v5 la hoja pasó a ser un espejo de las tablas —una pestaña por store, columnas deducidas de
- * los datos— así que estas ya no las escribe nadie. **No se borran**: se renombran con un sufijo y se
- * quedan en el mismo fichero como respaldo. Contienen datos que su dueño puede querer mirar, y
- * borrarle a alguien una pestaña de su Drive no es una decisión que este código pueda tomar.
- *
- * El renombrado es idempotente: una vez renombradas, el título ya no coincide y no se vuelve a tocar.
- */
-const LEGACY_TABS = ['Insumos', 'Recetas', 'RecetaInsumos', 'Categorias', 'Sabores', 'Capacidades'];
-const LEGACY_SUFFIX = ' (v4)';
-
 interface ValueRange {
   range?: string;
   values?: unknown[][];
@@ -101,13 +88,17 @@ export class GoogleSheetsRemoteRepository extends RemoteRepository {
     const titles = new Set(tabs.map((tab) => tab.title));
 
     const present = tables.filter((table) => titles.has(table));
-    const ranges = [
-      // Desde la fila 1 —la cabecera— hasta donde llegue: las columnas no se saben de antemano, así
-      // que se pide un ancho holgado y Sheets recorta por donde de verdad acabe la tabla.
-      ...present.map((table) => rangeOf(table, 'A1:ZZ')),
-      ...(titles.has(META_TAB) ? [rangeOf(META_TAB, 'A1:B10')] : []),
-    ];
-    const read = await this.fetchRanges(credential, target, ranges);
+    // Desde la fila 1 —la cabecera— hasta donde llegue: las columnas no se saben de antemano, así que
+    // se pide un ancho holgado y Sheets recorta por donde de verdad acabe la tabla.
+    //
+    // La pestaña de servicio **no se lee**: la versión del esquema se escribe para que quede dicha en
+    // la hoja, pero hoy no hay ninguna decisión que dependa de ella. Leerla sería un rango más en cada
+    // ciclo a cambio de un dato que nadie mira.
+    const read = await this.fetchRanges(
+      credential,
+      target,
+      present.map((table) => rangeOf(table, 'A1:ZZ')),
+    );
 
     const readByTable = new Map(present.map((table, index) => [table, read[index]?.values ?? []]));
     const remoteTables: RemoteTable[] = tables.map((table) =>
@@ -116,14 +107,12 @@ export class GoogleSheetsRemoteRepository extends RemoteRepository {
         : { table, present: false, columns: [], rows: [], unreadable: [], raw: [] },
     );
 
-    const schemaVersion = schemaVersionOf(read[present.length]?.values);
     this.log.debug('destino leído', {
-      schemaVersion,
       tablas: Object.fromEntries(
         remoteTables.map((table) => [table.table, table.present ? table.rows.length : 'ausente']),
       ),
     });
-    return { tables: remoteTables, schemaVersion };
+    return { tables: remoteTables };
   }
 
   async write({ credential, target, writes }: WriteRequest): Promise<WriteOutcome> {
@@ -173,28 +162,6 @@ export class GoogleSheetsRemoteRepository extends RemoteRepository {
     }
     this.log.debug('destino escrito ✔', { peticiones: count, aplicadas: applied });
     return { applied, requests: count };
-  }
-
-  /**
-   * Aparta las pestañas de la versión anterior, renombrándolas en vez de borrarlas.
-   *
-   * Va en la parte estructural del lote, así que ocurre antes de escribir ningún valor — si fuera al
-   * revés, la pestaña nueva y la vieja coexistirían un instante con el mismo título y Sheets
-   * rechazaría la petición entera.
-   */
-  private retireLegacy(batch: SheetWriteBatch, tabs: readonly TabProperties[]): void {
-    for (const tab of tabs) {
-      if (!LEGACY_TABS.includes(tab.title)) {
-        continue;
-      }
-      this.log.debug('apartando una pestaña del esquema anterior', { title: tab.title });
-      batch.structuralRequest({
-        updateSheetProperties: {
-          properties: { sheetId: tab.sheetId, title: `${tab.title}${LEGACY_SUFFIX}` },
-          fields: 'title',
-        },
-      });
-    }
   }
 
   /** Título, identificador y tamaño de cada pestaña. Hace falta para leer y para escribir. */
@@ -409,20 +376,4 @@ function textOf(row: Cells): Record<string, string> {
 
 function isService(column: string): boolean {
   return (SERVICE_COLUMNS as readonly string[]).includes(column);
-}
-
-/**
- * La versión de esquema apuntada en la pestaña de servicio, que es una lista de `clave | valor`.
- *
- * `null` si no está o no es un número: es el caso de una hoja escrita antes de que se apuntara, y lo
- * que toca entonces es adoptar lo que haya, no fallar.
- */
-function schemaVersionOf(values: readonly unknown[][] | undefined): number | null {
-  for (const row of values ?? []) {
-    if (canonicalText(row?.[0]) === 'schemaVersion') {
-      const version = Number(canonicalText(row?.[1]));
-      return Number.isFinite(version) ? version : null;
-    }
-  }
-  return null;
 }

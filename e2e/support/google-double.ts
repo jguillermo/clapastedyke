@@ -562,18 +562,6 @@ export class GoogleDouble {
         replies.push({});
         continue;
       }
-      if (request.updateSheetProperties?.properties) {
-        // Renombrar una pestaña: es lo que hace la migración de esquema con las de la versión
-        // anterior — se apartan con un sufijo en vez de borrarse.
-        const { sheetId, title } = request.updateSheetProperties.properties;
-        const tab = file.tabById(sheetId);
-        if (tab && title !== undefined) {
-          tab.title = title;
-        }
-        replies.push({});
-        continue;
-      }
-
       if (request.deleteDimension) {
         const { sheetId, startIndex, endIndex } = request.deleteDimension.range;
         const tab = file.tabById(sheetId);
@@ -768,7 +756,6 @@ interface StructuralRequest {
   addSheet?: { properties?: { title?: string; gridProperties?: { rowCount?: number } } };
   appendDimension?: { sheetId: number; length: number };
   deleteDimension?: { range: { sheetId: number; startIndex: number; endIndex: number } };
-  updateSheetProperties?: { properties?: { sheetId: number; title?: string }; fields?: string };
 }
 
 /**

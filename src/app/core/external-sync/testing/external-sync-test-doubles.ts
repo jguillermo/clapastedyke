@@ -232,7 +232,7 @@ export class FakeCredentialsProvider extends CredentialsProvider {
  */
 @Injectable()
 export class FakeRemoteRepository extends RemoteRepository {
-  snapshot: RemoteSnapshot = { tables: [], schemaVersion: null };
+  snapshot: RemoteSnapshot = { tables: [] };
   readonly written: WriteRequest[] = [];
   readonly requested: ReadRequest[] = [];
   reads = 0;

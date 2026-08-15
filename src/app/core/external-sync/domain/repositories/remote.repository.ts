@@ -85,8 +85,6 @@ export interface UnreadableRemoteRow {
 
 export interface RemoteSnapshot {
   readonly tables: readonly RemoteTable[];
-  /** Con qué versión del esquema se escribió el destino. `null` si no lo dice. */
-  readonly schemaVersion: number | null;
 }
 
 export interface RemoteRequest {
