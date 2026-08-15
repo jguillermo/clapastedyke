@@ -17,10 +17,9 @@ import { SignOut } from '@core/auth/application/use-cases/sign-out.use-case';
 import { WatchSession } from '@core/auth/application/use-cases/watch-session.use-case';
 import { PrepareSyncTarget } from '@core/external-sync/application/use-cases/prepare-sync-target.use-case';
 import {
-  ReconcileWithRemote,
-  ReconcileWithRemoteResult,
-} from '@core/external-sync/application/use-cases/reconcile-with-remote.use-case';
-import { SynchronizeWithRemote } from '@core/external-sync/application/use-cases/synchronize-with-remote.use-case';
+  SynchronizeResult,
+  SynchronizeTables,
+} from '@core/external-sync/application/use-cases/synchronize-tables.use-case';
 import { VerifySyncConnection } from '@core/external-sync/application/use-cases/verify-sync-connection.use-case';
 import { WatchSyncStatus } from '@core/external-sync/application/use-cases/watch-sync-status.use-case';
 
@@ -88,7 +87,7 @@ interface ConnectFailure {
  *
  * De las dos acciones del pie, **«Comprobar la hoja» solo lee**: compara y cuenta lo que haría, sin
  * tocar la hoja ni los datos de este dispositivo. Es lo que se pulsa para decidir si conviene pulsar la
- * otra. Ver `ReconcileWithRemote`.
+ * otra. Ver `SynchronizeTables` en modo simulación.
  *
  * ## Conectar lo hace todo, y se cuenta paso a paso
  *
@@ -148,8 +147,7 @@ export class Account {
   private readonly signOut = inject(SignOut);
   private readonly prepareTarget = inject(PrepareSyncTarget);
   private readonly verifyConnection = inject(VerifySyncConnection);
-  private readonly sync = inject(SynchronizeWithRemote);
-  private readonly reconcile = inject(ReconcileWithRemote);
+  private readonly sync = inject(SynchronizeTables);
   private readonly log = inject(Logger).scoped('ui/account');
 
   /** Estado de la sesión y de la sincronización, tal como los publica cada caso de uso. */
@@ -340,7 +338,7 @@ export class Account {
     this.running.set('sync');
     try {
       await this.run('sincronizar', async () => {
-        const result = await this.sync.execute();
+        const result = await this.sync.execute({});
         if (!result.synced && result.reason !== 'disconnected') {
           // El ciclo no lanza: informa del desenlace y deja el motivo en el estado.
           throw new Error(this.status().lastError ?? 'No se ha podido sincronizar con tu hoja.');
@@ -367,7 +365,7 @@ export class Account {
     this.running.set('check');
     try {
       await this.run('comprobar la hoja', async () => {
-        this.checkSummary.set(summaryOf(await this.reconcile.execute()));
+        this.checkSummary.set(summaryOf(await this.sync.execute({ dryRun: true })));
       });
     } finally {
       this.running.set(null);
@@ -392,12 +390,12 @@ export class Account {
   }
 
   private async pushEverything(): Promise<string> {
-    const result = await this.sync.execute();
+    const result = await this.sync.execute({});
     if (!result.synced) {
       // El ciclo no lanza: informa del desenlace y deja el motivo en el estado.
       throw new Error(this.status().lastError ?? 'No se ha podido sincronizar tu recetario.');
     }
-    return movements(result.applied, result.pushed, result.removed, result.rejected);
+    return movements(result);
   }
 
   // ── Apoyo ────────────────────────────────────────────────────────────────────────────────────
@@ -444,41 +442,35 @@ function describe(error: unknown): string {
  * arreglar a mano, importan más que las cuentas de lo que se movería. Un resumen que empezara por «12
  * filas al día» dejaría enterrado el «y una pestaña ha desaparecido».
  */
-function summaryOf(result: ReconcileWithRemoteResult): string {
-  const { plan } = result;
-  if (!plan) {
+function summaryOf(result: SynchronizeResult): string {
+  if (!result.synced && result.reason !== undefined && result.reason !== 'blocked') {
     return {
       disconnected: 'No hay ninguna cuenta conectada.',
       'no-target': 'Esta cuenta todavía no tiene hoja: conéctala primero.',
+      'stale-session': 'La sesión cambió mientras se comprobaba. Vuelve a intentarlo.',
+      'stale-target': 'La hoja cambió mientras se comprobaba. Vuelve a intentarlo.',
       failed: 'No se ha podido leer la hoja. El motivo está en la consola.',
-    }[result.reason ?? 'failed'];
+    }[result.reason];
   }
 
-  const { aborted } = plan;
-  if (aborted) {
-    const cause = {
-      'missing-table': `falta la pestaña de «${aborted.table}»`,
-      headers: `las columnas de «${aborted.table}» no están donde deberían`,
-      'mass-delete': `se borrarían demasiadas filas de «${aborted.table}»`,
-    }[aborted.kind];
-    return `La sincronización se negaría a seguir: ${cause}. El detalle está en la consola.`;
+  const { barrier } = result.problems;
+  if (barrier !== null) {
+    return `La sincronización se negaría a seguir: ${barrier}. El detalle está en la consola.`;
   }
 
   // Solo van arriba las que piden mano humana. Un id cambiado y un alta sin id los arregla el propio
   // ciclo, así que son movimientos, no deberes del usuario.
   const problems = [
-    count(plan.duplicates.length, 'id repetido', 'ids repetidos'),
-    count(plan.quarantined.length, 'fila ilegible', 'filas ilegibles'),
+    count(result.problems.duplicates, 'id repetido', 'ids repetidos'),
+    count(result.problems.unreadable, 'fila ilegible', 'filas ilegibles'),
+    count(result.problems.ignored, 'fila local sin id', 'filas locales sin id'),
   ].filter((text) => text !== '');
 
   const moves = [
-    count(plan.apply.length, 'fila bajaría', 'filas bajarían'),
-    count(plan.push.length, 'fila subiría', 'filas subirían'),
-    count(plan.remove.length, 'fila se borraría', 'filas se borrarían'),
-    count(plan.handAdds.length, 'fila sin id se adoptaría', 'filas sin id se adoptarían'),
-    count(plan.reids.length, 'id se devolvería a su fila', 'ids se devolverían a su fila'),
-    count(plan.adopt.length, 'fila se adoptaría', 'filas se adoptarían'),
-    count(plan.drift.length, 'diferencia', 'diferencias'),
+    count(result.movements.applied, 'fila bajaría', 'filas bajarían'),
+    count(result.movements.pushed, 'fila subiría', 'filas subirían'),
+    count(result.movements.removed, 'fila se borraría', 'filas se borrarían'),
+    count(result.movements.merged, 'fila se fusionaría', 'filas se fusionarían'),
   ].filter((text) => text !== '');
 
   const head = problems.length > 0 ? `Hay que revisar: ${problems.join(', ')}. ` : '';
@@ -489,16 +481,18 @@ function summaryOf(result: ReconcileWithRemoteResult): string {
 /**
  * Lo que se movió en un ciclo, en una frase.
  *
- * Se cuentan las cuatro cosas porque ahora la sincronización va en las dos direcciones: decir solo «12
- * filas enviadas» esconde que además bajaron ocho de otro dispositivo, que es justo lo que a alguien le
- * interesa saber la primera vez que conecta un segundo aparato.
+ * Se cuentan las cuatro cosas porque la sincronización va en las dos direcciones: decir solo «12 filas
+ * enviadas» esconde que además bajaron ocho de otro dispositivo, que es justo lo que a alguien le
+ * interesa saber la primera vez que conecta un segundo aparato. Y las fusionadas aparte, porque son
+ * las que antes se habrían perdido: un cambio de cada lado en campos distintos del mismo dato.
  */
-function movements(applied: number, pushed: number, removed: number, rejected: number): string {
+function movements(result: SynchronizeResult): string {
   const parts = [
-    count(pushed, 'fila subida', 'filas subidas'),
-    count(applied, 'fila bajada', 'filas bajadas'),
-    count(removed, 'fila borrada', 'filas borradas'),
-    count(rejected, 'fila ilegible', 'filas ilegibles'),
+    count(result.movements.pushed, 'fila subida', 'filas subidas'),
+    count(result.movements.applied, 'fila bajada', 'filas bajadas'),
+    count(result.movements.removed, 'fila borrada', 'filas borradas'),
+    count(result.movements.merged, 'fila fusionada', 'filas fusionadas'),
+    count(result.problems.unreadable, 'fila ilegible', 'filas ilegibles'),
   ].filter((text) => text !== '');
 
   return parts.length === 0 ? 'Ya estaba todo al día' : parts.join(', ');

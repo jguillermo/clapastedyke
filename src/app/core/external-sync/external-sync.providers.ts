@@ -10,11 +10,13 @@ import { DeviceIdentity } from './domain/services/device-identity';
 import { SyncCoordinator } from './domain/services/sync-coordinator';
 import { SyncGateway } from './domain/services/sync.gateway';
 import { SyncOutbox } from './domain/services/sync-outbox';
-import { SyncReader } from './domain/services/sync-reader';
+import { LocalRepository } from './domain/repositories/local.repository';
+import { RemoteRepository } from './domain/repositories/remote.repository';
 import { SyncShadow } from './domain/services/sync-shadow';
 import { SyncStatus } from './domain/services/sync-status';
 import { GoogleSheetsGateway } from './infrastructure/google-sheets.gateway';
-import { GoogleSheetsReader } from './infrastructure/google-sheets.reader';
+import { IndexedDbLocalRepository } from './infrastructure/indexeddb-local.repository';
+import { GoogleSheetsRemoteRepository } from './infrastructure/sheets/google-sheets-remote.repository';
 import { IndexedDbDeviceIdentity } from './infrastructure/indexeddb-device-identity';
 import { IndexedDbSyncShadow } from './infrastructure/indexeddb-sync-shadow';
 import { IndexedDbSyncTargetRepository } from './infrastructure/indexeddb-sync-target.repository';
@@ -52,7 +54,8 @@ export function provideExternalSync(): EnvironmentProviders {
     { provide: SyncGateway, useClass: GoogleSheetsGateway },
     // Leer es un puerto aparte del de escribir: hay código que solo lee, y le viene bien no poder
     // escribir ni por accidente. Ver `sync-reader.ts`.
-    { provide: SyncReader, useClass: GoogleSheetsReader },
+    { provide: LocalRepository, useClass: IndexedDbLocalRepository },
+    { provide: RemoteRepository, useClass: GoogleSheetsRemoteRepository },
     { provide: SyncShadow, useClass: IndexedDbSyncShadow },
     { provide: SyncTargetRepository, useClass: IndexedDbSyncTargetRepository },
     { provide: SyncOutbox, useClass: IndexeddbSyncOutbox },

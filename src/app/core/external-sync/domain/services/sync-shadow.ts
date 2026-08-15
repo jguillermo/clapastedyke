@@ -22,11 +22,23 @@
  * igual, en cualquiera de los dos sentidos, pierde datos: o se resucita lo borrado, o se borra lo que
  * nunca se había subido.
  *
- * ## Por qué se guarda la huella y no la fila
+ * ## Por qué también se guardan los valores, y no solo la huella
  *
- * Para comparar basta saber **si** cambió, no en qué. Guardando la huella, la base ocupa lo mismo por
- * fila tenga la fila tres columnas o treinta, y no duplica en disco un catálogo que ya está entero en
- * los stores de su contexto.
+ * Durante un tiempo se guardó solo la huella: para saber **si** algo cambió basta con eso, y ocupa lo
+ * mismo tenga la fila tres columnas o treinta. Pero saber que cambió no es suficiente para las dos
+ * cosas que la base hace ahora:
+ *
+ * 1. **Fusionar campo a campo.** Si el destino cambió el precio y aquí se cambió el nombre, se pueden
+ *    quedar los dos — pero solo si hay un tercer punto de referencia con el que atribuir cada cambio a
+ *    su lado (el mismo papel que el *merge base* de `git`). Con una huella se sabe que la fila cambió;
+ *    con los valores se sabe **qué** cambió, y entonces no hay que descartar un lado entero.
+ * 2. **Reconocer que falta una columna.** Si alguien borra el rótulo de una columna en la hoja, sus
+ *    celdas dejan de tener nombre y no vuelven: la fila parecería editada a mano con ese campo en
+ *    blanco y el campo se borraría en todos los dispositivos. Comparando con lo que la base recuerda
+ *    se ve que esa columna estaba, y el ciclo se niega a seguir.
+ *
+ * El precio es duplicar el catálogo en disco. Se acepta: son unos cientos de filas de texto, y lo que
+ * compra es no perder el trabajo de nadie.
  *
  * ## Es por cuenta
  *
@@ -54,6 +66,17 @@ export interface ShadowRow {
    * todo, **no se sobrescribe**: escribirle nuestro valor encima borraría su intento de corrección.
    */
   readonly rejected?: string;
+  /**
+   * Los valores de la fila la última vez que se vio, enteros.
+   *
+   * Es el **ancestro común** con el que se fusionan campos no solapados, y lo que permite reconocer
+   * que una columna ha desaparecido de la hoja (ver la cabecera de este fichero).
+   *
+   * Opcional a propósito: una fila recordada antes de que este campo existiera no lo trae, y su
+   * ausencia significa simplemente que no hay ancestro — se decide como siempre, ganando un lado
+   * entero. Ningún dispositivo tiene que migrar nada.
+   */
+  readonly values?: Record<string, unknown>;
 }
 
 export abstract class SyncShadow {
@@ -63,12 +86,21 @@ export abstract class SyncShadow {
   /**
    * Recuerda una fila.
    *
-   * Se escribe **fila a fila, justo después de aplicar cada una**, no al final del lote. Si el proceso
-   * muriera entre «apliqué cuarenta filas» y «apunté la base», esas cuarenta parecerían cambios locales
-   * en el ciclo siguiente y se subirían de vuelta **con una versión nueva y contenido viejo**, ganándole
-   * a una edición legítima de otro dispositivo.
+   * Se escribe **justo después de aplicarla**, no al final del lote. Si el proceso muriera entre
+   * «apliqué cuarenta filas» y «apunté la base», esas cuarenta parecerían cambios locales en el ciclo
+   * siguiente y se subirían de vuelta **con una versión nueva y contenido viejo**, ganándole a una
+   * edición legítima de otro dispositivo.
    */
   abstract put(row: ShadowRow): Promise<void>;
+
+  /**
+   * Recuerda N filas **en una sola transacción**.
+   *
+   * Es la misma escritura que `put`, en bloque: apuntar una tabla entera fila a fila multiplica por N
+   * el coste de un ciclo. La atomicidad juega a favor — o se recuerdan todas o ninguna—, siempre que
+   * se llame **después** de que la escritura que describen esté confirmada.
+   */
+  abstract putAll(rows: readonly ShadowRow[]): Promise<void>;
 
   /** Olvida una fila: ya no está en el destino y tampoco aquí. */
   abstract remove(table: string, rowId: string): Promise<void>;

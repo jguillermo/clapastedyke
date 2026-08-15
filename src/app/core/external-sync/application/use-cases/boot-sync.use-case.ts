@@ -2,7 +2,7 @@ import { inject, Injectable } from '@angular/core';
 import { CredentialsProvider } from '@core/_common/credentials/credentials-provider';
 import { Logger } from '@core/_common/logger/logger';
 import { UseCase } from '@core/_common/use-case';
-import { SynchronizeWithRemote } from './synchronize-with-remote.use-case';
+import { SynchronizeTables } from './synchronize-tables.use-case';
 
 /**
  * Cuánto se le da al primer ciclo antes de dejar entrar al usuario.
@@ -41,7 +41,7 @@ export interface BootSyncResult {
 @Injectable({ providedIn: 'root' })
 export class BootSync extends UseCase<void, BootSyncResult> {
   private readonly credentials = inject(CredentialsProvider);
-  private readonly cycle = inject(SynchronizeWithRemote);
+  private readonly cycle = inject(SynchronizeTables);
   private readonly log = inject(Logger).scoped('external-sync/boot');
 
   async execute(): Promise<BootSyncResult> {
@@ -53,7 +53,7 @@ export class BootSync extends UseCase<void, BootSyncResult> {
     }
 
     this.log.debug('arranque: se espera la primera sincronización', { plazo: BOOT_TIMEOUT_MS });
-    const cycle = this.cycle.execute();
+    const cycle = this.cycle.execute({});
     const outcome = await Promise.race([
       cycle.then((result): 'ok' | 'failed' => (result.synced ? 'ok' : 'failed')),
       wait(BOOT_TIMEOUT_MS).then(() => 'timeout' as const),

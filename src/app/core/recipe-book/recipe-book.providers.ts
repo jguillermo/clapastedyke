@@ -14,10 +14,6 @@ import { IndexedDbRecipeRepository } from './infrastructure/recipe/indexeddb-rec
 import { IndexedDbRecipeCategoryRepository } from './infrastructure/recipe-category/indexeddb-recipe-category.repository';
 import { IndexedDbRecipeFlavorRepository } from './infrastructure/recipe-flavor/indexeddb-recipe-flavor.repository';
 import { IndexedDbRecipeCapacityRepository } from './infrastructure/recipe-capacity/indexeddb-recipe-capacity.repository';
-import { ExportableData } from '@core/_common/export/exportable-data';
-import { ImportableData } from '@core/_common/import/importable-data';
-import { RecipeBookExportableData } from './infrastructure/recipe-book-exportable-data';
-import { RecipeBookImportableData } from './infrastructure/recipe-book-importable-data';
 import { RecipeBookSeed } from './infrastructure/seed/recipe-book-seed';
 import { SeedDataSource, HttpSeedDataSource } from './infrastructure/seed/seed-data-source';
 import { SeedState } from './infrastructure/seed/seed-state';
@@ -38,8 +34,6 @@ export function provideRecipeBook(): EnvironmentProviders {
     { provide: RecipeCapacityRepository, useClass: IndexedDbRecipeCapacityRepository },
     // Cómo se lleva sus datos quien tenga que sacarlos fuera, y cómo se le traen de vuelta. Los dos
     // contratos son del shared kernel, así que ningún otro contexto necesita conocer este.
-    { provide: ExportableData, useClass: RecipeBookExportableData },
-    { provide: ImportableData, useClass: RecipeBookImportableData },
     { provide: SeedDataSource, useClass: HttpSeedDataSource },
     { provide: SeedState, useClass: IndexedDbSeedState },
     provideAppInitializer(() => inject(RecipeBookSeed).run()),

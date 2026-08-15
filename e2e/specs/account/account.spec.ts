@@ -61,42 +61,48 @@ test.describe('Cuenta · conexión y sincronización', () => {
 
     const sheet = google.sheet;
     expect(sheet.title).toBe('Clapastedyke — Recetario');
+    // Una pestaña por tabla replicada, con el nombre de la tabla. La de servicio se crea con la hoja,
+    // así que va primera; las demás las crea la primera escritura, en el orden en que se sincronizan.
     expect(sheet.titles).toEqual([
-      'Insumos',
-      'Recetas',
-      'RecetaInsumos',
-      'Categorias',
-      'Sabores',
-      'Capacidades',
       '_meta',
+      'ingredients',
+      'recipes',
+      'recipe_categories',
+      'flavors',
+      'conversion_options',
     ]);
 
     // Las columnas de servicio van al final, y son las que hacen posible la fusión.
-    const insumos = sheet.tab('Insumos');
+    const insumos = sheet.tab('ingredients');
     expect(insumos.headers.slice(-4)).toEqual(['version', 'origen', 'huella', 'borrado']);
 
     // El catálogo entero, tabla por tabla: nada se queda por el camino.
     expect(insumos.dataRowCount).toBe(SUPPLY_COUNT);
-    expect(sheet.tab('Recetas').dataRowCount).toBe(RECIPE_COUNT);
-    expect(sheet.tab('Categorias').dataRowCount).toBe(CATEGORIES.length);
-    expect(sheet.tab('Sabores').dataRowCount).toBe(FLAVORS.length);
-    expect(sheet.tab('Capacidades').dataRowCount).toBe(PORTIONS.length + MOLDS.length);
-    expect(sheet.tab('RecetaInsumos').dataRowCount).toBeGreaterThan(RECIPE_COUNT);
+    expect(sheet.tab('recipes').dataRowCount).toBe(RECIPE_COUNT);
+    expect(sheet.tab('recipe_categories').dataRowCount).toBe(CATEGORIES.length);
+    expect(sheet.tab('flavors').dataRowCount).toBe(FLAVORS.length);
+    expect(sheet.tab('conversion_options').dataRowCount).toBe(PORTIONS.length + MOLDS.length);
 
-    // Una fila concreta, con su precio ya convertido en número por la hoja (`RAW`) y su huella escrita:
+    // Una fila concreta, con su precio anidado desplegado en columnas con ruta y su huella escrita:
     // sin huella, el ciclo siguiente la tomaría por editada a mano.
     const harina = insumos.rowOf('id', SUPPLIES.harina.id);
     expect(harina).toBeGreaterThan(1);
-    expect(insumos.cell(harina, 'Nombre')).toBe(SUPPLIES.harina.name);
-    expect(insumos.cell(harina, 'Precio de compra')).toBe(Number(SUPPLIES.harina.price));
+    expect(insumos.cell(harina, 'name')).toBe(SUPPLIES.harina.name);
+    expect(insumos.cell(harina, 'purchasePrice.amount')).toBe(Number(SUPPLIES.harina.price));
     expect(String(insumos.cell(harina, 'huella'))).not.toBe('');
     expect(String(insumos.cell(harina, 'version'))).not.toBe('');
     expect(insumos.cell(harina, 'borrado')).toBe('');
 
-    // La versión del esquema queda apuntada en la pestaña de servicio: es lo que dispara la migración
-    // de una hoja escrita con una versión anterior.
+    // Las líneas de una receta viajan **dentro de su receta**, en una celda marcada como lista: ya no
+    // hay una pestaña hija sin identidad propia.
+    const recetas = sheet.tab('recipes');
+    expect(recetas.headers).toContain('lines[]');
+    expect(sheet.find('RecetaInsumos')).toBeUndefined();
+
+    // La versión del esquema queda apuntada en la pestaña de servicio: es lo que dispara el retiro de
+    // las pestañas de una hoja escrita con una versión anterior.
     const meta = sheet.tab('_meta');
-    expect(meta.cell(meta.rowOf('Clave', 'schemaVersion'), 'Valor')).toBe(4);
+    expect(meta.cell(meta.rowOf('Clave', 'schemaVersion'), 'Valor')).toBe(5);
 
     // ── Caso 3 · un ciclo más para asentar, y la comprobación no encuentra nada que mover ────────
     await account.syncAll.click();
@@ -133,7 +139,7 @@ test.describe('Cuenta · conexión y sincronización', () => {
     expect(google.sheets).toHaveLength(2);
     const fresh = google.sheet;
     expect(fresh.id).not.toBe(sheet.id);
-    expect(fresh.tab('Insumos').dataRowCount).toBe(SUPPLY_COUNT);
+    expect(fresh.tab('ingredients').dataRowCount).toBe(SUPPLY_COUNT);
     await expect(account.sheetLink).toHaveAttribute('href', fresh.url);
     await expect(account.statusLabel).toHaveText('Al día');
   });
@@ -169,7 +175,7 @@ test.describe('Cuenta · conexión y sincronización', () => {
 
     // Y adoptarla no duplicó su contenido: los ids del seed son fijos, así que las filas se emparejan
     // con las que ya estaban en vez de añadirse otra vez.
-    expect(google.sheet.tab('Insumos').dataRowCount).toBe(SUPPLY_COUNT);
+    expect(google.sheet.tab('ingredients').dataRowCount).toBe(SUPPLY_COUNT);
     await expect(account.statusLabel).toHaveText('Al día');
   });
 });

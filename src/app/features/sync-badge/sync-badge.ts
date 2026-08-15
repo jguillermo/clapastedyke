@@ -49,7 +49,12 @@ export class SyncBadge {
   protected readonly status = this.watchStatus.state;
 
   protected readonly state = computed<SyncIndicatorState>(() => {
-    const { phase, pending } = this.status();
+    const { phase, pending, upToDate } = this.status();
+    // «Todo al día» lo decide el caso de uso, no esta vista: si cada sitio lo dedujera por su cuenta,
+    // el aviso y la pantalla de cuenta acabarían diciendo cosas distintas del mismo estado.
+    if (upToDate) {
+      return 'hidden';
+    }
     switch (phase) {
       case 'error':
         return 'error';
@@ -59,7 +64,7 @@ export class SyncBadge {
         // Sin nada pendiente, un ciclo es rutina y no hay nada que contar.
         return pending > 0 ? 'syncing' : 'hidden';
       case 'idle':
-        return pending > 0 ? 'pending' : 'hidden';
+        return 'pending';
       case 'disconnected':
         // Quien no ha conectado cuenta no tiene copia remota de la que avisar.
         return 'hidden';

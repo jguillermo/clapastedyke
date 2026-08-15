@@ -75,7 +75,7 @@ test.describe('Cuenta · la hoja es la fuente de la verdad', () => {
   }) => {
     await connectAccount();
     // La misma referencia durante todo el journey: el doble muta la pestaña, no la reemplaza.
-    const insumos = google.sheet.tab('Insumos');
+    const insumos = google.sheet.tab('ingredients');
 
     // ── Caso 1 · lo que se crea aquí acaba en la hoja ────────────────────────────────────────────
     await openSupplies(account, home, catalog, supplies);
@@ -90,19 +90,19 @@ test.describe('Cuenta · la hoja es la fuente de la verdad', () => {
     // dejarle llegar.
     await expect.poll(() => insumos.dataRowCount, { timeout: 20_000 }).toBe(SUPPLY_COUNT + 2);
 
-    const manteca = insumos.rowOf('Nombre', 'Manteca E2E');
+    const manteca = insumos.rowOf('name', 'Manteca E2E');
     expect(manteca).toBeGreaterThan(1);
-    expect(insumos.rowOf('Nombre', 'Coco E2E')).toBeGreaterThan(1);
-    expect(insumos.cell(manteca, 'Precio de compra')).toBe(9.9);
-    expect(insumos.cell(manteca, 'Presentación (cantidad)')).toBe(500);
-    expect(insumos.cell(manteca, 'Presentación (unidad)')).toBe('g');
+    expect(insumos.rowOf('name', 'Coco E2E')).toBeGreaterThan(1);
+    expect(insumos.cell(manteca, 'purchasePrice.amount')).toBe(9.9);
+    expect(insumos.cell(manteca, 'purchasePrice.per.value')).toBe(500);
+    expect(insumos.cell(manteca, 'purchasePrice.per.unit')).toBe('g');
 
     // ── Caso 2 · dos ediciones a mano en la hoja, y la app se pone al día ────────────────────────
     // Se toca SOLO la celda del dato, como haría una persona: ni la versión ni la huella. Es esa
     // discrepancia —la huella escrita ya no cuadra con el contenido— la que hace que la hoja gane.
     const harina = insumos.rowOf('id', SUPPLIES.harina.id);
-    insumos.setCell(harina, 'Nombre', 'Harina E2E');
-    insumos.setCell(manteca, 'Precio de compra', '12.5');
+    insumos.setCell(harina, 'name', 'Harina E2E');
+    insumos.setCell(manteca, 'purchasePrice.amount', '12.5');
 
     await sync(account);
 
@@ -115,14 +115,14 @@ test.describe('Cuenta · la hoja es la fuente de la verdad', () => {
     await expect(supplies.list.priceInput(mantecaRow)).toHaveValue('12.5');
 
     // Leer la hoja no la reescribe: la corrección de quien la editó se queda tal cual.
-    expect(insumos.cell(harina, 'Nombre')).toBe('Harina E2E');
+    expect(insumos.cell(harina, 'name')).toBe('Harina E2E');
 
     // ── Caso 3 · borrar en la hoja, de las dos formas posibles, borra aquí ───────────────────────
     await backToAccount(supplies, catalog, home, account);
 
     // Una lápida (así la escribe la app) y una fila que simplemente desaparece.
-    insumos.setCell(insumos.rowOf('Nombre', 'Manteca E2E'), 'borrado', 'TRUE');
-    insumos.deleteRow(insumos.rowOf('Nombre', 'Coco E2E'));
+    insumos.setCell(insumos.rowOf('name', 'Manteca E2E'), 'borrado', 'TRUE');
+    insumos.deleteRow(insumos.rowOf('name', 'Coco E2E'));
 
     await sync(account);
 
@@ -139,13 +139,13 @@ test.describe('Cuenta · la hoja es la fuente de la verdad', () => {
     // ── Caso 4 · una fila escrita a mano SIN id se adopta ────────────────────────────────────────
     await backToAccount(supplies, catalog, home, account);
     const nueva = insumos.appendRow({
-      Nombre: 'Cardamomo E2E',
-      'Unidad base': 'g',
-      Uso: 'recipe',
-      'Precio de compra': '18',
-      'Presentación (cantidad)': '100',
-      'Presentación (unidad)': 'g',
-      Moneda: 'PEN',
+      name: 'Cardamomo E2E',
+      baseUnit: 'g',
+      usage: 'recipe',
+      'purchasePrice.amount': '18',
+      'purchasePrice.per.value': '100',
+      'purchasePrice.per.unit': 'g',
+      'purchasePrice.currency': 'PEN',
     });
 
     await sync(account);
@@ -161,7 +161,7 @@ test.describe('Cuenta · la hoja es la fuente de la verdad', () => {
     const adoptado = String(insumos.cell(nueva, 'id'));
     expect(String(insumos.cell(nueva, 'huella'))).not.toBe('');
     expect(String(insumos.cell(nueva, 'version'))).not.toBe('');
-    expect(insumos.cell(nueva, 'Nombre')).toBe('Cardamomo E2E');
+    expect(insumos.cell(nueva, 'name')).toBe('Cardamomo E2E');
 
     await openSupplies(account, home, catalog, supplies);
     expect(await supplies.list.names()).toContain('Cardamomo E2E');

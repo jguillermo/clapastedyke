@@ -18,29 +18,20 @@ import {
   CredentialsProvider,
   UserCredentials,
 } from '../../_common/credentials/credentials-provider';
-import {
-  ExportableData,
-  ExportedRows,
-  ExportQuery,
-  ExportRef,
-} from '../../_common/export/exportable-data';
-import { ApplyOutcome, ImportableData, ImportChange } from '../../_common/import/importable-data';
 import { DeviceIdentity } from '../domain/services/device-identity';
 import { SyncCoordinator } from '../domain/services/sync-coordinator';
-import { SyncReader } from '../domain/services/sync-reader';
-import { RemoteSnapshot } from '../domain/services/sync-reader.types';
+import { LocalRepository, TableRow } from '../domain/repositories/local.repository';
+import {
+  ReadRequest,
+  RemoteRepository,
+  RemoteSnapshot,
+  RemoteWrite,
+  WriteOutcome,
+  WriteRequest,
+} from '../domain/repositories/remote.repository';
 import { ShadowRow, SyncShadow } from '../domain/services/sync-shadow';
 import { SyncGateway } from '../domain/services/sync.gateway';
-import {
-  MarkDeletedRequest,
-  MigrateRequest,
-  ProbeOutcome,
-  ProbeRequest,
-  PurgeRequest,
-  StampRequest,
-  SyncOutcome,
-  SyncRequest,
-} from '../domain/services/sync.gateway.types';
+import { ProbeOutcome, ProbeRequest } from '../domain/services/sync.gateway.types';
 import { SyncOutbox } from '../domain/services/sync-outbox';
 import { SyncTargetRepository } from '../domain/repositories/sync-target.repository';
 import { SyncStatus } from '../domain/services/sync-status';
@@ -151,7 +142,6 @@ export class FakeEventBus extends EventBus {
 /** Destino falso: registra lo que se le manda y puede programarse para fallar lo siguiente. */
 @Injectable()
 export class FakeSyncGateway extends SyncGateway {
-  readonly sent: SyncRequest[] = [];
   readonly probed: ProbeRequest[] = [];
   /** Cuántas hojas se han creado. Para asertar que no se crea una en cada conexión. */
   created = 0;
@@ -185,46 +175,6 @@ export class FakeSyncGateway extends SyncGateway {
 
   async exists(): Promise<boolean> {
     return this.targetAlive;
-  }
-
-  async send(request: SyncRequest): Promise<SyncOutcome> {
-    this.sent.push(request);
-    if (this.failWith) {
-      throw this.failWith;
-    }
-    return { applied: {} };
-  }
-
-  /** Cuántas veces se ha puesto al día la forma del destino, y con qué se llamó. */
-  readonly migrated: MigrateRequest[] = [];
-
-  async migrate(request: MigrateRequest): Promise<void> {
-    this.migrated.push(request);
-  }
-
-  /** Filas marcadas como borradas, y filas tiradas. Para asertar qué se hizo con las lápidas. */
-  readonly markedDeleted: MarkDeletedRequest[] = [];
-  readonly purged: PurgeRequest[] = [];
-
-  async markDeleted(request: MarkDeletedRequest): Promise<void> {
-    this.markedDeleted.push(request);
-    if (this.failWith) {
-      throw this.failWith;
-    }
-  }
-
-  async purge(request: PurgeRequest): Promise<void> {
-    this.purged.push(request);
-  }
-
-  /** Celdas escritas sobre filas que ya existían: el id de un alta a mano, o un id devuelto. */
-  readonly stamped: StampRequest[] = [];
-
-  async stamp(request: StampRequest): Promise<void> {
-    this.stamped.push(request);
-    if (this.failWith) {
-      throw this.failWith;
-    }
   }
 
   async probe(request: ProbeRequest): Promise<ProbeOutcome> {
@@ -274,19 +224,74 @@ export class FakeCredentialsProvider extends CredentialsProvider {
   }
 }
 
-/** Lector falso: se le programa el estado remoto que debe devolver. */
+/**
+ * El destino, en memoria.
+ *
+ * Guarda lo que se le escribe con la misma forma con la que lo devuelve, así que un ciclo seguido de
+ * otro ve lo que dejó el primero — que es lo que hace posible probar la idempotencia sin red.
+ */
 @Injectable()
-export class FakeSyncReader extends SyncReader {
+export class FakeRemoteRepository extends RemoteRepository {
   snapshot: RemoteSnapshot = { tables: [], schemaVersion: null };
-  failWith: Error | null = null;
+  readonly written: WriteRequest[] = [];
+  readonly requested: ReadRequest[] = [];
   reads = 0;
+  failWith: Error | null = null;
+  /**
+   * Un gancho para hacer que el mundo cambie **mientras** se lee.
+   *
+   * Es la única forma de provocar la carrera que de verdad ocurre: la pantalla de cuenta reemplaza la
+   * hoja justo cuando un ciclo ya la estaba leyendo. Sin esto habría que doblar el doble.
+   */
+  beforeRead: (() => Promise<void>) | null = null;
 
-  async read(): Promise<RemoteSnapshot> {
+  async read(request: ReadRequest): Promise<RemoteSnapshot> {
     this.reads += 1;
+    this.requested.push(request);
+    await this.beforeRead?.();
     if (this.failWith) {
       throw this.failWith;
     }
     return this.snapshot;
+  }
+
+  async write(request: WriteRequest): Promise<WriteOutcome> {
+    this.written.push(request);
+    if (this.failWith) {
+      throw this.failWith;
+    }
+    return { applied: {}, requests: 1 };
+  }
+
+  /** Todas las escrituras de un tipo, aplanadas. Para asertar sin recorrer los lotes a mano. */
+  writesOf<Kind extends RemoteWrite['kind']>(kind: Kind): Extract<RemoteWrite, { kind: Kind }>[] {
+    return this.written
+      .flatMap((request) => request.writes)
+      .filter((write): write is Extract<RemoteWrite, { kind: Kind }> => write.kind === kind);
+  }
+}
+
+/** Las tablas de aquí, en memoria, con la misma semántica que las de verdad. */
+@Injectable()
+export class FakeLocalRepository extends LocalRepository {
+  readonly tables = new Map<string, TableRow[]>();
+  /** Cuántas transacciones se han abierto. Para asertar que se escribe en bloque y no fila a fila. */
+  writes = 0;
+
+  async all(table: string): Promise<TableRow[]> {
+    return [...(this.tables.get(table) ?? [])];
+  }
+
+  async putAll(table: string, rows: readonly TableRow[]): Promise<void> {
+    if (rows.length === 0) {
+      return;
+    }
+    this.writes += 1;
+    const current = new Map((this.tables.get(table) ?? []).map((row) => [row.id, row]));
+    for (const row of rows) {
+      current.set(row.id, row);
+    }
+    this.tables.set(table, [...current.values()]);
   }
 }
 
@@ -301,6 +306,12 @@ export class FakeSyncShadow extends SyncShadow {
 
   async put(row: ShadowRow): Promise<void> {
     this.rows.set(`${row.table}:${row.rowId}`, row);
+  }
+
+  async putAll(rows: readonly ShadowRow[]): Promise<void> {
+    for (const row of rows) {
+      await this.put(row);
+    }
   }
 
   async remove(table: string, rowId: string): Promise<void> {
@@ -326,64 +337,6 @@ export class FakeDeviceIdentity extends DeviceIdentity {
   async current(): Promise<string> {
     return this.deviceId;
   }
-}
-
-/** Origen falso: devuelve una fila por cada referencia pedida (o una fija cuando se pide todo). */
-@Injectable()
-export class FakeExportableData extends ExportableData {
-  readonly queries: ExportQuery[] = [];
-  rows: ExportedRows | null = null;
-
-  async export(query: ExportQuery): Promise<ExportedRows> {
-    this.queries.push(query);
-    if (this.rows) {
-      return this.rows;
-    }
-    const refs = query.all ? [{ aggregate: 'recipe', id: 'todo' }] : query.refs;
-    return { data: refs.map((ref) => ({ id: ref.id, aggregate: ref.aggregate })) };
-  }
-}
-
-/**
- * Destino falso de lo que se trae de fuera. Por defecto acepta todo; `rejectIds` fuerza el caso
- * interesante: una fila que el origen no puede leer.
- */
-@Injectable()
-export class FakeImportableData extends ImportableData {
-  readonly changes: ImportChange[] = [];
-  /** Ids que se rechazan, para ejercitar la cuarentena. */
-  rejectIds: string[] = [];
-
-  async apply(change: ImportChange): Promise<ApplyOutcome> {
-    this.changes.push(change);
-
-    const refs: ExportRef[] = Object.entries(change.tables).flatMap(([table, rows]) =>
-      rows.map((row) => ({
-        aggregate: aggregateOf(table),
-        id: String((row as Record<string, unknown>)['id'] ?? ''),
-      })),
-    );
-
-    return {
-      applied: [...refs.filter((ref) => !this.rejectIds.includes(ref.id)), ...change.deleted],
-      rejected: refs
-        .filter((ref) => this.rejectIds.includes(ref.id))
-        .map((ref) => ({ ref, reason: 'la fila del test se rechaza a propósito' })),
-    };
-  }
-}
-
-/** Los nombres que usa el recetario, para que el doble hable como el de verdad. */
-function aggregateOf(table: string): string {
-  return (
-    {
-      supplies: 'supply',
-      recipes: 'recipe',
-      categories: 'category',
-      flavors: 'flavor',
-      capacities: 'capacity',
-    }[table] ?? table
-  );
 }
 
 /**
@@ -452,21 +405,19 @@ export function makeExternalSyncFakes(): { providers: Provider[] } {
       FakeSyncGateway,
       FakeSyncTargetRepository,
       FakeCredentialsProvider,
-      FakeExportableData,
       FakeDeviceIdentity,
-      FakeSyncReader,
+      FakeRemoteRepository,
+      FakeLocalRepository,
       FakeSyncShadow,
-      FakeImportableData,
       FakeSyncCoordinator,
-      { provide: ImportableData, useExisting: FakeImportableData },
       { provide: SyncCoordinator, useExisting: FakeSyncCoordinator },
       { provide: SyncOutbox, useExisting: FakeSyncOutbox },
       { provide: SyncGateway, useExisting: FakeSyncGateway },
-      { provide: SyncReader, useExisting: FakeSyncReader },
+      { provide: RemoteRepository, useExisting: FakeRemoteRepository },
+      { provide: LocalRepository, useExisting: FakeLocalRepository },
       { provide: SyncShadow, useExisting: FakeSyncShadow },
       { provide: SyncTargetRepository, useExisting: FakeSyncTargetRepository },
       { provide: CredentialsProvider, useExisting: FakeCredentialsProvider },
-      { provide: ExportableData, useExisting: FakeExportableData },
       { provide: DeviceIdentity, useExisting: FakeDeviceIdentity },
       { provide: SyncStatus, useClass: InMemorySyncStatus },
       { provide: EventBus, useClass: FakeEventBus },

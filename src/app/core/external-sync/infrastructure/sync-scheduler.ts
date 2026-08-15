@@ -1,7 +1,7 @@
 import { inject, Injectable } from '@angular/core';
 import { AppConfig } from '@core/_common/infrastructure/config/app-config';
 import { Logger } from '@core/_common/logger/logger';
-import { SynchronizeWithRemote } from '../application/use-cases/synchronize-with-remote.use-case';
+import { SynchronizeTables } from '../application/use-cases/synchronize-tables.use-case';
 import { SyncCoordinator } from '../domain/services/sync-coordinator';
 import { SyncStatus } from '../domain/services/sync-status';
 
@@ -63,7 +63,7 @@ const MAX_BACKOFF_MS = 5 * 60_000;
  */
 @Injectable({ providedIn: 'root' })
 export class SyncScheduler {
-  private readonly cycle = inject(SynchronizeWithRemote);
+  private readonly cycle = inject(SynchronizeTables);
   private readonly coordinator = inject(SyncCoordinator);
   private readonly status = inject(SyncStatus);
   private readonly log = inject(Logger).scoped('external-sync/scheduler');
@@ -168,13 +168,13 @@ export class SyncScheduler {
     this.running = true;
     this.lastRunAt = Date.now();
     try {
-      const result = await this.cycle.execute();
+      const result = await this.cycle.execute({});
 
       if (result.synced) {
         this.failures = 0;
         // Los datos locales han cambiado: hay que releerlos aquí y avisar a las demás pestañas. Si no,
         // el usuario editaría sobre lo viejo y su guardado ganaría con contenido antiguo.
-        if (result.applied > 0 || result.removed > 0) {
+        if (result.movements.applied > 0 || result.movements.removed > 0) {
           this.status.markDataChanged();
           this.coordinator.announce();
         }

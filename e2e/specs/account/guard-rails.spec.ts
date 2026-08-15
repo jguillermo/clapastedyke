@@ -26,7 +26,7 @@ test.describe('Cuenta · barreras de la sincronización', () => {
   }) => {
     await connectAccount();
     const sheet = google.sheet;
-    const insumos = sheet.tab('Insumos');
+    const insumos = sheet.tab('ingredients');
     const intact = insumos.snapshot();
 
     // ── Caso 1 · alguien borra ocho filas de Insumos ─────────────────────────────────────────────
@@ -39,7 +39,7 @@ test.describe('Cuenta · barreras de la sincronización', () => {
 
     await account.syncAll.click();
     await expect(
-      account.problems.filter({ hasText: 'Se borrarían demasiadas filas' }).first(),
+      account.problems.filter({ hasText: 'se borrarían 8 filas' }).first(),
     ).toBeVisible();
     await expect(account.statusLabel).toHaveText('Error');
 
@@ -60,11 +60,11 @@ test.describe('Cuenta · barreras de la sincronización', () => {
     await expect(account.statusLabel).toHaveText('Al día');
 
     // ── Caso 2 · alguien elimina la pestaña de Sabores ───────────────────────────────────────────
-    const sabores = sheet.removeTab('Sabores');
+    const sabores = sheet.removeTab('flavors');
 
     await account.syncAll.click();
     await expect(
-      account.problems.filter({ hasText: 'Falta la pestaña «Sabores»' }).first(),
+      account.problems.filter({ hasText: 'falta la pestaña «flavors»' }).first(),
     ).toBeVisible();
     await expect(account.statusLabel).toHaveText('Error');
     // Una pestaña que falta aborta el ciclo ENTERO, no solo su tabla: los insumos siguen en la hoja.
@@ -74,30 +74,31 @@ test.describe('Cuenta · barreras de la sincronización', () => {
     await account.syncAll.click();
     await expect(account.statusLabel).toHaveText('Al día');
 
-    // ── Caso 3 · alguien renombra una cabecera ───────────────────────────────────────────────────
-    // La cabecera es la prueba de que la columna N sigue siendo el campo N. Sin comprobarla, todo lo
-    // que viniera detrás de una columna insertada se leería corrido —el precio en la columna de la
-    // moneda— y, al quedar la fila coherente consigo misma, no se vería nunca.
-    insumos.setHeader('Nombre', 'Nombre del insumo');
+    // ── Caso 3 · alguien renombra la cabecera de una columna ─────────────────────────────────────
+    /*
+     * Las columnas se leen **por nombre**, así que moverlas de sitio ya no rompe nada — esa barrera
+     * desapareció con el motor nuevo, y es una mejora. Lo que sigue siendo destructivo es **renombrar**
+     * una: sus celdas dejan de tener el nombre que tenían, no vuelven, y la fila parecería editada a
+     * mano con ese campo en blanco. El campo se borraría en todos los dispositivos a la vez.
+     *
+     * Se reconoce porque la base recuerda los valores de la última fila remota conocida, así que se ve
+     * qué columnas había.
+     */
+    insumos.setHeader('name', 'nombre_del_insumo');
 
     await account.syncAll.click();
-    const misplaced = account.problems.filter({ hasText: 'Las columnas de «Insumos»' });
+    const misplaced = account.problems.filter({ hasText: 'ha perdido la columna «name»' });
     await expect(misplaced.first()).toBeVisible();
     await expect(account.statusLabel).toHaveText('Error');
     expect(insumos.dataRowCount).toBe(SUPPLY_COUNT);
 
-    /*
-     * La cabecera **se queda como la dejó el usuario**, y eso es la barrera funcionando.
-     *
-     * El paso que pone al día la forma de la hoja también escribe la fila de cabecera, y corre después de
-     * decidir justamente por esto: si la reparara antes, una columna *insertada* quedaría tapada — este
-     * ciclo abortaría, pero el siguiente vería cabeceras que cuadran sobre datos corridos un sitio y ya no
-     * se quejaría nunca. La barrera duraría un ciclo y el daño sería permanente.
-     */
-    expect(insumos.headers).toContain('Nombre del insumo');
+    // La cabecera **se queda como la dejó el usuario**: la barrera se niega a seguir, no repara. Si la
+    // reparase sola, el ciclo siguiente encontraría todo en orden y nadie se enteraría de que alguien
+    // estuvo a punto de perder una columna entera.
+    expect(insumos.headers).toContain('nombre_del_insumo');
 
     // Y como no se arregla solo, el ciclo se sigue negando hasta que alguien lo arregla de verdad.
-    insumos.setHeader('Nombre del insumo', 'Nombre');
+    insumos.setHeader('nombre_del_insumo', 'name');
     await account.syncAll.click();
     await expect(account.statusLabel).toHaveText('Al día');
     expect(insumos.dataRowCount).toBe(SUPPLY_COUNT);

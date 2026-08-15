@@ -3,35 +3,20 @@ import { Logger } from '@core/_common/logger/logger';
 import { SyncGateway } from '../domain/services/sync.gateway';
 import {
   CredentialRequest,
-  MarkDeletedRequest,
-  MigrateRequest,
   ProbeOutcome,
   ProbeRequest,
-  PurgeRequest,
-  StampedRow,
-  StampRequest,
   SyncError,
-  SyncOutcome,
-  SyncRequest,
   TargetRequest,
 } from '../domain/services/sync.gateway.types';
 import { SyncTarget } from '../domain/value-objects/sync-target';
 import { googleFetch } from './google-api';
-import { schemaMigrationFor } from './schema-migration';
-import { FLAG_TRUE } from './sheet-canonical';
-import { mergeByKey, replaceByParent, toRow } from './sheet-merge';
 import {
-  ALL_TABS,
-  columnLetter,
   INITIAL_ROWS,
   META_TAB,
   PROBE_KEY,
   PROBE_ROW,
   rangeOf,
-  SCHEMA_VERSION,
-  SHEET_TABLES,
   SPREADSHEET_NAME,
-  SheetTable,
 } from './sheet-schema';
 
 const SHEETS_API = 'https://sheets.googleapis.com/v4/spreadsheets';
@@ -70,14 +55,6 @@ interface ValueRange {
   values?: string[][];
 }
 
-/** Lo que hace falta saber de una pestaña antes de escribirla. */
-interface TabState {
-  table: SheetTable;
-  sheetId: number | null;
-  rowCount: number;
-  existing: string[][];
-}
-
 /**
  * Escribe la copia del usuario **directamente en su hoja de Google**, con las APIs de Sheets y
  * Drive y su propio token.
@@ -112,25 +89,36 @@ interface TabState {
 export class GoogleSheetsGateway extends SyncGateway {
   private readonly log = inject(Logger).scoped('external-sync/google-sheets');
 
-  /** Crea la hoja con todas sus pestañas, cabeceras y cabecera congelada, de una sola llamada. */
+  /**
+   * Crea la hoja del usuario con **solo la pestaña de servicio**.
+   *
+   * Las pestañas de datos no se crean aquí y no es un olvido: sus columnas se deducen de los datos, así
+   * que hasta el primer ciclo no se sabe cuáles son. Crearlas ahora obligaría a mantener en este
+   * fichero una lista de tablas y columnas —justo lo que este diseño quita— y dejaría al usuario una
+   * hoja llena de pestañas vacías con cabeceras que igual no coinciden con lo que se escriba después.
+   *
+   * Las crea la primera escritura, cada una con sus columnas reales.
+   */
   async create({ credential }: CredentialRequest): Promise<SyncTarget> {
     this.log.debug('creando la hoja del usuario ▶');
     const created = await googleFetch<SpreadsheetMetadata>(credential, 'POST', SHEETS_API, {
       properties: { title: SPREADSHEET_NAME },
-      sheets: ALL_TABS.map((tab, index) => ({
-        properties: {
-          title: tab.title,
-          index,
-          gridProperties: { rowCount: INITIAL_ROWS, frozenRowCount: 1 },
-        },
-        data: [
-          {
-            startRow: 0,
-            startColumn: 0,
-            rowData: [{ values: tab.headers.map((header) => cell(header)) }],
+      sheets: [
+        {
+          properties: {
+            title: META_TAB,
+            index: 0,
+            gridProperties: { rowCount: INITIAL_ROWS, frozenRowCount: 1 },
           },
-        ],
-      })),
+          data: [
+            {
+              startRow: 0,
+              startColumn: 0,
+              rowData: [{ values: [cell('Clave'), cell('Valor')] }],
+            },
+          ],
+        },
+      ],
     });
 
     this.log.debug('hoja creada', { targetId: created.spreadsheetId });
@@ -205,73 +193,6 @@ export class GoogleSheetsGateway extends SyncGateway {
     return alive;
   }
 
-  async send({ credential, target, batch }: SyncRequest): Promise<SyncOutcome> {
-    const payload = batch.payload() as Record<string, Record<string, unknown>[]>;
-    const pending = SHEET_TABLES.filter((table) => (payload[table.name] ?? []).length > 0);
-
-    // El límite exterior: qué sale y qué vuelve. NUNCA el contenido de las filas.
-    this.log.debug('escribiendo en la hoja ▶', {
-      requestId: batch.requestId,
-      filas: batch.total,
-      tablas: pending.map((table) => table.name),
-    });
-
-    if (pending.length === 0) {
-      return { applied: {} };
-    }
-
-    const tabs = await this.readTabs(credential, target, pending);
-
-    const writes: ValueRange[] = [];
-    const clears: string[] = [];
-    const applied: Record<string, number> = {};
-
-    for (const tab of tabs) {
-      const incoming = (payload[tab.table.name] ?? []).map((row) => toRow(tab.table, row));
-      const merged = tab.table.parentKey
-        ? replaceByParent(tab.table, tab.existing, incoming)
-        : mergeByKey(tab.table, tab.existing, incoming);
-
-      applied[tab.table.name] = incoming.length;
-
-      const width = columnLetter(tab.table.fields.length);
-      if (merged.length > 0) {
-        writes.push({
-          range: rangeOf(tab.table.title, `A2:${width}${merged.length + 1}`),
-          values: merged,
-        });
-      }
-      // Si la tabla se ha encogido, el sobrante de la anterior tiene que desaparecer: si no,
-      // quedarían filas huérfanas que el usuario leería como datos suyos.
-      if (tab.existing.length > merged.length) {
-        clears.push(
-          rangeOf(tab.table.title, `A${merged.length + 2}:${width}${tab.existing.length + 1}`),
-        );
-      }
-    }
-
-    writes.push({
-      range: rangeOf(META_TAB, 'A1:B4'),
-      values: [
-        ['Clave', 'Valor'],
-        ['schemaVersion', String(SCHEMA_VERSION)],
-        ['lastSyncAt', batch.syncedAt],
-        ['generadoPor', 'Clapastedyke · sincronización automática'],
-      ],
-    });
-
-    await this.grow(credential, target, tabs, writes);
-    await this.write(credential, target, writes);
-    if (clears.length > 0) {
-      await googleFetch(credential, 'POST', `${sheet(target)}/values:batchClear`, {
-        ranges: clears,
-      });
-    }
-
-    this.log.debug('escrito en la hoja ✔', { requestId: batch.requestId, aplicadas: applied });
-    return { applied };
-  }
-
   async probe({ credential, target, probe }: ProbeRequest): Promise<ProbeOutcome> {
     const range = rangeOf(META_TAB, `A${PROBE_ROW}:C${PROBE_ROW}`);
     this.log.debug('prueba de ida y vuelta ▶');
@@ -293,274 +214,17 @@ export class GoogleSheetsGateway extends SyncGateway {
     return { echo };
   }
 
-  /** Metadatos + contenido actual de las pestañas que se van a tocar, en dos llamadas. */
-  private async readTabs(
+  /** El único sitio que escribe en la hoja desde aquí: la prueba de ida y vuelta. */
+  private async write(
     credential: string,
     target: SyncTarget,
-    tables: readonly SheetTable[],
-  ): Promise<TabState[]> {
-    const metadata = await googleFetch<SpreadsheetMetadata>(
-      credential,
-      'GET',
-      `${sheet(target)}?fields=sheets(properties(sheetId,title,gridProperties/rowCount))`,
-    );
-    const known = new Map(
-      (metadata.sheets ?? []).map((entry) => [entry.properties.title, entry.properties]),
-    );
-
-    const present = tables.filter((table) => known.has(table.title));
-    const ranges = present.map((table) =>
-      rangeOf(table.title, `A2:${columnLetter(table.fields.length)}`),
-    );
-
-    const read =
-      ranges.length === 0
-        ? { valueRanges: [] as ValueRange[] }
-        : await googleFetch<{ valueRanges?: ValueRange[] }>(
-            credential,
-            'GET',
-            `${sheet(target)}/values:batchGet?majorDimension=ROWS&` +
-              ranges.map((range) => `ranges=${encodeURIComponent(range)}`).join('&'),
-          );
-
-    const byTitle = new Map(
-      present.map((table, index) => [table.title, read.valueRanges?.[index]?.values ?? []]),
-    );
-
-    return tables.map((table) => {
-      const properties = known.get(table.title);
-      return {
-        table,
-        sheetId: properties?.sheetId ?? null,
-        rowCount: properties?.gridProperties?.rowCount ?? 0,
-        // Una fila entera en blanco no es un dato: es el hueco que deja una tabla que se encogió.
-        existing: (byTitle.get(table.title) ?? []).filter((row) =>
-          row.some((value) => String(value).trim() !== ''),
-        ),
-      };
-    });
-  }
-
-  /**
-   * Una sola llamada estructural para las dos cosas que hay que hacer antes de escribir: crear las
-   * pestañas que falten (alguien pudo borrarlas, o la hoja es de una versión anterior del esquema) y
-   * ampliar la cuadrícula de las que se quedan cortas.
-   */
-  private async grow(
-    credential: string,
-    target: SyncTarget,
-    tabs: readonly TabState[],
-    writes: readonly ValueRange[],
+    data: readonly { range: string; values: string[][] }[],
   ): Promise<void> {
-    const requests: unknown[] = [];
-
-    for (const tab of tabs) {
-      if (tab.sheetId === null) {
-        requests.push({
-          addSheet: {
-            properties: {
-              title: tab.table.title,
-              gridProperties: { rowCount: INITIAL_ROWS, frozenRowCount: 1 },
-            },
-          },
-        });
-        continue;
-      }
-      const needed = rowsNeededFor(tab.table.title, writes);
-      if (needed > tab.rowCount) {
-        requests.push({
-          appendDimension: {
-            sheetId: tab.sheetId,
-            dimension: 'ROWS',
-            // Con holgura, para no repetir esta llamada en cada sincronización.
-            length: needed - tab.rowCount + 200,
-          },
-        });
-      }
-    }
-
-    if (requests.length === 0) {
-      return;
-    }
-
-    this.log.debug('ajustando la hoja antes de escribir', { operaciones: requests.length });
-    await googleFetch(credential, 'POST', `${sheet(target)}:batchUpdate`, { requests });
-
-    // Una pestaña recién creada nace vacía: hay que ponerle sus cabeceras.
-    const created = tabs.filter((tab) => tab.sheetId === null);
-    if (created.length > 0) {
-      await this.write(
-        credential,
-        target,
-        created.map((tab) => ({
-          range: rangeOf(tab.table.title, 'A1'),
-          values: [[...tab.table.headers]],
-        })),
-      );
-    }
-  }
-
-  /**
-   * Pone al día las cabeceras de la hoja. Nada más: los datos no se tocan.
-   *
-   * Adoptar las filas de una hoja antigua **no se hace aquí** — lo decide `reconcile` por la ausencia de
-   * huella, que es una señal mejor porque vale igual para una hoja de la v3 y para una fila que alguien
-   * añadió a mano ayer. Ver `schema-migration.ts`.
-   */
-  async migrate({ credential, target, snapshot }: MigrateRequest): Promise<void> {
-    const migration = schemaMigrationFor(snapshot);
-    if (migration.writes.length === 0) {
-      return;
-    }
-
-    this.log.debug('poniendo al día la forma de la hoja', {
-      desde: migration.from,
-      hasta: SCHEMA_VERSION,
-      pestañas: migration.writes.length,
-    });
-    await this.write(
-      credential,
-      target,
-      migration.writes.map((header) => ({ range: header.range, values: [[...header.headers]] })),
-    );
-  }
-
-  /**
-   * Escribe la marca de borrado y la versión **en las celdas de esas dos columnas**, sin tocar el resto
-   * de la fila. Dos rangos por fila, todos en una sola petición.
-   */
-  async markDeleted({ credential, target, rows }: MarkDeletedRequest): Promise<void> {
-    if (rows.length === 0) {
-      return;
-    }
-
-    this.log.debug('marcando filas como borradas en la hoja', { filas: rows.length });
-    await this.write(
-      credential,
-      target,
-      cellsOf(
-        rows.map((row) => ({
-          table: row.table,
-          index: row.index,
-          cells: { version: row.version, borrado: FLAG_TRUE },
-        })),
-      ),
-    );
-  }
-
-  /**
-   * Escribe las celdas que se le pidan de filas que ya existen. Un rango por celda, todos en una
-   * petición.
-   */
-  async stamp({ credential, target, rows }: StampRequest): Promise<void> {
-    if (rows.length === 0) {
-      return;
-    }
-
-    this.log.debug('escribiendo celdas de servicio en la hoja', {
-      filas: rows.length,
-      // Los nombres de columna sí, el contenido no: en `id` va un dato que no es secreto pero tampoco
-      // hace falta, y en el resto no hay nada que leer.
-      columnas: [...new Set(rows.flatMap((row) => Object.keys(row.cells)))],
-    });
-    await this.write(credential, target, cellsOf(rows));
-  }
-
-  /**
-   * Quita filas de la hoja con `deleteDimension`, **de abajo arriba**.
-   *
-   * El orden es obligatorio, no una optimización: borrar una fila desplaza hacia arriba todas las de
-   * debajo, así que hacerlo de arriba abajo dejaría todos los índices siguientes apuntando una fila más
-   * abajo de lo que toca — y se borrarían filas ajenas.
-   */
-  async purge({ credential, target, rows }: PurgeRequest): Promise<void> {
-    if (rows.length === 0) {
-      return;
-    }
-
-    const metadata = await googleFetch<SpreadsheetMetadata>(
-      credential,
-      'GET',
-      `${sheet(target)}?fields=sheets(properties(sheetId,title))`,
-    );
-    const sheetIdOf = new Map(
-      (metadata.sheets ?? []).map((entry) => [entry.properties.title, entry.properties.sheetId]),
-    );
-
-    const requests = [...rows]
-      .sort((a, b) => b.index - a.index)
-      .flatMap((row) => {
-        const title = SHEET_TABLES.find((candidate) => candidate.name === row.table)?.title;
-        const sheetId = title === undefined ? undefined : sheetIdOf.get(title);
-        if (sheetId === undefined) {
-          return [];
-        }
-        return [
-          {
-            deleteDimension: {
-              range: {
-                sheetId,
-                dimension: 'ROWS',
-                // La API cuenta desde 0 y las filas de la hoja desde 1.
-                startIndex: row.index - 1,
-                endIndex: row.index,
-              },
-            },
-          },
-        ];
-      });
-
-    if (requests.length === 0) {
-      return;
-    }
-    this.log.debug('tirando lápidas viejas de la hoja', { filas: requests.length });
-    await googleFetch(credential, 'POST', `${sheet(target)}:batchUpdate`, { requests });
-  }
-
-  private write(
-    credential: string,
-    target: SyncTarget,
-    data: readonly ValueRange[],
-  ): Promise<void> {
-    if (data.length === 0) {
-      return Promise.resolve();
-    }
-    return googleFetch(credential, 'POST', `${sheet(target)}/values:batchUpdate`, {
+    await googleFetch(credential, 'POST', `${sheet(target)}/values:batchUpdate`, {
       valueInputOption: RAW,
       data,
-    }).then(() => undefined);
+    });
   }
-}
-
-/** `'Insumos'!J7` — una celda sola, por su columna (desde 0) y su fila (desde 1). */
-function cellRange(title: string, column: number, row: number): string {
-  return rangeOf(title, `${columnLetter(column + 1)}${row}`);
-}
-
-/**
- * Traduce «esta celda de esta fila» a rangos de la hoja, resolviendo cada nombre de campo a su columna.
- *
- * Una columna que el esquema del destino todavía no tiene se **omite en silencio**: `migrate()` las pone
- * antes de llegar aquí, así que solo pasaría con un esquema a medias, y ahí escribir en la columna
- * equivocada sería mucho peor que no escribir.
- */
-function cellsOf(rows: readonly StampedRow[]): ValueRange[] {
-  const data: ValueRange[] = [];
-
-  for (const row of rows) {
-    const table = SHEET_TABLES.find((candidate) => candidate.name === row.table);
-    if (!table) {
-      continue;
-    }
-    for (const [field, value] of Object.entries(row.cells)) {
-      const column = table.fields.indexOf(field);
-      if (column < 0) {
-        continue;
-      }
-      data.push({ range: cellRange(table.title, column, row.index), values: [[value]] });
-    }
-  }
-  return data;
 }
 
 function sheet(target: SyncTarget): string {
@@ -574,14 +238,6 @@ function sheetUrlOf(id: string): string {
 
 function cell(value: string): { userEnteredValue: { stringValue: string } } {
   return { userEnteredValue: { stringValue: value } };
-}
-
-/** La última fila que va a ocupar una pestaña, según lo que se va a escribir en ella. */
-function rowsNeededFor(title: string, writes: readonly ValueRange[]): number {
-  const prefix = rangeOf(title, '');
-  return writes
-    .filter((write) => (write.range ?? '').startsWith(prefix))
-    .reduce((max, write) => Math.max(max, (write.values?.length ?? 0) + 1), 0);
 }
 
 /** Se re-exporta para que el resto del contexto no importe el transporte por su cuenta. */

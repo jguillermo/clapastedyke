@@ -1,6 +1,9 @@
 import { TestBed } from '@angular/core/testing';
 import { BootSync } from '../../../application/use-cases/boot-sync.use-case';
-import { SynchronizeWithRemote } from '../../../application/use-cases/synchronize-with-remote.use-case';
+import {
+  SynchronizeResult,
+  SynchronizeTables,
+} from '../../../application/use-cases/synchronize-tables.use-case';
 import { FakeCredentialsProvider, makeExternalSyncFakes } from '../../external-sync-test-doubles';
 
 /**
@@ -13,14 +16,14 @@ import { FakeCredentialsProvider, makeExternalSyncFakes } from '../../external-s
 describe('BootSync', () => {
   let boot: BootSync;
   let credentials: FakeCredentialsProvider;
-  let cycle: SynchronizeWithRemote;
+  let cycle: SynchronizeTables;
 
   beforeEach(() => {
     vi.useFakeTimers();
     TestBed.configureTestingModule({ providers: makeExternalSyncFakes().providers });
     boot = TestBed.inject(BootSync);
     credentials = TestBed.inject(FakeCredentialsProvider);
-    cycle = TestBed.inject(SynchronizeWithRemote);
+    cycle = TestBed.inject(SynchronizeTables);
   });
 
   afterEach(() => {
@@ -28,7 +31,7 @@ describe('BootSync', () => {
     vi.restoreAllMocks();
   });
 
-  const ok = { synced: true, applied: 0, pushed: 0, removed: 0, rejected: 0 };
+  const ok = ciclo(true);
 
   it('sin cuenta no espera nada: la app es local-first', async () => {
     credentials.credentials = null;
@@ -87,3 +90,13 @@ describe('BootSync', () => {
     await expect(boot.execute()).resolves.toEqual({ synced: false, reason: 'failed' });
   });
 });
+
+/** Un resultado de ciclo sin movimientos: aquí solo importa si salió bien y cuánto tardó. */
+function ciclo(synced: boolean): SynchronizeResult {
+  return {
+    synced,
+    movements: { pushed: 0, applied: 0, removed: 0, merged: 0 },
+    problems: { duplicates: 0, unreadable: 0, ignored: 0, barrier: null },
+    byTable: {},
+  };
+}

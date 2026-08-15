@@ -64,9 +64,9 @@ test.describe('Aviso de sincronización', () => {
     // Se espera por la fila: el ciclo que estaba retenido leyó lo local ANTES del alta, así que puede
     // ser el siguiente el que la suba (el planificador repite al acabar si algo disparó mientras corría).
     // La cola se vacía con el primero, así que el aviso puede irse un instante antes que la fila llegue.
-    const insumos = google.sheet.tab('Insumos');
+    const insumos = google.sheet.tab('ingredients');
     await expect
-      .poll(() => insumos.rowOf('Nombre', 'Tocino E2E'), { timeout: 20_000 })
+      .poll(() => insumos.rowOf('name', 'Tocino E2E'), { timeout: 20_000 })
       .toBeGreaterThan(1);
     expect(insumos.dataRowCount).toBe(SUPPLY_COUNT + 1);
   });

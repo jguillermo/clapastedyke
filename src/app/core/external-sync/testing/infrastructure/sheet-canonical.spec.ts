@@ -1,15 +1,9 @@
 import {
-  authoritativeFields,
   canonicalCode,
   canonicalFlag,
   canonicalNumber,
-  canonicalRow,
   canonicalText,
-  FIELD_KINDS,
-  TECHNICAL_FIELDS,
 } from '../../infrastructure/sheet-canonical';
-import { SHEET_TABLES } from '../../infrastructure/sheet-schema';
-
 /**
  * El canonizador es el cimiento del motor de sincronización, y su fallo es invisible: si la ida y la
  * vuelta no dan la misma cadena, cada fila parece editada a mano en cada ciclo y dos dispositivos se
@@ -125,94 +119,5 @@ describe('canonicalFlag', () => {
     ['booleano', false],
   ])('cuenta como «no» si viene %s', (_caso, value) => {
     expect(canonicalFlag(value)).toBe('');
-  });
-});
-
-describe('coherencia con el esquema de la hoja', () => {
-  it('cada columna del esquema está clasificada, o es de servicio', () => {
-    // Si alguien añade un campo a SHEET_TABLES y olvida clasificarlo aquí, falla el test en vez de
-    // fallar la huella en la hoja de un usuario semanas después. Las de servicio no se clasifican por
-    // tabla: se excluyen en un solo sitio, porque son las mismas en todas.
-    const sinClasificar = SHEET_TABLES.flatMap((table) =>
-      table.fields
-        .filter(
-          (field) => !TECHNICAL_FIELDS.has(field) && FIELD_KINDS[table.name]?.[field] === undefined,
-        )
-        .map((field) => `${table.name}.${field}`),
-    );
-
-    expect(sinClasificar).toEqual([]);
-  });
-
-  it('ninguna columna de servicio entra en la huella', () => {
-    for (const table of SHEET_TABLES) {
-      const fields = authoritativeFields(table.name, table.fields);
-      expect(fields.filter((field) => TECHNICAL_FIELDS.has(field))).toEqual([]);
-    }
-  });
-
-  it('no hay columnas clasificadas que el esquema ya no tenga', () => {
-    const fantasmas = Object.entries(FIELD_KINDS).flatMap(([name, kinds]) => {
-      const table = SHEET_TABLES.find((candidate) => candidate.name === name);
-      return Object.keys(kinds)
-        .filter((field) => !table?.fields.includes(field))
-        .map((field) => `${name}.${field}`);
-    });
-
-    expect(fantasmas).toEqual([]);
-  });
-
-  it('la clave de cada tabla es una columna autoritativa', () => {
-    // Si la clave fuera derivada o metadato, la identidad de la fila quedaría fuera de la huella.
-    for (const table of SHEET_TABLES) {
-      const key = table.key ?? table.parentKey;
-      if (key) {
-        expect(authoritativeFields(table.name, table.fields)).toContain(key);
-      }
-    }
-  });
-
-  it('las columnas que la app recalcula quedan fuera de lo autoritativo', () => {
-    const recipes = SHEET_TABLES.find((table) => table.name === 'recipes');
-    const fields = authoritativeFields('recipes', recipes?.fields ?? []);
-
-    expect(fields).toContain('categoryId');
-    expect(fields).not.toContain('categoryName');
-    expect(fields).not.toContain('lineCount');
-    expect(fields).not.toContain('syncedAt');
-  });
-});
-
-describe('canonicalRow', () => {
-  const fields = ['id', 'name', 'baseUnit', 'priceAmount', 'currency', 'syncedAt'];
-
-  it('devuelve solo lo autoritativo, en el orden del esquema', () => {
-    const row: Record<string, unknown> = {
-      id: 'ING-1',
-      name: '  Harina  ',
-      baseUnit: 'G',
-      priceAmount: 2.5,
-      currency: 'PEN',
-      syncedAt: '2026-08-04T00:00:00.000Z',
-    };
-
-    const result = canonicalRow('supplies', fields, (field) => row[field]);
-
-    expect(result).toEqual({ values: ['ing-1', 'Harina', 'g', '2.5', 'pen'] });
-  });
-
-  it('señala la celda culpable en vez de lanzar', () => {
-    const result = canonicalRow('supplies', fields, (field) =>
-      field === 'priceAmount' ? 'gratis' : 'x',
-    );
-
-    expect(result).toEqual({ unreadable: { field: 'priceAmount', value: 'gratis' } });
-  });
-
-  it('una columna sin clasificar se trata como dato, no se ignora', () => {
-    // Prudencia: incluirla de más se nota (una falsa edición manual); ignorarla pierde datos.
-    const result = canonicalRow('supplies', ['inventada'], () => ' Hola ');
-
-    expect(result).toEqual({ values: ['Hola'] });
   });
 });

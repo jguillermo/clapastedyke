@@ -18,6 +18,7 @@ interface ShadowRecord {
   version?: string;
   deleted?: boolean;
   rejected?: string;
+  values?: Record<string, unknown>;
 }
 
 function keyOf(table: string, rowId: string): string {
@@ -53,16 +54,18 @@ export class IndexedDbSyncShadow extends SyncShadow {
   }
 
   async put(row: ShadowRow): Promise<void> {
-    const record: ShadowRecord = {
-      id: keyOf(row.table, row.rowId),
-      table: row.table,
-      rowId: row.rowId,
-      fingerprint: row.fingerprint,
-      version: row.version,
-      deleted: row.deleted,
-      ...(row.rejected === undefined ? {} : { rejected: row.rejected }),
-    };
-    await ask((await this.store('readwrite')).put(record));
+    await ask((await this.store('readwrite')).put(toRecord(row)));
+  }
+
+  async putAll(rows: readonly ShadowRow[]): Promise<void> {
+    if (rows.length === 0) {
+      return;
+    }
+    const store = await this.store('readwrite');
+    // Todas las peticiones sobre la MISMA transacción, esperadas juntas: un `await` por fila la
+    // dejaría morir entre una y otra (IndexedDB la cierra en cuanto se queda sin peticiones vivas).
+    await Promise.all(rows.map((row) => ask(store.put(toRecord(row)))));
+    this.log.debug('base actualizada en bloque', { filas: rows.length });
   }
 
   async remove(table: string, rowId: string): Promise<void> {
@@ -99,5 +102,19 @@ function toRow(record: ShadowRecord): ShadowRow {
     version: record.version ?? '',
     deleted: record.deleted === true,
     ...(record.rejected === undefined ? {} : { rejected: record.rejected }),
+    ...(record.values === undefined ? {} : { values: record.values }),
+  };
+}
+
+function toRecord(row: ShadowRow): ShadowRecord {
+  return {
+    id: keyOf(row.table, row.rowId),
+    table: row.table,
+    rowId: row.rowId,
+    fingerprint: row.fingerprint,
+    version: row.version,
+    deleted: row.deleted,
+    ...(row.rejected === undefined ? {} : { rejected: row.rejected }),
+    ...(row.values === undefined ? {} : { values: row.values }),
   };
 }

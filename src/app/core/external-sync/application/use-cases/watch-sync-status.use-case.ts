@@ -13,6 +13,18 @@ export interface SyncStatusView {
   lastSyncedLabel: string;
   lastError: string | null;
   pending: number;
+  /**
+   * **¿Está todo sincronizado?**, en un solo valor.
+   *
+   * Vive aquí y no en cada vista porque antes se deducía por separado en dos sitios —el aviso flotante
+   * y la pantalla de cuenta— con dos reglas escritas a mano que podían dejar de coincidir. Una de las
+   * dos habría acabado diciendo «al día» mientras la otra decía que faltaban cosas.
+   *
+   * Son las dos condiciones a la vez: el ciclo no está trabajando ni ha fallado, **y** no queda nada
+   * en la cola. Sin la segunda, un cambio local recién hecho contaría como sincronizado hasta que el
+   * ciclo siguiente lo mirara.
+   */
+  upToDate: boolean;
 }
 
 const LABELS: Readonly<Record<SyncPhase, string>> = {
@@ -43,6 +55,7 @@ export class WatchSyncStatus extends UseCase<void, SyncStatusView> {
       lastSyncedLabel: formatMoment(snapshot.lastSyncedAt),
       lastError: snapshot.lastError,
       pending: this.outbox.pending(),
+      upToDate: snapshot.phase === 'idle' && this.outbox.pending() === 0,
     };
   });
 

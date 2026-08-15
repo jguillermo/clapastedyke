@@ -1,12 +1,13 @@
 import { TestBed } from '@angular/core/testing';
-import { SynchronizeWithRemote } from '../../application/use-cases/synchronize-with-remote.use-case';
+import {
+  SynchronizeResult,
+  SynchronizeTables,
+} from '../../application/use-cases/synchronize-tables.use-case';
 import { SyncStatus } from '../../domain/services/sync-status';
 import { SyncTarget } from '../../domain/value-objects/sync-target';
 import { SyncScheduler } from '../../infrastructure/sync-scheduler';
-import { SHEET_TABLES } from '../../infrastructure/sheet-schema';
 import {
   FakeSyncCoordinator,
-  FakeSyncReader,
   FakeSyncTargetRepository,
   makeExternalSyncFakes,
 } from '../external-sync-test-doubles';
@@ -34,10 +35,10 @@ describe('SyncScheduler', () => {
 
     // El ciclo se dobla contando llamadas: aquí no se prueba lo que hace, sino cuándo se llama.
     cycles = 0;
-    const cycle = TestBed.inject(SynchronizeWithRemote);
+    const cycle = TestBed.inject(SynchronizeTables);
     vi.spyOn(cycle, 'execute').mockImplementation(async () => {
       cycles += 1;
-      return { synced: true, applied: 0, pushed: 0, removed: 0, rejected: 0 };
+      return quieto(true);
     });
 
     // Un destino y una lectura válidos, para que nada se pare antes de tiempo.
@@ -45,15 +46,6 @@ describe('SyncScheduler', () => {
       'cuenta-1',
       SyncTarget.of('hoja-1', 'https://example.test/hoja-1'),
     );
-    TestBed.inject(FakeSyncReader).snapshot = {
-      schemaVersion: 4,
-      tables: SHEET_TABLES.map((table) => ({
-        name: table.name,
-        present: true,
-        headers: [...table.headers],
-        rows: [],
-      })),
-    };
 
     scheduler = TestBed.inject(SyncScheduler);
   });
@@ -156,10 +148,10 @@ describe('SyncScheduler', () => {
   });
 
   it('un fallo espera cada vez más, en vez de reintentar sin parar', async () => {
-    const cycle = TestBed.inject(SynchronizeWithRemote);
+    const cycle = TestBed.inject(SynchronizeTables);
     vi.spyOn(cycle, 'execute').mockImplementation(async () => {
       cycles += 1;
-      return { synced: false, applied: 0, pushed: 0, removed: 0, rejected: 0, reason: 'failed' };
+      return { ...quieto(false), reason: 'failed' as const };
     });
 
     scheduler.start();
@@ -191,13 +183,10 @@ describe('SyncScheduler', () => {
     });
 
     it('un ciclo que aplicó algo avisa a las demás y sube la revisión aquí', async () => {
-      const cycle = TestBed.inject(SynchronizeWithRemote);
+      const cycle = TestBed.inject(SynchronizeTables);
       vi.spyOn(cycle, 'execute').mockResolvedValue({
-        synced: true,
-        applied: 3,
-        pushed: 0,
-        removed: 0,
-        rejected: 0,
+        ...quieto(true),
+        movements: { pushed: 0, applied: 3, removed: 0, merged: 0 },
       });
 
       scheduler.start();
@@ -217,3 +206,18 @@ describe('SyncScheduler', () => {
     });
   });
 });
+
+/**
+ * Un resultado de ciclo sin movimientos.
+ *
+ * Aquí no se prueba lo que hace el ciclo, sino **cuándo** se llama, así que el resultado solo tiene
+ * que ser del tipo correcto y decir si salió bien.
+ */
+function quieto(synced: boolean): SynchronizeResult {
+  return {
+    synced,
+    movements: { pushed: 0, applied: 0, removed: 0, merged: 0 },
+    problems: { duplicates: 0, unreadable: 0, ignored: 0, barrier: null },
+    byTable: {},
+  };
+}

@@ -323,18 +323,28 @@ El motor no sabe nada de "cómo se ve" un destino — eso es enteramente trabajo
    edición humana sin pasar por una API— se resuelve **antes o después** de llamar al motor, nunca
    dentro de él.
 
-## Trabajo pendiente
+## Dónde está el adaptador
 
-Este motor **todavía no está conectado**: nadie fuera de esta carpeta lo importa. Faltan dos cosas, y
-las dos están fuera de él a propósito:
+Este motor **no sabe qué es una hoja de cálculo**, y hoy su único destino lo es. Todo lo que sabe que
+lo es vive en `infrastructure/sheets/`, y todo lo que decide vive aquí:
 
-1. **El adaptador de Google Sheets.** Hoy el único destino es Google Sheets, y su adaptador vive
-   integrado en `infrastructure/reconcile.ts` — el motor anterior a este, con toda la lógica de
-   posición de columnas y edición humana de una grilla mezclada con la decisión. Moverlo a un
-   adaptador que traduzca la hoja a `Registro[]` y delegue aquí es lo que queda. Necesita además dos
-   piezas que hoy no existen: fechas en formato de reloj lógico (las de `recipe-book` son ISO) y un
-   sitio donde guardar `sync.syncedValues` (el `SyncShadow` actual solo guarda la huella, que no
-   sirve de ancestro para fusionar).
-2. **Un solo reloj.** `domain/value-objects/row-version.ts` (`RowVersion`/`RowClock`, el que usa
-   producción) y `hybrid-clock.ts` (`LogicalVersion`/`HybridClock`, el de aquí) son dos
-   implementaciones casi idénticas del mismo HLC. Cuando el adaptador exista, sobra una.
+| Qué | Dónde |
+|---|---|
+| Fila de la base de datos ⇄ celdas (rutas con punto, listas en JSON) | `sheets/row-shape.ts` |
+| Qué columnas tiene una pestaña y de qué clase es cada una | `sheets/table-columns.ts` |
+| Lo que hace una persona en la hoja: editar, borrar, teclear sin id, cambiar un id | `sheets/remote-registros.ts` |
+| Del plan de este motor a escrituras concretas | `sheets/plan-to-writes.ts` |
+| Todas las escrituras de un ciclo, en una petición | `sheets/sheet-write-batch.ts` |
+
+El **único** consumidor de `reconcile(...)` es
+`application/use-cases/synchronize-tables.use-case.ts`, que además decide en un array qué tablas se
+replican. Si alguna vez hay un segundo destino, lo que cambia es el adaptador y una línea de
+`external-sync.providers.ts`; este motor no se toca.
+
+El ancestro (`sync.syncedValues`) lo mantiene el shadow (`domain/services/sync-shadow.ts`), que guarda
+los valores de la última fila remota conocida — y no solo su huella — precisamente para poder
+alimentarlo.
+
+Queda una duplicación conocida: `domain/value-objects/row-version.ts` desapareció, pero conviene
+revisar que nadie reintroduzca un segundo reloj lógico. El de este motor (`hybrid-clock.ts`) es el
+único que debe existir.
