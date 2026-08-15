@@ -1,4 +1,4 @@
-import { reconcile } from './reconcile';
+import { nextSyncedValues, reconcile } from './reconcile';
 import { Registro } from './engine.types';
 
 /**
@@ -18,11 +18,13 @@ import { Registro } from './engine.types';
  * necesita una tercera colección aparte que alguien mantenga sincronizada. Lo que SÍ puede llevar
  * cada registro de `data` es su propio ancestro embebido (`sync.syncedValues`): los campos de
  * negocio que ese registro sabía que coincidían con el destino la última vez que convergieron. Es
- * opcional — sin él, el motor cae en "gana un lado entero por versión"; con él, y sin solapamiento
- * de campos, el motor fusiona en vez de descartar un lado completo (ver el describe "fusión de
- * campos no solapados" más abajo). Siempre es UNA sola colección: `base`/`data` son arrays de
- * `Registro` — los campos de negocio **aplanados** al nivel superior del objeto, junto con sus
- * metadatos de sincronización en `sync` — no colecciones anidadas.
+ * **opcional** (se omite del todo cuando no hay ancestro, que es el caso normal y más frecuente:
+ * primera sincronización de un registro) — sin él, el motor cae en "gana un lado entero por
+ * versión"; con él, y sin solapamiento de campos, el motor fusiona en vez de descartar un lado
+ * completo (ver el describe "fusión de campos no solapados" más abajo). Siempre es UNA sola
+ * colección: `base`/`data` son arrays de `Registro` — los campos de negocio **aplanados** al nivel
+ * superior del objeto, junto con sus metadatos de sincronización en `sync` — no colecciones
+ * anidadas.
  *
  * `sync.id` no es el valor del identificador: es el NOMBRE del campo de negocio donde vive, y es
  * **obligatorio, sin default** — quien construye el registro tiene que decirlo explícitamente, o
@@ -140,7 +142,12 @@ describe('reconcile engine', () => {
           {
             id: '1',
             contenido: 'remoto',
-            sync: { id: 'id', keyfinder: 'fp', deleted: false, createdAt: 'no-es-una-version' },
+            sync: {
+              id: 'id',
+              keyfinder: 'fp',
+              deleted: false,
+              createdAt: 'no-es-una-version',
+            },
           },
         ],
         data: [],
@@ -221,7 +228,12 @@ describe('reconcile engine', () => {
           {
             id: '1',
             contenido: 'x',
-            sync: { id: 'id', keyfinder: 'fp', deleted: true, createdAt: 'no-es-una-version' },
+            sync: {
+              id: 'id',
+              keyfinder: 'fp',
+              deleted: true,
+              createdAt: 'no-es-una-version',
+            },
           },
         ],
         data: [
@@ -910,7 +922,7 @@ describe('reconcile engine', () => {
               deleted: false,
               createdAt: '0000000000100-0000-origina',
               updatedAt: '0000000003000-0000-origina',
-              // Sin syncedValues.
+              // Sin syncedValues: no hay ancestro con el que fusionar.
             },
           },
         ],
@@ -1011,6 +1023,687 @@ describe('reconcile engine', () => {
       expect(plan.push[0]?.b).toBe('nuevo-local');
       expect(plan.pull[0]?.a).toBe('remoto-a');
       expect(plan.pull[0]?.b).toBe('nuevo-local');
+    });
+
+    /**
+     * Caso: el escenario exacto que motivó el feature — el destino cambió DOS campos y local
+     * cambió un tercero, todos distintos entre sí. La fusión no se limita a "un campo por lado":
+     * atribuye cada clave divergente a quien la cambió, sin importar cuántas sean.
+     * Entrada: `syncedValues = { a: 'orig-a', b: 'orig-b', c: 'orig-c' }`; `base` cambió `a` y `b`;
+     * `data` cambió solo `c`.
+     * Salida: fusiona los tres campos; `mergedFrom.remote = ['a', 'b']`, `mergedFrom.local = ['c']`.
+     */
+    it('destino cambia DOS campos y local cambia uno: se fusionan los tres', () => {
+      const plan = reconcile({
+        base: [
+          {
+            id: '1',
+            a: 'remoto-a',
+            b: 'remoto-b',
+            c: 'orig-c',
+            sync: {
+              id: 'id',
+              keyfinder: 'fp-remoto',
+              deleted: false,
+              createdAt: '0000000000100-0000-origina',
+            },
+          },
+        ],
+        data: [
+          {
+            id: '1',
+            a: 'orig-a',
+            b: 'orig-b',
+            c: 'local-c',
+            sync: {
+              id: 'id',
+              keyfinder: 'fp-local',
+              deleted: false,
+              createdAt: '0000000000100-0000-origina',
+              syncedValues: { id: '1', a: 'orig-a', b: 'orig-b', c: 'orig-c' },
+            },
+          },
+        ],
+        now: 1_700_000_000_000,
+        originId: 'origina',
+      });
+
+      const merged = { id: '1', a: 'remoto-a', b: 'remoto-b', c: 'local-c' };
+      expect(plan.push[0]).toMatchObject(merged);
+      expect(plan.pull[0]).toMatchObject(merged);
+      expect(plan.conflicts).toEqual([
+        {
+          id: '1',
+          winner: 'merged',
+          blind: false,
+          mergedFrom: { remote: ['a', 'b'], local: ['c'] },
+        },
+      ]);
+    });
+
+    /**
+     * Caso simétrico al anterior: local cambia DOS campos y el destino cambia solo uno. La fusión
+     * no favorece a ningún lado por cuántos campos haya tocado.
+     * Entrada: `base` cambió solo `a`; `data` cambió `b` y `c`.
+     * Salida: fusiona los tres; `mergedFrom.remote = ['a']`, `mergedFrom.local = ['b', 'c']`.
+     */
+    it('local cambia DOS campos y destino cambia uno: se fusionan los tres', () => {
+      const plan = reconcile({
+        base: [
+          {
+            id: '1',
+            a: 'remoto-a',
+            b: 'orig-b',
+            c: 'orig-c',
+            sync: {
+              id: 'id',
+              keyfinder: 'fp-remoto',
+              deleted: false,
+              createdAt: '0000000000100-0000-origina',
+            },
+          },
+        ],
+        data: [
+          {
+            id: '1',
+            a: 'orig-a',
+            b: 'local-b',
+            c: 'local-c',
+            sync: {
+              id: 'id',
+              keyfinder: 'fp-local',
+              deleted: false,
+              createdAt: '0000000000100-0000-origina',
+              syncedValues: { id: '1', a: 'orig-a', b: 'orig-b', c: 'orig-c' },
+            },
+          },
+        ],
+        now: 1_700_000_000_000,
+        originId: 'origina',
+      });
+
+      const merged = { id: '1', a: 'remoto-a', b: 'local-b', c: 'local-c' };
+      expect(plan.push[0]).toMatchObject(merged);
+      expect(plan.pull[0]).toMatchObject(merged);
+      expect(plan.conflicts).toEqual([
+        {
+          id: '1',
+          winner: 'merged',
+          blind: false,
+          mergedFrom: { remote: ['a'], local: ['b', 'c'] },
+        },
+      ]);
+    });
+
+    /**
+     * Caso: la fusión no está pensada solo para strings — compara por igualdad estructural
+     * (`deepEqual`), así que campos numéricos y booleanos se atribuyen igual que cualquier otro.
+     * Entrada: `syncedValues = { precio: 10, activo: true }`; `base` cambió `precio` a `20`; `data`
+     * cambió `activo` a `false`.
+     * Salida: fusiona los dos campos con sus tipos originales intactos (no se convierten a texto).
+     */
+    it('campos numéricos y booleanos se fusionan igual que los de texto', () => {
+      const plan = reconcile<{ id: string; precio: number; activo: boolean }>({
+        base: [
+          {
+            id: '1',
+            precio: 20,
+            activo: true,
+            sync: {
+              id: 'id',
+              keyfinder: 'fp-remoto',
+              deleted: false,
+              createdAt: '0000000000100-0000-origina',
+            },
+          },
+        ],
+        data: [
+          {
+            id: '1',
+            precio: 10,
+            activo: false,
+            sync: {
+              id: 'id',
+              keyfinder: 'fp-local',
+              deleted: false,
+              createdAt: '0000000000100-0000-origina',
+              syncedValues: { id: '1', precio: 10, activo: true },
+            },
+          },
+        ],
+        now: 1_700_000_000_000,
+        originId: 'origina',
+      });
+
+      expect(plan.push[0]).toMatchObject({ precio: 20, activo: false });
+      expect(plan.conflicts).toEqual([
+        {
+          id: '1',
+          winner: 'merged',
+          blind: false,
+          mergedFrom: { remote: ['precio'], local: ['activo'] },
+        },
+      ]);
+    });
+
+    /**
+     * Caso: `deepEqual` compara arrays por valor, no por referencia — dos arrays con el mismo
+     * contenido cuentan como "sin cambio" aunque sean instancias distintas. Necesario para que un
+     * campo de negocio que sea una lista (p. ej. etiquetas) no parezca "cambiado" solo por ser un
+     * objeto nuevo en memoria.
+     * Entrada: `base` cambió `nombre` (con `tags` igual al ancestro, pero en un array NUEVO con el
+     * mismo contenido); `data` cambió `tags` a una lista distinta.
+     * Salida: fusiona; `nombre` viene de `base` y `tags` de `data`.
+     */
+    it('un campo de negocio que es un array se fusiona por valor, no por referencia', () => {
+      const plan = reconcile<{ id: string; nombre: string; tags: string[] }>({
+        base: [
+          {
+            id: '1',
+            nombre: 'remoto',
+            tags: ['a', 'b'], // mismo contenido que el ancestro, pero OTRA instancia de array
+            sync: {
+              id: 'id',
+              keyfinder: 'fp-remoto',
+              deleted: false,
+              createdAt: '0000000000100-0000-origina',
+            },
+          },
+        ],
+        data: [
+          {
+            id: '1',
+            nombre: 'orig',
+            tags: ['a', 'b', 'c'],
+            sync: {
+              id: 'id',
+              keyfinder: 'fp-local',
+              deleted: false,
+              createdAt: '0000000000100-0000-origina',
+              syncedValues: { id: '1', nombre: 'orig', tags: ['a', 'b'] },
+            },
+          },
+        ],
+        now: 1_700_000_000_000,
+        originId: 'origina',
+      });
+
+      expect(plan.push[0]).toMatchObject({ nombre: 'remoto', tags: ['a', 'b', 'c'] });
+      expect(plan.conflicts).toEqual([
+        {
+          id: '1',
+          winner: 'merged',
+          blind: false,
+          mergedFrom: { remote: ['nombre'], local: ['tags'] },
+        },
+      ]);
+    });
+
+    /**
+     * Caso: un campo que el ancestro tenía y que YA NO EXISTE en ninguno de los dos lados (se quitó
+     * del esquema, o del registro, en los dos sitios por igual). Los dos "cambiaron" respecto al
+     * ancestro (pasó de tener valor a estar ausente), pero al MISMO valor final (`undefined`), así
+     * que no es un solapamiento real y no bloquea la fusión del resto de campos.
+     * Entrada: `syncedValues = { a: 'orig-a', obsoleto: 'y' }`; ni `base` ni `data` traen
+     * `obsoleto`; `base` cambió `a`.
+     * Salida: fusiona con normalidad; `obsoleto` no aparece en `mergedFrom` de ningún lado.
+     */
+    it('un campo que desaparece de los dos lados por igual no bloquea la fusión del resto', () => {
+      const plan = reconcile<{ id: string; a: string; obsoleto?: string }>({
+        base: [
+          {
+            id: '1',
+            a: 'remoto-a',
+            sync: {
+              id: 'id',
+              keyfinder: 'fp-remoto',
+              deleted: false,
+              createdAt: '0000000000100-0000-origina',
+            },
+          },
+        ],
+        data: [
+          {
+            id: '1',
+            a: 'orig-a',
+            sync: {
+              id: 'id',
+              keyfinder: 'fp-local',
+              deleted: false,
+              createdAt: '0000000000100-0000-origina',
+              syncedValues: { id: '1', a: 'orig-a', obsoleto: 'y' },
+            },
+          },
+        ],
+        now: 1_700_000_000_000,
+        originId: 'origina',
+      });
+
+      expect(plan.conflicts).toEqual([
+        { id: '1', winner: 'merged', blind: false, mergedFrom: { remote: ['a'], local: [] } },
+      ]);
+      expect(plan.push[0]?.obsoleto).toBeUndefined();
+    });
+
+    /**
+     * Caso: las huellas no coinciden, pero al comparar campo a campo NINGUNO difiere realmente del
+     * ancestro — solo cambió el propio identificador de contenido (`keyfinder`), no ningún campo de
+     * negocio. Es una fusión "vacía": el motor no tiene por qué saberlo y sigue el mismo camino,
+     * produciendo un `push`/`pull` que solo re-estampa huella y versión.
+     * Entrada: `base` y `data` tienen el mismo contenido que el ancestro, pero huellas distintas
+     * entre sí.
+     * Salida: `winner: 'merged'` con `mergedFrom: { remote: [], local: [] }` — ningún campo se
+     * atribuye a nadie porque ninguno cambió.
+     */
+    it('huellas distintas sin ningún campo realmente cambiado: fusión vacía, sin mergedFrom', () => {
+      const plan = reconcile({
+        base: [
+          {
+            id: '1',
+            a: 'x',
+            b: 'y',
+            sync: {
+              id: 'id',
+              keyfinder: 'fp-remoto',
+              deleted: false,
+              createdAt: '0000000000100-0000-origina',
+            },
+          },
+        ],
+        data: [
+          {
+            id: '1',
+            a: 'x',
+            b: 'y',
+            sync: {
+              id: 'id',
+              keyfinder: 'fp-local',
+              deleted: false,
+              createdAt: '0000000000100-0000-origina',
+              syncedValues: { id: '1', a: 'x', b: 'y' },
+            },
+          },
+        ],
+        now: 1_700_000_000_000,
+        originId: 'origina',
+      });
+
+      expect(plan.conflicts).toEqual([
+        { id: '1', winner: 'merged', blind: false, mergedFrom: { remote: [], local: [] } },
+      ]);
+      expect(plan.push[0]).toMatchObject({ a: 'x', b: 'y' });
+    });
+
+    /**
+     * Caso: la fusión funciona igual con un `sync.id` que no sea `'id'` — el motor resuelve la
+     * identidad por el nombre de campo que diga `sync.id`, y eso no cambia nada de la lógica de
+     * atribución de campos.
+     * Entrada: identificador en `sku`; `base` cambió `a`, `data` cambió `b`.
+     * Salida: fusiona igual que con el campo `id` por defecto.
+     */
+    it('la fusión funciona con un sync.id distinto de "id" (p. ej. sku)', () => {
+      const plan = reconcile({
+        base: [
+          {
+            sku: '1',
+            a: 'remoto-a',
+            b: 'orig-b',
+            sync: {
+              id: 'sku',
+              keyfinder: 'fp-remoto',
+              deleted: false,
+              createdAt: '0000000000100-0000-origina',
+            },
+          },
+        ],
+        data: [
+          {
+            sku: '1',
+            a: 'orig-a',
+            b: 'local-b',
+            sync: {
+              id: 'sku',
+              keyfinder: 'fp-local',
+              deleted: false,
+              createdAt: '0000000000100-0000-origina',
+              syncedValues: { sku: '1', a: 'orig-a', b: 'orig-b' },
+            },
+          },
+        ],
+        now: 1_700_000_000_000,
+        originId: 'origina',
+      });
+
+      expect(plan.conflicts).toEqual([
+        { id: '1', winner: 'merged', blind: false, mergedFrom: { remote: ['a'], local: ['b'] } },
+      ]);
+      expect(plan.push[0]).toMatchObject({ sku: '1', a: 'remoto-a', b: 'local-b' });
+      expect(plan.pull[0]).toMatchObject({ sku: '1', a: 'remoto-a', b: 'local-b' });
+    });
+
+    /**
+     * Caso: el ciclo completo que documenta el README ("Lo que le toca al adaptador") — tras una
+     * fusión, el adaptador guarda los valores YA fusionados como el `syncedValues` del siguiente
+     * ciclo, usando exactamente `nextSyncedValues(applied)` (la función exportada para esto, ver
+     * "reconcile · nextSyncedValues" más abajo) sobre el registro que salió de `plan.push`. Este
+     * test hace ese paso de verdad, no lo simula a mano, para comprobar que con ese nuevo ancestro
+     * un segundo ciclo con divergencias distintas vuelve a fusionar sin arrastrar los cambios ya
+     * resueltos en el primero.
+     * Entrada ciclo 1: `base` cambia `a`, `data` cambia `b` → fusiona en `{ a: 'remoto-a', b: 'local-b' }`.
+     * Entrada ciclo 2 (con `nextSyncedValues` de ese resultado como ancestro): `base` cambia ahora
+     * `a` otra vez (a `'remoto-a-2'`), `data` cambia `c` (nuevo campo, ausente en el ciclo 1).
+     * Salida: el ciclo 2 fusiona `a` (de `base`) y `c` (de `data`), y conserva `b` del ciclo
+     * anterior sin tocarlo — la prueba de que el ancestro se actualiza ciclo a ciclo.
+     */
+    it('el ancestro del ciclo 2 es nextSyncedValues() del resultado fusionado del ciclo 1', () => {
+      const ciclo1 = reconcile<{ id: string; a: string; b: string }>({
+        base: [
+          {
+            id: '1',
+            a: 'remoto-a',
+            b: 'orig-b',
+            sync: {
+              id: 'id',
+              keyfinder: 'fp1',
+              deleted: false,
+              createdAt: '0000000000100-0000-origina',
+            },
+          },
+        ],
+        data: [
+          {
+            id: '1',
+            a: 'orig-a',
+            b: 'local-b',
+            sync: {
+              id: 'id',
+              keyfinder: 'fp2',
+              deleted: false,
+              createdAt: '0000000000100-0000-origina',
+              syncedValues: { id: '1', a: 'orig-a', b: 'orig-b' },
+            },
+          },
+        ],
+        now: 1_700_000_000_000,
+        originId: 'origina',
+      });
+      const fusionadoCiclo1 = ciclo1.push[0] as Registro<{ id: string; a: string; b: string }>;
+      expect(fusionadoCiclo1).toMatchObject({ a: 'remoto-a', b: 'local-b' });
+
+      // El paso real del adaptador: `nextSyncedValues` sobre el registro que se acaba de aplicar.
+      const nuevoAncestro = nextSyncedValues(fusionadoCiclo1);
+      expect(nuevoAncestro).toEqual({ id: '1', a: 'remoto-a', b: 'local-b' });
+
+      const ciclo2 = reconcile<{ id: string; a: string; b: string; c?: string }>({
+        base: [
+          {
+            id: '1',
+            a: 'remoto-a-2', // el destino volvió a cambiar 'a' tras el ciclo 1
+            b: 'local-b', // 'b' quedó como lo dejó el ciclo 1, nadie lo tocó
+            sync: {
+              id: 'id',
+              keyfinder: 'fp3',
+              deleted: false,
+              createdAt: '0000000000200-0000-origina',
+            },
+          },
+        ],
+        data: [
+          {
+            id: '1',
+            a: 'remoto-a', // aquí todavía no se ha visto el segundo cambio remoto
+            b: 'local-b',
+            c: 'nuevo-local', // local añadió un campo que no existía en el ciclo 1
+            sync: {
+              id: 'id',
+              keyfinder: 'fp4',
+              deleted: false,
+              createdAt: '0000000000200-0000-origina',
+              syncedValues: nuevoAncestro,
+            },
+          },
+        ],
+        now: 1_700_000_100_000,
+        originId: 'origina',
+      });
+
+      expect(ciclo2.conflicts).toEqual([
+        { id: '1', winner: 'merged', blind: false, mergedFrom: { remote: ['a'], local: ['c'] } },
+      ]);
+      expect(ciclo2.push[0]).toMatchObject({ a: 'remoto-a-2', b: 'local-b', c: 'nuevo-local' });
+    });
+  });
+
+  describe('nextSyncedValues · lo que un adaptador debe guardar como el ancestro del próximo ciclo', () => {
+    /**
+     * `nextSyncedValues` es la única pieza exportada del motor pensada para usarse DESPUÉS de
+     * aplicar un plan, no durante `reconcile()`. Estos tests no ejercitan `reconcile`: comprueban
+     * directamente el contrato de esta función, que es lo que hace comprobable —y no solo
+     * documentado en prosa— el paso "el adaptador guarda syncedValues tras escribir con éxito".
+     */
+
+    /**
+     * Caso: el uso normal — un registro que salió de `plan.push` (o `plan.pull`, da igual, tienen
+     * la misma forma) se convierte en el ancestro quitándole `sync`.
+     * Entrada: un `Registro` con campos de negocio y su `sync` completo.
+     * Salida: un objeto con SOLO los campos de negocio, sin `sync` en absoluto.
+     */
+    it('devuelve los campos de negocio de un registro aplicado, sin su sync', () => {
+      const aplicado: Registro<{ id: string; nombre: string; precio: number }> = {
+        id: '1',
+        nombre: 'Bizcocho',
+        precio: 25,
+        sync: {
+          id: 'id',
+          keyfinder: 'fp-nueva',
+          deleted: false,
+          createdAt: '0000000000100-0000-origina',
+          updatedAt: '1700000000000-0000-origina',
+        },
+      };
+
+      expect(nextSyncedValues(aplicado)).toEqual({ id: '1', nombre: 'Bizcocho', precio: 25 });
+    });
+
+    /**
+     * Caso: da igual si el registro aplicado viene de un `push`, un `pull` o una fusión — las tres
+     * formas comparten la misma forma de `Registro`, así que `nextSyncedValues` las trata igual.
+     * Entrada: reconcile() real que produce una fusión; se toma el registro de `plan.pull`.
+     * Salida: el ancestro resultante son los valores YA fusionados, listos para el próximo ciclo.
+     */
+    it('funciona igual sobre el resultado de una fusión real (push o pull)', () => {
+      const plan = reconcile({
+        base: [
+          {
+            id: '1',
+            a: 'remoto-a',
+            b: 'orig-b',
+            sync: {
+              id: 'id',
+              keyfinder: 'fp-remoto',
+              deleted: false,
+              createdAt: '0000000000100-0000-origina',
+            },
+          },
+        ],
+        data: [
+          {
+            id: '1',
+            a: 'orig-a',
+            b: 'local-b',
+            sync: {
+              id: 'id',
+              keyfinder: 'fp-local',
+              deleted: false,
+              createdAt: '0000000000100-0000-origina',
+              syncedValues: { id: '1', a: 'orig-a', b: 'orig-b' },
+            },
+          },
+        ],
+        now: 1_700_000_000_000,
+        originId: 'origina',
+      });
+
+      expect(nextSyncedValues(plan.pull[0]!)).toEqual({ id: '1', a: 'remoto-a', b: 'local-b' });
+    });
+
+    /**
+     * Caso: la huella vacía a propósito de una fusión (ver README) NO se filtra por accidente —
+     * `nextSyncedValues` solo quita `sync`, nunca inspecciona ni transforma los campos de negocio.
+     * Entrada: un registro fusionado real, con `sync.keyfinder === ''`.
+     * Salida: el ancestro no lleva ningún campo `keyfinder`, `deleted` ni ninguno de `sync` —
+     * ninguno de esos nombres se filtra desde `sync` hacia el resultado.
+     */
+    it('no incluye ningún campo de sync, ni siquiera con nombres que colisionen', () => {
+      const aplicado: Registro<{ id: string; a: string }> = {
+        id: '1',
+        a: 'x',
+        sync: {
+          id: 'id',
+          keyfinder: '',
+          deleted: false,
+          createdAt: '0000000000100-0000-origina',
+          updatedAt: '1700000000000-0000-origina',
+        },
+      };
+
+      const ancestro = nextSyncedValues(aplicado);
+      expect(Object.keys(ancestro)).toEqual(['id', 'a']);
+      expect(ancestro).not.toHaveProperty('keyfinder');
+      expect(ancestro).not.toHaveProperty('deleted');
+    });
+
+    /**
+     * Caso: no debe mutar ni el registro recibido ni su `sync` — un adaptador que siga usando el
+     * registro original después de llamar a esta función no puede llevarse una sorpresa.
+     */
+    it('no muta el registro que recibe', () => {
+      const aplicado: Registro<{ id: string; a: string }> = {
+        id: '1',
+        a: 'x',
+        sync: {
+          id: 'id',
+          keyfinder: 'fp',
+          deleted: false,
+          createdAt: '0000000000100-0000-origina',
+        },
+      };
+      const antes = JSON.parse(JSON.stringify(aplicado)) as unknown;
+
+      nextSyncedValues(aplicado);
+
+      expect(JSON.parse(JSON.stringify(aplicado)) as unknown).toEqual(antes);
+    });
+
+    /**
+     * Caso: un registro BORRADO (una lápida) que se sube o se trae pasa por `push`/`pull` como
+     * cualquiera otro — con su contenido de negocio intacto y `sync.deleted: true`.
+     * `nextSyncedValues` no distingue: no mira `deleted` en absoluto, solo quita `sync`.
+     *
+     * Que esto sea inofensivo —y no un descuido— depende de una regla ya probada en el describe
+     * "borrado local: compite por fecha, sin privilegio": un borrado (de cualquiera de los dos
+     * lados) NUNCA entra en la fusión, así que este ancestro queda inerte mientras el registro siga
+     * borrado en cualquiera de los dos lados. Solo importaría el día que el registro "reviva" y
+     * vuelva a competir por contenido — y para eso hace falta tenerlo guardado, igual que cualquier
+     * otro ancestro.
+     * Entrada: un registro con `sync.deleted: true`, tal como saldría de `plan.push`/`plan.pull`.
+     * Salida: `nextSyncedValues` devuelve sus campos de negocio igual que con cualquier registro
+     * activo — `deleted` no aparece en el resultado porque vive en `sync`, no en los campos de
+     * negocio.
+     */
+    it('funciona igual sobre un registro borrado (tombstone): el motor no lo excluye', () => {
+      const borrado: Registro<{ id: string; nombre: string }> = {
+        id: '1',
+        nombre: 'Bizcocho',
+        sync: {
+          id: 'id',
+          keyfinder: 'fp',
+          deleted: true,
+          createdAt: '0000000000100-0000-origina',
+          updatedAt: '1700000000000-0000-origina',
+        },
+      };
+
+      expect(nextSyncedValues(borrado)).toEqual({ id: '1', nombre: 'Bizcocho' });
+    });
+
+    /**
+     * Caso: el ancestro NO nace solo de una fusión — nace de CUALQUIER escritura con éxito,
+     * incluida la más simple de todas: un alta local que el destino nunca había visto (`base`
+     * vacío). Este test encadena dos ciclos completos para probarlo de punta a punta:
+     *
+     * - Ciclo 1: un alta simple, sin ningún ancestro (como el primer test del archivo). El
+     *   adaptador, tras el `push`, calcula `nextSyncedValues` sobre lo que se acaba de subir.
+     * - Ciclo 2: el destino YA tiene ese dato (llegó del ciclo 1) y alguien lo cambia allí; en
+     *   paralelo, aquí se cambia un campo distinto — usando como ancestro el que generó el ciclo 1.
+     *
+     * Entrada ciclo 1: `base` vacío; `data` = `{ a: 'x', b: 'y' }`, sin `syncedValues`.
+     * Entrada ciclo 2: `base` = `{ a: 'remoto-a2', b: 'y' }` (cambió `a`); `data` = `{ a: 'x', b:
+     * 'local-b' }` con `syncedValues` = lo que salió de `nextSyncedValues` del ciclo 1.
+     * Salida: el ciclo 2 FUSIONA `a` (de `base`) y `b` (de `data`) — algo que sin el ancestro del
+     * ciclo 1 habría sido, como mucho, un conflicto a ciegas por fecha.
+     */
+    it('el ancestro se crea tras CUALQUIER escritura exitosa, no solo tras una fusión', () => {
+      const ciclo1 = reconcile<{ id: string; a: string; b: string }>({
+        base: [],
+        data: [
+          {
+            id: '1',
+            a: 'x',
+            b: 'y',
+            sync: {
+              id: 'id',
+              keyfinder: 'fp',
+              deleted: false,
+              createdAt: '0000000000100-0000-origina',
+            },
+          },
+        ],
+        now: 1_700_000_000_000,
+        originId: 'origina',
+      });
+      expect(ciclo1.push).toHaveLength(1); // es un alta simple: NINGUNA fusión en este ciclo
+
+      // El paso del adaptador tras el alta: exactamente el mismo que tras una fusión.
+      const ancestroTrasElAlta = nextSyncedValues(ciclo1.push[0]!);
+      expect(ancestroTrasElAlta).toEqual({ id: '1', a: 'x', b: 'y' });
+
+      const ciclo2 = reconcile<{ id: string; a: string; b: string }>({
+        base: [
+          {
+            id: '1',
+            a: 'remoto-a2', // el destino recibió el alta y luego alguien cambió 'a' allí
+            b: 'y',
+            sync: {
+              id: 'id',
+              keyfinder: 'fp2',
+              deleted: false,
+              createdAt: '0000000000200-0000-origina',
+            },
+          },
+        ],
+        data: [
+          {
+            id: '1',
+            a: 'x',
+            b: 'local-b', // aquí, en paralelo, se cambió 'b'
+            sync: {
+              id: 'id',
+              keyfinder: 'fp3',
+              deleted: false,
+              createdAt: '0000000000200-0000-origina',
+              syncedValues: ancestroTrasElAlta, // ← el ancestro nacido de un alta, no de una fusión
+            },
+          },
+        ],
+        now: 1_700_000_100_000,
+        originId: 'origina',
+      });
+
+      expect(ciclo2.conflicts).toEqual([
+        { id: '1', winner: 'merged', blind: false, mergedFrom: { remote: ['a'], local: ['b'] } },
+      ]);
+      expect(ciclo2.push[0]).toMatchObject({ a: 'remoto-a2', b: 'local-b' });
     });
   });
 
@@ -1220,12 +1913,22 @@ describe('reconcile engine', () => {
           {
             id: '1',
             contenido: 'uno',
-            sync: { id: 'id', keyfinder: 'fp-uno', deleted: false, createdAt: 'no-es-una-version' },
+            sync: {
+              id: 'id',
+              keyfinder: 'fp-uno',
+              deleted: false,
+              createdAt: 'no-es-una-version',
+            },
           },
           {
             id: '1',
             contenido: 'dos',
-            sync: { id: 'id', keyfinder: 'fp-dos', deleted: false, createdAt: 'no-es-una-version' },
+            sync: {
+              id: 'id',
+              keyfinder: 'fp-dos',
+              deleted: false,
+              createdAt: 'no-es-una-version',
+            },
           },
         ],
         data: [
@@ -1257,12 +1960,22 @@ describe('reconcile engine', () => {
       const uno: Registro<{ id: string; contenido: string }> = {
         id: '1',
         contenido: 'x',
-        sync: { id: 'id', keyfinder: 'fp', deleted: false, createdAt: 'no-es-una-version' },
+        sync: {
+          id: 'id',
+          keyfinder: 'fp',
+          deleted: false,
+          createdAt: 'no-es-una-version',
+        },
       };
       const dos: Registro<{ id: string; contenido: string }> = {
         id: '1',
         contenido: 'y',
-        sync: { id: 'id', keyfinder: 'fp', deleted: false, createdAt: 'no-es-una-version' },
+        sync: {
+          id: 'id',
+          keyfinder: 'fp',
+          deleted: false,
+          createdAt: 'no-es-una-version',
+        },
       };
 
       const plan = reconcile({ base: [uno, dos], data: [], now: 1_700_000_000_000, originId: 'a' });
@@ -1664,6 +2377,54 @@ describe('reconcile engine', () => {
           },
         },
       ]);
+    });
+  });
+
+  describe('reconcile · sync.id es obligatorio (garantía de tipos); sync.syncedValues es opcional', () => {
+    /**
+     * `sync.id` no tiene forma de validarse en runtime sin coste: nada impide construir un objeto
+     * incompleto con un `as unknown as Registro<...>`, y el motor no va a recorrer cada registro
+     * comprobando que esté, porque eso es exactamente el trabajo que ya hace el compilador gratis.
+     * La garantía real es de TIPOS — `Sync.id` es una clave obligatoria (ver `engine.types.ts`),
+     * así que un literal que la omita no compila.
+     *
+     * `@ts-expect-error` es lo que lo convierte en un test de verdad y no solo en un comentario: si
+     * `sync.id` volviera a ser opcional, el error esperado dejaría de producirse, la directiva
+     * quedaría "no usada" y **`tsc` fallaría con `TS2578`** — exactamente lo que hace falta para
+     * que un futuro cambio que relaje esta regla se note en `npm run typecheck`, no en producción.
+     */
+    it('un registro sin `sync.id` no compila', () => {
+      const registro: Registro<{ id: string }> = {
+        id: '1',
+        // @ts-expect-error — sync.id es obligatorio, sin default; omitirlo es un error de tipos.
+        sync: { keyfinder: 'fp', deleted: false, createdAt: '0000000000100-0000-origina' },
+      };
+
+      expect(registro.sync.keyfinder).toBe('fp');
+    });
+
+    /**
+     * Caso: `sync.syncedValues`, a diferencia de `sync.id`, es opcional a propósito — su ausencia
+     * es el estado normal de la primera sincronización de un registro, no un descuido que haya que
+     * forzar a declarar (el porqué completo está en `engine.types.ts`). Omitirla del todo compila
+     * sin problema, y el motor la trata exactamente igual que si valiera `undefined`: sin ancestro
+     * con el que fusionar, cae en el criterio de siempre.
+     * Entrada: un alta local sin `sync.syncedValues` en absoluto.
+     * Salida: el registro compila y se sube con normalidad, como cualquier alta sin ancestro.
+     */
+    it('un registro sin `sync.syncedValues` compila y se trata como si no hubiera ancestro', () => {
+      const registro: Registro<{ id: string }> = {
+        id: '1',
+        sync: {
+          id: 'id',
+          keyfinder: 'fp',
+          deleted: false,
+          createdAt: '0000000000100-0000-origina',
+        },
+      };
+
+      const plan = reconcile({ base: [], data: [registro], now: 1_700_000_000_000, originId: 'x' });
+      expect(plan.push).toHaveLength(1);
     });
   });
 });

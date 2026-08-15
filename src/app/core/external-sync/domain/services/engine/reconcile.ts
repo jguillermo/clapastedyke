@@ -207,6 +207,32 @@ function omitSync<TValues extends object>(registro: Registro<TValues>): TValues 
 }
 
 /**
+ * Lo que un adaptador tiene que guardar como el nuevo `sync.syncedValues` del registro local,
+ * **justo después de escribir con éxito** cualquier entrada de `plan.push` o `plan.pull` (incluida
+ * una fusión) — nunca antes, y nunca para una escritura que falló.
+ *
+ * El motor no lo hace por sí solo (ver README → "Lo que le toca al adaptador"): no sabe si la
+ * escritura tuvo éxito, y guardarlo aquí encima congelaría un ancestro sobre un intento que pudo no
+ * haber llegado a persistir. Esta función existe para que un adaptador no tenga que reinventar "qué
+ * cuenta como ancestro" por su cuenta — es literalmente el registro aplicado, sin sus metadatos de
+ * `sync`, porque eso es justo lo que en ese instante ya coincide en los dos lados.
+ *
+ * ```ts
+ * const outcome = await gateway.send({ ... , batch: plan.push });
+ * if (outcome.ok) {
+ *   for (const applied of plan.push) {
+ *     await localStore.setSyncedValues(applied.id, nextSyncedValues(applied));
+ *   }
+ * }
+ * ```
+ */
+export function nextSyncedValues<TValues extends object>(
+  applied: Registro<TValues>,
+): Record<string, unknown> {
+  return omitSync(applied) as Record<string, unknown>;
+}
+
+/**
  * Intenta fusionar los campos de negocio de `base` y `data` usando `data.sync.syncedValues` como
  * ancestro común. Devuelve `null` — nunca lanza — cuando no se puede fusionar con seguridad: sin
  * ancestro, con contenido que no es un objeto plano, o con un solapamiento real (el mismo campo
@@ -276,6 +302,8 @@ function tryMerge<TValues extends object>(
         deleted: false,
         createdAt: base.sync.createdAt,
         updatedAt: clock.next(now).toString(),
+        // Sin syncedValues: igual que la huella, el motor no decide el ancestro del próximo ciclo
+        // — es trabajo del adaptador, tras escribir, guardar los valores YA fusionados como tal.
       },
     } as Registro<TValues>,
     fromRemote,
@@ -328,6 +356,7 @@ function pushLocal<TValues extends object>(decision: Decision<TValues>): void {
       deleted: data.sync.deleted,
       createdAt: data.sync.createdAt,
       updatedAt: clock.next(now).toString(),
+      // Sin syncedValues: este plan de escritura no lleva ancestro — el adaptador lo guarda tras escribir.
     },
   } as Registro<TValues>);
 }
@@ -344,6 +373,7 @@ function pullOf<TValues extends object>(
       deleted: base.sync.deleted,
       createdAt: base.sync.createdAt,
       updatedAt: version.toString(),
+      // Sin syncedValues: el destino no tiene ancestro propio (ver README) — el adaptador lo guarda tras escribir.
     },
   } as Registro<TValues>;
 }

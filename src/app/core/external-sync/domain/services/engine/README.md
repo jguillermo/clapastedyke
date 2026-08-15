@@ -54,6 +54,7 @@ type Registro<TValues> = TValues & {  // TValues: los campos de negocio, opacos 
     deleted: boolean;    // borrado lógico — nunca se elimina físicamente el dato
     createdAt: string;   // formato de reloj lógico híbrido, ver hybrid-clock.ts
     updatedAt?: string;  // mismo formato; se usa antes que createdAt si está
+    syncedValues?: Record<string, unknown>; // el ancestro — opcional; ausente = sin ancestro todavía
   };
 };
 ```
@@ -169,16 +170,18 @@ El motor sigue sin tener memoria propia entre llamadas (ver más arriba). El anc
 una tercera lista aparte en `EngineInput` — viaja **dentro de `data`**, en `sync.syncedValues`:
 
 ```ts
-interface Sync<TValues> {
+interface Sync {
   // ...los campos de siempre (id, keyfinder, deleted, createdAt, updatedAt)...
-  syncedValues?: TValues; // los campos de negocio que ESTE registro local sabía que coincidían con el destino
+  syncedValues?: Record<string, unknown>; // los campos que ESTE registro local sabía que coincidían con el destino
 }
 ```
 
 - Solo tiene sentido en un registro de `data`; el motor lo ignora si aparece en `base`.
-- **Ausente** (primera sincronización de este registro, o escrito por código anterior a este campo)
-  ⇒ el motor no puede fusionar y cae en el criterio de siempre: gana un lado entero por versión.
-  100% retrocompatible: ningún llamador existente que no rellene `syncedValues` nota ningún cambio
+- **Opcional, a diferencia de `sync.id`** (ver más arriba): su ausencia no es un descuido que haya
+  que forzar a declarar, es el estado normal y más frecuente — la primera sincronización de cada
+  registro, o cualquiera escrito antes de que este campo existiera. Se omite del todo, sin más.
+- **Ausente** ⇒ el motor no puede fusionar y cae en el criterio de siempre: gana un lado entero por
+  versión. 100% retrocompatible: ningún llamador que no rellene `syncedValues` nota ningún cambio
   de comportamiento.
 
 ### Cómo decide qué fusionar
@@ -230,10 +233,13 @@ Además de lo de siempre (leer el destino, calcular la huella, aplicar `push`/`p
 que quiera aprovechar la fusión:
 
 1. **Tras cada ciclo con éxito** —haya escrito por `push`, por `pull` o por una fusión—, guarda junto
-   al registro local una copia de los campos de negocio que en ese momento coinciden con el destino,
-   como su nuevo `sync.syncedValues`. Ese es el ancestro que hará posible fusionar la próxima vez que
-   algo diverja. Sin este paso, el ancestro nunca aparece y el motor sigue funcionando exactamente
-   como antes de este feature (gana un lado entero).
+   al registro local `nextSyncedValues(aplicado)` (exportada desde `reconcile.ts`) como su nuevo
+   `sync.syncedValues`. La función solo le quita `sync` al registro que se acaba de aplicar — no hay
+   que calcular nada a mano, y así ningún adaptador reinventa (o se equivoca) qué cuenta como
+   ancestro. Ese es el ancestro que hará posible fusionar la próxima vez que algo diverja. Sin este
+   paso, el ancestro nunca aparece y el motor sigue funcionando exactamente como antes de este
+   feature (gana un lado entero). **Nunca antes de que la escritura se confirme**: guardarlo sobre un
+   intento que no llegó a persistir congelaría un ancestro falso.
 2. **Al recibir un registro con `keyfinder: ''`** (viene de una fusión), recalcula la huella real
    antes de escribirla en cualquiera de los dos lados.
 
@@ -256,7 +262,8 @@ El motor no sabe nada de "cómo se ve" un destino — eso es enteramente trabajo
 4. **Aplica el plan**: escribe en el destino lo que diga `push` (usando el id de cada registro para
    ubicarlo — el motor asume que basta con eso), y escribe aquí lo que diga `pull`. Si un registro
    trae `keyfinder: ''`, recalcula la huella real antes de escribirlo, en cualquiera de los dos
-   lados; después de escribir, actualiza el `syncedValues` local de ese registro.
+   lados; después de escribir con éxito, guarda `nextSyncedValues(aplicado)` como el `syncedValues`
+   local de ese registro (ver más arriba).
 5. Cualquier peculiaridad del destino que no encaje en "un registro con id" —posiciones, cabeceras,
    edición humana sin pasar por una API— se resuelve **antes o después** de llamar al motor, nunca
    dentro de él.

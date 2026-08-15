@@ -17,7 +17,7 @@ export type RecordId = string;
  * para que el motor pueda comparar y versionar (`keyfinder`, `deleted`, `createdAt`/`updatedAt`,
  * `syncedValues`).
  */
-export interface Sync<TValues = unknown> {
+export interface Sync {
   /**
    * Nombre del campo de negocio que es el identificador del registro. **No es el valor del id**:
    * es el nombre del campo donde vive (p. ej. `'sku'` ⇒ la identidad real está en `registro.sku`).
@@ -45,12 +45,30 @@ export interface Sync<TValues = unknown> {
    * tres vías (el mismo papel que el *merge base* en `git`). Solo tiene sentido en un registro de
    * `data`; el motor lo ignora en `base`.
    *
-   * Ausente (primera sincronización de este registro, o escrito antes de que este campo
-   * existiera) ⇒ el motor no puede atribuir un campo divergente a un lado concreto y cae en el
+   * **Opcional, y a propósito — a diferencia de `sync.id`.** `sync.id` se hizo obligatorio porque
+   * su ausencia con un default silencioso puede esconder un error real (leer `registro.id` cuando
+   * el identificador vive en `sku`). Aquí no hay ningún default que ocultar: la ausencia de
+   * ancestro es un estado **normal y frecuente** — la primera sincronización de cada registro, o
+   * cualquiera escrito antes de que este campo existiera — no un descuido que haya que forzar a
+   * declarar. Exigir la clave con un `undefined` explícito en cada registro sin ancestro solo
+   * añadía ruido a cada literal sin ganar ninguna validación real.
+   *
+   * **Ausente** ⇒ el motor no puede atribuir un campo divergente a un lado concreto y cae en el
    * criterio de siempre: gana un lado entero por versión. Ver "Fusión de campos no solapados" en
    * el `README.md` de esta carpeta.
+   *
+   * **Tipado como `Record<string, unknown>` y no como los campos de negocio de `TValues`, a
+   * propósito.** `Sync` en sí **no es genérico** por esta misma razón: `TValues` ya aparece en la
+   * posición de nivel superior de `Registro<TValues>` (los campos de negocio aplanados), y hacer
+   * que `sync.syncedValues` dependiera también de `TValues` le daría al compilador dos sitios
+   * distintos desde los que inferir el mismo parámetro de tipo en la misma llamada — en cuanto uno
+   * de ellos es un literal `undefined` (p. ej. quien SÍ quisiera dejarlo explícito), TypeScript
+   * deja de poder resolver `TValues` y lo reduce a su cota (`object`), perdiendo el tipado de TODOS
+   * los campos de negocio en cualquier llamada a `reconcile(...)` sin argumento de tipo explícito.
+   * El motor de todos modos solo valida la forma del ancestro en tiempo de ejecución (`isRecord`,
+   * ver `reconcile.ts`), así que no pierde nada al no tiparlo con `TValues`.
    */
-  readonly syncedValues?: TValues;
+  readonly syncedValues?: Record<string, unknown>;
 }
 
 /**
@@ -62,7 +80,7 @@ export interface Sync<TValues = unknown> {
  * la intersección de los dos: `{ ...camposDeNegocio, sync }`.
  */
 export type Registro<TValues extends object = Record<string, unknown>> = TValues & {
-  readonly sync: Sync<TValues>;
+  readonly sync: Sync;
 };
 
 export interface EngineInput<TValues extends object = Record<string, unknown>> {
