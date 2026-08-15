@@ -48,6 +48,23 @@ const MILLIS_WIDTH = 13;
 /** Ancho del contador. Son escrituras dentro de un mismo milisegundo: 9999 es un techo generoso. */
 const COUNTER_WIDTH = 4;
 
+/** El mayor valor que cabe en cada parte sin ensanchar su acolchado. */
+const MILLIS_MAX = 10 ** MILLIS_WIDTH - 1;
+const COUNTER_MAX = 10 ** COUNTER_WIDTH - 1;
+
+/**
+ * Qué puede ser un origen: **no vacío y sin guiones**. La versión se lee partiendo por guiones, así
+ * que un origen que lleve uno (un UUID entero, por ejemplo) produce una cadena que este mismo módulo
+ * no puede volver a leer — y una versión ilegible pierde siempre contra el destino, en silencio.
+ */
+function assertUsableOrigin(originId: string): void {
+  if (originId.length === 0 || originId.includes('-')) {
+    throw new Error(
+      `originId inservible para una versión: ${JSON.stringify(originId)} (no puede estar vacío ni llevar guiones)`,
+    );
+  }
+}
+
 export class LogicalVersion {
   private constructor(
     readonly millis: number,
@@ -57,8 +74,13 @@ export class LogicalVersion {
 
   /**
    * Lee una versión escrita. `null` si no se puede: vacía, con otra forma, con letras donde van
-   * números o con partes negativas. **No lanza**: un dato que alguien estropeó no puede parar la
-   * sincronización de todo lo demás.
+   * números, con partes negativas o con un valor que no cabe en el ancho de su parte. **No lanza**:
+   * un dato que alguien estropeó no puede parar la sincronización de todo lo demás.
+   *
+   * El acolchado sí se perdona (`100-0-x` se lee y sale normalizado): lo que no se perdona es un
+   * valor que no cabe, porque `toString()` lo escribiría con más dígitos de los que tiene su parte y
+   * el orden de texto dejaría de coincidir con el real — que es lo único para lo que existe el ancho
+   * fijo. Un valor así se trata como ilegible y quien lo reciba le pondrá una versión sana.
    */
   static parse(raw: string): LogicalVersion | null {
     const parts = raw.trim().split('-');
@@ -73,13 +95,25 @@ export class LogicalVersion {
 
     const parsedMillis = Number(millis);
     const parsedCounter = Number(counter);
-    if (!Number.isSafeInteger(parsedMillis) || !Number.isSafeInteger(parsedCounter)) {
+    if (parsedMillis > MILLIS_MAX || parsedCounter > COUNTER_MAX) {
       return null;
     }
     return new LogicalVersion(parsedMillis, parsedCounter, originId);
   }
 
+  /**
+   * Construye una versión nueva. **Lanza** si alguna parte rompe el formato — al revés que `parse`, y
+   * a propósito: `parse` lee datos ajenos, que pueden venir estropeados; `of` la llama código de
+   * este lado, así que una parte inválida aquí es un error de programación y tiene que doler.
+   */
   static of(millis: number, counter: number, originId: string): LogicalVersion {
+    assertUsableOrigin(originId);
+    if (!Number.isInteger(millis) || millis < 0 || millis > MILLIS_MAX) {
+      throw new Error(`instante fuera de rango para una versión: ${millis}`);
+    }
+    if (!Number.isInteger(counter) || counter < 0 || counter > COUNTER_MAX) {
+      throw new Error(`contador fuera de rango para una versión: ${counter}`);
+    }
     return new LogicalVersion(millis, counter, originId);
   }
 
@@ -136,7 +170,11 @@ export class HybridClock {
   private millis = 0;
   private counter = 0;
 
-  constructor(private readonly originId: string) {}
+  constructor(private readonly originId: string) {
+    // En la puerta de entrada: un origen inservible se detecta al construir el reloj, no en la
+    // primera versión que emita —que puede ser mucho después y en otro sitio.
+    assertUsableOrigin(originId);
+  }
 
   /**
    * Pone el reloj al día con algo que se acaba de leer.
@@ -162,10 +200,20 @@ export class HybridClock {
    * La siguiente versión de este origen, estrictamente posterior a todo lo emitido y a todo lo
    * observado. Si el tiempo físico avanzó, se reinicia el contador; si no —mismo milisegundo, o un
    * reloj que retrocedió—, se incrementa.
+   *
+   * Al llegar al techo del contador **se avanza el instante** en vez de ensancharlo: un contador de
+   * cinco dígitos se escribiría más largo que su acolchado y el orden de texto dejaría de coincidir
+   * con el real, que es justo lo que el ancho fijo existe para garantizar. Avanzar un milisegundo
+   * mantiene las dos cosas: la versión sigue siendo estrictamente posterior y sigue cabiendo.
+   * (Hace falta un ciclo con más de 9999 escrituras dentro del mismo milisegundo, o un contador
+   * heredado ya en el techo, para llegar aquí.)
    */
   next(now: number): LogicalVersion {
     if (now > this.millis) {
       this.millis = now;
+      this.counter = 0;
+    } else if (this.counter >= COUNTER_MAX) {
+      this.millis += 1;
       this.counter = 0;
     } else {
       this.counter += 1;

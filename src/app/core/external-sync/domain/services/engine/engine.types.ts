@@ -28,8 +28,18 @@ export interface Sync {
    * que nada avisara). El caso común (`registro.id`) se escribe explícito: `sync: { id: 'id', ... }`.
    */
   readonly id: string;
-  /** Huella/hash del contenido, para saber si cambió. Valor real, no un nombre de campo. */
-  readonly keyfinder: string;
+  /**
+   * Huella/hash del contenido, para saber si cambió. Valor real, no un nombre de campo.
+   *
+   * **`null` significa «hay que recalcularla antes de escribir»**, y es lo que sale de una fusión:
+   * los valores fusionados son contenido nuevo que no coincide con la huella de ningún lado, y el
+   * motor no calcula huellas — no es su trabajo (ver `README.md`). Se eligió `null` y no `''` porque
+   * una cadena vacía es indistinguible de una huella legítima: si alguien la persistía, el ciclo
+   * siguiente veía `'' === ''` y declaraba convergencia **con contenidos distintos**, dejando la
+   * divergencia congelada sin conflicto y sin rastro. Con `null`, el tipo obliga a mirarlo, y dos
+   * `null` nunca cuentan como convergidos.
+   */
+  readonly keyfinder: string | null;
   /** Si este registro está borrado (borrado lógico — nunca se elimina físicamente el dato). */
   readonly deleted: boolean;
   /** Cuándo se creó, en formato de reloj lógico híbrido (`millis-contador-origen`, ver `hybrid-clock.ts`). */
@@ -105,11 +115,45 @@ export interface Conflict {
   readonly winner: 'remote' | 'local' | 'merged';
   /** `true` si se eligió sin poder leer una fecha local con la que comparar. Siempre `false` si `winner` es `'merged'` — una fusión no es una apuesta a ciegas. */
   readonly blind: boolean;
+  /**
+   * Solo presente (y siempre `true`) cuando la versión del DESTINO no era fiable —ilegible, o de un
+   * futuro que ningún reloj justifica— y hubo que re-estamparla con el reloj de este origen.
+   *
+   * Se marca porque tiene una consecuencia que conviene no esconder: una versión re-estampada es,
+   * por construcción, la más alta que hay, así que el destino gana ese conflicto contra cualquier
+   * edición local legítima. Que gane es coherente con que el destino sea la fuente de la verdad;
+   * que fuera indistinguible de un conflicto decidido con dos fechas buenas, no. `blind` no sirve
+   * para esto: habla solo del lado local.
+   */
+  readonly restamped?: boolean;
   /** Solo presente cuando `winner` es `'merged'`: qué campos de negocio vinieron de cada lado. */
   readonly mergedFrom?: {
     readonly remote: readonly string[];
     readonly local: readonly string[];
   };
+}
+
+/** Por qué un registro no se pudo tener en cuenta. */
+export type IgnoredReason =
+  /** Su campo de identidad no es un texto no vacío, así que no hay identidad que resolver. */
+  | 'no-id'
+  /** Otro registro LOCAL reclama el mismo id, y ganó por versión. */
+  | 'duplicate-local';
+
+/**
+ * Un registro que el motor no pudo tener en cuenta, y por qué.
+ *
+ * Existe porque descartar en silencio es la peor forma de fallar: quien aplica el plan no tenía
+ * ninguna forma de saber que había datos locales que nunca se iban a subir. Un id repetido del
+ * destino sí se reportaba (`duplicates`); el mismo problema del lado local, no.
+ */
+export interface IgnoredRecord<TValues extends object = Record<string, unknown>> {
+  /** De cuál de las dos colecciones de la entrada venía. */
+  readonly side: 'base' | 'data';
+  readonly reason: IgnoredReason;
+  /** El id en conflicto; `null` cuando el motivo es justamente que no se pudo resolver. */
+  readonly id: RecordId | null;
+  readonly registro: Registro<TValues>;
 }
 
 /** Un id que aparece en más de un registro remoto. No se toca por ningún lado. */
@@ -121,15 +165,17 @@ export interface DuplicateIdentity<TValues extends object = Record<string, unkno
 export interface EnginePlan<TValues extends object = Record<string, unknown>> {
   /**
    * Registros que hay que escribir en el destino: ganó lo local (incluidos los borrados
-   * marcados), o son el resultado de una fusión — en ese caso, el MISMO registro aparece también
-   * en `pull` (ver "Fusión de campos no solapados" en `README.md`).
+   * marcados), o son el resultado de una fusión que el destino todavía no tiene — y solo entonces
+   * el MISMO registro aparece también en `pull` (ver "Fusión de campos no solapados" en `README.md`).
    */
   readonly push: readonly Registro<TValues>[];
   /**
    * Registros que hay que escribir aquí: ganó el destino (incluidos los que el destino borró), o
-   * son el resultado de una fusión — en ese caso, el MISMO registro aparece también en `push`.
+   * son el resultado de una fusión que aquí todavía no se tiene.
    */
   readonly pull: readonly Registro<TValues>[];
   readonly duplicates: readonly DuplicateIdentity<TValues>[];
   readonly conflicts: readonly Conflict[];
+  /** Registros que no se pudieron tener en cuenta, de cualquiera de los dos lados, y por qué. */
+  readonly ignored: readonly IgnoredRecord<TValues>[];
 }

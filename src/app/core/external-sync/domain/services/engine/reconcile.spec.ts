@@ -92,7 +92,7 @@ describe('reconcile engine', () => {
         now: 1_700_000_000_000,
         originId: 'origina',
       });
-      expect(vacio).toEqual({ push: [], pull: [], duplicates: [], conflicts: [] });
+      expect(vacio).toEqual({ push: [], pull: [], duplicates: [], conflicts: [], ignored: [] });
 
       const plan = reconcile<{ id: string; contenido: string }>({
         base: [
@@ -195,6 +195,7 @@ describe('reconcile engine', () => {
         ],
         duplicates: [],
         conflicts: [],
+        ignored: [],
       });
     });
   });
@@ -376,6 +377,7 @@ describe('reconcile engine', () => {
         ],
         duplicates: [],
         conflicts: [],
+        ignored: [],
       });
     });
 
@@ -646,7 +648,10 @@ describe('reconcile engine', () => {
      * Cuando no se puede leer una fecha con la que comparar, el destino gana por precaución y el
      * conflicto queda marcado `blind: true` para que quien reciba el plan sepa que fue una apuesta:
      * - `ciego-aqui`: solo la fecha local es ilegible ⇒ se aplica la versión del destino.
-     * - `ciego-los-dos`: ninguna es legible ⇒ además hay que sintetizar la versión que se escribe.
+     * - `ciego-los-dos`: ninguna es legible ⇒ además hay que sintetizar la versión que se escribe, y
+     *   eso se marca aparte con `restamped`. Son dos cosas distintas y por eso son dos banderas:
+     *   `blind` dice que no había fecha LOCAL con la que comparar; `restamped`, que la del DESTINO
+     *   tampoco se podía creer y salió del reloj — o sea, que ganó con una versión inventada.
      */
     it('sin fecha legible gana el destino, marcado a ciegas, sintetizando versión si hace falta', () => {
       const plan = reconcile<{ id: string; contenido: string }>({
@@ -701,7 +706,7 @@ describe('reconcile engine', () => {
 
       expect(plan.conflicts).toEqual([
         { id: 'ciego-aqui', winner: 'remote', blind: true },
-        { id: 'ciego-los-dos', winner: 'remote', blind: true },
+        { id: 'ciego-los-dos', winner: 'remote', blind: true, restamped: true },
       ]);
       expect(plan.push).toEqual([]);
       expect(plan.pull).toEqual([
@@ -739,8 +744,10 @@ describe('reconcile engine', () => {
      *
      * Se generan DOS comandos con el MISMO registro (literalmente el mismo objeto): al destino le
      * falta lo que cambió aquí y a local le falta lo que cambió el destino, así que ninguno de los
-     * dos por separado basta. La huella va vacía A PROPÓSITO — el contenido fusionado no coincide
-     * con la de ningún lado y el motor no calcula huellas.
+     * dos por separado basta. Esto es lo que justifica los dos comandos, y por eso el caso vive
+     * aquí: cuando solo cambia un lado, solo se emite uno (ver «la fusión solo escribe donde falta
+     * algo»). La huella sale `null` A PROPÓSITO —«hay que recalcularla»—, porque el contenido
+     * fusionado no coincide con la de ningún lado y el motor no calcula huellas.
      */
     it('cada lado cambió un campo distinto: se fusionan en un único registro para push y pull', () => {
       const plan = reconcile<{ id: string; a: string; b: string }>({
@@ -782,7 +789,7 @@ describe('reconcile engine', () => {
         b: 'local-b',
         sync: {
           id: 'id',
-          keyfinder: '',
+          keyfinder: null,
           deleted: false,
           createdAt: '0000000000100-0000-origina',
           updatedAt: '1700000000000-0000-origina',
@@ -812,6 +819,10 @@ describe('reconcile engine', () => {
      *   motor sigue el mismo camino y solo re-estampa huella y versión.
      *
      * Cada uno es un id independiente, así que también prueban que una fusión no contamina a otra.
+     *
+     * Los tres últimos, además, son de UN SOLO lado (`campo-borrado` solo remoto; `mismo-valor` solo
+     * local; `sin-cambios-reales` ninguno), así que aquí se ve de paso a qué lista va cada uno — la
+     * regla entera está en «la fusión solo escribe donde falta algo».
      */
     it('la atribución cubre tipos no-texto, arrays por valor, campos añadidos, quitados y coincidentes', () => {
       interface Fila {
@@ -970,6 +981,8 @@ describe('reconcile engine', () => {
         originId: 'origina',
       });
 
+      // Solo los tres primeros son conflictos: en ellos hubo que combinar un cambio de cada lado.
+      // En los otros tres solo cambió un lado (o ninguno), así que no hubo nada que decidir.
       expect(plan.conflicts).toEqual([
         {
           id: 'tipos',
@@ -989,40 +1002,30 @@ describe('reconcile engine', () => {
           blind: false,
           mergedFrom: { remote: ['a'], local: ['b'] },
         },
-        // `obsoleto` desapareció de los dos lados: no se le atribuye a nadie.
-        {
-          id: 'campo-borrado',
-          winner: 'merged',
-          blind: false,
-          mergedFrom: { remote: ['a'], local: [] },
-        },
-        // `a` cambió en los dos, pero al mismo valor: tampoco se atribuye.
-        {
-          id: 'mismo-valor',
-          winner: 'merged',
-          blind: false,
-          mergedFrom: { remote: [], local: ['b'] },
-        },
-        {
-          id: 'sin-cambios-reales',
-          winner: 'merged',
-          blind: false,
-          mergedFrom: { remote: [], local: [] },
-        },
       ]);
 
-      const fusionados = [
+      // Al destino solo se le manda lo que no tiene: los tres de doble cambio, y `mismo-valor`,
+      // donde `b` solo cambió aquí. `campo-borrado` (solo cambió allí) y `sin-cambios-reales`
+      // (no cambió nada) no le hacen falta — mandárselos sería escribir de más.
+      expect(plan.push.map(nextSyncedValues)).toEqual([
+        { id: 'tipos', precio: 20, activo: false },
+        { id: 'arrays', nombre: 'remoto', tags: ['a', 'b', 'c'] },
+        { id: 'campo-nuevo', a: 'remoto-a', b: 'nuevo-local' },
+        { id: 'mismo-valor', a: 'nuevo', b: 'local-b' },
+      ]);
+      // Y aquí se escribe lo que aquí falta: los tres de doble cambio, `campo-borrado` (lo que
+      // cambió allí) y `sin-cambios-reales`, que no aporta contenido pero recalcula la huella rancia
+      // que provocó esta divergencia — si no, se repetiría cada ciclo sin resolverse nunca.
+      expect(plan.pull.map(nextSyncedValues)).toEqual([
         { id: 'tipos', precio: 20, activo: false },
         { id: 'arrays', nombre: 'remoto', tags: ['a', 'b', 'c'] },
         { id: 'campo-nuevo', a: 'remoto-a', b: 'nuevo-local' },
         { id: 'campo-borrado', a: 'remoto-a' }, // `obsoleto` ya no está en ninguno
-        { id: 'mismo-valor', a: 'nuevo', b: 'local-b' },
         { id: 'sin-cambios-reales', a: 'x', b: 'y' },
-      ];
-      expect(plan.push.map(nextSyncedValues)).toEqual(fusionados);
-      expect(plan.pull.map(nextSyncedValues)).toEqual(fusionados);
-      // Toda fusión sale con la huella vacía: quien aplique el plan DEBE recalcularla.
-      expect(plan.push.every((registro) => registro.sync.keyfinder === '')).toBe(true);
+      ]);
+      // Toda fusión sale con la huella marcada para recalcular: `null`, nunca una cadena.
+      expect(plan.push.every((registro) => registro.sync.keyfinder === null)).toBe(true);
+      expect(plan.pull.every((registro) => registro.sync.keyfinder === null)).toBe(true);
     });
 
     /**
@@ -1614,21 +1617,16 @@ describe('reconcile engine', () => {
         originId: 'origina',
       });
 
-      // Solo cambió un lado, así que la "fusión" es la edición local entera; lo que importa es qué
-      // se propone escribir y que el plan NO lleva ancestro con el que sellar nada todavía.
-      expect(ciclo.conflicts).toEqual([
-        {
-          id: 'ing-1',
-          winner: 'merged',
-          blind: false,
-          mergedFrom: { remote: [], local: ['precio'] },
-        },
-      ]);
+      // Solo cambió un lado: no hay nada que decidir (no es un conflicto) y al destino le falta la
+      // subida, así que solo se emite `push`. Lo que importa aquí es qué se propone escribir y que
+      // el plan NO lleva ancestro con el que sellar nada todavía.
+      expect(ciclo.conflicts).toEqual([]);
+      expect(ciclo.pull).toEqual([]);
       expect(nextSyncedValues(ciclo.push[0]!)).toEqual({ id: 'ing-1', precio: 2.75 });
       expect(ciclo.push[0]?.sync.syncedValues).toBeUndefined();
 
       // 1. CONFIRMÓ. El adaptador sella el ancestro y recalcula la huella real (la fusión sale con
-      //    `keyfinder: ''`, ver README). El destino ya tiene 2,75.
+      //    `keyfinder: null`, ver README). El destino ya tiene 2,75.
       const selladoTrasConfirmar = nextSyncedValues(ciclo.push[0]!);
       expect(selladoTrasConfirmar).toEqual({ id: 'ing-1', precio: 2.75 });
 
@@ -1663,7 +1661,13 @@ describe('reconcile engine', () => {
         now: 1_700_000_100_000,
         originId: 'origina',
       });
-      expect(trasConfirmar).toEqual({ push: [], pull: [], duplicates: [], conflicts: [] });
+      expect(trasConfirmar).toEqual({
+        push: [],
+        pull: [],
+        duplicates: [],
+        conflicts: [],
+        ignored: [],
+      });
 
       // 2. FALLÓ. No se sella nada: el registro local queda EXACTAMENTE como estaba, ancestro viejo
       //    incluido, y el destino tampoco cambió. El ciclo siguiente vuelve a proponer la subida.
@@ -1683,19 +1687,15 @@ describe('reconcile engine', () => {
         originId: 'origina',
       });
 
-      // El precio pasa a atribuirse al DESTINO —que no lo tocó— y la edición de 2,75 desaparece:
-      // se escribe 2,50 aquí (`pull`) y se sube al destino (`push`) como si fuera lo acordado.
-      expect(trasSellarSinConfirmar.conflicts).toEqual([
-        {
-          id: 'ing-1',
-          winner: 'merged',
-          blind: false,
-          mergedFrom: { remote: ['precio'], local: [] },
-        },
-      ]);
-      const perdido = { id: 'ing-1', precio: 2.5 };
-      expect(nextSyncedValues(trasSellarSinConfirmar.push[0]!)).toEqual(perdido);
-      expect(nextSyncedValues(trasSellarSinConfirmar.pull[0]!)).toEqual(perdido);
+      // El precio pasa a atribuirse al DESTINO —que no lo tocó—, así que el motor cree que aquí no
+      // se editó nada y lo único que falta es traerse los 2,50 «de allí». La edición de 2,75
+      // desaparece: se escribe 2,50 encima, sin conflicto, sin aviso y sin forma de recuperarla.
+      expect(trasSellarSinConfirmar.conflicts).toEqual([]);
+      expect(trasSellarSinConfirmar.push).toEqual([]);
+      expect(nextSyncedValues(trasSellarSinConfirmar.pull[0]!)).toEqual({
+        id: 'ing-1',
+        precio: 2.5,
+      });
     });
   });
 
@@ -1816,7 +1816,9 @@ describe('reconcile engine', () => {
         originId: 'origina',
       });
 
-      expect(plan.conflicts).toEqual([{ id: 'conflicto', winner: 'remote', blind: true }]);
+      expect(plan.conflicts).toEqual([
+        { id: 'conflicto', winner: 'remote', blind: true, restamped: true },
+      ]);
       expect(plan.pull[0]?.sync.updatedAt).toBe('1700000000000-0000-origina');
       expect(plan.push[0]?.sync.updatedAt).toBe('1700000000000-0001-origina');
     });
@@ -1828,11 +1830,13 @@ describe('reconcile engine', () => {
      * la colección:
      * - `dup`: dos registros del DESTINO reclaman el mismo id. No se puede saber cuál es el de
      *   verdad, así que no se toca por ningún lado (escribir en uno dejaría al otro reapareciendo
-     *   como un fantasma cada ciclo) y se reporta ENTERO, con sus registros, no solo el id.
-     * - un registro de `data` sin id legible: no puede indexarse ni compararse ⇒ se ignora.
-     * - `repetido-aqui`: el id repetido está en `data`. Aquí sí hay un criterio —el último gana— y
-     *   se comprueba porque ese último converge con el destino: si se hubiera quedado con el
-     *   primero, habría salido un conflicto.
+     *   como un fantasma cada ciclo) y se reporta ENTERO, con sus registros, no solo el id. El
+     *   registro LOCAL con ese mismo id queda en cuarentena con ellos: no se sube ni se compara.
+     * - un registro de `data` sin id legible: no puede indexarse ni compararse ⇒ se ignora, pero
+     *   **se reporta** en `ignored`. Descartarlo sin decirlo era perder datos locales en silencio.
+     * - `repetido-aqui`: el id repetido está en `data`. Aquí sí hay un criterio —la versión más
+     *   alta, y a igualdad el último— y se comprueba porque ese ganador converge con el destino: si
+     *   se hubiera quedado con el otro, habría salido un conflicto. El perdedor también se reporta.
      *
      * `sano` demuestra que el resto de la colección decide con normalidad pese a todo lo anterior.
      */
@@ -1851,6 +1855,27 @@ describe('reconcile engine', () => {
         id: 'dup',
         contenido: 'dos',
         sync: { id: 'id', keyfinder: 'fp-dos', deleted: false, createdAt: 'no-es-una-version' },
+      };
+      // Sin campo `id`: no hay identidad que resolver, así que se ignora entero — pero se reporta.
+      const huerfano: Registro<Fila> = {
+        contenido: 'huerfano',
+        sync: {
+          id: 'id',
+          keyfinder: 'fp-huerfano',
+          deleted: false,
+          createdAt: 'no-es-una-version',
+        },
+      };
+      // Misma versión que su gemela, así que el desempate cae en el orden: gana la última.
+      const repetidaPerdedora: Registro<Fila> = {
+        id: 'repetido-aqui',
+        contenido: 'vieja',
+        sync: {
+          id: 'id',
+          keyfinder: 'fp-primera',
+          deleted: false,
+          createdAt: '0000000000100-0000-origina',
+        },
       };
 
       const plan = reconcile<Fila>({
@@ -1890,26 +1915,8 @@ describe('reconcile engine', () => {
               createdAt: 'no-es-una-version',
             },
           },
-          {
-            // Sin campo `id`: no hay identidad que resolver, así que se ignora entero.
-            contenido: 'huerfano',
-            sync: {
-              id: 'id',
-              keyfinder: 'fp-huerfano',
-              deleted: false,
-              createdAt: 'no-es-una-version',
-            },
-          },
-          {
-            id: 'repetido-aqui',
-            contenido: 'vieja',
-            sync: {
-              id: 'id',
-              keyfinder: 'fp-primera',
-              deleted: false,
-              createdAt: '0000000000100-0000-origina',
-            },
-          },
+          huerfano,
+          repetidaPerdedora,
           {
             id: 'repetido-aqui',
             contenido: 'x',
@@ -1942,6 +1949,15 @@ describe('reconcile engine', () => {
         ],
         duplicates: [{ id: 'dup', registros: [dupUno, dupDos] }],
         conflicts: [],
+        ignored: [
+          { side: 'data', reason: 'no-id', id: null, registro: huerfano },
+          {
+            side: 'data',
+            reason: 'duplicate-local',
+            id: 'repetido-aqui',
+            registro: repetidaPerdedora,
+          },
+        ],
       });
     });
 
@@ -2070,6 +2086,784 @@ describe('reconcile engine', () => {
 
       expect(plan.push).toHaveLength(1);
       expect(plan.conflicts).toEqual([]);
+    });
+  });
+
+  describe('reconcile · el reloj y las versiones locales', () => {
+    /**
+     * El reloj se pone al día con **los dos lados**, no solo con el destino.
+     *
+     * Un HLC solo cumple su promesa si observa todo lo que ha visto, **incluida su propia historia
+     * ya persistida**. Si solo mirase `base`, la versión que se emite al subir podría nacer por
+     * detrás de la que ese mismo registro ya tenía guardada aquí — y entonces el desfase de reloj que
+     * el HLC existe para absorber vuelve por la puerta de atrás: la edición vieja de este origen
+     * ganaría a una edición remota posterior.
+     *
+     * `adelantado` lo ejercita: su versión local (`+2 min`, dentro del margen tolerado) es más alta
+     * que todo lo que hay en el destino. Lo que se sube tiene que quedar por delante de ella, no por
+     * detrás. `normal` está ahí para que se vea que un registro corriente no paga nada por esto.
+     */
+    it('el reloj observa también `data`: nada se sube por detrás de la versión que ya tenía aquí', () => {
+      interface Fila {
+        id: string;
+        contenido: string;
+      }
+
+      const ahora = 1_700_000_000_000;
+      const localAdelantada = `${String(ahora + 120_000).padStart(13, '0')}-0000-origina`;
+
+      const plan = reconcile<Fila>({
+        base: [
+          {
+            id: 'normal',
+            contenido: 'remoto',
+            sync: {
+              id: 'id',
+              keyfinder: 'fp-remoto',
+              deleted: false,
+              createdAt: '0000000000100-0000-otro',
+            },
+          },
+        ],
+        data: [
+          {
+            id: 'adelantado',
+            contenido: 'local',
+            sync: {
+              id: 'id',
+              keyfinder: 'fp-local',
+              deleted: false,
+              createdAt: '0000000000100-0000-origina',
+              updatedAt: localAdelantada,
+            },
+          },
+        ],
+        now: ahora,
+        originId: 'origina',
+      });
+
+      const subida = plan.push[0]?.sync.updatedAt ?? '';
+      expect(subida > localAdelantada).toBe(true);
+    });
+
+    /**
+     * El tope de reloj futuro protege **los dos lados**, no solo el destino.
+     *
+     * `base` ya estaba protegido (`effectiveVersion` re-estampa lo que viene del futuro). `data` no
+     * lo estaba, y ese hueco se paga caro: `data` sale de IndexedDB, que también escriben otra
+     * pestaña, una versión anterior de la app o un import — un `updatedAt` corrupto en el año 3000
+     * ganaba **todos** los conflictos, para siempre y sin dejar rastro.
+     *
+     * Con el tope aplicado, una versión local del futuro se trata como lo que es: ilegible. Gana el
+     * destino, marcado `blind`, y al aplicar el `pull` el registro local queda re-estampado con una
+     * versión sana — o sea, se cura solo.
+     */
+    it('una versión local del futuro no vale: se trata como ilegible y gana el destino', () => {
+      interface Fila {
+        id: string;
+        contenido: string;
+      }
+
+      const ahora = 1_700_000_000_000;
+      const delFuturo = `${String(ahora + 6 * 60 * 1000).padStart(13, '0')}-0000-origina`;
+
+      const plan = reconcile<Fila>({
+        base: [
+          {
+            id: 'envenenado',
+            contenido: 'remoto',
+            sync: {
+              id: 'id',
+              keyfinder: 'fp-remoto',
+              deleted: false,
+              createdAt: '0000000000100-0000-otro',
+              updatedAt: '0000000000500-0000-otro',
+            },
+          },
+        ],
+        data: [
+          {
+            id: 'envenenado',
+            contenido: 'local',
+            sync: {
+              id: 'id',
+              keyfinder: 'fp-local',
+              deleted: false,
+              createdAt: '0000000000100-0000-origina',
+              updatedAt: delFuturo,
+            },
+          },
+        ],
+        now: ahora,
+        originId: 'origina',
+      });
+
+      expect(plan.push).toEqual([]);
+      expect(plan.conflicts).toEqual([{ id: 'envenenado', winner: 'remote', blind: true }]);
+      expect(plan.pull).toEqual([
+        {
+          id: 'envenenado',
+          contenido: 'remoto',
+          sync: {
+            id: 'id',
+            keyfinder: 'fp-remoto',
+            deleted: false,
+            createdAt: '0000000000100-0000-otro',
+            updatedAt: '0000000000500-0000-otro',
+          },
+        },
+      ]);
+    });
+
+    /**
+     * `updatedAt` es la fecha de cambio **si se puede leer**; si no, la de creación sigue ahí y vale.
+     *
+     * Los dos caminos por los que se perdía:
+     * - `vacio`: `updatedAt: ''` — un `??` no cae con la cadena vacía (es falsy, no nullish), así que
+     *   la versión salía `null` sin llegar a mirar `createdAt`.
+     * - `basura`: un `updatedAt` que no se puede leer devolvía `null` en vez de caer a `createdAt`.
+     *
+     * En un registro local eso significa `blind` ⇒ gana el destino: **la edición local se descartaba**
+     * aunque su `createdAt` fuera perfectamente legible y posterior. Aquí los dos ganan por fecha, que
+     * es lo que les corresponde.
+     */
+    it('un `updatedAt` vacío o ilegible cae a `createdAt` en vez de perder la edición local', () => {
+      interface Fila {
+        id: string;
+        contenido: string;
+      }
+
+      const plan = reconcile<Fila>({
+        base: [
+          {
+            id: 'vacio',
+            contenido: 'remoto',
+            sync: {
+              id: 'id',
+              keyfinder: 'fp-remoto',
+              deleted: false,
+              createdAt: '0000000000100-0000-otro',
+            },
+          },
+          {
+            id: 'basura',
+            contenido: 'remoto',
+            sync: {
+              id: 'id',
+              keyfinder: 'fp-remoto',
+              deleted: false,
+              createdAt: '0000000000100-0000-otro',
+            },
+          },
+        ],
+        data: [
+          {
+            id: 'vacio',
+            contenido: 'local',
+            sync: {
+              id: 'id',
+              keyfinder: 'fp-local',
+              deleted: false,
+              createdAt: '0000000000900-0000-origina',
+              updatedAt: '',
+            },
+          },
+          {
+            id: 'basura',
+            contenido: 'local',
+            sync: {
+              id: 'id',
+              keyfinder: 'fp-local',
+              deleted: false,
+              createdAt: '0000000000900-0000-origina',
+              updatedAt: 'lo-que-alguien-tecleo',
+            },
+          },
+        ],
+        now: 1_700_000_000_000,
+        originId: 'origina',
+      });
+
+      expect(plan.pull).toEqual([]);
+      expect(plan.conflicts).toEqual([
+        { id: 'vacio', winner: 'local', blind: false },
+        { id: 'basura', winner: 'local', blind: false },
+      ]);
+      expect(plan.push.map((registro) => registro.id)).toEqual(['vacio', 'basura']);
+    });
+  });
+
+  describe('reconcile · la entrada local rota se reporta, no se pierde', () => {
+    /**
+     * Un registro local que el motor no puede indexar **no puede desaparecer en silencio**.
+     *
+     * Antes se descartaba sin dejar rastro en ninguna lista del plan: quien lo aplicaba no tenía
+     * forma de saber que había datos locales que nunca se iban a subir. Un id duplicado del destino
+     * sí se reportaba (`duplicates`); el mismo problema del lado local, no. Ahora todo lo que se
+     * ignora sale en `ignored`, con el lado y el motivo, que es lo mínimo para poder arreglarlo.
+     *
+     * Los tres motivos, más el reverso:
+     * - `sin-campo` / vacío: no hay identidad que resolver.
+     * - **id numérico**: el caso más traicionero, porque el registro parece perfecto. Una hoja de
+     *   cálculo devuelve números; si el adaptador no los pasa a texto, la fila entera se evaporaba.
+     * - `base` también reporta lo suyo: una fila del destino sin id tampoco puede compararse.
+     *
+     * `sano` demuestra que el resto de la colección decide con normalidad pese a todo lo anterior.
+     */
+    it('un registro sin id legible —incluido un id numérico— se reporta en `ignored`', () => {
+      interface Fila {
+        id?: unknown;
+        contenido: string;
+      }
+
+      const sinCampo: Registro<Fila> = {
+        contenido: 'huerfano',
+        sync: {
+          id: 'id',
+          keyfinder: 'fp',
+          deleted: false,
+          createdAt: '0000000000100-0000-origina',
+        },
+      };
+      const vacio: Registro<Fila> = {
+        id: '',
+        contenido: 'vacio',
+        sync: {
+          id: 'id',
+          keyfinder: 'fp',
+          deleted: false,
+          createdAt: '0000000000100-0000-origina',
+        },
+      };
+      const numerico: Registro<Fila> = {
+        id: 42,
+        contenido: 'numerico',
+        sync: {
+          id: 'id',
+          keyfinder: 'fp',
+          deleted: false,
+          createdAt: '0000000000100-0000-origina',
+        },
+      };
+      const remotoSinId: Registro<Fila> = {
+        contenido: 'remoto-huerfano',
+        sync: {
+          id: 'id',
+          keyfinder: 'fp',
+          deleted: false,
+          createdAt: '0000000000100-0000-origina',
+        },
+      };
+
+      const plan = reconcile<Fila>({
+        base: [
+          remotoSinId,
+          {
+            id: 'sano',
+            contenido: 'x',
+            sync: {
+              id: 'id',
+              keyfinder: 'fp',
+              deleted: false,
+              createdAt: '0000000000100-0000-origina',
+            },
+          },
+        ],
+        data: [sinCampo, vacio, numerico],
+        now: 1_700_000_000_000,
+        originId: 'origina',
+      });
+
+      expect(plan.ignored).toEqual([
+        { side: 'base', reason: 'no-id', id: null, registro: remotoSinId },
+        { side: 'data', reason: 'no-id', id: null, registro: sinCampo },
+        { side: 'data', reason: 'no-id', id: null, registro: vacio },
+        { side: 'data', reason: 'no-id', id: null, registro: numerico },
+      ]);
+      expect(plan.push).toEqual([]);
+      expect(plan.pull.map((registro) => registro.id)).toEqual(['sano']);
+    });
+
+    /**
+     * Un id repetido **aquí** se resuelve por versión, no por posición en el array.
+     *
+     * Antes se quedaba con el último elemento del array y el resto desaparecía sin reporte. Dos
+     * problemas en uno: el criterio no era de negocio (el orden en que un almacén devuelve las filas
+     * no significa nada) y la pérdida era invisible. Ahora gana **la versión más alta** —el mismo
+     * criterio que decide cualquier otro empate en el motor— y el resto sale en `ignored`.
+     *
+     * La prueba de que ya no depende del orden: el mismo caso con `data` al revés da exactamente el
+     * mismo plan, salvo el orden en que se reportan los ignorados.
+     *
+     * `sin-version` fija el desempate cuando ninguno es legible: no hay criterio mejor que el orden,
+     * así que gana el último y queda documentado.
+     */
+    it('un id repetido en `data` lo gana la versión más alta, no la posición', () => {
+      interface Fila {
+        id: string;
+        contenido: string;
+      }
+
+      const vieja: Registro<Fila> = {
+        id: 'repetido',
+        contenido: 'vieja',
+        sync: {
+          id: 'id',
+          keyfinder: 'fp-vieja',
+          deleted: false,
+          createdAt: '0000000000100-0000-origina',
+          updatedAt: '0000000000200-0000-origina',
+        },
+      };
+      const nueva: Registro<Fila> = {
+        id: 'repetido',
+        contenido: 'nueva',
+        sync: {
+          id: 'id',
+          keyfinder: 'fp-nueva',
+          deleted: false,
+          createdAt: '0000000000100-0000-origina',
+          updatedAt: '0000000000900-0000-origina',
+        },
+      };
+
+      const entrada: EngineInput<Fila> = {
+        base: [],
+        // La nueva va PRIMERO: quedarse con la última del array elegiría la vieja.
+        data: [nueva, vieja],
+        now: 1_700_000_000_000,
+        originId: 'origina',
+      };
+
+      const plan = reconcile<Fila>(entrada);
+
+      expect(plan.push.map((registro) => registro.contenido)).toEqual(['nueva']);
+      expect(plan.ignored).toEqual([
+        { side: 'data', reason: 'duplicate-local', id: 'repetido', registro: vieja },
+      ]);
+
+      const alReves = reconcile<Fila>({ ...entrada, data: [vieja, nueva] });
+      expect(alReves.push).toEqual(plan.push);
+      expect(alReves.ignored).toEqual(plan.ignored);
+    });
+  });
+
+  describe('reconcile · la fusión solo escribe donde falta algo', () => {
+    /**
+     * Una fusión emite dos comandos **cuando de verdad faltan los dos**. Si solo un lado cambió
+     * respecto al ancestro, escribir en los dos es escribir de más.
+     *
+     * Y no es un caso raro: en cuanto el adaptador hace su trabajo (guardar `nextSyncedValues` tras
+     * cada ciclo con éxito), el ancestro está presente **casi siempre**, así que **cualquier edición
+     * corriente** entra por aquí. Antes, todas salían con `push` Y `pull` y una entrada en
+     * `conflicts` con `winner: 'merged'`. Eso significaba: escrituras en el destino de filas que no
+     * habían cambiado (cuota, latencia y una carrera con cualquier otro dispositivo) y un
+     * diagnóstico que llamaba «conflicto» a lo que era una edición normal.
+     *
+     * Los cuatro casos, con el mismo ancestro `{ a: 'orig', b: 'orig' }`:
+     * - `solo-local`: cambió `b` aquí ⇒ al destino le falta ⇒ **solo `push`**. No hay conflicto.
+     * - `solo-remoto`: cambió `a` allí ⇒ aquí falta ⇒ **solo `pull`**. No hay conflicto.
+     * - `los-dos`: cada lado cambió un campo distinto ⇒ **los dos** comandos y `winner: 'merged'`,
+     *   igual que siempre. Sin regresión.
+     * - `ni-uno`: los tres lados tienen los MISMOS valores y solo difieren las huellas — una huella
+     *   quedó mal calculada o rancia. No hay nada que mandar al destino (sus valores ya son los
+     *   buenos); se escribe **solo aquí** para que la huella local se recalcule y el ciclo siguiente
+     *   converja de verdad. Sin esto, cada ciclo volvería a ver divergencia y a no hacer nada.
+     */
+    it('solo local ⇒ solo push; solo el destino ⇒ solo pull; los dos ⇒ los dos y conflicto', () => {
+      interface Fila {
+        id: string;
+        a: string;
+        b: string;
+      }
+
+      const ancestro = { a: 'orig', b: 'orig' };
+      const versionRemota = {
+        id: 'id',
+        keyfinder: 'fp-remoto',
+        deleted: false,
+        createdAt: '0000000000100-0000-otro',
+      } as const;
+      const versionLocal = {
+        id: 'id',
+        keyfinder: 'fp-local',
+        deleted: false,
+        createdAt: '0000000000100-0000-origina',
+      } as const;
+
+      const plan = reconcile<Fila>({
+        base: [
+          { id: 'solo-local', a: 'orig', b: 'orig', sync: versionRemota },
+          { id: 'solo-remoto', a: 'remoto', b: 'orig', sync: versionRemota },
+          { id: 'los-dos', a: 'remoto', b: 'orig', sync: versionRemota },
+          { id: 'ni-uno', a: 'orig', b: 'orig', sync: versionRemota },
+        ],
+        data: [
+          {
+            id: 'solo-local',
+            a: 'orig',
+            b: 'local',
+            sync: { ...versionLocal, syncedValues: { id: 'solo-local', ...ancestro } },
+          },
+          {
+            id: 'solo-remoto',
+            a: 'orig',
+            b: 'orig',
+            sync: { ...versionLocal, syncedValues: { id: 'solo-remoto', ...ancestro } },
+          },
+          {
+            id: 'los-dos',
+            a: 'orig',
+            b: 'local',
+            sync: { ...versionLocal, syncedValues: { id: 'los-dos', ...ancestro } },
+          },
+          {
+            id: 'ni-uno',
+            a: 'orig',
+            b: 'orig',
+            sync: { ...versionLocal, syncedValues: { id: 'ni-uno', ...ancestro } },
+          },
+        ],
+        now: 1_700_000_000_000,
+        originId: 'origina',
+      });
+
+      expect(plan.push.map(nextSyncedValues)).toEqual([
+        { id: 'solo-local', a: 'orig', b: 'local' },
+        { id: 'los-dos', a: 'remoto', b: 'local' },
+      ]);
+      expect(plan.pull.map(nextSyncedValues)).toEqual([
+        { id: 'solo-remoto', a: 'remoto', b: 'orig' },
+        { id: 'los-dos', a: 'remoto', b: 'local' },
+        { id: 'ni-uno', a: 'orig', b: 'orig' },
+      ]);
+      // Solo el caso en que de verdad hubo que combinar dos cambios cuenta como conflicto.
+      expect(plan.conflicts).toEqual([
+        {
+          id: 'los-dos',
+          winner: 'merged',
+          blind: false,
+          mergedFrom: { remote: ['a'], local: ['b'] },
+        },
+      ]);
+    });
+
+    /**
+     * Un campo que desapareció de los dos lados desaparece **del todo** del registro fusionado.
+     *
+     * Antes se quedaba como una clave con valor `undefined`, arrastrada del ancestro. Es un fallo que
+     * `toEqual` **no ve** (vitest trata `{ a: undefined }` y `{}` como iguales), así que se comprueba
+     * con `Object.keys` a propósito — si no, este test pasaría igual estando roto. Importa porque ese
+     * registro se escribe en el destino y se convierte en el ancestro del ciclo siguiente: una clave
+     * fantasma se propaga.
+     */
+    it('una clave borrada en los dos lados no queda como `undefined` en el fusionado', () => {
+      interface Fila {
+        id: string;
+        a: string;
+        obsoleto?: string;
+      }
+
+      const plan = reconcile<Fila>({
+        base: [
+          {
+            id: 'm',
+            a: 'remoto',
+            sync: {
+              id: 'id',
+              keyfinder: 'fp-remoto',
+              deleted: false,
+              createdAt: '0000000000100-0000-otro',
+            },
+          },
+        ],
+        data: [
+          {
+            id: 'm',
+            a: 'orig',
+            sync: {
+              id: 'id',
+              keyfinder: 'fp-local',
+              deleted: false,
+              createdAt: '0000000000100-0000-origina',
+              syncedValues: { id: 'm', a: 'orig', obsoleto: 'y' },
+            },
+          },
+        ],
+        now: 1_700_000_000_000,
+        originId: 'origina',
+      });
+
+      expect(Object.keys(nextSyncedValues(plan.pull[0]))).toEqual(['id', 'a']);
+    });
+
+    /**
+     * `base` y `data` que declaran identidades en campos distintos **no se fusionan**.
+     *
+     * Fusionar mezcla los campos de los dos lados, así que si uno dice que su identidad vive en `id`
+     * y el otro en `sku`, el registro resultante saldría con las DOS — y se escribiría así en el
+     * destino, inventando una columna y una identidad que nadie pidió. Ante esa incoherencia se cae
+     * al criterio de siempre (gana un lado entero), que sube o trae un registro tal cual venía, con
+     * una sola identidad.
+     */
+    it('con nombres de campo de identidad distintos no se fusiona: nunca sale un registro con dos', () => {
+      interface Fila {
+        id?: string;
+        sku?: string;
+        a: string;
+      }
+
+      const plan = reconcile<Fila>({
+        base: [
+          {
+            id: 'x',
+            a: 'remoto',
+            sync: {
+              id: 'id',
+              keyfinder: 'fp-remoto',
+              deleted: false,
+              createdAt: '0000000000100-0000-otro',
+              updatedAt: '0000000000900-0000-otro',
+            },
+          },
+        ],
+        data: [
+          {
+            sku: 'x',
+            a: 'local',
+            sync: {
+              id: 'sku',
+              keyfinder: 'fp-local',
+              deleted: false,
+              createdAt: '0000000000100-0000-origina',
+              syncedValues: { sku: 'x', a: 'orig' },
+            },
+          },
+        ],
+        now: 1_700_000_000_000,
+        originId: 'origina',
+      });
+
+      expect(plan.conflicts).toEqual([{ id: 'x', winner: 'remote', blind: false }]);
+      expect(plan.push).toEqual([]);
+      expect(Object.keys(nextSyncedValues(plan.pull[0])).sort()).toEqual(['a', 'id']);
+    });
+  });
+
+  describe('reconcile · la huella de una fusión hay que recalcularla', () => {
+    /**
+     * Por qué la huella de un registro fusionado es `null` y no `''`.
+     *
+     * Los valores fusionados son contenido **nuevo**, que no coincide con la huella de ningún lado, y
+     * el motor no calcula huellas. Hasta ahí, igual que antes. Lo que cambia es cómo se dice: `''` es
+     * una cadena como cualquier otra —indistinguible de una huella legítima— y persistirla tenía una
+     * consecuencia silenciosa y grave, que es lo que fija este test de DOS ciclos: en el segundo, los
+     * dos lados traen `''`, el motor los ve iguales y **declara convergencia con contenidos
+     * distintos**. La divergencia se queda ahí para siempre, sin conflicto y sin rastro.
+     *
+     * Con `null`, «hay que recalcular» deja de ser una convención que cada adaptador tiene que
+     * recordar y pasa a ser algo que el tipo obliga a mirar; y aunque alguien lo persista igual, dos
+     * `null` ya **no** cuentan como convergidos.
+     */
+    it('sale marcada para recalcular, y persistirla tal cual no hace converger en falso', () => {
+      interface Fila {
+        id: string;
+        a: string;
+        b: string;
+      }
+
+      const primerCiclo = reconcile<Fila>({
+        base: [
+          {
+            id: 'm',
+            a: 'remoto',
+            b: 'orig',
+            sync: {
+              id: 'id',
+              keyfinder: 'fp-remoto',
+              deleted: false,
+              createdAt: '0000000000100-0000-otro',
+            },
+          },
+        ],
+        data: [
+          {
+            id: 'm',
+            a: 'orig',
+            b: 'local',
+            sync: {
+              id: 'id',
+              keyfinder: 'fp-local',
+              deleted: false,
+              createdAt: '0000000000100-0000-origina',
+              syncedValues: { id: 'm', a: 'orig', b: 'orig' },
+            },
+          },
+        ],
+        now: 1_700_000_000_000,
+        originId: 'origina',
+      });
+
+      const fusionado = primerCiclo.push[0];
+      expect(fusionado.sync.keyfinder).toBeNull();
+
+      // El adaptador que NO recalcula: escribe la huella centinela tal cual en los dos lados, pero
+      // con contenidos que en realidad siguen sin coincidir (aquí se aplicó el `pull`, allí no).
+      const segundoCiclo = reconcile<Fila>({
+        base: [{ ...fusionado, a: 'remoto', b: 'orig' }],
+        data: [{ ...fusionado, sync: { ...fusionado.sync, syncedValues: undefined } }],
+        now: 1_700_000_001_000,
+        originId: 'origina',
+      });
+
+      expect(segundoCiclo.conflicts).not.toEqual([]);
+    });
+  });
+
+  describe('reconcile · una versión no fiable del destino se ve en el diagnóstico', () => {
+    /**
+     * Cuando la versión del destino no se puede creer —ilegible, o de un futuro que ningún reloj
+     * justifica— se re-estampa con el reloj de este origen. Eso es lo correcto (si no, un valor
+     * corrupto en una columna que un humano edita ganaría esa fila para siempre), pero tiene una
+     * consecuencia que conviene no esconder: la versión re-estampada es, por construcción, **la más
+     * alta que hay** — así que el destino gana ese conflicto contra cualquier edición local legítima.
+     *
+     * Que gane es defendible: el destino es la fuente de la verdad. Que **no se vea** no lo era:
+     * `blind` solo habla del lado local, así que el conflicto salía indistinguible de uno decidido
+     * con dos fechas buenas. `restamped` lo dice.
+     */
+    it('la versión re-estampada gana el conflicto, y queda marcada como `restamped`', () => {
+      interface Fila {
+        id: string;
+        contenido: string;
+      }
+
+      const ahora = 1_700_000_000_000;
+      const plan = reconcile<Fila>({
+        base: [
+          {
+            id: 'ilegible',
+            contenido: 'remoto',
+            sync: {
+              id: 'id',
+              keyfinder: 'fp-remoto',
+              deleted: false,
+              createdAt: 'lo-que-alguien-tecleo',
+            },
+          },
+          {
+            id: 'del-futuro',
+            contenido: 'remoto',
+            sync: {
+              id: 'id',
+              keyfinder: 'fp-remoto',
+              deleted: false,
+              createdAt: '0000000000100-0000-otro',
+              updatedAt: '9999999999999-0000-otro',
+            },
+          },
+          {
+            id: 'normal',
+            contenido: 'remoto',
+            sync: {
+              id: 'id',
+              keyfinder: 'fp-remoto',
+              deleted: false,
+              createdAt: '0000000000100-0000-otro',
+            },
+          },
+        ],
+        data: [
+          {
+            id: 'ilegible',
+            contenido: 'local',
+            sync: {
+              id: 'id',
+              keyfinder: 'fp-local',
+              deleted: false,
+              createdAt: `${String(ahora - 1000).padStart(13, '0')}-0000-origina`,
+            },
+          },
+          {
+            id: 'del-futuro',
+            contenido: 'local',
+            sync: {
+              id: 'id',
+              keyfinder: 'fp-local',
+              deleted: false,
+              createdAt: `${String(ahora - 1000).padStart(13, '0')}-0000-origina`,
+            },
+          },
+          {
+            id: 'normal',
+            contenido: 'local',
+            sync: {
+              id: 'id',
+              keyfinder: 'fp-local',
+              deleted: false,
+              createdAt: `${String(ahora - 1000).padStart(13, '0')}-0000-origina`,
+            },
+          },
+        ],
+        now: ahora,
+        originId: 'origina',
+      });
+
+      expect(plan.conflicts).toEqual([
+        { id: 'ilegible', winner: 'remote', blind: false, restamped: true },
+        { id: 'del-futuro', winner: 'remote', blind: false, restamped: true },
+        // El normal pierde por fecha, con las dos versiones legibles: aquí no hay nada que marcar.
+        { id: 'normal', winner: 'local', blind: false },
+      ]);
+    });
+  });
+
+  describe('reconcile · volumen', () => {
+    /**
+     * Un ciclo real trae la colección entera, no un puñado de filas, así que el motor tiene que
+     * aguantar el tamaño de un almacén de verdad sin degradarse a cuadrático. El agrupado por id era
+     * el sitio donde eso podía pasar sin que nadie lo notara (copiaba el array del grupo en cada
+     * inserción), y el caso peor es justo el patológico: **todos los registros con el mismo id**.
+     *
+     * El tope de tiempo es deliberadamente generoso: no se está midiendo rendimiento —eso sería un
+     * test intermitente—, se está detectando un cambio de orden de complejidad, que se pasa de ese
+     * tope por varios órdenes de magnitud.
+     */
+    it('10.000 registros, y 5.000 repitiendo el mismo id, salen en un tiempo razonable', () => {
+      interface Fila {
+        id: string;
+        contenido: string;
+      }
+
+      const version = (millis: number) => `${String(millis).padStart(13, '0')}-0000-origina`;
+      const base: Registro<Fila>[] = [];
+      const data: Registro<Fila>[] = [];
+      for (let i = 0; i < 10_000; i += 1) {
+        const sync = {
+          id: 'id',
+          keyfinder: `fp-${i}`,
+          deleted: false,
+          createdAt: version(100 + i),
+        } as const;
+        base.push({ id: `r${i}`, contenido: `remoto-${i}`, sync });
+        // Un tercio diverge: hay que decidirlos, no solo compararlos.
+        data.push({
+          id: `r${i}`,
+          contenido: `local-${i}`,
+          sync: { ...sync, keyfinder: i % 3 === 0 ? `fp-local-${i}` : `fp-${i}` },
+        });
+      }
+      for (let i = 0; i < 5_000; i += 1) {
+        data.push({ id: 'repetido', contenido: `dup-${i}`, sync: base[0].sync });
+      }
+
+      const arranque = performance.now();
+      const plan = reconcile<Fila>({ base, data, now: 1_700_000_000_000, originId: 'origina' });
+      const tardo = performance.now() - arranque;
+
+      expect(plan.conflicts).toHaveLength(3334);
+      expect(plan.ignored).toHaveLength(4_999);
+      expect(tardo).toBeLessThan(2_000);
     });
   });
 });
