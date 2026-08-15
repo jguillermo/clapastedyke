@@ -99,6 +99,28 @@ export interface AppFixtures {
   connectAccount: () => Promise<AccountPage>;
 }
 
+/**
+ * `true` si el mensaje lo produjo **un fichero de tipografía**. Esos no cuentan como error.
+ *
+ * Una fuente que no carga es lo único que el navegador sabe degradar solo: usa la siguiente de la
+ * pila (`system-ui`) y **todo lo demás sigue funcionando** — los flujos, los textos, los cálculos y
+ * cada aserción de esta suite. No hay ningún E2E que compruebe con qué letra se pinta la app, así que
+ * un `.woff2` que falle no puede decidir si un test pasa.
+ *
+ * Costó descubrirlo: cuando la tipografía venía del CDN de Google, un `.woff2` empezó a dar 404 y
+ * **caía un test distinto en cada corrida**. La petición de una fuente es lenta y asíncrona, así que el
+ * error aterrizaba en la ventana de cualquier test que estuviera abierto en ese momento. Parecía
+ * intermitencia por paralelismo y no lo era.
+ *
+ * Se mira **la extensión del recurso, no el texto del mensaje**: filtrar por «Failed to load
+ * resource…» escondería también el 404 de un asset de verdad, que sí hay que ver. Y se mira sin
+ * importar el origen: da igual que la fuente venga de un CDN o de `public/fonts/` — sigue sin ser un
+ * fallo de la app.
+ */
+function isFontResource(url: string): boolean {
+  return /\.(woff2?|ttf|otf|eot)(\?|#|$)/i.test(url);
+}
+
 export const test = base.extend<AppOptions & AppFixtures>({
   webgl: [false, { option: true }],
 
@@ -130,12 +152,16 @@ export const test = base.extend<AppOptions & AppFixtures>({
    * Funciona porque el registro está encendido también en el build de producción que sirven los E2E:
    * `warn` y `error` se ven siempre. **Los `warn` se ignoran a propósito** — son degradaciones
    * esperadas en algunos flujos (un insumo legacy, un fallback), no fallos.
+   *
+   * **La única excepción son las tipografías** (ver {@link isFontResource}): una fuente que no carga la
+   * degrada el navegador solo, y esta suite no comprueba con qué letra se pinta nada. Todo lo demás
+   * —incluido el 404 de cualquier otro asset— sigue tumbando el test.
    */
   consoleErrors: [
     async ({ page }, use) => {
       const errors: string[] = [];
       page.on('console', (message) => {
-        if (message.type() === 'error') {
+        if (message.type() === 'error' && !isFontResource(message.location().url)) {
           errors.push(message.text());
         }
       });
@@ -178,7 +204,7 @@ export const test = base.extend<AppOptions & AppFixtures>({
     // La misma guarda que el aparato principal: un error en consola de este también rompe el test.
     const errors: string[] = [];
     page.on('console', (message) => {
-      if (message.type() === 'error') {
+      if (message.type() === 'error' && !isFontResource(message.location().url)) {
         errors.push(message.text());
       }
     });
