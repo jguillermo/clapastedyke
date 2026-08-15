@@ -1556,6 +1556,147 @@ describe('reconcile engine', () => {
         b: 'local-b',
       });
     });
+
+    /**
+     * **El ancestro se guarda cuando el destino ya confirmó, y solo entonces.** Es la regla más
+     * peligrosa del diseño, así que se ejecuta en vez de quedarse documentada.
+     *
+     * El motor no puede imponerla —no sabe si la escritura llegó—, y lo único que está en su mano es
+     * no estorbar: no lo mete en el plan (`push`/`pull` salen siempre sin `syncedValues`) y deja el
+     * sello al adaptador, con `nextSyncedValues(aplicado)`. Este test recorre las TRES continuaciones
+     * posibles del mismo ciclo, con el motor de verdad en las tres.
+     *
+     * El escenario: los dos lados tenían el precio en 2,50 y aquí se sube a 2,75. El ciclo decide
+     * subirlo.
+     *
+     * 1. **Confirmó** ⇒ el adaptador sella `nextSyncedValues(aplicado)` y el ciclo siguiente ve los
+     *    dos lados iguales: convergido, plan vacío. Estado estable.
+     * 2. **Falló** ⇒ NO se sella nada. El registro local sigue con su ancestro anterior (2,50), así
+     *    que el ciclo siguiente vuelve a proponer la subida: el reintento es honesto y **no se pierde
+     *    la edición**.
+     * 3. **Falló pero se selló igual** ⇒ el desastre, y por eso está aquí: con `ancestro = 2,75`, el
+     *    motor lee «el destino bajó el precio a 2,50» y «aquí no tocó nadie», así que **aplica 2,50
+     *    encima de tu edición y encima la sube como acordada**. Sin excepción, sin conflicto y sin
+     *    rastro. El único que avisaría es este test.
+     *
+     * La asimetría que justifica todo: un ancestro **vacío** degrada a "gana un lado entero"
+     * (molesto, visible, recuperable); un ancestro **mentiroso** pierde datos en silencio.
+     */
+    it('el ancestro solo se sella tras confirmar: sin confirmar se reintenta, y sellarlo igual perdería la edición', () => {
+      const local = {
+        id: 'ing-1',
+        precio: 2.75, // aquí se subió de 2,50 a 2,75
+        sync: {
+          id: 'id',
+          keyfinder: 'fp-275',
+          deleted: false,
+          createdAt: '0000000000100-0000-origina',
+          updatedAt: '0000000003000-0000-origina',
+          syncedValues: { id: 'ing-1', precio: 2.5 }, // lo último que se sabe acordado
+        },
+      };
+      const remoto = {
+        id: 'ing-1',
+        precio: 2.5, // el destino sigue como estaba
+        sync: {
+          id: 'id',
+          keyfinder: 'fp-250',
+          deleted: false,
+          createdAt: '0000000000100-0000-origina',
+          updatedAt: '0000000002000-0000-origina',
+        },
+      };
+
+      const ciclo = reconcile<{ id: string; precio: number }>({
+        base: [remoto],
+        data: [local],
+        now: 1_700_000_000_000,
+        originId: 'origina',
+      });
+
+      // Solo cambió un lado, así que la "fusión" es la edición local entera; lo que importa es qué
+      // se propone escribir y que el plan NO lleva ancestro con el que sellar nada todavía.
+      expect(ciclo.conflicts).toEqual([
+        {
+          id: 'ing-1',
+          winner: 'merged',
+          blind: false,
+          mergedFrom: { remote: [], local: ['precio'] },
+        },
+      ]);
+      expect(nextSyncedValues(ciclo.push[0]!)).toEqual({ id: 'ing-1', precio: 2.75 });
+      expect(ciclo.push[0]?.sync.syncedValues).toBeUndefined();
+
+      // 1. CONFIRMÓ. El adaptador sella el ancestro y recalcula la huella real (la fusión sale con
+      //    `keyfinder: ''`, ver README). El destino ya tiene 2,75.
+      const selladoTrasConfirmar = nextSyncedValues(ciclo.push[0]!);
+      expect(selladoTrasConfirmar).toEqual({ id: 'ing-1', precio: 2.75 });
+
+      const trasConfirmar = reconcile<{ id: string; precio: number }>({
+        base: [
+          {
+            id: 'ing-1',
+            precio: 2.75,
+            sync: {
+              id: 'id',
+              keyfinder: 'fp-275',
+              deleted: false,
+              createdAt: '0000000000100-0000-origina',
+              updatedAt: '1700000000000-0000-origina',
+            },
+          },
+        ],
+        data: [
+          {
+            id: 'ing-1',
+            precio: 2.75,
+            sync: {
+              id: 'id',
+              keyfinder: 'fp-275',
+              deleted: false,
+              createdAt: '0000000000100-0000-origina',
+              updatedAt: '1700000000000-0000-origina',
+              syncedValues: selladoTrasConfirmar,
+            },
+          },
+        ],
+        now: 1_700_000_100_000,
+        originId: 'origina',
+      });
+      expect(trasConfirmar).toEqual({ push: [], pull: [], duplicates: [], conflicts: [] });
+
+      // 2. FALLÓ. No se sella nada: el registro local queda EXACTAMENTE como estaba, ancestro viejo
+      //    incluido, y el destino tampoco cambió. El ciclo siguiente vuelve a proponer la subida.
+      const trasFallar = reconcile<{ id: string; precio: number }>({
+        base: [remoto],
+        data: [local], // el mismo objeto de entrada: nada se tocó
+        now: 1_700_000_100_000,
+        originId: 'origina',
+      });
+      expect(nextSyncedValues(trasFallar.push[0]!)).toEqual({ id: 'ing-1', precio: 2.75 });
+
+      // 3. FALLÓ, pero se selló igual. Mismo destino intacto en 2,50, y un ancestro que miente.
+      const trasSellarSinConfirmar = reconcile<{ id: string; precio: number }>({
+        base: [remoto],
+        data: [{ ...local, sync: { ...local.sync, syncedValues: { id: 'ing-1', precio: 2.75 } } }],
+        now: 1_700_000_100_000,
+        originId: 'origina',
+      });
+
+      // El precio pasa a atribuirse al DESTINO —que no lo tocó— y la edición de 2,75 desaparece:
+      // se escribe 2,50 aquí (`pull`) y se sube al destino (`push`) como si fuera lo acordado.
+      expect(trasSellarSinConfirmar.conflicts).toEqual([
+        {
+          id: 'ing-1',
+          winner: 'merged',
+          blind: false,
+          mergedFrom: { remote: ['precio'], local: [] },
+        },
+      ]);
+      const perdido = { id: 'ing-1', precio: 2.5 };
+      expect(nextSyncedValues(trasSellarSinConfirmar.push[0]!)).toEqual(perdido);
+      expect(nextSyncedValues(trasSellarSinConfirmar.pull[0]!)).toEqual(perdido);
+    });
   });
 
   describe('reconcile · reloj lógico híbrido (HLC)', () => {
