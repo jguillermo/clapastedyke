@@ -203,16 +203,37 @@ describe('SynchronizeWithRemote', () => {
       expect(sink.changes[0]?.tables['supplies']).toHaveLength(1);
     });
 
-    it('una fila rechazada se recuerda en la base para no reintentarla en cada ciclo', async () => {
-      reader.snapshot = remote([cellsOf(insumo('ing-malo'))]);
+    /**
+     * El cerrojo del adaptador, y la razón por la que la base se escribe **fila a fila con lo que el
+     * destino confirmó de CADA una**, no de una pasada sobre el lote: aquí una fila entra y la otra se
+     * rechaza en el mismo envío.
+     *
+     * Si alguien "simplificara" el bucle recorriendo `plan.apply` en vez de `outcome.applied` y
+     * `outcome.rejected` por separado, el fallo sería silencioso en las dos direcciones: la rechazada
+     * quedaría apuntada como buena —y entonces no se reintentaría **nunca**, ni siquiera cuando el
+     * humano corrigiera la celda—, o la buena quedaría en cuarentena y se reintentaría en cada ciclo,
+     * para siempre. Las dos se recuerdan, pero no igual.
+     */
+    it('en un lote mixto apunta cada fila según lo que confirmó el destino, no el lote entero', async () => {
+      reader.snapshot = remote([
+        cellsOf(insumo('ing-bueno')),
+        cellsOf(insumo('ing-malo', 'Manteca')),
+      ]);
       sink.rejectIds = ['ing-malo'];
 
       const result = await cycle.execute();
 
-      expect(result.rejected).toBe(1);
-      expect(await shadow.all()).toMatchObject([
+      expect(result).toMatchObject({ applied: 1, rejected: 1 });
+
+      const base = [...(await shadow.all())].sort((x, y) => x.rowId.localeCompare(y.rowId));
+      expect(base).toMatchObject([
+        { table: 'supplies', rowId: 'ing-bueno', deleted: false },
         { table: 'supplies', rowId: 'ing-malo', rejected: expect.any(String) },
       ]);
+      // La que entró se apunta limpia: sin marca de cuarentena.
+      expect(base[0]?.rejected).toBeUndefined();
+      // Y la rechazada guarda la huella con la que falló, que es lo único que la sacará de ahí.
+      expect(base[1]?.fingerprint).toEqual(expect.any(String));
     });
   });
 

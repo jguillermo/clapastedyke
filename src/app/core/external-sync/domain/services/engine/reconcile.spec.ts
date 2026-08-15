@@ -33,6 +33,26 @@ import { EngineInput, Registro } from './engine.types';
  * `id` propio y escriben `sync.id: 'id'` en cada registro, salvo el caso que ejercita
  * explícitamente un nombre de campo distinto (`sku`).
  *
+ * ## Por qué la mayoría de los registros de estos tests NO lleva `sync.syncedValues`
+ *
+ * Porque **no es un campo que el motor rellene, y su ausencia significa algo**. Cada registro lo
+ * lleva solo si su caso lo necesita, y hay exactamente tres motivos para omitirlo:
+ *
+ * 1. **Es imposible que exista.** El registro solo está en `base` (nunca se ha visto aquí), solo
+ *    está en `data` (el destino no lo ha visto nunca: un alta), o converge por huella — en los tres
+ *    el motor ni siquiera llega a `tryMerge`. Ahí ponerlo sería inventar un dato falso.
+ * 2. **Su ausencia ES el caso.** Sin ancestro no hay forma de atribuir un campo divergente a un
+ *    lado, así que se cae en "gana un lado entero por versión". Es el estado real de un registro
+ *    nunca sincronizado, o escrito antes de que el campo existiera.
+ * 3. **El motor no lo lee ahí.** En `base` se ignora siempre: el destino no tiene ancestro propio
+ *    (lo prueba `ancestro-en-base`).
+ *
+ * Y la otra mitad del contrato: **el motor NUNCA escribe `syncedValues` en su salida**, ni siquiera
+ * arrastrando el que traía el registro local. Lo guarda el adaptador con `nextSyncedValues(...)`
+ * DESPUÉS de escribir con éxito — hacerlo antes congelaría un ancestro sobre una escritura que
+ * todavía puede fallar. Se comprueba con la forma completa de los `push`/`pull` (`toEqual`), no de
+ * pasada: en el describe de fusión, un registro que entra con ancestro sale sin él.
+ *
  * ## Cómo está organizado
  *
  * **Un `it` por regla del motor, no por ejemplo de esa regla.** Cada regla tiene una sola prueba,
@@ -182,16 +202,29 @@ describe('reconcile engine', () => {
   describe('reconcile · borrados', () => {
     /**
      * El borrado del DESTINO es incondicional: es la fuente de verdad y su borrado no se discute,
-     * así que no se compara ni huella ni fecha. Las tres variantes que podrían hacer dudar:
+     * así que no se compara ni huella, ni fecha, ni ancestro. Las cuatro variantes que podrían
+     * hacer dudar:
      * - `mas-nuevo-aqui`: aquí sigue vivo, con otro contenido y una fecha MÁS reciente.
      * - `misma-huella`: el contenido de aquí es idéntico al que tenía el destino (no decide la
      *   huella, decide el `deleted` de `base`).
      * - `sin-version`: el destino no dejó ninguna fecha legible al borrar ⇒ se sintetiza una.
+     * - `con-ancestro`: aquí SÍ hay ancestro (`sync.syncedValues`) y los campos divergentes son
+     *   distintos en cada lado, o sea que una fusión sería posible — el borrado del destino corta
+     *   antes de intentarla siquiera (`if (base.sync.deleted)` va antes que `tryMerge`).
      *
-     * En los tres: `pull` de la lápida, nada que subir y ningún conflicto — no hubo nada que decidir.
+     * En los cuatro: `pull` de la lápida, nada que subir y ningún conflicto — no hubo nada que
+     * decidir. Y el registro traído NO lleva `syncedValues`: el motor nunca lo escribe, lo guarda el
+     * adaptador tras aplicar (por eso la comprobación es de forma completa, con `toEqual`).
      */
-    it('un borrado en el destino se trae siempre, sin mirar huella ni fecha', () => {
-      const plan = reconcile<{ id: string; contenido: string }>({
+    it('un borrado en el destino se trae siempre, sin mirar huella, fecha ni ancestro', () => {
+      interface Fila {
+        id: string;
+        contenido?: string;
+        a?: string;
+        b?: string;
+      }
+
+      const plan = reconcile<Fila>({
         base: [
           {
             id: 'mas-nuevo-aqui',
@@ -223,6 +256,18 @@ describe('reconcile engine', () => {
               keyfinder: 'fp',
               deleted: true,
               createdAt: 'no-es-una-version',
+            },
+          },
+          {
+            id: 'con-ancestro',
+            a: 'remoto-a',
+            b: 'orig-b',
+            sync: {
+              id: 'id',
+              keyfinder: 'fp-remoto',
+              deleted: true,
+              createdAt: '0000000000100-0000-origina',
+              updatedAt: '0000000000500-0000-origina',
             },
           },
         ],
@@ -258,6 +303,20 @@ describe('reconcile engine', () => {
               keyfinder: 'fp2',
               deleted: false,
               createdAt: '0000000000100-0000-origina',
+            },
+          },
+          {
+            // El destino cambió 'a' y aquí se cambió 'b': con ancestro y sin solapamiento, esto
+            // fusionaría… si el destino no lo hubiera borrado. Con la lápida, ni se intenta.
+            id: 'con-ancestro',
+            a: 'orig-a',
+            b: 'local-b',
+            sync: {
+              id: 'id',
+              keyfinder: 'fp-local',
+              deleted: false,
+              createdAt: '0000000000100-0000-origina',
+              syncedValues: { id: 'con-ancestro', a: 'orig-a', b: 'orig-b' },
             },
           },
         ],
@@ -299,6 +358,19 @@ describe('reconcile engine', () => {
               deleted: true,
               createdAt: 'no-es-una-version',
               updatedAt: '1700000000000-0000-origina',
+            },
+          },
+          {
+            // Sin `syncedValues`: el motor no lo escribe nunca, ni lo arrastra del registro local.
+            id: 'con-ancestro',
+            a: 'remoto-a',
+            b: 'orig-b',
+            sync: {
+              id: 'id',
+              keyfinder: 'fp-remoto',
+              deleted: true,
+              createdAt: '0000000000100-0000-origina',
+              updatedAt: '0000000000500-0000-origina',
             },
           },
         ],
@@ -440,12 +512,17 @@ describe('reconcile engine', () => {
 
   describe('reconcile · conflicto: gana la versión más reciente', () => {
     /**
-     * Sin ancestro no hay nada que atribuir, así que gana un lado ENTERO por versión. Las tres
-     * formas de resolverlo:
+     * Cuando no se puede fusionar, gana un lado ENTERO por versión. Las tres formas de resolverlo:
      * - `gana-aqui`: la edición local es posterior ⇒ `push` con una versión nueva.
      * - `gana-destino`: la del destino es posterior ⇒ `pull`, respetando su versión tal cual.
      * - `empate`: mismo milisegundo y mismo contador ⇒ desempata el origen, alfabéticamente
      *   ('devicea' < 'deviceb'), para que TODAS las réplicas decidan igual.
+     *
+     * Ninguno lleva `sync.syncedValues`, y es deliberado: **su ausencia es la que abre esta rama**.
+     * Modela un registro nunca sincronizado o escrito antes de que el campo existiera. Con ancestro
+     * se llega aquí igual —pero solo si el cambio SOLAPA en el mismo campo—, y ese camino lo cubre
+     * `solapamiento` en el describe de fusión; lo que se prueba aquí es el desempate por versión, que
+     * es idéntico venga de donde venga.
      */
     it('huella distinta: gana la fecha más reciente, y un empate exacto lo rompe el origen', () => {
       const plan = reconcile<{ id: string; contenido: string }>({
@@ -949,16 +1026,24 @@ describe('reconcile engine', () => {
     });
 
     /**
-     * Cuándo NO se fusiona, aunque los campos divergentes parezcan compatibles. En los cuatro casos
+     * Cuándo NO se fusiona, aunque los campos divergentes parezcan compatibles. En los cinco casos
      * se cae al criterio de siempre (gana un lado entero por versión), sin lanzar ninguna excepción:
-     * - `sin-ancestro`: no hay `syncedValues` ⇒ no hay forma de atribuir un cambio a un lado.
+     * - `sin-ancestro`: no hay `syncedValues` ⇒ no hay forma de atribuir un cambio a un lado. Es el
+     *   estado de un registro nunca sincronizado, o escrito antes de que el campo existiera.
      * - `ancestro-texto` / `ancestro-array`: el ancestro no es un objeto plano ⇒ no hay "campos" que
      *   comparar.
+     * - `ancestro-en-base`: el ancestro está en el registro del DESTINO, no en el local. El motor
+     *   solo lee `data.sync.syncedValues` —el destino no tiene ancestro propio, ver `engine.types.ts`—
+     *   así que este no cuenta y no habilita ninguna fusión.
      * - `solapamiento`: el mismo campo cambiado a valores DISTINTOS en los dos lados; fusionar
      *   perdería en silencio el cambio de uno, así que se aborta la fusión entera.
      *
-     * La huella conservada en `push` (`fp-local`, no `''`) es la prueba de que ninguno pasó por la
-     * fusión: un registro fusionado sale siempre con la huella vacía.
+     * Dos pruebas de que ninguno pasó por la fusión: la huella conservada en `push` (`fp-local`, no
+     * `''`), y la forma completa del registro subido — que además fija la otra mitad del contrato de
+     * `syncedValues`: **el motor nunca lo propaga**. `solapamiento` entra con ancestro y sale sin él,
+     * porque quien lo guarda es el adaptador DESPUÉS de escribir con éxito (`nextSyncedValues`), no
+     * el plan. Si el motor lo arrastrara, se congelaría un ancestro sobre una escritura que aún
+     * puede fallar.
      */
     it('sin ancestro utilizable o con solapamiento real no se fusiona: gana un lado entero', () => {
       interface Fila {
@@ -1014,6 +1099,20 @@ describe('reconcile engine', () => {
               updatedAt: '0000000002000-0000-origina',
             },
           },
+          {
+            // El ancestro va aquí, en el destino: el motor NO lo lee. Solo cuenta el del local.
+            id: 'ancestro-en-base',
+            a: 'remoto-a',
+            b: 'orig-b',
+            sync: {
+              id: 'id',
+              keyfinder: 'fp-remoto',
+              deleted: false,
+              createdAt: '0000000000100-0000-origina',
+              updatedAt: '0000000002000-0000-origina',
+              syncedValues: { id: 'ancestro-en-base', a: 'orig-a', b: 'orig-b' },
+            },
+          },
         ],
         data: [
           {
@@ -1065,6 +1164,19 @@ describe('reconcile engine', () => {
               syncedValues: { id: 'solapamiento', a: 'orig' },
             },
           },
+          {
+            // Cambia 'b' mientras el destino cambia 'a': fusionaría, si el ancestro estuviera aquí.
+            id: 'ancestro-en-base',
+            a: 'orig-a',
+            b: 'local-b',
+            sync: {
+              id: 'id',
+              keyfinder: 'fp-local',
+              deleted: false,
+              createdAt: '0000000000100-0000-origina',
+              updatedAt: '0000000003000-0000-origina',
+            },
+          },
         ],
         now: 1_700_000_000_000,
         originId: 'origina',
@@ -1075,6 +1187,7 @@ describe('reconcile engine', () => {
         { id: 'ancestro-texto', winner: 'local', blind: false },
         { id: 'ancestro-array', winner: 'local', blind: false },
         { id: 'solapamiento', winner: 'local', blind: false },
+        { id: 'ancestro-en-base', winner: 'local', blind: false },
       ]);
       expect(plan.pull).toEqual([]);
       expect(plan.push.map(nextSyncedValues)).toEqual([
@@ -1082,8 +1195,23 @@ describe('reconcile engine', () => {
         { id: 'ancestro-texto', a: 'local' },
         { id: 'ancestro-array', a: 'local' },
         { id: 'solapamiento', a: 'local' },
+        { id: 'ancestro-en-base', a: 'orig-a', b: 'local-b' },
       ]);
       expect(plan.push.every((registro) => registro.sync.keyfinder === 'fp-local')).toBe(true);
+
+      // Forma completa del ÚNICO push cuya entrada traía `syncedValues`: sale sin él.
+      expect(plan.push[3]).toEqual({
+        id: 'solapamiento',
+        a: 'local',
+        sync: {
+          id: 'id',
+          keyfinder: 'fp-local',
+          deleted: false,
+          createdAt: '0000000000100-0000-origina',
+          updatedAt: '1700000000000-0003-origina',
+        },
+      });
+      expect(plan.push.every((registro) => registro.sync.syncedValues === undefined)).toBe(true);
     });
 
     /**
@@ -1217,17 +1345,24 @@ describe('reconcile engine', () => {
 
     /**
      * El ciclo completo que documenta el README ("Lo que le toca al adaptador"), encadenado de
-     * verdad — sin simular a mano ningún ancestro. Tres ciclos, porque son tres afirmaciones
-     * distintas:
+     * verdad — sin simular a mano ningún ancestro. El README dice «tras cada ciclo con éxito, haya
+     * escrito por `push`, por `pull` o por una fusión», así que aquí se recorren **las tres formas
+     * de escritura**, que es lo que hace de esto una prueba y no una ilustración:
      *
-     * 1. Un alta simple, SIN ancestro (el estado normal de la primera sincronización). El ancestro
-     *    nace de CUALQUIER escritura aplicada, no solo de una fusión.
-     * 2. Con ese ancestro, el ciclo siguiente ya puede fusionar lo que antes habría sido, como
+     * 1. **Alta (`push`)**, SIN ancestro — el estado normal de la primera sincronización. El
+     *    ancestro nace de CUALQUIER escritura aplicada, no solo de una fusión.
+     * 2. **Fusión**: con ese ancestro, el ciclo siguiente ya fusiona lo que antes habría sido, como
      *    mucho, un conflicto a ciegas por fecha.
-     * 3. Con `nextSyncedValues` del registro FUSIONADO, el tercer ciclo vuelve a fusionar sin
-     *    arrastrar lo ya resuelto: `b` quedó como lo dejó el ciclo 2 y nadie vuelve a reclamarlo.
+     * 3. **Fusión encadenada**: con `nextSyncedValues` del registro FUSIONADO, el tercer ciclo
+     *    vuelve a fusionar sin arrastrar lo ya resuelto — `b` quedó como lo dejó el ciclo 2 y nadie
+     *    vuelve a reclamarlo.
+     * 4. **`pull`** (otro id, para no enredarlo con lo anterior): ganó el destino, y el ancestro
+     *    pasa a ser lo que el destino trajo. Este es el que más silenciosamente duele si se olvida:
+     *    con un ancestro viejo, el ciclo siguiente vería los valores que acaban de LLEGAR del
+     *    destino como si los hubiera cambiado el local, y abortaría la fusión por un solapamiento
+     *    que no existe. Con el ancestro al día, fusiona.
      */
-    it('el ancestro nace de cualquier escritura aplicada y se actualiza ciclo a ciclo', () => {
+    it('el ancestro nace de cualquier escritura aplicada —push, fusión o pull— y se actualiza ciclo a ciclo', () => {
       const alta = reconcile<{ id: string; a: string; b: string }>({
         base: [],
         data: [
@@ -1331,6 +1466,94 @@ describe('reconcile engine', () => {
         a: 'remoto-a3',
         b: 'local-b',
         c: 'nuevo-local',
+      });
+
+      // 4. La otra mitad: el ancestro también se rehace tras un `pull`. Otro id, para no enredarlo
+      //    con la cadena de arriba.
+      const ganaElDestino = reconcile<{ id: string; a: string; b: string }>({
+        base: [
+          {
+            id: '2',
+            a: 'remoto-a',
+            b: 'remoto-b',
+            sync: {
+              id: 'id',
+              keyfinder: 'fp-remoto',
+              deleted: false,
+              createdAt: '0000000000100-0000-origina',
+              updatedAt: '0000000009000-0000-origina',
+            },
+          },
+        ],
+        data: [
+          {
+            id: '2',
+            a: 'local-a',
+            b: 'remoto-b',
+            sync: {
+              id: 'id',
+              keyfinder: 'fp-local',
+              deleted: false,
+              createdAt: '0000000000100-0000-origina',
+              updatedAt: '0000000003000-0000-origina',
+              // Sin ancestro todavía: por eso este ciclo no fusiona, lo resuelve la fecha.
+            },
+          },
+        ],
+        now: 1_700_000_300_000,
+        originId: 'origina',
+      });
+      expect(ganaElDestino.conflicts).toEqual([{ id: '2', winner: 'remote', blind: false }]);
+
+      // El paso del adaptador tras aplicar el `pull`: el ancestro es lo que trajo el destino, no lo
+      // que había aquí antes.
+      const trasElPull = nextSyncedValues(ganaElDestino.pull[0]!);
+      expect(trasElPull).toEqual({ id: '2', a: 'remoto-a', b: 'remoto-b' });
+
+      const trasAplicarElPull = reconcile<{ id: string; a: string; b: string }>({
+        base: [
+          {
+            id: '2',
+            a: 'remoto-a2', // el destino cambia 'a' otra vez
+            b: 'remoto-b',
+            sync: {
+              id: 'id',
+              keyfinder: 'fp6',
+              deleted: false,
+              createdAt: '0000000000100-0000-origina',
+              updatedAt: '0000000009500-0000-origina',
+            },
+          },
+        ],
+        data: [
+          {
+            id: '2',
+            a: 'remoto-a', // lo que dejó el pull anterior: aquí nadie lo ha tocado
+            b: 'local-b', // y aquí se cambia 'b'
+            sync: {
+              id: 'id',
+              keyfinder: 'fp7',
+              deleted: false,
+              createdAt: '0000000000100-0000-origina',
+              updatedAt: '0000000009400-0000-origina',
+              syncedValues: trasElPull, // ← el ancestro nacido de un pull
+            },
+          },
+        ],
+        now: 1_700_000_400_000,
+        originId: 'origina',
+      });
+
+      // Con el ancestro al día, `a` se atribuye al destino y `b` al local. Con el ancestro viejo
+      // (`{ a: 'local-a', … }`), `a` habría contado como cambiado en LOS DOS lados a valores
+      // distintos: solapamiento falso, fusión abortada y un cambio perdido por la fecha.
+      expect(trasAplicarElPull.conflicts).toEqual([
+        { id: '2', winner: 'merged', blind: false, mergedFrom: { remote: ['a'], local: ['b'] } },
+      ]);
+      expect(nextSyncedValues(trasAplicarElPull.push[0]!)).toEqual({
+        id: '2',
+        a: 'remoto-a2',
+        b: 'local-b',
       });
     });
   });
