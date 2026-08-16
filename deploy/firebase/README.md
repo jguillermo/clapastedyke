@@ -7,7 +7,7 @@ workflow de GitHub Actions, que lanza el despliegue pero no decide nada de él.
 |---|---|
 | [`environments.json`](environments.json) | **La lista de ambientes y su configuración.** El único sitio donde se declaran |
 | [`config.mjs`](config.mjs) | Genera el `config.json` de un ambiente a partir del anterior |
-| [`firebase.json`](firebase.json) | Cómo se sirve el sitio: qué carpeta, el rewrite de SPA y las cabeceras de caché. **Uno solo para todos los ambientes** |
+| [`../../firebase.json`](../../firebase.json) | Cómo se sirve el sitio. **Vive en la raíz y no puede moverse aquí** — ver abajo |
 
 Cada ambiente es un **proyecto de Firebase distinto** bajo la misma cuenta de Google. Hoy hay dos,
 `dev` y `prod`, pero el número no está fijado en ninguna parte: los ambientes son **datos**, no
@@ -94,28 +94,38 @@ verdad es `FIREBASE_SERVICE_ACCOUNT`**, que sí es una clave privada.
 
 ## Tres detalles del diseño que parecen rarezas
 
-**El `public` del `firebase.json` empieza por `../../`.** El CLI toma como raíz del proyecto **el
-directorio donde está el `firebase.json`**, no aquel desde el que lo lanzas. Por eso la ruta sube dos
-niveles y por eso toda invocación lleva `--config`:
+**`firebase.json` está en la raíz y no puede vivir en esta carpeta.** Se intentó, y el deploy falla:
 
-```bash
-npx --yes firebase-tools deploy --only hosting \
-  --config deploy/firebase/firebase.json --project <projectId>
+```
+Error: ../../dist/misaevol/browser is outside of project directory
 ```
 
-Si algún día se mueve esta carpeta, hay que **recontar los `../`**. Comprobarlo no requiere
-desplegar ni tener credenciales — el emulador acepta cualquier proyecto que empiece por `demo-`:
+El CLI fija la **raíz del proyecto** en el directorio del `firebase.json` (`detectProjectRoot`) y
+después rechaza cualquier `public` relativo que se salga de ella (`Config.path`). Con el fichero en
+`deploy/firebase/`, el build queda fuera y no hay ruta relativa legal que llegue a él. Es la única
+excepción a «todo el despliegue en esta carpeta», y la impone la herramienta.
+
+> **Cuidado con verificarlo solo con el emulador.** `emulators:start` **no** pasa por esa validación
+> y acepta `../../` tan tranquilo. Un `public` mal puesto arranca perfecto en local y revienta en el
+> deploy. Para comprobar de verdad esa parte hay que ejercitar el propio cargador de config:
+>
+> ```bash
+> node -e 'const {Config}=require("firebase-tools/lib/config.js");
+>          const c=Config.load({cwd:process.cwd()});
+>          console.log(c.path(c.get("hosting.public")))'
+> ```
+
+Para lo demás —rewrite y cabeceras— el emulador sí vale, y no pide credenciales (acepta cualquier
+proyecto que empiece por `demo-`):
 
 ```bash
 npm run build
-npx --yes firebase-tools emulators:start --only hosting \
-  --config deploy/firebase/firebase.json --project demo-x
+npx --yes firebase-tools emulators:start --only hosting --project demo-x
 ```
 
-Arranca imprimiendo `Serving hosting files from: …`. Si esa ruta no apunta al build, el `public`
-está mal. Con el emulador vivo se comprueba lo demás con `curl`: una ruta profunda (`/home`) debe
-dar 200 —es el rewrite—, e `index.html`, `config.json` y `seed/**` deben responder con
-`Cache-Control: no-cache` mientras los `.js`/`.css` hasheados responden `immutable`.
+Con él vivo: una ruta profunda (`/home`) debe dar 200 —es el rewrite—, e `index.html`,
+`config.json` y `seed/**` deben responder `Cache-Control: no-cache` mientras los `.js`/`.css`
+hasheados responden `immutable`.
 
 **El ambiente se escribe a mano, no se elige de un desplegable.** Para que GitHub pinte un
 desplegable hay que declarar los valores como literales dentro del propio workflow (`type: choice`

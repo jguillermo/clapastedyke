@@ -242,15 +242,12 @@ Para una prueba rápida, con el `projectId` que quieras de `environments.json`:
 npx --yes firebase-tools login                                        # una sola vez
 npm run build
 node deploy/firebase/config.mjs dev --out dist/misaevol/browser/config.json
-npx --yes firebase-tools deploy --only hosting \
-  --config deploy/firebase/firebase.json --project migo-dev-20b41
+npx --yes firebase-tools deploy --only hosting --project migo-dev-20b41
 ```
 
-Dos cosas que no se pueden saltar:
-
-- **La línea de `config.mjs`.** Sin ella subes el `public/config.json` del repo, que es el de `dev`:
-  si estabas desplegando a otro ambiente, publicarías su configuración equivocada.
-- **`--config`**, porque el `firebase.json` no está en la raíz y sin él el CLI no lo encuentra.
+Se lanza **desde la raíz del repo**, que es donde está el `firebase.json`, y la línea de
+`config.mjs` no se puede saltar: sin ella subes el `public/config.json` del repo, que es el de
+`dev`, así que desplegando a otro ambiente publicarías su configuración equivocada.
 
 Por eso mismo, para un despliegue de verdad usa el workflow: ahí ese orden no se puede olvidar.
 
@@ -258,13 +255,19 @@ Por eso mismo, para un despliegue de verdad usa el workflow: ahí ese orden no s
 
 ## Qué hay en `firebase.json`, y por qué
 
-Vive en [`deploy/firebase/firebase.json`](../deploy/firebase/firebase.json) y es **uno solo para
-todos los ambientes**: lo que cambia entre ellos es el proyecto de destino y el `config.json`, no
-cómo se sirve el sitio.
+Vive en [`firebase.json`](../firebase.json), **en la raíz del repo**, y es **uno solo para todos los
+ambientes**: lo que cambia entre ellos es el proyecto de destino y el `config.json`, no cómo se
+sirve el sitio.
+
+Es el único fichero del despliegue que no está en `deploy/firebase/`, y no es por gusto: el CLI fija
+la raíz del proyecto en el directorio del `firebase.json` y **rechaza cualquier `public` que se
+salga de ella**. Con el fichero en `deploy/firebase/`, el deploy muere con
+`../../dist/misaevol/browser is outside of project directory`. Detalle en
+[`deploy/firebase/README.md`](../deploy/firebase/README.md).
 
 | Clave | Por qué |
 |---|---|
-| `"public": "../../dist/misaevol/browser"` | El builder `application` de Angular deja el cliente ahí. Los `../` son porque el CLI resuelve esta ruta **desde el directorio del `firebase.json`**, que no es la raíz. Apuntar a `dist/misaevol` publicaría además `3rdpartylicenses.txt` y un `prerendered-routes.json` que no pinta nada |
+| `"public": "dist/misaevol/browser"` | El builder `application` de Angular deja el cliente ahí. Apuntar a `dist/misaevol` publicaría además `3rdpartylicenses.txt` y un `prerendered-routes.json` que no pinta nada |
 | `"rewrites"` → `/index.html` | La app es una SPA sin hash: sin esto, recargar `/home` daría 404. Sustituye al truco del `404.html` de GitHub Pages |
 | `Cache-Control: immutable` en `js/css/woff2` | El build usa `outputHashing: "all"`, así que el nombre cambia con el contenido y cachear un año es seguro |
 | `Cache-Control: no-cache` en `index.html`, `config.json` y `seed/**` | `main.ts` lee `config.json` **antes** de arrancar. Si el CDN lo cachease, un cambio de configuración tardaría en verse |
@@ -287,5 +290,6 @@ cómo se sirve el sitio.
 | El sitio se publica con el `config.json` de otro ambiente | Desplegaste a mano y te saltaste `config.mjs` | Usa el workflow, o repite la secuencia completa de «Desde local» |
 | `public/config.json` vuelve a cambiar solo | Es un fichero **generado**; lo reescribe `npm run config` | Edita `environments.json`, no el `config.json` |
 | La home carga, pero recargar `/home` da 404 | Falta el `rewrites` de `firebase.json` | No lo toques; si lo tocaste, restáuralo |
+| `… is outside of project directory` | Alguien movió `firebase.json` fuera de la raíz | Tiene que estar en la raíz: el CLI no sirve nada que quede por encima de él |
 | `Error 400: origin_mismatch` al conectar Google | Falta ese origen concreto — son **dos por ambiente** | Paso 5 |
 | La consola no muestra trazas `[events]` en prod | `debug: false`, que es lo correcto | Los `warn` y `error` se ven siempre; en dev tienes `debug: true` |
