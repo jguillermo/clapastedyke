@@ -71,6 +71,8 @@ platform/
 ├── viewport/
 │   ├── viewport.providers.ts
 │   └── viewport.service.ts
+├── stale-build/
+│   └── stale-build.ts          # Recarga cuando el despliegue cambió bajo una pestaña abierta
 └── three/                      # El motor 3D (no es DOM: fuera de las reglas de estilo)
     ├── kitchen-engine.ts  camera-rig.ts  chef-engine.ts  …
     └── book/
@@ -93,7 +95,12 @@ A platform module stays flat by default. Add a `ui/` subdirectory only when the 
 
 ## Provider pattern
 
-Each platform module exposes a `provide*()` function using `makeEnvironmentProviders`, aggregated in `platform.providers.ts`:
+Each platform module exposes a `provide*()` function using `makeEnvironmentProviders`, aggregated in `platform.providers.ts`.
+
+> **Excepción — lo que no es un provider.** `stale-build/` exporta una función suelta y no un
+> `provide*()`: lo suyo es una **feature del router** (`withNavigationErrorHandler`), que solo se
+> puede pasar como argumento a `provideRouter(...)` y no cabe en un `makeEnvironmentProviders`. Se
+> engancha en `app.config.ts`. Corre en contexto de inyección, así que puede usar `inject()`.
 
 ```typescript
 // platform/error/error.providers.ts

@@ -237,9 +237,9 @@ salga de ella**. Con el fichero en `deploy/firebase/`, el deploy muere con
 | Clave | Por qué |
 |---|---|
 | `"public": "dist/misaevol/browser"` | El builder `application` de Angular deja el cliente ahí. Apuntar a `dist/misaevol` publicaría además `3rdpartylicenses.txt` y un `prerendered-routes.json` que no pinta nada |
-| `"rewrites"` → `/index.html` | La app es una SPA sin hash: sin esto, recargar `/home` daría 404. Sustituye al truco del `404.html` de GitHub Pages |
+| `"rewrites"`: `**/!(*.*)` → `/index.html` | La app es una SPA sin hash: sin esto, recargar `/home` daría 404. Sustituye al truco del `404.html` de GitHub Pages. El patrón **excluye lo que lleva extensión** a propósito: con `**` a secas, un `chunk-*.js` borrado por el despliegue siguiente devolvía `index.html` con 200 y `text/html`, y el navegador fallaba con un opaco *«Failed to fetch dynamically imported module»* en vez de un 404 |
 | `Cache-Control: immutable` en `js/css/woff2` | El build usa `outputHashing: "all"`, así que el nombre cambia con el contenido y cachear un año es seguro |
-| `Cache-Control: no-cache` en `index.html`, `config.json` y `seed/**` | `main.ts` lee `config.json` **antes** de arrancar. Si el CDN lo cachease, un cambio de configuración tardaría en verse |
+| `Cache-Control: no-cache` en `/`, las rutas sin extensión, `index.html`, `config.json` y `seed/**` | `main.ts` lee `config.json` **antes** de arrancar: si se cachease, un cambio de configuración tardaría en verse. Y el shell **tiene que revalidar siempre**: cubrir solo `/index.html` dejaba `/`, `/home` y `/cuenta` con el defecto de Firebase (`max-age=3600`), así que durante una hora tras publicar se servía el `index.html` viejo → el `main-*.js` viejo → chunks que ya no existen |
 
 ---
 
@@ -259,6 +259,7 @@ salga de ella**. Con el fichero en `deploy/firebase/`, el deploy muere con
 | El sitio se publica con el `config.json` de otro ambiente | Desplegaste a mano y te saltaste `config.mjs` | Usa el workflow, o repite la secuencia completa de «Desde local» |
 | `public/config.json` vuelve a cambiar solo | Es un fichero **generado**; lo reescribe `npm run config` | Edita `environments.json`, no el `config.json` |
 | La home carga, pero recargar `/home` da 404 | Falta el `rewrites` de `firebase.json` | No lo toques; si lo tocaste, restáuralo |
+| `Failed to fetch dynamically imported module: …/chunk-XXXX.js` al navegar | La pestaña lleva abierta desde un despliegue anterior: pide un chunk con el hash de aquel build, que la publicación nueva borró | Recargar (`Cmd`/`Ctrl`+`Shift`+`R`). La app se recarga sola desde `platform/stale-build/`; si aun así se repite **después** de recargar, el fallo es otro (sin red, o una publicación a medias) y queda un `error` en consola |
 | `… is outside of project directory` | Alguien movió `firebase.json` fuera de la raíz | Tiene que estar en la raíz: el CLI no sirve nada que quede por encima de él |
 | `Error 400: origin_mismatch` al conectar Google | Falta ese origen concreto — son **dos por ambiente** | Paso 5 |
 | La consola no muestra trazas `[events]` en prod | `debug: false`, que es lo correcto | Los `warn` y `error` se ven siempre; en dev tienes `debug: true` |
