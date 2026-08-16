@@ -1,17 +1,18 @@
 /**
- * Ajustes de autenticación de este navegador. Repositorio puro: leer y escribir, sin lógica.
+ * Ajustes de autenticación de la app. Repositorio puro: leer, y nada más.
  *
  * Guarda **solo configuración** — el identificador de la aplicación ante el proveedor. Nunca
  * credenciales, nunca identidad: eso es sesión y vive en memoria.
+ *
+ * **Es de solo lectura a propósito.** El identificador es de la *aplicación*, no del usuario: hay uno
+ * para todo el despliegue y lo fija quien despliega. Hubo una época en que cada navegador podía
+ * guardar el suyo desde la pantalla de cuenta, y solo servía para que dos personas con la misma app
+ * tuvieran configuraciones distintas sin saberlo.
  */
 export abstract class AuthSettingsRepository {
   /**
-   * El `clientId` **efectivo**: el que el usuario guardó aquí o, si no hay ninguno, el que traiga la
-   * configuración del despliegue. `null` cuando no hay ni uno ni otro y todavía no se puede
-   * iniciar sesión.
+   * El identificador de cliente con el que iniciar sesión, o `null` si el despliegue no trae
+   * ninguno y todavía no se puede autenticar a nadie.
    */
   abstract clientId(): Promise<string | null>;
-
-  /** Guarda el `clientId` de este navegador. `null` vuelve a dejar mandar al del despliegue. */
-  abstract saveClientId(clientId: string | null): Promise<void>;
 }

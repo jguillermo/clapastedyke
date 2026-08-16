@@ -25,6 +25,7 @@ export const RecipeCapacityMapper = {
       group: record.group,
       label: record.label,
       factor: record.factor,
+      updatedAt: record.updatedAt ?? null,
     });
   },
 };

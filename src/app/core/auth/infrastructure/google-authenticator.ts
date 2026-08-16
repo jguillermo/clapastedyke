@@ -26,6 +26,13 @@ const USERINFO_URL = 'https://openidconnect.googleapis.com/v1/userinfo';
 /** Permiso sin el cual no se puede crear ni escribir la hoja de cálculo del usuario. */
 export const DRIVE_FILE_PERMISSION = 'https://www.googleapis.com/auth/drive.file';
 
+/**
+ * **Una sola casilla, y la más estrecha que existe.** `drive.file` alcanza únicamente los ficheros
+ * que esta app crea: la hoja del recetario entra, y el resto del Drive del usuario no se ve siquiera.
+ *
+ * Con esto basta para crearla Y para escribirla, así que no hace falta ningún permiso más. Google no
+ * lo considera sensible, así que tampoco hay verificación ni techo de usuarios.
+ */
 const SCOPES = ['openid', 'email', 'profile', DRIVE_FILE_PERMISSION].join(' ');
 
 // Tipado mínimo de GIS, escrito a mano: `tsconfig.app.json` declara `"types": []` (sin tipos
@@ -46,6 +53,7 @@ interface GoogleIdentityApi {
         scope: string;
         callback: (response: TokenResponse) => void;
         error_callback?: (error: { type?: string; message?: string }) => void;
+        hint?: string;
       }): { requestAccessToken(overrides?: { prompt?: string }): void };
       revoke(accessToken: string, done: () => void): void;
     };
@@ -81,19 +89,54 @@ export class GoogleAuthenticator extends Authenticator {
     return { account, credential };
   }
 
+  /**
+   * Reanudar es el **mismo flujo con `prompt: ''`**: Google devuelve un token nuevo sin enseñar nada
+   * si esa cuenta ya consintió y sigue con sesión abierta en el navegador. El `hint` es lo que evita
+   * que dude cuando hay varias cuentas de Google abiertas a la vez.
+   *
+   * Cualquier cosa que no sea un token limpio se traduce a `null`: aquí no se distingue «no hay
+   * sesión en Google» de «hace falta consentimiento otra vez», porque el desenlace es el mismo —
+   * pedirlo a mano. Y **no se registra como fallo**: no lo es.
+   */
+  async resume(clientId: string, hint: string): Promise<Authentication | null> {
+    this.log.debug('intentando reanudar la sesión sin molestar al usuario');
+    try {
+      const credential = await this.requestToken(clientId, { prompt: '', hint });
+      if (!credential.allows(DRIVE_FILE_PERMISSION)) {
+        this.log.debug('el token reanudado no trae el permiso de Drive, se descarta');
+        return null;
+      }
+      const account = await this.readProfile(credential);
+      this.log.debug('sesión reanudada', { accountId: account.id.value });
+      return { account, credential };
+    } catch {
+      this.log.debug('no se ha podido reanudar en silencio, hará falta conectar a mano');
+      return null;
+    }
+  }
+
   async revoke(credential: Credential): Promise<void> {
     const google = await this.load();
     await new Promise<void>((resolve) => google.accounts.oauth2.revoke(credential.token, resolve));
     this.log.debug('token revocado en el proveedor');
   }
 
-  private async requestToken(clientId: string): Promise<Credential> {
+  /**
+   * `prompt: 'select_account'` en el inicio normal —es lo que permite **cambiar de cuenta**; con el
+   * defecto de Google se reutilizaría en silencio la última—, y `prompt: ''` al reanudar, que es lo
+   * contrario: no enseñar nada.
+   */
+  private async requestToken(
+    clientId: string,
+    options: { prompt: string; hint?: string } = { prompt: 'select_account' },
+  ): Promise<Credential> {
     const google = await this.load();
 
     return new Promise<Credential>((resolve, reject) => {
       const client = google.accounts.oauth2.initTokenClient({
         client_id: clientId,
         scope: SCOPES,
+        ...(options.hint === undefined ? {} : { hint: options.hint }),
         callback: (response) => {
           if (response.error || !response.access_token) {
             reject(new Error(describe(response.error, response.error_description)));
@@ -111,7 +154,7 @@ export class GoogleAuthenticator extends Authenticator {
         error_callback: (error) => reject(new Error(describe(error.type, error.message))),
       });
 
-      client.requestAccessToken({ prompt: 'select_account' });
+      client.requestAccessToken({ prompt: options.prompt });
     });
   }
 
@@ -194,10 +237,10 @@ function describe(type: string | undefined, detail: string | undefined): string 
     case 'access_denied':
       return 'Has denegado el permiso. Sin él la app no puede crear la hoja en tu Drive.';
     case 'idpiframe_initialization_failed':
-      return 'Google no acepta este origen. Añade la URL de la app a «Orígenes de JavaScript autorizados» del Client ID (ver appscript.md, paso 4).';
+      return 'Google no acepta este origen. Añade la URL de la app a «Orígenes de JavaScript autorizados» del Client ID (ver manual/google-integration.md).';
     default:
       return detail
         ? `Google ha rechazado la autorización: ${detail}`
-        : 'Google ha rechazado la autorización. Comprueba el Client ID y sus orígenes autorizados (ver appscript.md, paso 4).';
+        : 'Google ha rechazado la autorización. Comprueba el Client ID y sus orígenes autorizados (ver manual/google-integration.md).';
   }
 }

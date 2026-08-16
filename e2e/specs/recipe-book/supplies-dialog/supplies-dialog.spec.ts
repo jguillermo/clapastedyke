@@ -25,7 +25,12 @@ test.describe('Diálogo de Insumos', () => {
     await expect(supplies.title).toHaveText('Insumos');
     await expect(supplies.list.rows).toHaveCount(SUPPLY_COUNT + 1);
     await expect(supplies.list.hint).toBeVisible();
-    await expect(supplies.list.columnHeaders).toHaveText(['Insumo', 'Empaque', 'Precio']);
+    await expect(supplies.list.columnHeaders).toHaveText([
+      'Insumo',
+      'Empaque',
+      'Precio',
+      'Acciones',
+    ]);
 
     // Salida 1: la × de la cabecera. Sin cambios, el libro conserva sus recetas.
     await supplies.close.click();

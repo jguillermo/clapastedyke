@@ -100,7 +100,7 @@ describe('SaveRecipe', () => {
 
     await expect(
       TestBed.inject(SaveRecipe).execute({ ...aRequest(), ingredients: [] }),
-    ).rejects.toThrow('Recipe needs at least one ingredient');
+    ).rejects.toThrow('La receta no tiene ningún ingrediente.');
 
     expect(await TestBed.inject(RecipeRepository).all()).toEqual([]);
     expect(bus.published).toEqual([]);
@@ -108,7 +108,7 @@ describe('SaveRecipe', () => {
 
   it('una receta sin nombre no se guarda ni publica (invariante del dominio)', async () => {
     await expect(TestBed.inject(SaveRecipe).execute({ ...aRequest(), name: '  ' })).rejects.toThrow(
-      'Recipe name is required',
+      'La receta necesita un nombre.',
     );
 
     expect(await TestBed.inject(RecipeRepository).all()).toEqual([]);

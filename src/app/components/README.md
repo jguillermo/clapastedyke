@@ -45,6 +45,10 @@ targets táctiles ≥ 44px (`min-h-11`). Detalle en
 | [Checkbox](#checkbox) | `migo-checkbox` | Control booleano | ✅ | ✅ |
 | [Select](#select) | `migo-select` | Control (CDK Overlay+Listbox) | ✅ | ✅ |
 | [Badge](#badge) | `migo-badge` | Presentacional (píldora de característica) | — | ✅ |
+| [Alert](#alert) | `migo-alert` | Presentacional (aviso en línea) | — | ✅ |
+| [CopyField](#copyfield) | `migo-copy-field` | Presentacional (valor + copiar) | — | ✅ |
+| [CodeBlock](#codeblock) | `migo-code-block` | Presentacional (texto largo + copiar) | — | ✅ |
+| [Checklist](#checklist) | `migo-checklist` | Presentacional (pasos que se van marcando) | — | ✅ |
 | [Table](#table) | `migo-table` | Hoja de cálculo (`<table>` + teclado) | — | ✅ |
 | [SelectTag](#selecttag) | `migo-select-tag` | Etiquetas tipo Select2 (chips + autocompletar) | — | ✅ |
 | [Dialog](#dialog) | `MigoDialog` (servicio) | Servicio (CDK Dialog) | — | ✅ |
@@ -248,6 +252,107 @@ del 4.5:1 de WCAG AA). La jerarquía la marcan el tamaño y el peso, no una manc
 <migo-badge size="xs">Porciones: 40</migo-badge>
 ```
 
+## Alert
+
+`migo-alert` — **aviso en línea**: un mensaje con peso semántico que se queda en la página (a
+diferencia de un toast, que pasa). `variant`: `info` (default) · `success` · `warning` · `error`.
+`heading` es un título opcional; el cuerpo es contenido proyectado.
+
+El **texto va en `text-body`, no en el color de la variante**. El color semántico se reserva al
+icono y al borde: sobre `bg-*-soft`, un `text-error` se queda por debajo del 4.5:1 de WCAG AA.
+
+El **rol ARIA cambia con la urgencia**: `error` (o `assertive`) usa `role="alert"`, que interrumpe
+al lector de pantalla; el resto usa `role="status"`, que espera turno. Un aviso informativo que
+interrumpe molesta tanto como un error que pasa desapercibido.
+
+```html
+<migo-alert variant="error">No se ha podido guardar la receta.</migo-alert>
+
+<migo-alert variant="warning" heading="Falta un paso">
+  Activa la API de Apps Script en tu cuenta y vuelve a intentarlo.
+</migo-alert>
+```
+
+## CopyField
+
+`migo-copy-field` — un valor de **solo lectura que el usuario tiene que llevarse a otro sitio**: una
+URL que pegar en otra pestaña, un identificador que teclear en una consola. `value` es obligatorio;
+`ariaLabel` (para cuando no hay `migo-form-field`) y `copyLabel` son opcionales. Emite `copied` con
+el valor. **No es un `ControlValueAccessor`**: no edita nada.
+
+Se copia con el **`Clipboard` del CDK**, no con `navigator.clipboard`: es síncrono, devuelve
+`boolean` (así hay una rama de fallo real que pintar) y no exige contexto seguro.
+
+**El nombre accesible del botón no cambia al copiar.** Cambiar el nombre de un elemento que tiene el
+foco se anuncia de forma inconsistente entre lectores de pantalla, y duplicaría lo que ya dice la
+región viva. Lo que cambia es el icono; la confirmación va en un `role="status"` aparte.
+
+El `<input readonly>` no es decorativo: da **scroll horizontal** cuando el valor no cabe (crítico a
+375px) y se autoselecciona al enfocarlo, así que **Tab + Cmd/Ctrl+C funciona sin tocar el botón** —
+que es también la salida cuando el portapapeles falla. Por eso es `readonly` y no `disabled`: un
+`disabled` no recibe foco ni se puede seleccionar.
+
+```html
+<migo-copy-field ariaLabel="URL del sincronizador" [value]="webAppUrl()" />
+
+<migo-form-field label="URL del sincronizador" hint="No hace falta que hagas nada con ella.">
+  <migo-copy-field [value]="webAppUrl()" />
+</migo-form-field>
+```
+
+## CodeBlock
+
+`migo-code-block` — el **hermano largo de `migo-copy-field`**: aquel es un `<input>` de una línea para
+un valor suelto; este es un `<pre>` con scroll para cientos de líneas, y su razón de ser es el botón
+de copiar (nadie selecciona 900 líneas a mano en un móvil). `code` es obligatorio; `label` nombra el
+bloque (y es el nombre accesible de la región), `copyLabel`, `emptyLabel` y `open` son opcionales.
+Emite `copied` con el texto.
+
+**Viene plegado**: un script entero empujaría el resto de la página fuera de la pantalla. Con más de
+12 líneas aparece «Ver entero»; copiar funciona igual esté plegado o no. `open` lo deja desplegado y
+sin ventana de altura, para bloques de tres líneas.
+
+`code` vacío no es un fallo que ocultar: se pinta `emptyLabel`. Es el estado de un fichero que no se
+pudo leer, y la pantalla debe poder contarlo.
+
+El `<pre>` es `role="region"` y `tabindex="0"`: un bloque con scroll propio al que no se llega con el
+teclado es una trampa (WCAG 2.1.1). Usa `font-mono`, la única tipografía del tema que no es de marca
+— es texto para copiar, donde importa distinguir `0`/`O` y `l`/`1`.
+
+```html
+<migo-code-block label="Code.gs" [code]="setup().script" (copied)="onCopied()" />
+<migo-code-block label="appsscript.json" [code]="setup().manifest" open />
+```
+
+## Checklist
+
+`migo-checklist` — la lista de **pasos que se van marcando** mientras un proceso largo avanza: icono
+de estado, rótulo, detalle opcional y un raíl vertical que se colorea al completarse el paso.
+`items` es obligatorio (`{ label, state, detail? }` con `state`: `pending` | `running` | `done` |
+`failed`); `label` da el nombre accesible de la lista y `stateLabels` sustituye los textos de estado
+si la app no está en español.
+
+**Presentacional puro: no ejecuta nada.** Recibe los pasos ya resueltos y los pinta; quien los
+avanza es la feature, que es la única que puede llamar a casos de uso. Un `failed` es terminal: los
+pasos que venían detrás se quedan en `pending`, que es justo lo que hace legible dónde se rompió.
+
+**El icono no es la única señal del estado** (WCAG 1.4.1): cada paso lleva su estado en texto en un
+`sr-only`, y la lista es una región viva `polite` con `aria-busy` mientras haya un paso en curso, así
+que el salto de «En curso» a «Hecho» se anuncia sin interrumpir. El giro y el salto de escala van con
+`motion-reduce:`.
+
+```html
+<migo-checklist [items]="pasos()" label="Progreso de la conexión" />
+```
+
+```typescript
+protected readonly pasos = signal<ChecklistItem[]>([
+  { label: 'Leyendo la configuración', state: 'done', detail: 'Client ID encontrado' },
+  { label: 'Creando la hoja en tu Drive', state: 'running' },
+  { label: 'Sincronizando tu recetario', state: 'pending' },
+]);
+```
+
 ## Dialog
 
 **Servicio que abre un componente** (`@angular/cdk/dialog`). El Dialog es un shell agnóstico: el
@@ -300,6 +405,10 @@ Inputs: `columns` (`{ name, size?, align?, max? }[]`) · `rows` · `ariaLabel` �
 rompe el padding del padre y va borde a borde) · `maxWidth` (`'reading'|'page'`). Output: `removeRow`
 (índice). Métodos públicos: `focusCell(r, c)` · `remove(index)` (dispara `removeRow`).
 
+**El `name` de una columna nunca va vacío**, ni en la de acciones: una cabecera de tabla en blanco es un
+fallo de AXE (`empty-table-header`) y deja a quien usa un lector de pantalla sin saber de qué es esa
+columna. Para la columna del botón de eliminar, «Acciones».
+
 **Mobile-first**: vertical **nunca scrollea** (crece; scrollea el contenedor exterior). Las columnas
 flexibles (`auto`) absorben el ancho sobrante; si las fijas/% suman de más, hay **scroll horizontal**
 de fallback. `bleed` lleva la tabla a los bordes en móvil. Los inputs de celda llevan `min-w-0`
@@ -308,7 +417,7 @@ de fallback. `bleed` lleva la tabla a los bordes en móvil. Los inputs de celda 
 ```html
 <migo-table
   #table
-  [columns]="[{ name: 'Insumo' }, { name: 'Cantidad', size: 'fit', align: 'center' }, { name: '', size: 'fit' }]"
+  [columns]="[{ name: 'Insumo' }, { name: 'Cantidad', size: 'fit', align: 'center' }, { name: 'Acciones', size: 'fit' }]"
   [rows]="lineControls()"
   bleed
   (removeRow)="removeLine($event)"
@@ -394,7 +503,8 @@ Pendiente (ningún componente de abajo existe todavía). Orden sugerido por uso 
 - [ ] **Radio / RadioGroup** (`migo-radio-group` + `migo-radio`) — CVA, `@angular/cdk/a11y`.
 - [ ] **Switch / Toggle** (`migo-switch`) — booleano, CVA.
 - [ ] **Spinner / Progress** (`migo-spinner`, `migo-progress-bar`) — estados de carga.
-- [ ] **Alert / Banner** (`migo-alert`) — info/success/warning/error inline (tokens semánticos).
+- [x] **Alert / Banner** (`migo-alert`) — ✅ hecho: aviso en línea info/success/warning/error, con
+      icono por variante y `role` según urgencia (`alert` vs `status`).
 - [ ] **Toast / Snackbar** (servicio `MigoToast` sobre CDK Overlay) — notificaciones efímeras.
 
 ### Prioridad media (navegación / overlays)

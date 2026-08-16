@@ -9,6 +9,8 @@
  * uso corren contra estas implementaciones en memoria en lugar de IndexedDB.
  */
 import { Provider } from '@angular/core';
+import { AccountHistory } from '../../_common/credentials/account-history';
+import { SaveOptions } from '../domain/repositories/save-options';
 import { EntityId } from '../../_common/entity-id';
 import { BaseUnit, Quantity } from '../../_common/quantity';
 import { DomainEvent } from '../../_common/eventbus/domain-event';
@@ -52,9 +54,21 @@ class Store<T extends { id: EntityId }> {
     return [...this.items.values()].find((item) => nameOf(item).toLowerCase() === target) ?? null;
   }
 
-  save(aggregate: T): void {
+  /**
+   * Además de guardar, **apunta cómo se guardó**.
+   *
+   * `stamp: false` es la única excepción a «toda escritura local pone fecha de actualización», y solo
+   * la usa el seed. Que se pierda no se ve por ninguna otra vía —los dobles guardan agregados, no
+   * documentos, así que aquí no hay `updatedAt` que mirar— y su consecuencia es cara: la fábrica de un
+   * navegador recién abierto volvería a ganarle a la hoja. Por eso se registra y se asserta.
+   */
+  save(aggregate: T, options?: SaveOptions): void {
     this.items.set(aggregate.id.value, aggregate);
+    this.saves.push({ id: aggregate.id.value, stamped: options?.stamp !== false });
   }
+
+  /** Cada guardado, en orden, con si dejó fecha o no. */
+  readonly saves: { id: string; stamped: boolean }[] = [];
 
   all(): T[] {
     return [...this.items.values()];
@@ -66,8 +80,17 @@ class InMemorySupplyRepository extends SupplyRepository {
   nextIdentity = () => this.store.next();
   byId = async (id: EntityId) => this.store.byId(id);
   byName = async (name: string) => this.store.byName(name, (s) => s.name);
-  save = async (s: Supply) => this.store.save(s);
+  save = async (s: Supply, options?: SaveOptions) => this.store.save(s, options);
+  /** Los guardados que ha visto este doble, para poder asertar CÓMO se guardó. */
+  get saves() {
+    return this.store.saves;
+  }
   all = async () => this.store.all();
+  // El doble borra de verdad. Que la implementación real lo haga con una lápida es asunto suyo: el
+  // contrato del puerto dice «borrado es borrado, no se vuelve a leer», y eso es lo que se dobla.
+  delete = async (id: EntityId) => {
+    this.store.items.delete(id.value);
+  };
 }
 
 class InMemoryRecipeCategoryRepository extends RecipeCategoryRepository {
@@ -75,8 +98,15 @@ class InMemoryRecipeCategoryRepository extends RecipeCategoryRepository {
   nextIdentity = () => this.store.next();
   byId = async (id: EntityId) => this.store.byId(id);
   byName = async (name: string) => this.store.byName(name, (c) => c.name);
-  save = async (c: RecipeCategory) => this.store.save(c);
+  save = async (c: RecipeCategory, options?: SaveOptions) => this.store.save(c, options);
+  /** Los guardados que ha visto este doble, para poder asertar CÓMO se guardó. */
+  get saves() {
+    return this.store.saves;
+  }
   all = async () => this.store.all();
+  delete = async (id: EntityId) => {
+    this.store.items.delete(id.value);
+  };
 }
 
 class InMemoryRecipeRepository extends RecipeRepository {
@@ -93,15 +123,26 @@ class InMemoryRecipeRepository extends RecipeRepository {
   };
   byCategory = async (categoryId: EntityId) =>
     this.store.all().filter((r) => r.categoryId.equals(categoryId));
-  save = async (r: Recipe) => this.store.save(r);
+  save = async (r: Recipe, options?: SaveOptions) => this.store.save(r, options);
+  /** Los guardados que ha visto este doble, para poder asertar CÓMO se guardó. */
+  get saves() {
+    return this.store.saves;
+  }
   all = async () => this.store.all();
+  delete = async (id: EntityId) => {
+    this.store.items.delete(id.value);
+  };
 }
 
 class InMemoryRecipeFlavorRepository extends RecipeFlavorRepository {
   private readonly store = new Store<RecipeFlavor>('FL');
   nextIdentity = () => this.store.next();
   byId = async (id: EntityId) => this.store.byId(id);
-  save = async (f: RecipeFlavor) => this.store.save(f);
+  save = async (f: RecipeFlavor, options?: SaveOptions) => this.store.save(f, options);
+  /** Los guardados que ha visto este doble, para poder asertar CÓMO se guardó. */
+  get saves() {
+    return this.store.saves;
+  }
   all = async () => this.store.all();
   delete = async (id: EntityId) => {
     this.store.items.delete(id.value);
@@ -113,7 +154,11 @@ class InMemoryRecipeCapacityRepository extends RecipeCapacityRepository {
   nextIdentity = () => this.store.next();
   byId = async (id: EntityId) => this.store.byId(id);
   byGroup = async (group: CapacityGroup) => this.store.all().filter((c) => c.group === group);
-  save = async (c: RecipeCapacity) => this.store.save(c);
+  save = async (c: RecipeCapacity, options?: SaveOptions) => this.store.save(c, options);
+  /** Los guardados que ha visto este doble, para poder asertar CÓMO se guardó. */
+  get saves() {
+    return this.store.saves;
+  }
   all = async () => this.store.all();
   delete = async (id: EntityId) => {
     this.store.items.delete(id.value);
@@ -153,6 +198,17 @@ export class FakeSeedDataSource extends SeedDataSource {
   load = async () => this.doc;
 }
 
+/**
+ * Historial de cuenta falso. Por defecto **nunca se conectó nadie**, que es el caso de una instalación
+ * nueva y el que deja sembrar; `everConnected = true` simula un navegador que ya tuvo cuenta.
+ */
+export class FakeAccountHistory extends AccountHistory {
+  constructor(public connected = false) {
+    super();
+  }
+  everConnected = async () => this.connected;
+}
+
 /** Doble in-memory de SeedState: recuerda la versión aplicada por cada clave. */
 export class FakeSeedState extends SeedState {
   private readonly versions = new Map<string, number>();
@@ -166,6 +222,8 @@ export interface RecipeBookFakes {
   bus: RecordingEventBus;
   /** El doble de SeedDataSource; muta `.doc` para cambiar el sembrado entre corridas. */
   seedSource: FakeSeedDataSource;
+  /** El historial de cuenta; muta `.connected` para simular un navegador que ya tuvo una. */
+  accountHistory: FakeAccountHistory;
   providers: Provider[];
 }
 
@@ -178,13 +236,15 @@ export function makeRecipeBookFakes(
 ): RecipeBookFakes {
   const bus = new RecordingEventBus();
   const seedSource = new FakeSeedDataSource(seedDoc);
+  const accountHistory = new FakeAccountHistory();
   const providers: Provider[] = [
     ...recipeBookRepositoryProviders,
     { provide: EventBus, useValue: bus },
     { provide: SeedDataSource, useValue: seedSource },
     { provide: SeedState, useClass: FakeSeedState },
+    { provide: AccountHistory, useValue: accountHistory },
   ];
-  return { bus, seedSource, providers };
+  return { bus, seedSource, accountHistory, providers };
 }
 
 /** Helper de test: un literal de petición de precio de compra para SaveSupply. */

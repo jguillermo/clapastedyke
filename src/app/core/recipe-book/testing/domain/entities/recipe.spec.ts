@@ -79,11 +79,11 @@ describe('Recipe', () => {
   });
 
   it('create exige nombre', () => {
-    expect(() => aRecipe('   ')).toThrow('Recipe name is required');
+    expect(() => aRecipe('   ')).toThrow('La receta necesita un nombre.');
   });
 
   it('create exige al menos un ingrediente', () => {
-    expect(() => aRecipe('Bizcocho', [])).toThrow('Recipe needs at least one ingredient');
+    expect(() => aRecipe('Bizcocho', [])).toThrow('La receta no tiene ningún ingrediente.');
   });
 
   it('sabor y las dos capacidades coexisten y son opcionales', () => {

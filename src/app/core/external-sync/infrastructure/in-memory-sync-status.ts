@@ -19,8 +19,21 @@ const DISCONNECTED: SyncStatusSnapshot = {
 @Injectable()
 export class InMemorySyncStatus extends SyncStatus {
   private readonly state = signal<SyncStatusSnapshot>(DISCONNECTED);
+  private readonly changes = signal(0);
 
   readonly snapshot: Signal<SyncStatusSnapshot> = this.state.asReadonly();
+
+  /**
+   * El contador **no** se reinicia al desconectar, aunque el resto del estado sí.
+   *
+   * Cerrar sesión también cambia lo que las vistas tienen que mostrar, y volver a cero haría que una
+   * vista que ya hubiera visto el 0 no notara nada. Un contador que solo sube no tiene ese problema.
+   */
+  readonly revision: Signal<number> = this.changes.asReadonly();
+
+  markDataChanged(): void {
+    this.changes.update((count) => count + 1);
+  }
 
   markConnected(): void {
     this.state.update((current) => ({ ...current, phase: 'idle', lastError: null }));
@@ -28,6 +41,10 @@ export class InMemorySyncStatus extends SyncStatus {
 
   markDisconnected(): void {
     this.state.set(DISCONNECTED);
+  }
+
+  markNeedsReconnect(): void {
+    this.state.update((current) => ({ ...current, phase: 'reconnect', lastError: null }));
   }
 
   markSyncing(): void {

@@ -2,16 +2,10 @@ import { inject, Injectable } from '@angular/core';
 import { EventBus } from '@core/_common/eventbus/event-bus';
 import { IntegrationEventName } from '@core/_common/events/integration-events';
 import { Logger } from '@core/_common/logger/logger';
-import { Synchronize } from '../application/use-cases/synchronize.use-case';
 import { SyncOutbox } from '../domain/services/sync-outbox';
 import { SyncStatus } from '../domain/services/sync-status';
 import { SyncItem } from '../domain/value-objects/sync-item';
-
-/**
- * Espera antes de enviar. Agrupa la ráfaga de eventos que produce un solo guardado (el formulario de
- * receta asegura sus insumos uno por uno y luego guarda la receta) en un único envío.
- */
-const DEBOUNCE_MS = 400;
+import { SyncScheduler } from './sync-scheduler';
 
 /**
  * Identidad de este suscriptor ante el bus. Es la clave con la que el bus anota que ya recibió un
@@ -55,10 +49,8 @@ export class RecipeBookChangedSubscriber {
   private readonly bus = inject(EventBus);
   private readonly outbox = inject(SyncOutbox);
   private readonly status = inject(SyncStatus);
-  private readonly sync = inject(Synchronize);
+  private readonly scheduler = inject(SyncScheduler);
   private readonly log = inject(Logger).scoped('external-sync/on-book-changed');
-
-  private timer: ReturnType<typeof setTimeout> | null = null;
 
   register(): void {
     for (const [eventName, aggregate] of SUBSCRIPTIONS) {
@@ -78,19 +70,9 @@ export class RecipeBookChangedSubscriber {
     }
     await this.outbox.enqueue(SyncItem.of(aggregate, id));
     this.log.debug('encolado para sincronizar', { aggregate, id });
-    this.schedule();
-  }
 
-  private schedule(): void {
-    if (this.timer !== null) {
-      clearTimeout(this.timer);
-    }
-    this.timer = setTimeout(() => {
-      this.timer = null;
-      this.log.debug('se acabó la espera, se sincroniza lo pendiente');
-      this.sync
-        .execute({ scope: 'pending' })
-        .catch((error: unknown) => this.log.error('Sincronización pendiente fallida', error));
-    }, DEBOUNCE_MS);
+    // Solo se **programa**: el planificador pone su propio temporizador y vuelve enseguida. Aquí no se
+    // puede esperar a la red — este método corre dentro del guardado y dentro del reparto del bus.
+    this.scheduler.afterLocalChange();
   }
 }

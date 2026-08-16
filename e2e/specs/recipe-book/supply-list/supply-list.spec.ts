@@ -88,7 +88,7 @@ test.describe('Lista de insumos · agregar', () => {
     const sal = await supplies.list.rowOf(SUPPLIES.sal.name);
     await expect(supplies.list.priceInput(sal)).toHaveValue('2.75');
 
-    // Estado terminal: el insumo nuevo cuesta por pieza dentro de una receta guardada.
+    // El insumo nuevo cuesta por pieza dentro de una receta guardada.
     await supplies.close.click();
     await supplies.waitClosed();
     await catalog.newRecipeIn('Queques').click();
@@ -101,6 +101,35 @@ test.describe('Lista de insumos · agregar', () => {
     await form.waitClosed();
 
     await expect(catalog.recipe('Queques', 'Con moldes de papel E2E')).toBeVisible();
+
+    /*
+     * Borrar, y las dos mitades de la regla. Va al final porque necesita justo lo que dejó el paso
+     * anterior: un insumo que una receta usa y otro que no usa nadie.
+     */
+    await catalog.suppliesButton.click();
+    await supplies.waitReady();
+
+    // Un insumo que no usa nadie se borra y deja de estar.
+    await supplies.list.deleteSupply('Nuez pecana E2E');
+    await expect(supplies.list.deleteButton('Nuez pecana E2E')).toHaveCount(0);
+
+    // Uno que una receta usa NO se borra: se dice por qué y la fila se queda. Borrarlo dejaría la
+    // receta sin ese ingrediente y con un costo más bajo que nadie pidió cambiar.
+    await supplies.list.deleteSupply('Molde de papel E2E');
+    await expect(supplies.list.error).toContainText(
+      'No se puede borrar: lo usa la receta «Con moldes de papel E2E».',
+    );
+
+    // Estado terminal: se relee el catálogo y dice exactamente eso.
+    await supplies.close.click();
+    await supplies.waitClosed();
+    await catalog.suppliesButton.click();
+    await supplies.waitReady();
+
+    const afterDelete = await supplies.list.names();
+    expect(afterDelete).not.toContain('Nuez pecana E2E');
+    expect(afterDelete).toContain('Molde de papel E2E');
+    await expect(supplies.list.rows).toHaveCount(SUPPLY_COUNT + 5);
   });
 });
 

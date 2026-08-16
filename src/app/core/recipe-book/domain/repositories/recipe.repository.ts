@@ -1,4 +1,5 @@
 import { EntityId } from '../../../_common/entity-id';
+import { SaveOptions } from './save-options';
 import { Recipe } from '../entities/recipe';
 
 /**
@@ -12,6 +13,8 @@ export abstract class RecipeRepository {
   abstract byId(id: EntityId): Promise<Recipe | null>;
   abstract byNameInCategory(categoryId: EntityId, name: string): Promise<Recipe | null>;
   abstract byCategory(categoryId: EntityId): Promise<Recipe[]>;
-  abstract save(recipe: Recipe): Promise<void>;
+  abstract save(recipe: Recipe, options?: SaveOptions): Promise<void>;
   abstract all(): Promise<Recipe[]>;
+  /** Borra la receta. El **cómo** es cosa de la implementación — ver `SupplyRepository.delete`. */
+  abstract delete(id: EntityId): Promise<void>;
 }

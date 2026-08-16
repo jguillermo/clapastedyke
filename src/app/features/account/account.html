@@ -13,40 +13,7 @@
     </a>
   </header>
 
-  <!-- 1 · Configuración de este navegador -->
-  <migo-card variant="outlined">
-    <migo-card-header>
-      <migo-icon card-icon name="mat:settings" size="lg" />
-      <migo-card-title>Configuración</migo-card-title>
-      <migo-card-subtitle>
-        Identificador de la app ante Google. La URL del Apps Script la pone el despliegue.
-      </migo-card-subtitle>
-    </migo-card-header>
-
-    <migo-card-body>
-      <form class="flex flex-col gap-4" [formGroup]="form" (ngSubmit)="saveSettings()">
-        <migo-form-field
-          label="Client ID de OAuth"
-          hint="Acaba en .apps.googleusercontent.com. Se crea en Google Cloud (appscript.md, paso 4)."
-        >
-          <migo-input
-            formControlName="clientId"
-            placeholder="123456-abc.apps.googleusercontent.com"
-          />
-        </migo-form-field>
-
-        @if (settingsSaved()) {
-          <p class="m-0 text-caption text-success" role="status">Configuración guardada.</p>
-        }
-
-        <button migo-button type="submit" variant="secondary" [loading]="busy()">
-          Guardar configuración
-        </button>
-      </form>
-    </migo-card-body>
-  </migo-card>
-
-  <!-- 2 · La cuenta conectada -->
+  <!-- 1 · La cuenta conectada, con el detalle de lo que pasa al conectar -->
   <migo-card variant="outlined">
     <migo-card-header>
       <migo-card-title>Cuenta</migo-card-title>
@@ -60,7 +27,7 @@
     </migo-card-header>
 
     <migo-card-body>
-      <div class="flex flex-col gap-3">
+      <div class="flex flex-col gap-4">
         @if (session().connected) {
           <div class="flex flex-col gap-0.5">
             <p class="m-0 text-base font-semibold text-body">{{ session().displayName }}</p>
@@ -68,19 +35,91 @@
           </div>
         } @else {
           <p class="m-0 text-sm text-body">
-            Al conectar, la app crea una hoja llamada «Clapastedyke — Recetario» en tu Google Drive
-            y escribe en ella tus recetas e insumos. Solo puede ver los archivos que ella misma
-            crea.
+            Un botón: eliges tu cuenta de Google y aceptas los permisos. A partir de ahí la app crea
+            sola una hoja llamada «Clapastedyke — Recetario» en tu Drive y la mantiene al día en las
+            dos direcciones: lo que cambies aquí sube, y lo que cambies en la hoja baja. Solo
+            alcanza los archivos que ella misma crea, nada más de tu Drive.
           </p>
         }
 
-        @if (actionError()) {
-          <p class="m-0 text-sm font-medium text-error" role="alert">{{ actionError() }}</p>
+        @if (progress().length > 0) {
+          <migo-checklist [items]="progress()" label="Progreso de la conexión" />
+        }
+
+        @if (ready()) {
+          <migo-alert variant="success" heading="Conexión lista">
+            El dato de prueba ha ido y ha vuelto igual, y tu recetario ya está en la hoja.
+          </migo-alert>
+        }
+
+        <!-- Un error sin salida es un callejón. Y una salida que no es tuya, tampoco: lo que puedes
+             hacer va arriba; lo que se arregla en la instalación, abajo y dicho como lo que es. -->
+        @if (failure(); as problem) {
+          <migo-alert variant="error" [heading]="problem.step.label">
+            <div class="flex flex-col gap-3">
+              <p>{{ problem.step.remedy.what }}</p>
+
+              @if (problem.step.remedy.userActions.length > 0) {
+                <p><strong>Qué puedes hacer:</strong></p>
+                <ul class="list-disc ps-5">
+                  @for (action of problem.step.remedy.userActions; track action.text) {
+                    <li class="pb-2">{{ action.text }}</li>
+                  }
+                </ul>
+              } @else {
+                <p>
+                  <strong>Esto no se arregla desde tu cuenta:</strong> es de cómo está instalada la
+                  app. Avisa a quien la mantiene — mientras tanto, tus recetas siguen guardadas en
+                  este dispositivo, como siempre.
+                </p>
+              }
+
+              @if (problem.step.remedy.deployerHint; as hint) {
+                <div class="flex flex-col gap-2 border-t border-border-subtle pt-3">
+                  <p class="text-caption text-muted">
+                    <strong>Para quien mantiene la app:</strong>
+                    {{ hint }}
+                  </p>
+                  <p class="text-caption text-muted">{{ problem.reason }}</p>
+                </div>
+              }
+            </div>
+
+            <div alert-actions>
+              <button
+                migo-button
+                type="button"
+                variant="primary"
+                [loading]="busy()"
+                (click)="connect()"
+              >
+                Reintentar
+              </button>
+              @if (problem.step.remedy.offerReinstall) {
+                <button
+                  migo-button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  [loading]="busy()"
+                  (click)="reinstall()"
+                >
+                  Crear una hoja nueva
+                </button>
+              }
+            </div>
+          </migo-alert>
+        }
+
+        @if (actionError(); as error) {
+          <migo-alert variant="error">{{ error }}</migo-alert>
         }
       </div>
     </migo-card-body>
 
     <migo-card-footer>
+      <!-- Reintentar NO vive aquí: cuando algo falla, el botón está dentro del aviso, junto a las
+           instrucciones que hay que haber seguido antes de volver a pulsarlo. -->
       @if (session().connected) {
         <button
           migo-button
@@ -99,7 +138,7 @@
     </migo-card-footer>
   </migo-card>
 
-  <!-- 3 · Estado de la sincronización -->
+  <!-- 2 · Estado de la sincronización -->
   <migo-card variant="outlined">
     <migo-card-header>
       <migo-card-title>Sincronización</migo-card-title>
@@ -122,28 +161,46 @@
 
         @if (status().targetUrl) {
           <a
-            class="inline-flex min-h-11 w-fit items-center font-body text-sm font-semibold text-brand underline"
+            class="inline-flex min-h-11 w-fit items-center gap-1 font-body text-sm font-semibold text-brand underline"
             [href]="status().targetUrl"
             target="_blank"
             rel="noopener noreferrer"
           >
             Abrir la hoja en Google Sheets
+            <!-- Señala que sale de la app: abrir en pestaña nueva sin avisar desorienta. -->
+            <migo-icon name="mat:open_in_new" size="xs" />
           </a>
         }
 
-        @if (status().lastError) {
-          <p class="m-0 text-sm font-medium text-error" role="alert">{{ status().lastError }}</p>
+        @if (status().lastError; as error) {
+          <migo-alert variant="error">{{ error }}</migo-alert>
+        }
+
+        @if (checkSummary(); as summary) {
+          <migo-alert variant="info" heading="Comprobación de la hoja">{{ summary }}</migo-alert>
         }
       </div>
     </migo-card-body>
 
     <migo-card-footer>
+      <!-- Solo lee y cuenta: no toca la hoja ni los datos de este dispositivo. Va antes que
+           «Sincronizar todo» porque es lo que se pulsa para saber si conviene pulsar el otro. -->
+      <button
+        migo-button
+        type="button"
+        variant="secondary"
+        [disabled]="!session().connected || busy()"
+        [loading]="running() === 'check'"
+        (click)="checkSheet()"
+      >
+        Comprobar la hoja
+      </button>
       <button
         migo-button
         type="button"
         variant="primary"
-        [disabled]="!session().connected"
-        [loading]="busy()"
+        [disabled]="!session().connected || busy()"
+        [loading]="running() === 'sync'"
         (click)="syncAll()"
       >
         Sincronizar todo
@@ -152,7 +209,7 @@
   </migo-card>
 
   <p class="m-0 text-caption text-muted">
-    Cómo se monta el Apps Script y el proyecto de Google, paso a paso: <code>appscript.md</code> en
-    la raíz del repositorio.
+    Todo lo de arriba lo hace la app sola con tu permiso. Cómo funciona por dentro:
+    <code>manual/google-integration.md</code> en el repositorio.
   </p>
 </div>

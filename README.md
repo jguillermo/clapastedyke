@@ -63,12 +63,19 @@ The suite runs against the **compiled build** (`dist/misaevol/browser`), served 
 ## Google Sheets sync
 
 Recipes and supplies can be backed up to a Google Sheets file in **each user's own Drive**. The app
-never talks to the Sheets or Drive APIs: it posts to a **Google Apps Script Web App**
-(`apps-script/Code.gs`), which validates the user's token and writes the sheet on their behalf.
+creates that spreadsheet and writes it itself, through the Sheets and Drive REST APIs, using the
+user's own token and the `drive.file` scope — which reaches only the files the app created. Nothing
+is deployed into anyone's account, and users grant a single consent checkbox.
 
-Setting it up needs a one-time manual pass through Google Cloud and Apps Script. Every step is in
-[`appscript.md`](appscript.md) — start there. Once configured, users connect from the `/cuenta`
-screen; without it the app keeps working exactly as before, fully local.
+Publishing the app needs a one-time pass through Google Cloud (project, consent screen, OAuth Client
+ID). Every step is in [`manual/google-setup.md`](manual/google-setup.md) — start there. Once
+configured, users connect from the `/cuenta` screen; without it the app keeps working exactly as
+before, fully local.
+
+The reasoning behind that design — why a Google login is unavoidable, why the token travels in the
+POST body, why reloading the page forces a reconnect, and which alternatives were measured and
+rejected — is in [`manual/google-integration.md`](manual/google-integration.md). All technical
+documentation lives in [`manual/`](manual/).
 
 ## Additional Resources
 

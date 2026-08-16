@@ -47,6 +47,27 @@ export class SupplyListPage {
     return (await this.cell(row, 1).innerText()).trim();
   }
 
+  /**
+   * Botón de borrar de un insumo (por su nombre, que es lo que lleva su nombre accesible).
+   *
+   * Pide confirmación **en la misma celda**: el primer clic convierte el botón en {@link confirmDelete}.
+   * Los dos nombres accesibles son distintos a propósito, así que ninguno de los dos locators puede
+   * resolver al otro.
+   */
+  deleteButton(name: string): Locator {
+    return this.root.getByRole('button', { name: `Borrar ${name}`, exact: true });
+  }
+
+  confirmDelete(name: string): Locator {
+    return this.root.getByRole('button', { name: `Confirmar borrar ${name}`, exact: true });
+  }
+
+  /** Borra un insumo: pide y confirma. No espera nada — el resultado lo asserta el spec. */
+  async deleteSupply(name: string): Promise<void> {
+    await this.deleteButton(name).click();
+    await this.confirmDelete(name).click();
+  }
+
   /** Nombres de todos los insumos listados, incluido el renglón vacío de agregar. */
   async names(): Promise<string[]> {
     return this.root

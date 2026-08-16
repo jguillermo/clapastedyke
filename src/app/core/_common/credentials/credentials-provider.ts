@@ -7,6 +7,12 @@ export interface UserCredentials {
    * descartar el resultado de una operación cuya sesión ya no es la actual.
    */
   epoch: number;
+  /**
+   * Identidad **estable** de la cuenta, la que da el proveedor. Es la clave con la que otro contexto
+   * puede recordar algo por cuenta —dónde quedó instalado su sincronizador, por ejemplo— sin usar el
+   * correo, que la persona puede cambiar sin dejar de ser la misma.
+   */
+  accountId: string;
   /** Con qué cuenta se está actuando, para poder mostrarlo. */
   accountEmail: string;
 }

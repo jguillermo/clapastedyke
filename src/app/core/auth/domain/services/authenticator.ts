@@ -26,6 +26,20 @@ export abstract class Authenticator {
    */
   abstract authenticate(clientId: string): Promise<Authentication>;
 
+  /**
+   * Vuelve a entrar **sin interrumpir al usuario**, si el proveedor lo permite.
+   *
+   * Es lo que hace que recargar la página no eche a nadie. No es un `authenticate` silencioso: solo
+   * puede salir bien si esa persona ya dio su consentimiento antes y sigue con su sesión abierta en
+   * el proveedor. Cuando no se puede, **devuelve `null` en vez de lanzar** — no es un error, es que
+   * hay que pedirlo a mano, que es el estado normal de quien entra por primera vez.
+   *
+   * Nunca debe enseñar una ventana ni pedir nada: si hiciera falta interacción, `null`.
+   *
+   * @param hint con qué cuenta se estaba, para que el proveedor no dude entre varias abiertas.
+   */
+  abstract resume(clientId: string, hint: string): Promise<Authentication | null>;
+
   /** Retira la autorización concedida. */
   abstract revoke(credential: Credential): Promise<void>;
 }

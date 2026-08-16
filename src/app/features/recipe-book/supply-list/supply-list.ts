@@ -16,12 +16,14 @@ import { Autocomplete } from '@components/autocomplete/autocomplete';
 import { UnitInput, type UnitToken } from '@components/unit-input/unit-input';
 import { CurrencyInput } from '@components/currency-input/currency-input';
 import { Icon } from '@components/icon/icon';
+import { Button } from '@components/button/button';
 import { Logger } from '@core/_common/logger/logger';
 import { BaseUnit } from '@core/_common/quantity';
 import {
   MeasureInput,
   type MeasureKind,
 } from '@core/recipe-book/domain/value-objects/measure-input';
+import { DeleteSupply } from '@core/recipe-book/application/use-cases/delete-supply.use-case';
 import { SaveSupply } from '@core/recipe-book/application/use-cases/save-supply.use-case';
 import type { Supply } from '@core/recipe-book/domain/entities/supply';
 
@@ -55,7 +57,7 @@ interface RowPurchase {
 @Component({
   selector: 'app-supply-list',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, Table, Autocomplete, UnitInput, CurrencyInput, Icon],
+  imports: [ReactiveFormsModule, Table, Autocomplete, UnitInput, CurrencyInput, Icon, Button],
   host: { '(focusout)': 'onFocusOut($event)' },
   templateUrl: './supply-list.html',
 })
@@ -63,6 +65,7 @@ export class SupplyList implements OnInit {
   private readonly fb = inject(FormBuilder);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly saveSupply = inject(SaveSupply);
+  private readonly deleteSupply = inject(DeleteSupply);
   private readonly log = inject(Logger).scoped('ui/supply-list');
 
   /** Catálogo de insumos a mostrar/editar (lo pasa el hub ya cargado). */
@@ -71,15 +74,24 @@ export class SupplyList implements OnInit {
   /** Se emite tras guardar para que el hub recargue el catálogo (libro 3D, etc.). */
   readonly changed = output<void>();
 
-  // Insumo flexible (absorbe el espacio); empaque y precio fijos compactos (llevan input).
+  /*
+   * Insumo flexible (absorbe el espacio); empaque y precio fijos compactos (llevan input). La última es
+   * la de borrar, del ancho de su contenido.
+   *
+   * **Lleva rótulo aunque solo tenga un icono**: una cabecera de tabla vacía es un fallo de AXE
+   * (`empty-table-header`) y deja a quien navega con lector de pantalla sin saber de qué es esa columna.
+   */
   protected readonly columns: readonly TableColumn[] = [
     { name: 'Insumo' },
     { name: 'Empaque', size: 96 },
     { name: 'Precio', size: 96 },
+    { name: 'Acciones', size: 'fit' },
   ];
 
   protected readonly lines = this.fb.array<LineGroup>([this.newLine()]);
   protected readonly errorMessage = signal('');
+  /** Insumo cuyo borrado se está confirmando (su botón pasa a «Borrar»). `null` = ninguno. */
+  protected readonly pendingDeleteId = signal<string | null>(null);
   /** Id del insumo recién creado: muestra una marca breve en su fila (sin notificación). */
   protected readonly recentlyAddedId = signal<string | null>(null);
 
@@ -242,6 +254,37 @@ export class SupplyList implements OnInit {
     } catch (error) {
       this.log.warn('no se pudo actualizar el insumo', error, { id });
       this.errorMessage.set(messageOf(error));
+    }
+  }
+
+  /**
+   * Borra el insumo de una fila. La confirmación ya la dio el usuario en la celda (ver
+   * `pendingDeleteId`): esto es el segundo clic.
+   *
+   * Si alguna receta lo usa, el caso de uso **se niega** y aquí solo se enseña el motivo — la fila se
+   * queda donde estaba, que es lo correcto: el insumo sigue existiendo. Ver `DeleteSupply`.
+   */
+  protected async deleteLine(index: number): Promise<void> {
+    const line = this.lines.at(index) as LineGroup | undefined;
+    const id = line?.controls.id.value;
+    if (!id) {
+      return;
+    }
+
+    this.log.debug('borrar insumo ▶', { id });
+    this.errorMessage.set('');
+    try {
+      await this.deleteSupply.execute({ id });
+      this.lines.removeAt(index);
+      this.savedSnapshots.delete(id);
+      this.pendingDeleteId.set(null);
+      this.log.debug('borrar insumo ✔', { id });
+      this.changed.emit();
+    } catch (error) {
+      // El mensaje en pantalla no sustituye al registro: aquí queda la causa con su pila.
+      this.log.warn('no se pudo borrar el insumo', error, { id });
+      this.errorMessage.set(messageOf(error));
+      this.pendingDeleteId.set(null);
     }
   }
 

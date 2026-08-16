@@ -15,6 +15,8 @@ interface RecipeCapacityData {
   group: CapacityGroup;
   label: string;
   factor: number;
+  /** Ver `RecipeCapacity.updatedAt`. Opcional: quien la arma de cero todavía no la ha guardado. */
+  updatedAt?: string | null;
 }
 
 /**
@@ -31,6 +33,8 @@ export class RecipeCapacity extends AggregateRoot {
   readonly group: CapacityGroup; // Nivel 1: grupo/dimensión (portions/mold)
   readonly label: string; // Nivel 1: nombre visible (Doble, Molde grande, 20 porciones…)
   readonly factor: number; // Nivel 1: factor de escalado sobre los valores base
+  /** Nivel 3: metadato de auditoría — cuándo se guardó por última vez. Ver `Supply.updatedAt`. */
+  readonly updatedAt: string | null;
 
   private constructor(data: RecipeCapacityData) {
     super();
@@ -38,20 +42,14 @@ export class RecipeCapacity extends AggregateRoot {
     this.group = data.group;
     this.label = data.label;
     this.factor = data.factor;
+    this.updatedAt = data.updatedAt ?? null;
   }
 
   /** Arma la capacidad y graba que se guardó. */
   static create(id: EntityId, group: CapacityGroup, label: string, factor: number): RecipeCapacity {
-    if (!label.trim()) {
-      throw new Error('Recipe capacity label is required');
-    }
-    if (!CAPACITY_GROUPS.includes(group)) {
-      throw new Error(`Unknown capacity group "${group}"`);
-    }
-    if (!Number.isFinite(factor) || factor <= 0) {
-      throw new Error('Capacity factor must be a positive number');
-    }
-    const capacity = new RecipeCapacity({ id, group, label: label.trim(), factor });
+    const data = { id, group, label: label.trim(), factor };
+    RecipeCapacity.assertValid(data);
+    const capacity = new RecipeCapacity(data);
     capacity.recordEvent(
       RecipeBookEvents.recipeCapacitySaved(id.value, {
         group: capacity.group,
@@ -65,6 +63,26 @@ export class RecipeCapacity extends AggregateRoot {
   /** Rehidrata desde almacenamiento: NO graba eventos (leer no es guardar). */
   static restore(data: RecipeCapacityData): RecipeCapacity {
     return new RecipeCapacity(data);
+  }
+
+  /**
+   * Las reglas que hacen válida una capacidad, **en un solo sitio**. Ver `Supply.assertValid`.
+   *
+   * El grupo se comprueba aunque el tipo ya lo acote: quien rehidrata datos de fuera tiene que convertir
+   * una celda en `CapacityGroup`, y una conversión de tipo puede mentir.
+   */
+  static assertValid(data: RecipeCapacityData): void {
+    if (!data.label.trim()) {
+      throw new Error('La capacidad necesita una etiqueta.');
+    }
+    if (!CAPACITY_GROUPS.includes(data.group)) {
+      throw new Error(
+        `«${data.group}» no es un grupo de capacidad (${CAPACITY_GROUPS.join(' o ')}).`,
+      );
+    }
+    if (!Number.isFinite(data.factor) || data.factor <= 0) {
+      throw new Error('El factor de la capacidad tiene que ser un número positivo.');
+    }
   }
 
   equals(other: RecipeCapacity): boolean {

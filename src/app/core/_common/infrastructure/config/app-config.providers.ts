@@ -29,11 +29,10 @@ export function provideAppConfig(document: ConfigDocument | null): EnvironmentPr
         });
         return;
       }
-      // Booleanos, nunca los valores: la URL y el identificador de cliente no van a un registro.
+      // Un booleano, nunca el valor: el identificador de cliente no va a un registro.
       const { integration, debug } = inject(AppConfig);
       log.debug('configuración cargada', {
         debug,
-        appsScript: integration.appsScriptUrl !== null,
         oauth: integration.googleClientId !== null,
       });
     }),

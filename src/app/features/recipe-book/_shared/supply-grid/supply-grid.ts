@@ -92,14 +92,19 @@ export class SupplyGrid implements OnInit {
   /** Líneas para precargar al editar una receta (vacío = grilla nueva en blanco). */
   readonly initialLines = input<InitialLine[]>([]);
 
-  // Ingrediente flexible (absorbe el espacio); Cantidad y Costo 'fit' centradas (se encogen a su
-  // contenido: la cantidad usa field-sizing y el costo es un botón de texto). La 4ª columna ('')
-  // es la de eliminar fila: el botón lo pinta el feature y llama a `migo-table.remove(r)`.
+  /*
+   * Ingrediente flexible (absorbe el espacio); Cantidad y Costo 'fit' centradas (se encogen a su
+   * contenido: la cantidad usa field-sizing y el costo es un botón de texto). La 4ª es la de eliminar
+   * fila: el botón lo pinta el feature y llama a `migo-table.remove(r)`.
+   *
+   * **Lleva rótulo aunque solo tenga un icono**: una cabecera de tabla vacía es un fallo de AXE
+   * (`empty-table-header`) y deja a quien navega con lector de pantalla sin saber de qué es esa columna.
+   */
   protected readonly columns: readonly TableColumn[] = [
     { name: 'Ingrediente' },
     { name: 'Cantidad', size: 'fit', align: 'center' },
     { name: 'Costo', size: 'fit', align: 'center' },
-    { name: '', size: 'fit', align: 'center' },
+    { name: 'Acciones', size: 'fit', align: 'center' },
   ];
 
   protected readonly lines = this.fb.array<LineGroup>([this.newLine()]);

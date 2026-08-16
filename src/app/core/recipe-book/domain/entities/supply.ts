@@ -11,6 +11,8 @@ interface SupplyData {
   baseUnit: BaseUnit;
   purchasePrice: PurchasePrice;
   usage: SupplyUsage;
+  /** Ver `Supply.updatedAt`. Opcional: quien lo arma de cero todavía no lo ha guardado. */
+  updatedAt?: string | null;
 }
 
 /**
@@ -30,6 +32,15 @@ export class Supply extends AggregateRoot {
   readonly baseUnit: BaseUnit; // Nivel 1: unidad en la que se mide (g | u)
   readonly purchasePrice: PurchasePrice; // Nivel 1: costo de compra (presentación + precio)
   readonly usage: SupplyUsage; // Nivel 1: para qué se usa (recipe/topper/box/base)
+  /**
+   * Nivel 3: metadato de auditoría — cuándo se guardó por última vez (ISO), o `null` si aún no se ha
+   * guardado nunca.
+   *
+   * No es dato de negocio y nada del recetario decide en función de él: existe para que la
+   * sincronización pueda saber **cuál de dos cambios es más reciente** cuando el mismo insumo cambió
+   * aquí y en el destino. Lo estampa el repositorio al guardar, así que `create` no lo recibe.
+   */
+  readonly updatedAt: string | null;
 
   private constructor(data: SupplyData) {
     super();
@@ -38,6 +49,7 @@ export class Supply extends AggregateRoot {
     this.baseUnit = data.baseUnit;
     this.purchasePrice = data.purchasePrice;
     this.usage = data.usage;
+    this.updatedAt = data.updatedAt ?? null;
   }
 
   /** Arma el insumo con su precio de compra y graba que se guardó. */
@@ -48,15 +60,9 @@ export class Supply extends AggregateRoot {
     usage: SupplyUsage,
     purchasePrice: PurchasePrice,
   ): Supply {
-    if (!name.trim()) {
-      throw new Error('Supply name is required');
-    }
-    if (baseUnit !== purchasePrice.per.unit) {
-      throw new Error(
-        `Supply base unit (${baseUnit}) must match its purchase presentation unit (${purchasePrice.per.unit})`,
-      );
-    }
-    const supply = new Supply({ id, name: name.trim(), baseUnit, usage, purchasePrice });
+    const data = { id, name: name.trim(), baseUnit, usage, purchasePrice };
+    Supply.assertValid(data);
+    const supply = new Supply(data);
     supply.recordEvent(RecipeBookEvents.supplySaved(id.value, supply.snapshot()));
     return supply;
   }
@@ -64,6 +70,30 @@ export class Supply extends AggregateRoot {
   /** Rehidrata desde almacenamiento: NO graba eventos (leer no es guardar). */
   static restore(data: SupplyData): Supply {
     return new Supply(data);
+  }
+
+  /**
+   * Las reglas que hacen válido un insumo, **en un solo sitio**.
+   *
+   * Está aparte de `create` porque hay un segundo camino legítimo hacia el modelo: rehidratar filas que
+   * vienen de fuera (la sincronización trae filas que ha escrito una persona a mano). Ese camino usa
+   * `restore`, que no valida a propósito —leer no puede fallar por una regla de negocio—, así que
+   * necesita comprobarlas él. Antes las repetía, con lo que eso tiene de divergir en silencio: una regla
+   * nueva aquí dejaba entrar por la otra puerta un insumo que la app no sabe pintar.
+   *
+   * **Los mensajes se le enseñan a alguien**, así que están escritos para leerse: los pinta el formulario
+   * cuando el guardado falla, y salen en el diagnóstico de las filas que no se pueden leer.
+   */
+  static assertValid(data: SupplyData): void {
+    if (!data.name.trim()) {
+      throw new Error('El insumo necesita un nombre.');
+    }
+    // Un insumo que se mide en gramos no se puede comprar por unidades.
+    if (data.baseUnit !== data.purchasePrice.per.unit) {
+      throw new Error(
+        `El insumo se mide en «${data.baseUnit}» pero su compra está en «${data.purchasePrice.per.unit}»: no cuadran.`,
+      );
+    }
   }
 
   equals(other: Supply): boolean {

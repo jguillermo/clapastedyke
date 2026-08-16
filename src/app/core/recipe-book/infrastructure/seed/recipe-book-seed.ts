@@ -1,5 +1,7 @@
 import { inject, Injectable } from '@angular/core';
+import { AccountHistory } from '../../../_common/credentials/account-history';
 import { EntityId } from '../../../_common/entity-id';
+import { SaveOptions } from '../../domain/repositories/save-options';
 import { Logger } from '../../../_common/logger/logger';
 import { Quantity } from '../../../_common/quantity';
 import { RecipeCategory } from '../../domain/entities/recipe-category';
@@ -22,6 +24,17 @@ import { SeedCategory, SeedSupply, SeedRecipe } from './recipe-book-seed-documen
 const SEED_KEY = 'recipe-book';
 
 /**
+ * **Sembrar no es un cambio del usuario, así que no lleva fecha.**
+ *
+ * Es la única excepción a «toda escritura local pone fecha de actualización», y de ella depende que un
+ * navegador recién abierto no le gane a la hoja: fechar la fábrica con la hora de arranque la convertía
+ * en el dato más reciente del sistema, y pisaba lo que hubiera hecho el usuario en otro dispositivo.
+ * Sin fecha se considera anterior a cualquier cosa, que es lo que de verdad es. El porqué completo está
+ * en {@link SaveOptions}.
+ */
+const FACTORY: SaveOptions = { stamp: false };
+
+/**
  * Siembra el libro de recetas al arrancar.
  *
  * Sabores, capacidades de receta, insumos, categorías y recetas se cargan desde
@@ -33,6 +46,19 @@ const SEED_KEY = 'recipe-book';
  *
  * Desactivación: `"enabled": false` en el JSON (o fichero ausente) → se omite. Nunca rompe el
  * arranque: los fallos se registran y se continúa.
+ *
+ * ## No siembra si este navegador tuvo cuenta
+ *
+ * Quien tiene cuenta conectada tiene su catálogo en su hoja, y **la hoja manda**. Sembrar ahí datos de
+ * ejemplo no solo le ensuciaría la app: viajarían a su hoja en el primer ciclo. Se pregunta por
+ * `AccountHistory`, que lo contesta en local y sin red — con `CredentialsProvider` no valdría, porque
+ * sin cobertura diría «nunca hubo cuenta» y sembraría.
+ *
+ * Queda un caso estrecho que la pista **no** cubre: un dispositivo nuevo de alguien que ya tiene cuenta
+ * no la tiene todavía, así que siembra. Que eso sea inofensivo depende de las dos cosas de abajo. Como
+ * los ids del seed son fijos, sus filas son *las mismas* que las de su hoja y se emparejan sin duplicar
+ * nada; y como se siembran **sin fecha** ({@link FACTORY}), pierden contra todo lo que haya en la hoja
+ * en vez de pisarlo. Lo que esa persona hubiera **borrado** en otro dispositivo lo tapan las lápidas.
  *
  * Construye los agregados con **`restore`**, no con `create`: sembrar es rehidratar datos que vienen
  * con la app, no un guardado del usuario, así que no debe grabar ni publicar ningún `*Saved` (si no,
@@ -49,6 +75,7 @@ export class RecipeBookSeed {
   private readonly recipes = inject(RecipeRepository);
   private readonly source = inject(SeedDataSource);
   private readonly seedState = inject(SeedState);
+  private readonly history = inject(AccountHistory);
   private readonly log = inject(Logger).scoped('recipe-book/seed');
 
   /** ¿Ya se insertó la data seed alguna vez? (marcador persistido en IndexedDB). */
@@ -57,6 +84,13 @@ export class RecipeBookSeed {
   }
 
   async run(): Promise<void> {
+    // Si este navegador tuvo cuenta, su catálogo vive en otro sitio y ese sitio manda: sembrar aquí
+    // sería meterle datos de ejemplo a datos de verdad. Y no se queda en local — viajarían a su hoja.
+    if (await this.history.everConnected()) {
+      this.log.debug('siembra omitida: este navegador ya tuvo cuenta y su catálogo manda');
+      return;
+    }
+
     const doc = await this.source.load();
     if (!doc || doc.enabled === false) {
       // El «no hay documento» ya lo avisó la fuente; aquí solo queda contar la otra rama.
@@ -113,7 +147,7 @@ export class RecipeBookSeed {
       }
       const recipe = await this.buildRecipe(r);
       if (recipe) {
-        await this.recipes.save(recipe);
+        await this.recipes.save(recipe, FACTORY);
         sown++;
       }
     }
@@ -126,7 +160,10 @@ export class RecipeBookSeed {
   /** Guarda el agregado que produce `build` solo si su id no existe ya (create-if-absent). */
   private async createIfAbsent<T>(
     id: string,
-    repo: { byId(id: EntityId): Promise<T | null>; save(aggregate: T): Promise<void> },
+    repo: {
+      byId(id: EntityId): Promise<T | null>;
+      save(aggregate: T, options?: SaveOptions): Promise<void>;
+    },
     build: () => T,
   ): Promise<void> {
     const entityId = new EntityId(id);
@@ -135,7 +172,7 @@ export class RecipeBookSeed {
       return;
     }
     try {
-      await repo.save(build());
+      await repo.save(build(), FACTORY);
     } catch (error) {
       this.log.warn('no se pudo sembrar', error, { id });
     }

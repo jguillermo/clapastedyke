@@ -5,6 +5,8 @@ import { RecipeBookEvents } from '../events/recipe-book-events';
 interface RecipeCategoryData {
   id: EntityId;
   name: string;
+  /** Ver `RecipeCategory.updatedAt`. Opcional: quien la arma de cero todavía no la ha guardado. */
+  updatedAt?: string | null;
 }
 
 /**
@@ -17,19 +19,21 @@ interface RecipeCategoryData {
 export class RecipeCategory extends AggregateRoot {
   readonly id: EntityId; // Nivel 1: identidad única de la categoría
   readonly name: string; // Nivel 1: nombre visible (Queques, Galletas…)
+  /** Nivel 3: metadato de auditoría — cuándo se guardó por última vez. Ver `Supply.updatedAt`. */
+  readonly updatedAt: string | null;
 
   private constructor(data: RecipeCategoryData) {
     super();
     this.id = data.id;
     this.name = data.name;
+    this.updatedAt = data.updatedAt ?? null;
   }
 
   /** Arma la categoría y graba que se guardó. */
   static create(id: EntityId, name: string): RecipeCategory {
-    if (!name.trim()) {
-      throw new Error('Category name is required');
-    }
-    const category = new RecipeCategory({ id, name: name.trim() });
+    const data = { id, name: name.trim() };
+    RecipeCategory.assertValid(data);
+    const category = new RecipeCategory(data);
     category.recordEvent(RecipeBookEvents.recipeCategorySaved(id.value, { name: category.name }));
     return category;
   }
@@ -37,6 +41,13 @@ export class RecipeCategory extends AggregateRoot {
   /** Rehidrata desde almacenamiento: NO graba eventos (leer no es guardar). */
   static restore(data: RecipeCategoryData): RecipeCategory {
     return new RecipeCategory(data);
+  }
+
+  /** La regla que hace válida una categoría. Ver `Supply.assertValid` para el porqué. */
+  static assertValid(data: RecipeCategoryData): void {
+    if (!data.name.trim()) {
+      throw new Error('La categoría necesita un nombre.');
+    }
   }
 
   equals(other: RecipeCategory): boolean {

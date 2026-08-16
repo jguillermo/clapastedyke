@@ -1,0 +1,358 @@
+import { RemoteRow, RemoteTable } from '../../../domain/repositories/remote.repository';
+import { reconcile } from '../../../domain/services/engine/reconcile';
+import { ShadowRow } from '../../../domain/services/sync-shadow';
+import { fingerprintOf } from '../../../infrastructure/sheet-hash';
+import { SHEET_HEADERS } from '../../../infrastructure/sheet-schema';
+import { canonicalJson, payloadOf } from '../../../infrastructure/sheets/record-json';
+import { translateTable } from '../../../infrastructure/sheets/remote-registros';
+
+/**
+ * El adaptador: lo que convierte «una pestaña que una persona puede editar» en las dos listas que el
+ * motor sabe reconciliar.
+ *
+ * Aquí viven, re-alojados, los casos que antes probaba el motor específico de Sheets — porque son
+ * **suyos**, no del motor genérico: una edición a mano, una fila tecleada sin id, un id cambiado, una
+ * fila borrada de la hoja. El motor no sabe qué es ninguna de esas cosas; solo ve registros con
+ * huella, borrado y versión, y decide.
+ *
+ * Cada caso se comprueba de punta a punta —traducir y **decidir**— porque lo que importa no es qué
+ * versión se le pone a un registro, sino quién acaba ganando.
+ */
+describe('la traducción de una pestaña', () => {
+  const AHORA = 1_800_000_000_000;
+  const TABLE = 'ingredients';
+  const DEVICE = 'dev00001';
+
+  /** Un insumo tal cual vive en IndexedDB, con su precio anidado. */
+  function insumo(overrides: Partial<Record<string, unknown>> = {}): Record<string, unknown> {
+    return {
+      id: 'ing-harina',
+      name: 'Harina',
+      baseUnit: 'g',
+      purchasePrice: { amount: 4.5, per: { value: 1000, unit: 'g' }, currency: 'PEN' },
+      updatedAt: new Date(AHORA - 60_000).toISOString(),
+      ...overrides,
+    };
+  }
+
+  /** La huella que la app habría escrito para esa fila: lo que hace creíble «esto lo escribí yo». */
+  async function huellaDe(
+    _rows: readonly Record<string, unknown>[],
+    row: Record<string, unknown>,
+  ): Promise<string> {
+    return fingerprintOf([canonicalJson(payloadOf(row as never))]);
+  }
+
+  function tabla(rows: readonly RemoteRow[]): RemoteTable {
+    return {
+      table: TABLE,
+      present: true,
+      header: [...SHEET_HEADERS],
+      rows,
+      unreadable: [],
+      raw: rows.map((row) => ({
+        id: String(row.values['id'] ?? ''),
+        cells: {
+          id: String(row.values['id'] ?? ''),
+          datos: canonicalJson(row.values as never),
+          version: row.meta.version,
+          origen: row.meta.origin,
+          huella: row.meta.fingerprint,
+          borrado: row.meta.deleted ? 'TRUE' : '',
+        },
+      })),
+    };
+  }
+
+  function fila(values: Record<string, unknown>, meta: Partial<RemoteRow['meta']>): RemoteRow {
+    return {
+      index: 2,
+      // Lo que el repositorio entrega ya es el payload parseado: sin fecha de guardado ni lápida.
+      values: payloadOf(values as never),
+      meta: { version: '', origin: 'otro', fingerprint: '', deleted: false, ...meta },
+    };
+  }
+
+  function recordado(values: Record<string, unknown>, fingerprint: string): ShadowRow {
+    return {
+      table: TABLE,
+      rowId: String(values['id']),
+      fingerprint,
+      version: '0000000000500-0000-otro',
+      deleted: false,
+      // El shadow guarda el payload: la misma forma con la que el motor compara.
+      values: payloadOf(values as never),
+    };
+  }
+
+  async function decidir(input: {
+    remote: RemoteTable;
+    local: readonly Record<string, unknown>[];
+    shadow?: readonly ShadowRow[];
+  }) {
+    const translated = await translateTable({
+      remote: input.remote,
+      local: input.local as never,
+      shadow: input.shadow ?? [],
+      now: AHORA,
+      deviceId: DEVICE,
+      newIdentity: () => 'id-nuevo',
+    });
+    return {
+      translated,
+      plan: reconcile({
+        base: translated.base,
+        data: translated.data,
+        now: AHORA,
+        originId: DEVICE,
+      }),
+    };
+  }
+
+  /**
+   * **Una fila que no se puede leer NO es una fila borrada.**
+   *
+   * Las filas ilegibles se apartan antes de decidir —no se puede saber qué dicen— y ahí estaba la
+   * trampa: al no entrar en la lista de lo que la hoja contiene, el shadow las daba por desaparecidas y
+   * les sintetizaba una lápida. O sea que **una celda que alguien estropeó borraba el dato en todos los
+   * dispositivos**; y como la celda seguía en la hoja, lo volvía a borrar en cada ciclo.
+   *
+   * Estar en la hoja y poder interpretarse son cosas distintas. Esta fila está.
+   */
+  it('una fila ilegible sigue contando como presente: no se sintetiza su lápida', async () => {
+    const harina = insumo();
+    const remote: RemoteTable = {
+      ...tabla([]),
+      unreadable: [{ index: 2, id: 'ing-harina', column: 'datos' }],
+      raw: [
+        {
+          id: 'ing-harina',
+          cells: {
+            id: 'ing-harina',
+            datos: '{roto',
+            version: '',
+            origen: '',
+            huella: '',
+            borrado: '',
+          },
+        },
+      ],
+    };
+
+    const { translated, plan } = await decidir({
+      remote,
+      local: [harina],
+      shadow: [recordado(harina, await huellaDe([], harina))],
+    });
+
+    expect(translated.base.filter((registro) => registro.sync.deleted)).toEqual([]);
+    expect(translated.handDeletes).toBe(0);
+    expect(plan.pull.filter((registro) => registro.sync.deleted)).toEqual([]);
+  });
+
+  /**
+   * **Un id no se hereda por parecerse.**
+   *
+   * Reconocer que a una fila le cambiaron el id se hace comparando su contenido sin el id, que es lo
+   * único que sobrevive a ese cambio. Pero eso solo tiene sentido si el id viejo **ya no está en la
+   * hoja**: si sigue ahí, con su fila, entonces nadie le cambió nada y esta otra fila es otra cosa.
+   *
+   * Sin esa condición, cualquier fila remota con un id que este dispositivo no conociera —todas, la
+   * primera vez que se sincroniza— podía robarle la identidad a una fila local que estaba en su sitio.
+   * Y el id robado desaparecía de la hoja, así que el ciclo siguiente lo daba por borrado.
+   */
+  it('no se re-identifica una fila local cuyo id sigue estando en la hoja', async () => {
+    const harina = insumo();
+    const gemela = { ...insumo(), id: 'ing-copia' };
+
+    const { translated } = await decidir({
+      remote: {
+        ...tabla([fila(harina, {}), { ...fila(gemela, {}), index: 3 }]),
+      },
+      local: [harina],
+    });
+
+    expect(translated.reids).toEqual([]);
+    expect([...translated.positions.keys()].sort()).toEqual(['ing-copia', 'ing-harina']);
+  });
+
+  /**
+   * **La edición a mano gana**, y es lo que convierte la hoja en la fuente de la verdad.
+   *
+   * La app escribe siempre el contenido y su huella **juntos**, así que si al recalcularla no cuadra,
+   * esa fila la tocó una persona. Y una persona que corrige un precio no actualiza la columna de
+   * versión: sin esta detección, la resolución por versión pisaría su corrección sin dejar rastro.
+   */
+  it('una celda editada a mano gana, aunque su versión sea vieja', async () => {
+    const local = insumo();
+    const huella = await huellaDe([local], local);
+    const editada = { ...local, name: 'Harina E2E' };
+
+    const { plan } = await decidir({
+      // La huella escrita es la del contenido ANTERIOR: es la discrepancia lo que delata la edición.
+      remote: tabla([fila(editada, { version: '0000000000500-0000-otro', fingerprint: huella })]),
+      local: [local],
+    });
+
+    expect(plan.push).toEqual([]);
+    expect(plan.pull).toHaveLength(1);
+    expect(plan.pull[0]['name']).toBe('Harina E2E');
+  });
+
+  /**
+   * Una fila que la app escribió y **nadie ha tocado** no mueve nada: misma huella en los dos lados.
+   *
+   * Es el caso más frecuente con diferencia —todos los ciclos de una app que ya convergió— y el que
+   * revienta más caro si falla: si la huella local y la remota no coincidieran, cada ciclo vería una
+   * edición a mano donde no la hay y la hoja se reescribiría sola para siempre.
+   */
+  it('una fila intacta no mueve nada', async () => {
+    const local = insumo();
+    const huella = await huellaDe([local], local);
+
+    const { plan } = await decidir({
+      remote: tabla([fila(local, { version: '0000000000500-0000-otro', fingerprint: huella })]),
+      local: [local],
+    });
+
+    expect(plan.push).toEqual([]);
+    expect(plan.pull).toEqual([]);
+    expect(plan.conflicts).toEqual([]);
+  });
+
+  /**
+   * **Huella vacía = adoptar**, no «editada a mano».
+   *
+   * Una fila sin huella es una fila que este motor nunca escribió: o la hoja es de antes de que
+   * existiera la columna, o la acaba de teclear alguien. Si contara como edición manual, el primer
+   * ciclo contra una hoja que ya existía les pondría versión nueva a **todas** las filas a la vez y el
+   * catálogo entero colisionaría, resolviéndose por desempate de dispositivo — o sea, al azar.
+   */
+  it('una fila sin huella se adopta en vez de contar como edición a mano', async () => {
+    const local = insumo();
+
+    const { plan } = await decidir({
+      remote: tabla([fila(local, { version: '0000000000500-0000-otro', fingerprint: '' })]),
+      local: [local],
+    });
+
+    // Mismo contenido en los dos lados: adoptarla no genera ni conflicto ni escritura.
+    expect(plan.push).toEqual([]);
+    expect(plan.pull).toEqual([]);
+  });
+
+  /**
+   * Una fila que alguien tecleó **sin id** se adopta: se le da identidad, se importa, y se le estampan
+   * el id, la huella y la versión **en su propia fila**.
+   *
+   * Sin ese estampado de vuelta, el ciclo siguiente volvería a verla sin id y le inventaría otra
+   * identidad: un agregado nuevo cada dos minutos, para siempre.
+   */
+  it('una fila tecleada sin id recibe identidad y hay que estamparla', async () => {
+    const aMano = { name: 'Cardamomo', baseUnit: 'g' };
+
+    const { translated, plan } = await decidir({
+      remote: tabla([fila(aMano, {})]),
+      local: [],
+    });
+
+    expect(translated.handAdds).toEqual([
+      {
+        index: 2,
+        id: 'id-nuevo',
+        fingerprint: expect.any(String) as unknown as string,
+        version: expect.any(String) as unknown as string,
+      },
+    ]);
+    expect(translated.handAdds[0].fingerprint).not.toBe('');
+    // Y entra como cualquier fila que solo está allí: se trae.
+    expect(plan.pull).toHaveLength(1);
+    expect(plan.pull[0]['id']).toBe('id-nuevo');
+  });
+
+  /**
+   * Un id cambiado a mano **se devuelve a su sitio**.
+   *
+   * Es el desenlace más silencioso de todos si no se corrige: el id viejo desaparece (se daría por
+   * borrado el agregado), el nuevo parece un alta, y todo lo que apuntaba al viejo queda colgando
+   * mientras la hoja parece perfecta. Se reconoce comparando el contenido **sin su id**, que es lo
+   * único que sobrevive al cambio.
+   */
+  it('un id cambiado a mano se reconoce por el resto de la fila y se devuelve', async () => {
+    const local = insumo();
+    const conOtroId = { ...local, id: 'id-cambiado-a-mano' };
+
+    const { translated } = await decidir({
+      remote: tabla([fila(conOtroId, { version: '0000000000500-0000-otro' })]),
+      local: [local],
+    });
+
+    expect(translated.reids).toEqual([
+      { index: 2, id: 'ing-harina', previous: 'id-cambiado-a-mano' },
+    ]);
+  });
+
+  /**
+   * Una fila que **estaba y ya no está** es un borrado a mano, y el destino manda.
+   *
+   * El motor no deduce un borrado de una ausencia —y hace bien, porque «no está» también significa
+   * «nunca llegó a este dispositivo»—, así que la lápida la sintetiza el adaptador, que es el único
+   * que sabe lo que había antes. Sin esto, la fila se volvería a subir en el ciclo siguiente y el
+   * borrado no se aplicaría nunca.
+   */
+  it('una fila que el shadow recordaba y ya no está en la hoja se borra aquí', async () => {
+    const local = insumo();
+    const huella = await huellaDe([local], local);
+
+    const { translated, plan } = await decidir({
+      remote: tabla([]),
+      local: [local],
+      shadow: [recordado(local, huella)],
+    });
+
+    expect(translated.handDeletes).toBe(1);
+    expect(plan.push).toEqual([]);
+    expect(plan.pull).toHaveLength(1);
+    expect(plan.pull[0].sync.deleted).toBe(true);
+  });
+
+  /**
+   * El ancestro que guarda el shadow es lo que permite **fusionar campos no solapados**: el destino
+   * cambió el precio, aquí se cambió el nombre, y sobreviven los dos.
+   *
+   * Es la capacidad que el motor anterior no tenía: allí ganaba un lado entero y el otro cambio se
+   * perdía en silencio.
+   */
+  it('con ancestro, un cambio de cada lado en campos distintos se fusiona', async () => {
+    const acordado = insumo();
+    const huella = await huellaDe([acordado], acordado);
+
+    const local = {
+      ...acordado,
+      name: 'Harina especial',
+      updatedAt: new Date(AHORA - 1_000).toISOString(),
+    };
+    const enLaHoja = {
+      ...acordado,
+      purchasePrice: { ...(acordado['purchasePrice'] as object), amount: 5.25 },
+    };
+
+    const { plan } = await decidir({
+      remote: tabla([fila(enLaHoja, { version: '0000000000500-0000-otro', fingerprint: huella })]),
+      local: [local],
+      shadow: [recordado(acordado, huella)],
+    });
+
+    expect(plan.conflicts).toHaveLength(1);
+    expect(plan.conflicts[0].winner).toBe('merged');
+    // El motor ve el registro tal cual: `purchasePrice` es **un** campo, no cuatro. Se fusiona a nivel
+    // de campo de primer nivel, y el precio llega entero y con su tipo.
+    const fusionado = plan.push[0];
+    expect(fusionado['name']).toBe('Harina especial');
+    expect(fusionado['purchasePrice']).toEqual({
+      amount: 5.25,
+      per: { value: 1000, unit: 'g' },
+      currency: 'PEN',
+    });
+  });
+});

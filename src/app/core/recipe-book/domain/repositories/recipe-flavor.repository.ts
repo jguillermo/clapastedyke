@@ -1,4 +1,5 @@
 import { EntityId } from '../../../_common/entity-id';
+import { SaveOptions } from './save-options';
 import { RecipeFlavor } from '../entities/recipe-flavor';
 
 /**
@@ -11,6 +12,6 @@ export abstract class RecipeFlavorRepository {
   abstract nextIdentity(): EntityId;
   abstract byId(id: EntityId): Promise<RecipeFlavor | null>;
   abstract all(): Promise<RecipeFlavor[]>;
-  abstract save(flavor: RecipeFlavor): Promise<void>;
+  abstract save(flavor: RecipeFlavor, options?: SaveOptions): Promise<void>;
   abstract delete(id: EntityId): Promise<void>;
 }

@@ -1,11 +1,16 @@
 import { BaseUnit } from '../../_common/quantity';
 import { CapacityGroup } from '../domain/entities/recipe-capacity';
 import { SupplyUsage } from '../domain/value-objects/supply-usage';
+import { SyncedRecord } from './synced-record';
 
 /**
  * Documentos de almacenamiento planos (solo primitivos) persistidos en IndexedDB. Son contratos
  * de infraestructura — nunca modelos de dominio. La traducción agregado ⇄ record vive en los
  * mappers (la capa anticorrupción hacia el almacenamiento).
+ *
+ * Los cinco agregados extienden `SyncedRecord`: cuándo se guardó por última vez y si está borrado. Los
+ * dos campos son **opcionales**, que es exactamente lo que tienen los documentos escritos antes de que
+ * existieran — leer nunca se rompe por su ausencia.
  */
 
 export interface QuantityRecord {
@@ -26,7 +31,7 @@ export interface RecipeIngredientRecord {
   quantity: QuantityRecord;
 }
 
-export interface SupplyRecord {
+export interface SupplyRecord extends SyncedRecord {
   id: string;
   name: string;
   baseUnit: BaseUnit;
@@ -34,24 +39,24 @@ export interface SupplyRecord {
   purchasePrice: PurchasePriceRecord;
 }
 
-export interface RecipeFlavorRecord {
+export interface RecipeFlavorRecord extends SyncedRecord {
   id: string;
   label: string;
 }
 
-export interface RecipeCapacityRecord {
+export interface RecipeCapacityRecord extends SyncedRecord {
   id: string;
   group: CapacityGroup;
   label: string;
   factor: number;
 }
 
-export interface RecipeCategoryRecord {
+export interface RecipeCategoryRecord extends SyncedRecord {
   id: string;
   name: string;
 }
 
-export interface RecipeRecord {
+export interface RecipeRecord extends SyncedRecord {
   id: string;
   categoryId: string;
   name: string;

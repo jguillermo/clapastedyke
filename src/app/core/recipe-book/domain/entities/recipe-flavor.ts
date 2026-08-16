@@ -5,6 +5,8 @@ import { RecipeBookEvents } from '../events/recipe-book-events';
 interface RecipeFlavorData {
   id: EntityId;
   label: string;
+  /** Ver `RecipeFlavor.updatedAt`. Opcional: quien lo arma de cero todavía no lo ha guardado. */
+  updatedAt?: string | null;
 }
 
 /**
@@ -19,19 +21,21 @@ interface RecipeFlavorData {
 export class RecipeFlavor extends AggregateRoot {
   readonly id: EntityId; // Nivel 1: identidad única del sabor
   readonly label: string; // Nivel 1: nombre visible (Vainilla, Chocolate…)
+  /** Nivel 3: metadato de auditoría — cuándo se guardó por última vez. Ver `Supply.updatedAt`. */
+  readonly updatedAt: string | null;
 
   private constructor(data: RecipeFlavorData) {
     super();
     this.id = data.id;
     this.label = data.label;
+    this.updatedAt = data.updatedAt ?? null;
   }
 
   /** Arma el sabor y graba que se guardó. */
   static create(id: EntityId, label: string): RecipeFlavor {
-    if (!label.trim()) {
-      throw new Error('Flavor label is required');
-    }
-    const flavor = new RecipeFlavor({ id, label: label.trim() });
+    const data = { id, label: label.trim() };
+    RecipeFlavor.assertValid(data);
+    const flavor = new RecipeFlavor(data);
     flavor.recordEvent(RecipeBookEvents.flavorSaved(id.value, { label: flavor.label }));
     return flavor;
   }
@@ -39,6 +43,13 @@ export class RecipeFlavor extends AggregateRoot {
   /** Rehidrata desde almacenamiento: NO graba eventos (leer no es guardar). */
   static restore(data: RecipeFlavorData): RecipeFlavor {
     return new RecipeFlavor(data);
+  }
+
+  /** La regla que hace válido un sabor. Ver `Supply.assertValid` para el porqué. */
+  static assertValid(data: RecipeFlavorData): void {
+    if (!data.label.trim()) {
+      throw new Error('El sabor necesita un nombre.');
+    }
   }
 
   equals(other: RecipeFlavor): boolean {

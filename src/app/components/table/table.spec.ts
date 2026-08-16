@@ -25,10 +25,11 @@ import { Table, type TableColumn } from './table';
 })
 class Host {
   // 3ª columna = el botón de eliminar que pinta el consumidor (la tabla ya no trae columna propia).
+  // Con rótulo, como exige `TableColumn.name`: una cabecera vacía es un fallo de AXE.
   columns: TableColumn[] = [
     { name: 'Ingrediente' },
     { name: 'Cantidad' },
-    { name: '', size: 'fit' },
+    { name: 'Acciones', size: 'fit' },
   ];
   readonly rows = [0, 1, 2];
   bleed = false;

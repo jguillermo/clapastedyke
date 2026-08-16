@@ -5,6 +5,7 @@ import {
   ElementRef,
   OnDestroy,
   computed,
+  effect,
   inject,
   output,
   signal,
@@ -17,6 +18,7 @@ import { Badge } from '@components/badge/badge';
 import { MigoDialog } from '@components/dialog/dialog.service';
 import type { EntityId } from '@core/_common/entity-id';
 import { Logger } from '@core/_common/logger/logger';
+import { WatchSyncStatus } from '@core/external-sync/application/use-cases/watch-sync-status.use-case';
 import {
   ListRecipeBook,
   type RecipeBookCatalog,
@@ -295,8 +297,41 @@ export class RecipeBook3d implements AfterViewInit, OnDestroy {
 
   private readonly canvasRef = viewChild<ElementRef<HTMLCanvasElement>>('canvas');
   private readonly listRecipeBook = inject(ListRecipeBook);
+  private readonly syncStatus = inject(WatchSyncStatus);
   private readonly dialog = inject(MigoDialog);
   private readonly log = inject(Logger).scoped('ui/book');
+
+  /**
+   * La última revisión de datos que este libro ya tiene pintada.
+   *
+   * Se inicializa con la de **ahora**, así que el `effect` de abajo no recarga en su primera pasada: el
+   * montaje ya carga por su cuenta, y hacerlo dos veces repintaría el libro entero al abrirlo.
+   */
+  private seenRevision = this.syncStatus.revision();
+
+  /**
+   * Repinta el libro cuando la sincronización trae datos nuevos, sean de este dispositivo o de otra
+   * pestaña.
+   *
+   * No es un detalle estético. Sin esto el libro sigue mostrando el catálogo que leyó al abrirse, y si
+   * el usuario edita una receta a partir de ahí, lo que guarde saldrá **con el contenido de antes y una
+   * versión nueva** — y le ganará al cambio legítimo del otro dispositivo. La vista desactualizada se
+   * convierte en pérdida de datos.
+   *
+   * `load()` conserva la cara actual y absorbe sus propios fallos, así que recargar aquí no saca al
+   * usuario de donde estaba ni puede tumbar nada.
+   */
+  constructor() {
+    effect(() => {
+      const revision = this.syncStatus.revision();
+      if (revision === this.seenRevision) {
+        return;
+      }
+      this.seenRevision = revision;
+      this.log.debug('la sincronización trajo datos nuevos, se repinta el libro', { revision });
+      void this.load();
+    });
+  }
 
   protected readonly webglSupported = signal(detectWebgl());
   protected readonly indexOpen = signal(false);
@@ -600,9 +635,16 @@ export class RecipeBook3d implements AfterViewInit, OnDestroy {
     });
     ref.closed.subscribe((result) => {
       this.dialogOpen = false;
-      if (result) {
-        void this.load({ categoryId: result.categoryId, recipeName: result.name });
+      if (!result) {
+        return;
       }
+      // Si se borró, se recarga la categoría pero NO se busca la receta: ya no está, y buscarla dejaría
+      // el libro en la portada sin explicar por qué.
+      void this.load(
+        result.deleted
+          ? { categoryId: result.categoryId }
+          : { categoryId: result.categoryId, recipeName: result.name },
+      );
     });
   }
 

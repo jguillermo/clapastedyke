@@ -10,21 +10,34 @@ export const CONFIG_DOCUMENT_URL = 'config.json';
 export interface ConfigDocument {
   /** ¿Se ve el nivel `debug` en la consola? Ausente = `false`. */
   debug?: boolean;
-  /** URL `/exec` del Web App de Apps Script que escribe en la hoja. */
-  appsScriptUrl?: string;
-  /** Client ID de OAuth por defecto. */
+  /** Client ID de OAuth de la app ante Google. */
   googleClientId?: string;
+  /** Cada cuántos segundos se comprueba si hay cambios remotos. Ausente o inválido = 120 (2 min). */
+  syncPollSeconds?: number;
 }
 
 /**
- * Configuración de la integración con Google, resuelta al arrancar. Ambos valores pueden faltar:
- * la app funciona igual (local-only) y la pantalla de cuenta pide lo que haga falta.
+ * Configuración de la integración con Google, resuelta al arrancar.
+ *
+ * **Un solo valor**, y es del despliegue entero: el identificador de la app ante Google. Todo lo
+ * demás —dónde está la hoja, a qué dirección se le habla, con qué secreto— es de cada usuario, se
+ * crea al conectar y vive en su IndexedDB, no aquí.
  */
 export interface IntegrationConfig {
-  /** URL `/exec` del Web App de Apps Script que escribe en la hoja. */
-  appsScriptUrl: string | null;
-  /** Client ID de OAuth por defecto. Cada usuario puede poner el suyo en `/cuenta`. */
+  /** Client ID de OAuth de la app. Uno para todo el despliegue: no se configura por usuario. */
   googleClientId: string | null;
+}
+
+/**
+ * Cadencia del motor de sincronización, resuelta al arrancar.
+ *
+ * **Un solo valor**: cada cuánto se comprueba el destino por si otro dispositivo escribió. Es de
+ * despliegue, no de usuario, por la misma razón que `IntegrationConfig`: cambiarlo no debería
+ * exigir recompilar.
+ */
+export interface SyncConfig {
+  /** Segundos entre dos comprobaciones del destino. */
+  pollSeconds: number;
 }
 
 /**
@@ -37,9 +50,9 @@ export interface IntegrationConfig {
  * lado del bundle y se edita sin recompilar nada.
  *
  * Vive en **infraestructura** del shared kernel, y no en una capa de dominio, porque sus claves son
- * tecnología pura (si se registra el detalle, a qué Apps Script se llama, con qué Client ID de
- * Google). Solo la consumen adaptadores: el repositorio de ajustes de `auth`, el gateway de
- * `external-sync` y el adaptador del `Logger`. Ni un caso de uso ni una entidad la importan.
+ * tecnología pura (si se registra el detalle, con qué Client ID de Google se identifica la app). Solo
+ * la consumen adaptadores: el repositorio de ajustes de `auth`, el `SyncScheduler` de `external-sync`
+ * y el adaptador del `Logger`. Ni un caso de uso ni una entidad la importan.
  *
  * **Se lee antes de arrancar** (`main.ts`), no en un app-initializer: así todo lo que se inyecta
  * después la encuentra ya resuelta, y ninguna traza del arranque se pierde por ocurrir antes de que
@@ -49,4 +62,5 @@ export abstract class AppConfig {
   /** ¿Se emite `debug`? Lo consume el adaptador del `Logger`, nadie más. */
   abstract get debug(): boolean;
   abstract get integration(): IntegrationConfig;
+  abstract get sync(): SyncConfig;
 }

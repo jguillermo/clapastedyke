@@ -38,6 +38,7 @@ export const RecipeMapper = {
         ? new EntityId(record.portionsCapacityId)
         : null,
       moldCapacityId: record.moldCapacityId ? new EntityId(record.moldCapacityId) : null,
+      updatedAt: record.updatedAt ?? null,
     });
   },
 };

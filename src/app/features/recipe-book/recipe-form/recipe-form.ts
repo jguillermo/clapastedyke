@@ -24,6 +24,7 @@ import { Logger } from '@core/_common/logger/logger';
 import type { Supply } from '@core/recipe-book/domain/entities/supply';
 import type { RecipeFlavor } from '@core/recipe-book/domain/entities/recipe-flavor';
 import type { RecipeCapacity } from '@core/recipe-book/domain/entities/recipe-capacity';
+import { DeleteRecipe } from '@core/recipe-book/application/use-cases/delete-recipe.use-case';
 import { SaveRecipe } from '@core/recipe-book/application/use-cases/save-recipe.use-case';
 import {
   SaveRecipeProperty,
@@ -61,6 +62,11 @@ export interface RecipeFormResult {
   id: string;
   categoryId: string;
   name: string;
+  /**
+   * `true` si lo que se hizo fue **borrarla**. El libro recarga igual, pero no puede saltar a ella: ya
+   * no está, y buscarla dejaría el libro en su portada sin explicación.
+   */
+  deleted?: boolean;
 }
 
 /**
@@ -137,12 +143,46 @@ export interface RecipeFormResult {
         </div>
       </migo-card-body>
 
+      <!-- Borrar pregunta EN EL SITIO, y mientras pregunta no se ve nada más: un pie con «Borrar»,
+           «Cancelar» y «Guardar» a la vez invita a pulsar el que no era. -->
       <migo-card-footer>
-        <button migo-button variant="ghost" type="button" (click)="cancel()">Cancelar</button>
-        <button migo-button type="button" [disabled]="!canSave() || saving()" (click)="save()">
-          <migo-icon icon-leading name="mat:check" size="sm" />
-          <span>Guardar</span>
-        </button>
+        @if (confirmingDelete()) {
+          <span class="me-auto font-body text-sm text-body">
+            Se borrará «{{ data.recipe?.name }}».
+          </span>
+          <button migo-button variant="ghost" type="button" (click)="keepRecipe()">
+            Conservar
+          </button>
+          <!-- «Sí, borrar» y no «Borrar»: el rótulo del que confirma no puede ser idéntico al del que
+               pregunta, o quien pulsa dos veces seguidas por inercia borra sin haber leído. -->
+          <button
+            migo-button
+            variant="danger"
+            type="button"
+            [loading]="deleting()"
+            (click)="removeRecipe()"
+          >
+            Sí, borrar
+          </button>
+        } @else {
+          @if (data.recipe) {
+            <button
+              class="me-auto"
+              migo-button
+              variant="ghost"
+              type="button"
+              (click)="askToDelete()"
+            >
+              <migo-icon icon-leading name="mat:delete" size="sm" />
+              <span>Borrar</span>
+            </button>
+          }
+          <button migo-button variant="ghost" type="button" (click)="cancel()">Cancelar</button>
+          <button migo-button type="button" [disabled]="!canSave() || saving()" (click)="save()">
+            <migo-icon icon-leading name="mat:check" size="sm" />
+            <span>Guardar</span>
+          </button>
+        }
       </migo-card-footer>
     </migo-card>
   `,
@@ -152,6 +192,7 @@ export class RecipeForm {
   protected readonly data = inject<RecipeFormData>(MIGO_DIALOG_DATA);
   private readonly saveRecipe = inject(SaveRecipe);
   private readonly saveProperty = inject(SaveRecipeProperty);
+  private readonly deleteRecipe = inject(DeleteRecipe);
   private readonly log = inject(Logger).scoped('ui/recipe-form');
 
   private readonly grid = viewChild.required(SupplyGrid);
@@ -215,6 +256,10 @@ export class RecipeForm {
   protected readonly saving = signal(false);
   protected readonly errorMessage = signal('');
 
+  /** El pie está preguntando si borrar. Solo se puede llegar aquí editando una receta que existe. */
+  protected readonly confirmingDelete = signal(false);
+  protected readonly deleting = signal(false);
+
   protected readonly canSave = computed(() => this.nameValue().trim().length > 0);
 
   protected readonly supplyOptions = computed<SupplyOption[]>(() =>
@@ -258,6 +303,50 @@ export class RecipeForm {
       this.errorMessage.set(
         error instanceof Error ? error.message : 'No se pudo guardar la característica.',
       );
+    }
+  }
+
+  protected askToDelete(): void {
+    this.errorMessage.set('');
+    this.confirmingDelete.set(true);
+  }
+
+  protected keepRecipe(): void {
+    this.confirmingDelete.set(false);
+  }
+
+  /**
+   * Borra la receta que se está editando y cierra.
+   *
+   * Cierra con `deleted` para que el libro recargue **sin intentar saltar** a una receta que ya no está.
+   */
+  protected async removeRecipe(): Promise<void> {
+    const recipe = this.data.recipe;
+    if (!recipe) {
+      return;
+    }
+
+    this.log.debug('borrar receta ▶', { id: recipe.id });
+    this.deleting.set(true);
+    this.errorMessage.set('');
+    try {
+      await this.deleteRecipe.execute({ id: recipe.id });
+      this.log.debug('borrar receta ✔', { id: recipe.id });
+      this.ref.close({
+        id: recipe.id,
+        categoryId: this.data.category.id,
+        name: recipe.name,
+        deleted: true,
+      });
+    } catch (error) {
+      // El mensaje en pantalla no sustituye al registro: aquí queda la causa con su pila.
+      this.log.warn('no se pudo borrar la receta', error, { id: recipe.id });
+      this.errorMessage.set(
+        error instanceof Error ? error.message : 'No se pudo borrar la receta.',
+      );
+      this.confirmingDelete.set(false);
+    } finally {
+      this.deleting.set(false);
     }
   }
 

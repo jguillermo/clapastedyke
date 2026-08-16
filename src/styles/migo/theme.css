@@ -75,9 +75,13 @@
   --color-info: var(--info);
   --color-info-soft: var(--info-soft);
 
-  /* ---- Familias tipográficas → font-display / font-body ---- */
+  /* ---- Familias tipográficas → font-display / font-body / font-mono ---- */
   --font-display: var(--titular);
   --font-body: var(--cuerpo);
+  /* Monoespaciada del sistema. La única tipografía que NO es de marca, y a propósito: se usa para
+     texto que el usuario copia y pega en otro sitio (código, identificadores), donde lo que importa
+     es distinguir 0/O y l/1 y que las columnas cuadren. Ver el componente `migo-code-block`. */
+  --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
 
   /* ---- Pesos → font-regular … font-black ---- */
   --font-weight-regular: 400;

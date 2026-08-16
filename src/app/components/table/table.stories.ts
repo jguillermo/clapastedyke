@@ -7,10 +7,12 @@ import { Icon } from '@components/icon/icon';
 import { UnitInput } from '@components/unit-input/unit-input';
 import { Table, TableColumn } from './table';
 
+// La tercera es la de eliminar fila. Lleva rótulo aunque solo tenga un icono: una cabecera vacía es un
+// fallo de AXE (`empty-table-header`). Ver `TableColumn.name`.
 const COLUMNS: TableColumn[] = [
   { name: 'Insumo' },
   { name: 'Cantidad', size: 'fit', align: 'center' },
-  { name: '', size: 'fit' },
+  { name: 'Acciones', size: 'fit' },
 ];
 
 const SUGGESTIONS: string[] = ['Harina de trigo', 'Harina de maíz', 'Azúcar rubia', 'Huevos'];

@@ -29,6 +29,12 @@ export const IntegrationEventName = {
 
   // ── Publica: auth ────────────────────────────────────────────────────────────
   AUTHENTICATION_SUCCEEDED: 'AuthenticationSucceeded',
+  /**
+   * La misma cuenta de siempre ha vuelto sin que nadie pulse nada (una recarga, típicamente). **No
+   * es lo mismo que entrar**: quien escuche no debe tirar lo que quedara pendiente, porque es de esta
+   * misma persona.
+   */
+  SESSION_RESUMED: 'SessionResumed',
   AUTHENTICATION_FAILED: 'AuthenticationFailed',
   SIGN_OUT_SUCCEEDED: 'SignOutSucceeded',
   SIGN_OUT_FAILED: 'SignOutFailed',

@@ -5,7 +5,7 @@
  */
 
 export const DB_NAME = 'clapastedyke';
-export const DB_VERSION = 9;
+export const DB_VERSION = 13;
 
 const STORES = [
   'ingredients',
@@ -35,18 +35,37 @@ const STORES = [
   // 'google_integration' nació y murió dentro de la misma tanda que 'auth_settings' (se renombró al
   // hacer genérico el contexto de autenticación). Se conserva porque los stores solo se AÑADEN.
   'google_integration',
-  // Ajustes de autenticación: SOLO configuración de este navegador (el identificador de cliente).
-  // Ni credenciales, ni identidad, ni referencias a la hoja del usuario — eso vive en memoria y
-  // desaparece al cerrar sesión.
+  // 'auth_settings' es legacy: guardaba el identificador de cliente de ESTE navegador, hasta que se
+  // vio que identifica a la aplicación y no al usuario, y pasó a salir de `public/config.json`. Se
+  // conserva en la lista porque los stores solo se AÑADEN, pero ya no se lee ni se escribe.
   'auth_settings',
+  // Con qué cuenta se estaba, para poder reanudar la sesión al recargar sin volver a preguntar. NO
+  // guarda la credencial —eso sigue viviendo solo en memoria—, solo el id y el correo con los que
+  // pedirle al proveedor un token nuevo en silencio. Ver `auth/domain/repositories/session-hint`.
+  'auth_session_hint',
   // Cola durable de cambios pendientes de sincronizar. No guarda un agregado sino TRABAJO POR HACER,
   // y por eso vive aquí: un refresco a media sincronización no puede llevarse por delante los
   // cambios que esperaban turno. Ver `external-sync/infrastructure/indexeddb-sync-outbox.ts`.
   'sync_outbox',
+  // 'sync_installations' nació y murió dentro de la misma tanda: guardaba el Apps Script que se
+  // instalaba en cada cuenta, hasta que se vio que la app puede escribir la hoja ella misma con la
+  // API de Sheets. Se conserva porque los stores solo se AÑADEN, pero ya no se lee ni se escribe.
+  'sync_installations',
+  // Dónde tiene su hoja cada cuenta. Una entrada por persona: sin esto, cada recarga crearía una
+  // hoja nueva en su Drive. No guarda credenciales — esas viven en memoria y mueren con la sesión.
+  'sync_targets',
   // 'domain_events' nació y murió en la misma tanda: el bus de eventos acabó con su PROPIA base de
   // datos (`_common/eventbus/event-database.ts`) para no depender del versionado de esta. Se
   // conserva en la lista porque los stores solo se AÑADEN, pero ya no se lee ni se escribe.
   'domain_events',
+  // La última fila que se vio en la hoja, por tabla e id: la BASE con la que se compara. Sin ella no
+  // se puede distinguir «esta fila la borró alguien en la hoja» de «esta fila nunca llegó a este
+  // dispositivo», que son cosas opuestas. Ver `external-sync/infrastructure/indexeddb-sync-shadow.ts`.
+  'sync_shadow',
+  // Quién es ESTE navegador. Solo un identificador aleatorio, que entra en la versión de cada fila que
+  // se escribe para desempatar conflictos de forma igual en todas las máquinas. No identifica a la
+  // persona: se regenera al borrar los datos del sitio y no sale de aquí salvo dentro de esa versión.
+  'sync_device',
 ] as const;
 
 export type StoreName = (typeof STORES)[number];
@@ -85,7 +104,27 @@ export function openDatabase(): Promise<IDBDatabase> {
       }
     };
 
-    request.onsuccess = () => resolve(request.result);
+    request.onsuccess = () => {
+      const db = request.result;
+      // Una pestaña con la app abierta impide que OTRA suba la versión: mientras esta mantenga la
+      // conexión, la de al lado se queda esperando para siempre (ver `onblocked`). Al cerrarla en
+      // cuanto alguien quiere subir de versión, la que llega puede seguir. Esta pestaña se queda con
+      // una conexión cerrada y sus operaciones fallarán — es lo correcto: su código es el viejo, y lo
+      // que toca es recargar, no seguir escribiendo con un esquema que ya no es el vigente.
+      db.onversionchange = () => db.close();
+      resolve(db);
+    };
+
+    // Solo salta si otra pestaña sigue con una versión anterior y no soltó su conexión. Sin este
+    // manejador la promesa no se resolvía ni se rechazaba nunca: la app se quedaba en blanco al
+    // arrancar, sin error y sin nada que mirar.
+    request.onblocked = () =>
+      reject(
+        new Error(
+          `No se pudo subir IndexedDB "${DB_NAME}" a la v${DB_VERSION}: hay otra pestaña de la app abierta con una versión anterior. Ciérrala y recarga.`,
+        ),
+      );
+
     // El `DOMException` de IndexedDB no trae pila útil, así que va como `cause` de un error creado
     // aquí. Esta capa NO registra: traduce y relanza, y quien decide qué ve el usuario lo registra
     // una sola vez con la cadena entera. Ver logging-conventions.md → «un dueño por fallo».
