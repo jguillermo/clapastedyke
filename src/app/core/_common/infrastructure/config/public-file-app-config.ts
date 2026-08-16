@@ -32,10 +32,20 @@ export const CONFIG_DOCUMENT = new InjectionToken<ConfigDocument | null>('migo.c
  *
  * La URL es **relativa** a propósito: resuelve contra el `<base href>`, así que el mismo build
  * sirve en la raíz del dominio (Firebase Hosting) y bajo un subdirectorio, sin recompilar.
+ *
+ * **Siempre de la red, nunca de una copia.** El fichero es lo ÚNICO que cambia de un despliegue a
+ * otro con el mismo build, así que servir una versión guardada equivale a correr con la
+ * configuración de ayer. Por eso se pide con dos cerrojos, que cubren cosas distintas:
+ *
+ * · `cache: 'reload'` — el navegador **no** mira su caché HTTP (a diferencia de `'no-cache'`, que sí
+ *   la mira y solo revalida); pide de verdad y refresca lo guardado con la respuesta.
+ * · `?t=<epoch>` — la URL es distinta en cada arranque, así que ningún intermediario que ignore las
+ *   cabeceras (proxy corporativo, CDN mal configurada, un service worker futuro) puede responder con
+ *   lo que tenía. El coste es cero: son 142 bytes y una sola petición por arranque.
  */
 export async function readConfigDocument(): Promise<ConfigDocument | null> {
   try {
-    const res = await fetch(CONFIG_DOCUMENT_URL, { cache: 'no-cache' });
+    const res = await fetch(`${CONFIG_DOCUMENT_URL}?t=${Date.now()}`, { cache: 'reload' });
     return res.ok ? ((await res.json()) as ConfigDocument) : null;
   } catch {
     return null;
