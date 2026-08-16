@@ -9,7 +9,6 @@ marcha. Aquí no hay nada de producto ni de negocio — eso vive en [`.claude/do
 | Documento | Qué es |
 |---|---|
 | [`firebase-deploy.md`](firebase-deploy.md) | **Cómo se publica.** Los ambientes (hoy `dev` y `prod`, un proyecto de Firebase cada uno) declarados en un único `deploy/firebase/environments.json` (que además genera `public/config.json`), dónde vive cada valor y cuál es secreto, el alta manual paso a paso, cómo añadir un ambiente nuevo y cómo lanzar el despliegue, que es manual a propósito. Incluye qué hace cada clave de `firebase.json` y el diagnóstico de los fallos típicos. |
-| [`google-setup.md`](google-setup.md) | **El cómo.** Lo que hay que montar una vez para que la integración con Google Sheets funcione: proyecto de Cloud, pantalla de consentimiento, Client ID y la única clave de `config.json`. Incluye la lista de comprobación y el diagnóstico de fallos. La hoja de cada usuario la crea la app sola. |
 | [`google-integration.md`](google-integration.md) | **El porqué.** Modelo mental de la integración con Google, las restricciones de la plataforma que la fuerzan (sin refresh token en un navegador, el alcance real de `drive.file`), las arquitecturas descartadas y los datos medidos que respaldan cada decisión. |
 | [`sync-architecture.md`](sync-architecture.md) | **Cómo se mantienen iguales la app y la hoja.** Las tres copias y por qué no bastan dos, el reloj lógico y su tope, qué pasa cuando alguien edita la hoja a mano, las barreras que impiden que un clic derecho borre el catálogo, cuándo se sincroniza, los límites aceptados y qué mirar en la consola cuando algo no cuadra. |
 
@@ -20,6 +19,7 @@ condena a desactualizarse, porque nadie la ve al tocar el fichero de al lado.
 
 | Documento | Qué cubre |
 |---|---|
+| [`deploy/google-client-id.md`](../deploy/google-client-id.md) | **Los pasos para crear el Client ID de Google** (proyecto de Cloud, consentimiento, orígenes autorizados) y dónde se pega. Vive junto a `deploy/firebase/environments.json`, que es el fichero donde acaba ese valor. Es el **único** sitio con ese procedimiento: no se duplica aquí. |
 | [`src/app/components/README.md`](../src/app/components/README.md) | Catálogo vivo de la librería de componentes: qué existe, cómo se usa cada pieza y qué falta por construir. Se actualiza en el mismo commit que añade un componente. |
 | [`src/app/core/_common/eventbus/README.md`](../src/app/core/_common/eventbus/README.md) | Especificación del bus de eventos: cola persistente, entrega *at-least-once*, y por qué los manejadores tienen que tolerar ejecutarse dos veces. |
 | [`src/app/core/_common/logger/README.md`](../src/app/core/_common/logger/README.md) | El puerto de registro y su configuración. |

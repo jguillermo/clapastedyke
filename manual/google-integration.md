@@ -1,8 +1,8 @@
 # Integración con Google — modelo mental y decisiones
 
 Este documento es el **por qué**. El paso a paso para ponerlo en marcha está en
-[`google-setup.md`](google-setup.md); aquí está lo que hay que entender antes de tocarlo, las alternativas
-que se evaluaron y los datos medidos que respaldan cada decisión.
+[`deploy/google-client-id.md`](../deploy/google-client-id.md); aquí está lo que hay que entender antes de tocarlo, las
+alternativas que se evaluaron y los datos medidos que respaldan cada decisión.
 
 Se escribió después de una investigación con pruebas reales contra la API de Google (agosto 2026).
 Los resultados del [Anexo A](#anexo-a--el-botón-«desplegar-sincronizador»-investigado-y-archivado)
@@ -119,13 +119,19 @@ Por eso el aislamiento **no puede** basarse en que nadie conozca la URL. Se basa
 
 ### 2.6 `drive.file` alcanza justo lo que la app crea, y eso basta
 
-El scope se lee así: *«solo los ficheros específicos de Drive que uses con esta app»*. No es «solo
-lectura» ni «solo crear»: sobre **los ficheros que la app ha creado** puede todo — leerlos, escribirlos
-y borrarlos. Sobre el resto del Drive, nada; ni siquiera listarlo.
+En la pantalla de consentimiento se lee: *«See, edit, create, and delete only the specific Google
+Drive files you use with this app»*. Esa coletilla final es todo. No es «solo lectura» ni «solo
+crear»: sobre **los ficheros que la app ha creado** puede todo — leerlos, escribirlos y borrarlos.
+Sobre el resto del Drive, nada; ni siquiera listarlo.
 
 De ahí sale toda la arquitectura actual: la app **crea** la hoja, y por haberla creado puede
 **escribirla**, sin pedir un permiso más ancho y sin nada intermedio. Medido: crear la hoja con solo
 `drive.file` devuelve 200 ([Anexo A.2](#a2-resultados-medidos-3-agosto-2026-cuenta-real)).
+
+Las alternativas son peores en las dos direcciones: `drive` a secas daría acceso al Drive entero, y
+un scope de **solo lectura no es viable** porque la app escribe. Además, por ser el más estrecho,
+Google **no considera `drive.file` sensible** y no exige verificación de la app — de ahí que no haya
+techo de usuarios (ver [5.2](#52-el-techo-de-100-usuarios-y-cómo-se-quita)).
 
 ---
 
@@ -202,7 +208,7 @@ fichero, no un secreto.
 Y por `drive.file`, ese token solo alcanza los ficheros que esta app creó. Aunque alguien se lo
 llevara, no podría leer nada más del Drive de esa persona.
 
-### 3.1 Una hoja por cuenta, no una por dispositivo
+### 4.1 Una hoja por cuenta, no una por dispositivo
 
 La hoja se crea **una sola vez por cuenta**, con el nombre fijo `Clapastedyke — Recetario` y en la raíz
 del Drive del usuario. Que el id se recuerde en local no basta para garantizarlo: **lo local es por
@@ -221,7 +227,7 @@ el único que puede decidir tirarlas. Queda un límite conocido: Drive no ofrece
 atómico, así que dos conexiones **simultáneas** pueden crear dos hojas — del ciclo siguiente en adelante
 las dos se van a la misma.
 
-### 4.1 El token va donde tiene que ir: en la cabecera
+### 4.2 El token va donde tiene que ir: en la cabecera
 
 Las APIs REST de Google **sí responden al preflight CORS**, así que desde el navegador se llaman como
 cualquier otra: `Authorization: Bearer …` y `Content-Type: application/json`. Está en
@@ -231,80 +237,37 @@ Merece la pena saber que la excepción era Apps Script: **un Web App no contesta
 que cualquier cabecera propia mataba la llamada antes de salir y obligaba a mandar el token dentro
 del cuerpo con `text/plain`. Todo aquel rodeo desapareció al quitar el script de en medio.
 
-### 4.2 Por qué `drive.file` y no otro scope
-
-`drive.file` alcanza **solo los ficheros que la propia app crea**. No puede listar ni leer nada más
-del Drive del usuario. Por eso Google **no lo considera sensible** y no exige verificación de la app.
-
-En la pantalla de consentimiento se lee: *«See, edit, create, and delete only the specific Google
-Drive files you use with this app»*. Esa coletilla final es todo.
-
-La alternativa (`drive` a secas) daría acceso al Drive entero. **Un scope de solo lectura no es
-viable**: la app escribe.
-
 ---
 
 ## 5 · Puesta en marcha
 
-El procedimiento completo está en [`google-setup.md`](google-setup.md). Aquí solo las **trampas** que se
-descubrieron ejecutándolo, porque son las que hacen perder una tarde:
+**Este documento no explica cómo montarlo.** Los pasos —proyecto de Cloud, consentimiento, Client ID
+y orígenes, y dónde se pega el valor— viven **solo** en
+[`deploy/google-client-id.md`](../deploy/google-client-id.md), junto al fichero de ambientes donde
+acaba el Client ID. Lo que falla al usarlo está en [6 · Diagnóstico](#6--diagnóstico).
 
-### 5.1 Google renombró la consola
+Lo único que pertenece aquí es la consecuencia de diseño:
 
-Lo que la documentación de Google (y muchos tutoriales) llaman «Pantalla de consentimiento de OAuth»
-ahora es **Google Auth Platform**, partido en secciones:
-
-| Antes | Ahora |
-|---|---|
-| Pantalla de consentimiento → Datos de la app | `Branding` |
-| Pantalla de consentimiento → Tipo de usuario / Usuarios de prueba | `Audience` |
-| Pantalla de consentimiento → Permisos | `Data Access` |
-| Credenciales → Crear credenciales → ID de cliente | `Clients` |
-
-### 5.2 Los scopes no aparecen si la API no está habilitada
-
-En `Data Access` solo se ofrecen los permisos de las APIs **habilitadas en el proyecto**. Si
-`drive.file` no aparece, falta habilitar Google Drive API en *APIs y servicios → Biblioteca*.
-
-Los que no salgan en la lista se añaden con la caja **«Manually add scopes»**.
-
-### 5.3 `localhost` y `127.0.0.1` son orígenes distintos para Google
-
-Aunque sean la misma máquina. Los servidores locales imprimen las dos URLs al arrancar; si registras
-una y abres la otra, sale `Error 400: origin_mismatch`. **Registra las dos.**
-
-Y ojo con el **puerto**: si el 4200 está ocupado, muchos servidores estáticos cogen otro sin avisar.
-Para salir de dudas, en la consola del navegador:
-
-```js
-location.origin;  // esto, carácter por carácter, es lo que tiene que estar registrado
-```
-
-### 5.4 Sin usuarios de prueba, nadie puede conectar
-
-Mientras la app esté en modo *Testing*, **todo correo que vaya a usarla tiene que estar en
-`Audience → Test users`** (máximo 100). Quien no esté verá un error de acceso aunque el resto esté
-perfecto.
-
-### 5.5 Cada scope extra es una casilla más
+### 5.1 Cada scope extra es una casilla más
 
 Google presenta los permisos como **casillas desmarcadas** que el usuario tiene que marcar una por
 una. Si no las marca, el token vuelve **sin esos permisos y sin error aparente** — el fallo aparece
 mucho después y sin relación visible con la causa.
 
 Con los cuatro scopes de este diseño, el usuario ve **una sola casilla**: la de Drive. Los tres
-primeros (`openid`, `email`, `profile`) no suman ninguna.
+primeros (`openid`, `email`, `profile`) no suman ninguna. Esa es la razón de no añadir scopes a la
+ligera.
 
 > `GoogleAuthenticator` se protege de esto comprobando `credential.allows(DRIVE_FILE_PERMISSION)`
 > nada más recibir el token, y falla con un mensaje accionable. **Cualquier scope nuevo necesita su
 > comprobación equivalente.**
 
-### 5.6 El techo de 100 usuarios, y cómo se quita
+### 5.2 El techo de 100 usuarios, y cómo se quita
 
-Mientras la pantalla de consentimiento esté en *Testing*, hay que añadir el correo de cada persona a
-mano y **quien no esté en la lista ve un error al conectar**. Publicándola se acaba esa tarea: sale
-una pantalla de «app no verificada» que se salta con un clic, y **no hace falta pasar la
-verificación** porque `drive.file` no es un scope sensible. Es el único límite operativo que queda.
+El único límite operativo que queda es el modo *Testing* de la pantalla de consentimiento: 100
+correos, dados de alta a mano. Se quita **publicando** la app, y publicarla no cuesta nada porque
+`drive.file` no es sensible y no hay verificación que pasar (2.6). El trámite, en
+[`deploy/google-client-id.md`](../deploy/google-client-id.md) §2.
 
 ---
 
@@ -312,12 +275,15 @@ verificación** porque `drive.file` no es un scope sensible. Es el único límit
 
 | Síntoma | Causa | Arreglo |
 |---|---|---|
-| `Error 400: origin_mismatch` | El origen no está registrado, o es `127.0.0.1` vs `localhost`, o el puerto cambió | Ver 5.3 |
+| `Error 400: origin_mismatch` | El origen no está registrado, o es `127.0.0.1` vs `localhost`, o el puerto cambió | [`deploy/google-client-id.md`](../deploy/google-client-id.md) §3 |
 | `UNAUTHENTICATED` | El token caducó (dura una hora) | Reconectar; lo pendiente se reintenta |
 | `REJECTED` | El usuario no marcó la casilla de Drive, o revocó el acceso | Reconectar y marcarla |
 | `TARGET_GONE` | La hoja se borró o está en la papelera | Se recrea sola al reconectar; también **Crear una hoja nueva** |
 | Al recargar pide reconectar | **Es el comportamiento correcto** | Ver 2.4 |
-| `INTERNAL` con «*… API has not been used in project …*» | Falta habilitar Sheets o Drive API | *APIs y servicios → Biblioteca* |
+| `INTERNAL` con «*… API has not been used in project …*» | Falta habilitar Sheets o Drive API | *APIs & Services → Library* |
+| La ventana de Google no llega a abrirse | Bloqueador de ventanas emergentes | Permitir las emergentes de este sitio y reintentar |
+| «*El dato de prueba no ha vuelto igual*» | La hoja existe pero la escritura no cuaja | **Crear una hoja nueva** desde `/cuenta` |
+| «*Google está limitando las peticiones*» | Cuota de la API | Esperar y reintentar: la sincronización es idempotente |
 
 ---
 

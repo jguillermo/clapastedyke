@@ -26,29 +26,10 @@ lo secreto está fuera del repo. Nada de configuración vive dentro del workflow
 | [`deploy/firebase/environments.json`](../deploy/firebase/environments.json) | **La lista de ambientes**: a qué proyecto de Firebase va cada uno (`projectId`) y el `config.json` con el que corre la app | No |
 | **Environments de GitHub**, uno por ambiente | `FIREBASE_SERVICE_ACCOUNT` | Sí |
 
-```jsonc
-// deploy/firebase/environments.json
-{
-  "dev": {
-    "projectId": "migo-dev-20b41",     // a qué proyecto de Firebase se sube
-    "config": {                        // ← ESTO ES el config.json publicado, tal cual
-      "debug": true,
-      "googleClientId": "2229…apps.googleusercontent.com",
-      "syncPollSeconds": 120
-    }
-  },
-  "prod": { "projectId": "…", "config": { "debug": false, … } }
-}
-```
-
-Fuera de `config` va lo que necesita el **despliegue** y la app no ve (hoy solo `projectId`). Dentro
-de `config` va, literalmente, **el `config.json` que se publica**: el bloque se copia entero, sin
-transformar. Si mañana `config.json` gana una clave, se añade ahí y no se toca nada más.
-
-> **`public/config.json` es un fichero GENERADO** desde el bloque `dev`, con `npm run config`. No se
-> edita a mano. Está commiteado porque `ng serve`, `ng build` y los E2E lo necesitan, pero la fuente
-> de verdad es `environments.json`. El despliegue usa **el mismo script** con otra salida
-> (`--out dist/misaevol/browser/config.json`), así que local y CI no pueden divergir.
+**El formato de `environments.json`** —sus dos niveles, qué va en `config` y qué fuera, y por qué
+`public/config.json` es un fichero **generado** que no se edita a mano— está documentado junto al
+propio fichero, en [`deploy/firebase/README.md`](../deploy/firebase/README.md). No se repite aquí
+para que no puedan contradecirse.
 
 El nombre del ambiente es la bisagra: **la clave en `environments.json` y el nombre del *environment*
 de GitHub tienen que ser el mismo, en minúsculas.** Eso es lo que hace que `secrets.*` resuelva a
@@ -89,9 +70,10 @@ Firebase a veces le añade un sufijo aleatorio).
 }
 ```
 
-Aquí va también el **Client ID de OAuth** de cada ambiente (`config.googleClientId`): no es un
-secreto —lo protege la lista de orígenes autorizados, no el ocultarlo— y tenerlo a la vista deja en
-el diff qué usa cada ambiente.
+Aquí va también el **Client ID de OAuth** de cada ambiente (`config.googleClientId`), que **no es un
+secreto** y por eso está versionado —el porqué, en
+[`deploy/firebase/README.md`](../deploy/firebase/README.md). Cómo se genera:
+[`deploy/google-client-id.md`](../deploy/google-client-id.md).
 
 Después, `npm run config` para regenerar `public/config.json`, y commitea los dos. Si te dejas el
 placeholder `TU-PROJECT-ID-…`, el workflow falla en el primer job con un mensaje que te manda aquí,
@@ -134,9 +116,8 @@ contenido; y **no le quites los `\n`** del `private_key`, que son los que permit
 todos los ambientes y desplegar a dev publicaría con las credenciales de prod. Tiene que ser un
 **environment secret**, dentro de su environment.
 
-> **El Client ID de OAuth no está aquí, y es deliberado.** No es una credencial: viaja en el HTML de
-> cualquier app web y lo protege la lista de orígenes autorizados. Vive en `environments.json`, a la
-> vista y versionado, junto al resto de la configuración de su ambiente.
+> **El Client ID de OAuth no está aquí, y es deliberado**: no es una credencial. Vive en
+> `environments.json` (paso 2).
 
 #### Opcional pero recomendado: protecciones en `prod`
 
@@ -152,26 +133,14 @@ donde quieres desplegar cualquier rama sin pedir permiso.
 
 ### Paso 5 · Orígenes de OAuth (dos por ambiente)
 
-Firebase publica cada sitio en **dos dominios**, y para Google son orígenes distintos. Con dos
-ambientes son cuatro entradas; con cuatro ambientes, ocho.
+Solo si el ambiente va a usar la sincronización con Google. Firebase publica cada sitio en **dos
+dominios** (`https://<projectId>.web.app` y `https://<projectId>.firebaseapp.com`) y para Google son
+orígenes distintos: los dos tienen que estar en los orígenes autorizados del Client ID, o entrar por
+el que falte da `Error 400: origin_mismatch`. Con dos ambientes son cuatro entradas; con cuatro,
+ocho.
 
-En Google Cloud → *APIs y servicios → Credenciales → tu Client ID de tipo «Aplicación web»* →
-**Orígenes de JavaScript autorizados**:
-
-```
-http://localhost:4200
-https://clapastedyke-dev.web.app
-https://clapastedyke-dev.firebaseapp.com
-https://clapastedyke-prod.web.app
-https://clapastedyke-prod.firebaseapp.com
-```
-
-Si registras solo uno de cada par, entrar por el otro da `Error 400: origin_mismatch`. **No hace
-falta ningún URI de redirección**: la app usa el flujo popup de Google Identity Services
-([`google-integration.md`](google-integration.md) §2.2).
-
-Si usas **un Client ID por ambiente**, cada uno lleva solo los orígenes de su proyecto (más
-`localhost` en el de desarrollo).
+**Cómo se crea ese Client ID y dónde se registran sus orígenes está en
+[`deploy/google-client-id.md`](../deploy/google-client-id.md)** — es el único sitio con ese procedimiento.
 
 ---
 
