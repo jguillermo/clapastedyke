@@ -77,6 +77,27 @@ POST body, why reloading the page forces a reconnect, and which alternatives wer
 rejected — is in [`manual/google-integration.md`](manual/google-integration.md). All technical
 documentation lives in [`manual/`](manual/).
 
+## Deployment
+
+The app is published to **Firebase Hosting** by a **manual** workflow — merging to `main` does not
+deploy anything. Run it from `Actions → Desplegar en Firebase Hosting → Run workflow`, picking a
+branch and an environment.
+
+Environments are **data, not code**:
+[`deploy/firebase/environments.json`](deploy/firebase/environments.json) is the one and only place
+where they are declared — which Firebase project each one deploys to, and the `config.json` it runs
+with. Today there are two, `dev` and `prod`, backed by two separate Firebase projects; adding
+`stage` or `lab` is one block in that file plus a matching GitHub Environment holding its service
+account. The workflow itself never names an environment.
+
+**`public/config.json` is generated**, not hand-written — `npm run config` rebuilds it from the
+`dev` block, and a deploy does the same with the target environment's block. Edit
+`environments.json`, never `config.json`.
+
+The one-time setup (one Firebase project and service account per environment, the environment
+secret, OAuth origins) and the troubleshooting table are in
+[`manual/firebase-deploy.md`](manual/firebase-deploy.md). Start there before the first deploy.
+
 ## Additional Resources
 
 For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.

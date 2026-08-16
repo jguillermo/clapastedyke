@@ -24,6 +24,7 @@
     "test:e2e:debug": "playwright test --config e2e/playwright.config.ts --debug",
     "test:e2e:report": "playwright show-report playwright-report",
     "e2e:serve": "node e2e/support/static-server.mjs",
+    "config": "node deploy/firebase/config.mjs",
     "sb": "ng run misaevol:storybook",
     "sb:test": "vitest run --project=storybook",
     "sb:build": "ng run misaevol:build-storybook"
