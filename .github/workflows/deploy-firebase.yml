@@ -106,12 +106,11 @@ jobs:
           printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "${RUNNER_TEMP}/gcp-key.json"
           echo "GOOGLE_APPLICATION_CREDENTIALS=${RUNNER_TEMP}/gcp-key.json" >> "$GITHUB_ENV"
 
-      # `--config` apunta al firebase.json fuera de la raíz. Ojo: el CLI toma el directorio de ESE
-      # fichero como raíz del proyecto, y por eso su `public` es `../../dist/misaevol/browser`.
+      # Sin `--config`: el CLI encuentra `firebase.json` en la raíz, que es donde TIENE que estar
+      # (fija ahí la raíz del proyecto y `dist/` queda dentro). Ver deploy/firebase/README.md.
       - name: Deploy a Firebase Hosting
         run: |
           npx --yes firebase-tools@latest deploy \
             --only hosting \
-            --config deploy/firebase/firebase.json \
             --project "${{ needs.validar.outputs.project-id }}" \
             --non-interactive
