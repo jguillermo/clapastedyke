@@ -39,6 +39,11 @@ testem.log
 /typings
 __screenshots__/
 
+# Firebase — la CLI deja su caché y sus logs junto al firebase.json (deploy/firebase/)
+.firebase/
+firebase-debug.log
+firebase-*-debug.log
+
 # Playwright
 /test-results/
 /playwright-report/

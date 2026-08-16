@@ -30,8 +30,8 @@ export const CONFIG_DOCUMENT = new InjectionToken<ConfigDocument | null>('migo.c
  * **Nunca lanza y nunca registra**: devuelve `null` y deja que el arranque decida qué contar, que es
  * quien ya tiene un `Logger` (un dueño por fallo).
  *
- * La URL es **relativa** a propósito: resuelve contra el `<base href>`, que en la demo de GitHub
- * Pages es `/clapastedyke/`.
+ * La URL es **relativa** a propósito: resuelve contra el `<base href>`, así que el mismo build
+ * sirve en la raíz del dominio (Firebase Hosting) y bajo un subdirectorio, sin recompilar.
  */
 export async function readConfigDocument(): Promise<ConfigDocument | null> {
   try {

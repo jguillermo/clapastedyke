@@ -63,32 +63,56 @@ En **Google Auth Platform**:
 En **Credenciales → Crear credenciales → ID de cliente de OAuth**, tipo **Aplicación web**.
 
 En «Orígenes de JavaScript autorizados» pon el origen desde el que se sirve la app —el dominio, sin
-ruta—, uno por entorno:
+ruta—, uno por ambiente:
 
 ```
 http://localhost:4200
-https://tu-usuario.github.io
+https://TU-PROJECT-ID-DEV.web.app
+https://TU-PROJECT-ID-DEV.firebaseapp.com
+https://TU-PROJECT-ID-PROD.web.app
+https://TU-PROJECT-ID-PROD.firebaseapp.com
 ```
+
+Firebase Hosting publica cada sitio en **dos dominios a la vez**, y para Google son orígenes
+distintos: si registras solo uno del par, entrar por el otro da `Error 400: origin_mismatch`. Y hay
+**dos ambientes** (`dev` y `prod`), que son dos proyectos de Firebase separados — de ahí las cuatro
+entradas. Si conectas un dominio propio, añádelo también.
+
+También puedes usar **un Client ID por ambiente**, y entonces cada uno lleva solo los orígenes de su
+proyecto; el workflow inyecta el que corresponda desde el secret de ese ambiente. Ver
+[`firebase-deploy.md`](firebase-deploy.md).
 
 ---
 
 ## 4 · Configurar la app
 
-El Client ID va a `public/config.json`, y es lo único que hay que configurar:
+El Client ID es lo único que hay que configurar, y va al bloque `config` de **su ambiente** en
+[`deploy/firebase/environments.json`](../deploy/firebase/environments.json):
 
-```json
+```jsonc
 {
-  "debug": false,
-  "googleClientId": "123456-abc.apps.googleusercontent.com",
-  "syncPollSeconds": 120
+  "dev": {
+    "projectId": "migo-dev-20b41",
+    "config": {
+      "debug": true,
+      "googleClientId": "123456-abc.apps.googleusercontent.com",
+      "syncPollSeconds": 120
+    }
+  }
 }
 ```
 
-Se lee **en runtime**, así que se puede cambiar sin recompilar: basta editar el fichero dentro de
-`dist/misaevol/browser/` en el servidor. `"debug"` controla el registro en consola; el repositorio lo
-trae en `true` para desarrollar, y en un despliegue publicado va en `false` (los `warn` y `error` se
-ven igual: eso no se puede apagar). `"syncPollSeconds"` es opcional (por defecto 120, o sea 2
-minutos): cada cuántos segundos se comprueba si otro dispositivo escribió en la hoja.
+> **No lo edites en `public/config.json`.** Ese fichero está **generado**: lo reescribe
+> `npm run config` desde el bloque `dev`, y el despliegue hace lo mismo con el bloque del ambiente
+> que toque. Un cambio a mano ahí se pierde en el siguiente `npm run config`.
+
+Ese `config.json` se lee **en runtime**, así que la app no se recompila para cambiarlo: se edita
+`environments.json` y se vuelve a desplegar (ver [`firebase-deploy.md`](firebase-deploy.md)).
+
+`"debug"` controla el registro en consola; los ambientes de trabajo lo traen en `true` y los
+publicados en `false` (los `warn` y `error` se ven igual: eso no se puede apagar).
+`"syncPollSeconds"` es opcional (por defecto 120, o sea 2 minutos): cada cuántos segundos se
+comprueba si otro dispositivo escribió en la hoja.
 
 ---
 

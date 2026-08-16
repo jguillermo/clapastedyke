@@ -1,0 +1,18 @@
+{
+  "dev": {
+    "projectId": "migo-dev-20b41",
+    "config": {
+      "debug": true,
+      "googleClientId": "222908241558-s410u36cemq4281l2bd6vvonvu9h6q88.apps.googleusercontent.com",
+      "syncPollSeconds": 120
+    }
+  },
+  "prod": {
+    "projectId": "TU-PROJECT-ID-PROD",
+    "config": {
+      "debug": false,
+      "googleClientId": "",
+      "syncPollSeconds": 120
+    }
+  }
+}
