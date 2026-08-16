@@ -1,5 +1,5 @@
 import { ApplicationConfig, provideBrowserGlobalErrorListeners } from '@angular/core';
-import { provideRouter } from '@angular/router';
+import { provideRouter, withNavigationErrorHandler } from '@angular/router';
 
 import { routes } from './app.routes';
 import { ConfigDocument } from '@core/_common/infrastructure/config/app-config';
@@ -10,6 +10,7 @@ import { provideRecipeBook } from '@core/recipe-book/recipe-book.providers';
 import { provideAuth } from '@core/auth/auth.providers';
 import { provideExternalSync } from '@core/external-sync/external-sync.providers';
 import { providePlatform } from '@platform/platform.providers';
+import { reloadOnStaleBuild } from '@platform/stale-build/stale-build';
 
 /**
  * La composición de la app, **a partir del documento de configuración ya leído**.
@@ -25,7 +26,10 @@ export function appConfig(document: ConfigDocument | null): ApplicationConfig {
   return {
     providers: [
       provideBrowserGlobalErrorListeners(),
-      provideRouter(routes),
+      // Las rutas se cargan con `import()`: si el despliegue cambió mientras la pestaña estaba
+      // abierta, el chunk que pide ya no existe. `reloadOnStaleBuild` lo reconoce y recarga a la
+      // ruta pedida en vez de dejar la pantalla congelada. Ver `platform/stale-build/`.
+      provideRouter(routes, withNavigationErrorHandler(reloadOnStaleBuild)),
       // El registro va el primero de todos: cualquier otra cosa puede querer registrar al arrancar.
       // `debug` sale del fichero de configuración; el resto de niveles se ven siempre.
       provideLogger(document?.debug === true),
