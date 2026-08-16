@@ -3,7 +3,7 @@
 Cómo la app y la hoja del usuario se mantienen iguales, **por qué está hecho así**, qué límites tiene
 aceptados y cómo se diagnostica cuando algo no cuadra.
 
-El «cómo se configura» está en [google-setup.md](google-setup.md); el «por qué Google Sheets y no otra
+El «cómo se configura» está en [`deploy/google-client-id.md`](../deploy/google-client-id.md); el «por qué Google Sheets y no otra
 cosa» y las alternativas medidas y descartadas, en
 [google-integration.md](google-integration.md).
 

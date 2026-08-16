@@ -56,28 +56,10 @@ El despliegue usa **el mismo script** con otra salida
 
 ## Añadir un ambiente (`stage`, `lab`, `qa`…)
 
-Dos pasos. **El workflow no se toca.**
-
-**1 · Un bloque en `environments.json`**, con el proyecto de Firebase ya creado y Hosting activado:
-
-```jsonc
-"stage": {
-  "projectId": "clapastedyke-stage",
-  "config": { "debug": true, "googleClientId": "…", "syncPollSeconds": 120 }
-}
-```
-
-**2 · Un *environment* homónimo en GitHub** (`Settings → Environments → New environment`, nombre
-`stage`, **en minúsculas**) con su único secret:
-
-| Secret | Valor |
-|---|---|
-| `FIREBASE_SERVICE_ACCOUNT` | El JSON de la cuenta de servicio **de ese proyecto** |
-
-Y en Google Cloud, añade los dos orígenes del proyecto nuevo (`https://<projectId>.web.app` y
-`https://<projectId>.firebaseapp.com`) a los orígenes autorizados de su Client ID.
-
-Con eso, `Run workflow` escribiendo `stage` ya despliega.
+Un bloque más en `environments.json` y un *environment* homónimo en GitHub con su secret. **El
+workflow no se toca.** El procedimiento paso a paso está en
+[`manual/firebase-deploy.md`](../../manual/firebase-deploy.md) → «Añadir un ambiente»; aquí solo el
+diseño que lo hace posible.
 
 ---
 
@@ -89,6 +71,9 @@ invisible en el repo sin ganar nada, y habría partido en dos la configuración 
 
 Aquí está a la vista, versionado, y en el diff se ve qué usa cada ambiente. **El único secret de
 verdad es `FIREBASE_SERVICE_ACCOUNT`**, que sí es una clave privada.
+
+De dónde sale ese Client ID (proyecto de Cloud, pantalla de consentimiento, orígenes autorizados):
+[`../google-client-id.md`](../google-client-id.md).
 
 ---
 

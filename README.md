@@ -68,7 +68,7 @@ user's own token and the `drive.file` scope — which reaches only the files the
 is deployed into anyone's account, and users grant a single consent checkbox.
 
 Publishing the app needs a one-time pass through Google Cloud (project, consent screen, OAuth Client
-ID). Every step is in [`manual/google-setup.md`](manual/google-setup.md) — start there. Once
+ID). Every step is in [`deploy/google-client-id.md`](deploy/google-client-id.md) — start there. Once
 configured, users connect from the `/cuenta` screen; without it the app keeps working exactly as
 before, fully local.
 
