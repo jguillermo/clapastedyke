@@ -88,8 +88,9 @@ jobs:
           node-version: '22'
 
       # Sin `--base-href`: Firebase sirve desde la raíz del dominio y `src/index.html`
-      # ya trae `<base href="/">`. El fallback de SPA lo pone el `rewrites` de firebase.json,
-      # así que tampoco hace falta copiar `index.html` a `404.html`.
+      # ya trae `<base href="/">`. Tampoco hace falta copiar `index.html` a `404.html` ni
+      # ningún rewrite de SPA: la app enruta por fragmento (`/#/home`), así que la única
+      # ruta que pide al servidor es `/`.
       - name: Build de producción
         run: npm run build
 

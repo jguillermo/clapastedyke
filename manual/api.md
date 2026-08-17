@@ -79,8 +79,8 @@ estructuralmente, y de paso los ayudantes se pueden probar sin levantar nada.
 1. `api/<nombre>/` con `package.json` (`main: "lib/<nombre>/index.js"`), `tsconfig.json`
    (`rootDir: ".."`), `.gitignore` y `README.md`. Copiar los de `api/auth/` es el camino corto.
 2. `index.ts` que exporte `export const <nombre> = onRequest(…)`.
-3. `firebase.json`: una entrada más en el array `functions` y **un rewrite** `/api/<nombre>/**`,
-   siempre **antes** del fallback de SPA (`**/!(*.*)`), que si no se tragaría las rutas sin punto.
+3. `firebase.json`: una entrada más en el array `functions` y **un rewrite** `/api/<nombre>/**`. Los
+   rewrites se evalúan en orden, así que si alguna vez se añade uno más amplio, este va antes.
 4. `.github/workflows/ci.yml`: añadir el nombre a la matriz del job `api`.
 5. Si necesita configuración por ambiente: `.env.<projectId>` versionado para lo público y
    Secret Manager para lo secreto.

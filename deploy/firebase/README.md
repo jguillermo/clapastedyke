@@ -126,32 +126,33 @@ npx --yes firebase-tools emulators:start --only hosting --project demo-x
 Con él vivo, cuatro comprobaciones (el emulador dice en qué puerto quedó; suele ser 5000 o 5002):
 
 ```bash
-curl -sI http://127.0.0.1:5000/home          # 200 text/html · Cache-Control: no-cache   ← rewrite + shell sin cachear
-curl -sI http://127.0.0.1:5000/              # 200 text/html · Cache-Control: no-cache
-curl -sI http://127.0.0.1:5000/main-XXX.js   # 200 · immutable                            ← hasheado, cache eterna
-curl -sI http://127.0.0.1:5000/chunk-NOPE.js # 404                                        ← NO rewrite
+curl -sI http://127.0.0.1:5000/              # 200 text/html · Cache-Control: no-cache   ← la ÚNICA ruta de la app
+curl -sI http://127.0.0.1:5000/main-XXX.js   # 200 · immutable                          ← hasheado, cache eterna
+curl -sI http://127.0.0.1:5000/chunk-NOPE.js # 404                                      ← lo que no existe, falla
+curl -sI http://127.0.0.1:5000/home          # 404                                      ← correcto: las rutas van en /#/home
 ```
 
 Además, `config.json` y `seed/**` responden `no-cache`.
 
-### Por qué el rewrite es `**/!(*.*)` y el shell va `no-cache`
+### Por qué no hay rewrite de SPA y el shell va `no-cache`
 
-Las dos cosas arreglan el mismo fallo, visto desde los dos lados. Las rutas se cargan con `import()`,
-así que un `main-*.js` pide **el `chunk-*.js` con el hash de su propio build**, y al publicar
-**Firebase borra los ficheros que no estén en la release nueva**.
+Las rutas se cargan con `import()`, así que un `main-*.js` pide **el `chunk-*.js` con el hash de su
+propio build**, y al publicar **Firebase borra los ficheros que no estén en la release nueva**. De
+ahí salen las dos decisiones.
 
-- **Con el rewrite `**`**, *cualquier* petición sin fichero detrás devolvía `index.html` con **200 y
-  `content-type: text/html`**, incluida la de un chunk ya borrado. El navegador recibía HTML
-  disfrazado de módulo y soltaba *«Failed to fetch dynamically imported module»*, sin 404 que
-  interpretar. `**/!(*.*)` manda a `index.html` **solo las rutas del router** (las que no llevan
-  extensión: `/home`, `/cuenta`, anidadas incluidas) y deja que lo que parece un fichero falle como
-  lo que es.
+- **Ningún rewrite manda a `index.html`.** La app enruta por fragmento (`withHashLocation`), así que
+  la única ruta de servidor que existe es `/`. Un fallback de SPA sería peor que inútil aquí: con
+  `**`, la petición de un chunk ya borrado devolvía `index.html` con **200 y
+  `content-type: text/html`**, y el navegador soltaba *«Failed to fetch dynamically imported
+  module»* sin 404 que interpretar; y con `**/!(*.*)`, cualquier ruta inventada abriría la app —que,
+  al mirar solo el fragmento, aterrizaría **en la portada sin un solo error**, dando por buena una
+  URL que no lleva a donde dice. Sin fallback, lo que no existe da 404, que es lo que es.
 - **La cabecera `no-cache` solo cubría `/index.html`**, que es una ruta que nadie pide: el shell se
-  sirve en `/`, `/home`, `/cuenta`… y ahí Firebase ponía su defecto, **`max-age=3600`**. Durante una
-  hora tras publicar, abrir la app servía el `index.html` viejo desde la caché del navegador → el
-  `main-*.js` viejo (guardado `immutable`) → y sus chunks, ya borrados del servidor. Recargar no
-  arreglaba nada. Por eso las entradas `/` y `**/!(*.*)` de `headers` llevan el mismo `no-cache` que
-  `/index.html`: **el shell siempre revalida, los ficheros hasheados nunca lo hacen.**
+  sirve en `/`, y ahí Firebase ponía su defecto, **`max-age=3600`**. Durante una hora tras publicar,
+  abrir la app servía el `index.html` viejo desde la caché del navegador → el `main-*.js` viejo
+  (guardado `immutable`) → y sus chunks, ya borrados del servidor. Recargar no arreglaba nada. Por
+  eso la entrada `/` de `headers` lleva el mismo `no-cache` que `/index.html`: **el shell siempre
+  revalida, los ficheros hasheados nunca lo hacen.**
 
 Del lado de la app, el mismo fallo lo recoge `platform/stale-build/` (enganchado en `app.config.ts`
 con `withNavigationErrorHandler`): reconoce el error de chunk y recarga a la ruta pedida para traerse

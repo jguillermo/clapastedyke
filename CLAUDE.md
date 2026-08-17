@@ -42,7 +42,7 @@ npm run check       # autofix (lint + format) and then verify EVERYTHING, in CI 
 npm run fix         # autofix only: eslint --fix + prettier --write
 npm run verify      # validate only, in CI order: lint · format · types · unit · stories · E2E
 
-ng serve            # dev server at http://localhost:4200 (route: /home)
+ng serve            # dev server at http://localhost:4200 (route: /#/home — hash routing)
 ng build            # production build → dist/
 ng build --watch --configuration development   # also: npm run watch
 ng test             # unit tests — Vitest via @angular/build:unit-test (globals, jsdom)
@@ -70,7 +70,7 @@ npm run typecheck   # tsc over app + stories, unit specs, and the E2E suite
 
 ## What this app is
 
-A 3D in-browser cooking game (`misaevol` / "clapastedyke"). The user navigates a three.js kitchen world (`/home`); the real data-entry forms are the screens reached from it. `/ui` is the living component showcase. State is persisted locally in IndexedDB — **that is the source of truth, and no server ever holds the user's data**.
+A 3D in-browser cooking game (`misaevol` / "clapastedyke"). The user navigates a three.js kitchen world (`/#/home`); the real data-entry forms are the screens reached from it. `/#/ui` is the living component showcase. **Routing is hash-based** (`withHashLocation()` in `app.config.ts`): everything after `#` never reaches the server, so `/` is the **only** server route the app has and no app route can collide with `/api/**` or with a static file. There is deliberately **no SPA fallback rewrite** — see the comment on `provideRouter` and `manual/firebase-deploy.md`. State is persisted locally in IndexedDB — **that is the source of truth, and no server ever holds the user's data**.
 
 The one network integration is **optional and additive**: from `/cuenta` a user can connect a Google account and mirror recipes and supplies into a spreadsheet in their own Drive. The app creates that spreadsheet and writes it **itself**, with the Sheets and Drive REST APIs and the user's own token — no Apps Script, nothing deployed into anyone's account, one consent checkbox (`drive.file`, which only reaches files the app created). The one-time setup for whoever publishes the app (Cloud project, consent screen, Client ID **and client secret**) is in [`deploy/google-client-id.md`](deploy/google-client-id.md) — the **only** place that procedure is documented; the design reasoning, the platform constraints and the alternatives that were measured and rejected are in [`manual/google-integration.md`](manual/google-integration.md). Nothing about local persistence changes when it is off (which is the default: `public/config.json` ships with `googleClientId` empty).
 

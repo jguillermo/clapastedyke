@@ -71,8 +71,12 @@ export class AccountPage {
   readonly pending = this.field('Cambios pendientes');
   readonly lastSynced = this.field('Última sincronización');
 
+  /**
+   * `/#/cuenta`, con hash: la app enruta por fragmento (`withHashLocation`), así que el servidor solo
+   * ve `/`. Sin el `#` esto pediría al servidor una ruta que no existe y acabaría en la portada.
+   */
   async goto(): Promise<void> {
-    await this.page.goto('/cuenta');
+    await this.page.goto('/#/cuenta');
     await expect(this.root).toBeVisible();
   }
 

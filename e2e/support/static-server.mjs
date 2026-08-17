@@ -7,8 +7,9 @@
  * cada navegación de cada test es un fichero estático — mucho más rápido y
  * determinista. El build lo hace `npm run test:e2e` antes de arrancar Playwright.
  *
- * Sin dependencias: solo `node:http` y `node:fs`. Al ser una SPA con rutas del
- * router (`/home`), cualquier ruta que no exista como fichero devuelve `index.html`.
+ * Sin dependencias: solo `node:http` y `node:fs`. La app enruta **por fragmento**
+ * (`/#/home`), así que la única ruta de servidor es `/`: lo que no exista como
+ * fichero devuelve **404**, igual que Firebase Hosting. Ver `resolveFile`.
  *
  * Uso: `node e2e/support/static-server.mjs [--dir <ruta>] [--port <puerto>]`
  */
@@ -55,24 +56,32 @@ const MIME = {
   '.txt': 'text/plain; charset=utf-8',
 };
 
-/** Resuelve la petición a un fichero dentro de ROOT, o a `index.html` (SPA fallback). */
+/**
+ * Resuelve la petición a un fichero dentro de ROOT.
+ *
+ * `'forbidden'` si la ruta intenta escapar; `'missing'` si no existe. **No hay fallback de SPA**, y
+ * eso es deliberado: la app enruta por fragmento, así que la única ruta de servidor que existe es
+ * `/`. Servir `index.html` para cualquier ruta haría que la suite pasara con URLs que en producción
+ * dan 404 — el peor tipo de doble, el que miente en la dirección cómoda.
+ */
 function resolveFile(urlPath) {
   const clean = decodeURIComponent(urlPath.split('?')[0].split('#')[0]);
   // `normalize` + prefijo obligatorio: ninguna ruta puede escapar de ROOT.
-  const candidate = normalize(join(ROOT, clean));
+  const candidate = normalize(join(ROOT, clean === '/' ? '/index.html' : clean));
   if (!candidate.startsWith(ROOT)) {
-    return null;
+    return 'forbidden';
   }
-  if (existsSync(candidate) && statSync(candidate).isFile()) {
-    return candidate;
-  }
-  return join(ROOT, 'index.html');
+  return existsSync(candidate) && statSync(candidate).isFile() ? candidate : 'missing';
 }
 
 const server = createServer((request, response) => {
   const file = resolveFile(request.url ?? '/');
-  if (!file) {
+  if (file === 'forbidden') {
     response.writeHead(403).end('Forbidden');
+    return;
+  }
+  if (file === 'missing') {
+    response.writeHead(404).end('Not Found');
     return;
   }
   const type = MIME[extname(file).toLowerCase()] ?? 'application/octet-stream';

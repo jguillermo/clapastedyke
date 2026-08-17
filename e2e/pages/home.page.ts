@@ -53,10 +53,16 @@ export class HomePage {
     return this.page.locator('meta[name="viewport"]').getAttribute('content');
   }
 
-  /** Navega a la app y espera a que el HUD esté operable (el seed ya corrió). */
+  /**
+   * Navega a la app y espera a que el HUD esté operable (el seed ya corrió).
+   *
+   * Se entra por `/` a propósito: la app enruta por fragmento (`withHashLocation`), así que Angular
+   * redirige `''` a `home` y la URL acaba en `/#/home`. Se espera con una expresión regular y no con
+   * un glob porque el fragmento es justo la parte que hay que comprobar.
+   */
   async goto(): Promise<void> {
     await this.page.goto('/');
-    await this.page.waitForURL('**/home');
+    await this.page.waitForURL(/#\/home$/);
     await expect(this.dock).toBeVisible();
   }
 }

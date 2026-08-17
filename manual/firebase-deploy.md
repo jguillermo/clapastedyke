@@ -243,9 +243,10 @@ salga de ella**. Con el fichero en `deploy/firebase/`, el deploy muere con
 | Clave | Por qué |
 |---|---|
 | `"public": "dist/misaevol/browser"` | El builder `application` de Angular deja el cliente ahí. Apuntar a `dist/misaevol` publicaría además `3rdpartylicenses.txt` y un `prerendered-routes.json` que no pinta nada |
-| `"rewrites"`: `**/!(*.*)` → `/index.html` | La app es una SPA sin hash: sin esto, recargar `/home` daría 404. Sustituye al truco del `404.html` de GitHub Pages. El patrón **excluye lo que lleva extensión** a propósito: con `**` a secas, un `chunk-*.js` borrado por el despliegue siguiente devolvía `index.html` con 200 y `text/html`, y el navegador fallaba con un opaco *«Failed to fetch dynamically imported module»* en vez de un 404 |
+| `"rewrites"`: `/api/auth/**` → función `auth` | El backend de la sesión, servido como **mismo origen** que la app. Va **antes** del fallback de SPA, que si no se tragaría `/api/auth/token` (no lleva punto). Es lo que permite que la cookie `HttpOnly; SameSite=Lax` viaje — ver [`api.md`](api.md) |
+| **No hay fallback de SPA**, y es deliberado | La app enruta **por fragmento** (`withHashLocation`), así que la única ruta de servidor que existe es `/`: recargar `/#/home` no pide nada más. Un `**/!(*.*)` → `/index.html` sería peor que inútil — serviría la app para cualquier ruta inventada, y como el router solo mira el fragmento, esa visita acabaría **en la portada sin un solo error**, dando por buena una URL que no lleva a donde dice. Sin él, una ruta que no existe da 404, que es lo que es |
 | `Cache-Control: immutable` en `js/css/woff2` | El build usa `outputHashing: "all"`, así que el nombre cambia con el contenido y cachear un año es seguro |
-| `Cache-Control: no-cache` en `/`, las rutas sin extensión, `index.html`, `config.json` y `seed/**` | `main.ts` lee `config.json` **antes** de arrancar: si se cachease, un cambio de configuración tardaría en verse. Y el shell **tiene que revalidar siempre**: cubrir solo `/index.html` dejaba `/`, `/home` y `/cuenta` con el defecto de Firebase (`max-age=3600`), así que durante una hora tras publicar se servía el `index.html` viejo → el `main-*.js` viejo → chunks que ya no existen |
+| `Cache-Control: no-cache` en `/`, `index.html`, `config.json` y `seed/**` | `main.ts` lee `config.json` **antes** de arrancar: si se cachease, un cambio de configuración tardaría en verse. Y el shell **tiene que revalidar siempre**: cubrir solo `/index.html` dejaba `/` con el defecto de Firebase (`max-age=3600`), así que durante una hora tras publicar se servía el `index.html` viejo → el `main-*.js` viejo → chunks que ya no existen. Con el enrutado por hash, `/` es la única entrada, así que basta con esas dos |
 
 ---
 
@@ -264,7 +265,7 @@ salga de ella**. Con el fichero en `deploy/firebase/`, el deploy muere con
 | Desplegué a dev y se actualizó prod | El secret está como secret de repositorio, no de environment | Paso 4 |
 | El sitio se publica con el `config.json` de otro ambiente | Desplegaste a mano y te saltaste `config.mjs` | Usa el workflow, o repite la secuencia completa de «Desde local» |
 | `public/config.json` vuelve a cambiar solo | Es un fichero **generado**; lo reescribe `npm run config` | Edita `environments.json`, no el `config.json` |
-| La home carga, pero recargar `/home` da 404 | Falta el `rewrites` de `firebase.json` | No lo toques; si lo tocaste, restáuralo |
+| Una ruta da 404 | La URL va **sin `#`** (`/home` en vez de `/#/home`) | No es un fallo del despliegue: esa ruta no existe en el servidor. Todas las rutas de la app llevan hash |
 | `Failed to fetch dynamically imported module: …/chunk-XXXX.js` al navegar | La pestaña lleva abierta desde un despliegue anterior: pide un chunk con el hash de aquel build, que la publicación nueva borró | Recargar (`Cmd`/`Ctrl`+`Shift`+`R`). La app se recarga sola desde `platform/stale-build/`; si aun así se repite **después** de recargar, el fallo es otro (sin red, o una publicación a medias) y queda un `error` en consola |
 | `… is outside of project directory` | Alguien movió `firebase.json` fuera de la raíz | Tiene que estar en la raíz: el CLI no sirve nada que quede por encima de él |
 | `Error 400: origin_mismatch` al conectar Google | Falta ese origen concreto — son **dos por ambiente** | Paso 5 |

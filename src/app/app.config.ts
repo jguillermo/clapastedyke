@@ -1,5 +1,5 @@
 import { ApplicationConfig, provideBrowserGlobalErrorListeners } from '@angular/core';
-import { provideRouter, withNavigationErrorHandler } from '@angular/router';
+import { provideRouter, withHashLocation, withNavigationErrorHandler } from '@angular/router';
 
 import { routes } from './app.routes';
 import { ConfigDocument } from '@core/_common/infrastructure/config/app-config';
@@ -26,10 +26,29 @@ export function appConfig(document: ConfigDocument | null): ApplicationConfig {
   return {
     providers: [
       provideBrowserGlobalErrorListeners(),
-      // Las rutas se cargan con `import()`: si el despliegue cambió mientras la pestaña estaba
-      // abierta, el chunk que pide ya no existe. `reloadOnStaleBuild` lo reconoce y recarga a la
-      // ruta pedida en vez de dejar la pantalla congelada. Ver `platform/stale-build/`.
-      provideRouter(routes, withNavigationErrorHandler(reloadOnStaleBuild)),
+      /*
+       * `withHashLocation()` — las rutas de la app van **detrás de `#`**: `/#/home`, `/#/cuenta`.
+       *
+       * Lo que compra: **el servidor deja de tener voz en la navegación**. Todo lo que va detrás de
+       * `#` no se envía nunca en la petición, así que el navegador solo pide `/` y de ahí en adelante
+       * enruta Angular. Ninguna ruta de la app puede chocar con `/api/**` ni con un fichero estático.
+       *
+       * Por eso **`firebase.json` ya no tiene fallback de SPA**, y no debe volver a tenerlo: `/` es
+       * la única ruta de servidor que la app necesita. El que había (`**\/!(*.*)`, «cualquier ruta
+       * sin punto») además tenía su propia trampa — una ruta futura con un punto dentro,
+       * `/receta/pan-de-3.5-kg`, no habría casado, y al recargar daría 404 en producción mientras en
+       * `ng serve` funcionaba.
+       *
+       * El precio, y se acepta: la URL lleva `#`, y el fragmento no llega ni a los logs del servidor
+       * ni a un rastreador. Para una app privada sin SEO no cuesta nada. (Los «Orígenes de JavaScript
+       * autorizados» de Google son orígenes, sin ruta, así que el hash no los toca.)
+       *
+       * `withNavigationErrorHandler`: las rutas se cargan con `import()`, y si el despliegue cambió
+       * mientras la pestaña estaba abierta, el chunk que pide ya no existe. `reloadOnStaleBuild` lo
+       * reconoce y recarga a la ruta pedida en vez de dejar la pantalla congelada.
+       * Ver `platform/stale-build/`.
+       */
+      provideRouter(routes, withHashLocation(), withNavigationErrorHandler(reloadOnStaleBuild)),
       // El registro va el primero de todos: cualquier otra cosa puede querer registrar al arrancar.
       // `debug` sale del fichero de configuración; el resto de niveles se ven siempre.
       provideLogger(document?.debug === true),
