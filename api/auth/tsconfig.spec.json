@@ -1,0 +1,10 @@
+{
+  // Los tests se compilan a `lib-test/` y NO a `lib/`: lo que se despliega no lleva specs.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "lib-test",
+    "sourceMap": false
+  },
+  "include": ["./**/*.ts", "../_common/**/*.ts"],
+  "exclude": ["lib", "lib-test", "node_modules"]
+}

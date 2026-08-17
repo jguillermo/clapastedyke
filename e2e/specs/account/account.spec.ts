@@ -28,15 +28,20 @@ import {
  *    *después* de que cada valor haya pasado por una celda y haya vuelto — incluida la conversión que
  *    hace Sheets de `'4.5'` a `4.5`. Si la canonización no fuera determinista en ese viaje, aquí
  *    saldrían veintidós diferencias.
- * 4. **Una hoja en la papelera no deja al usuario sin sincronizar**: se crea otra y se vuelve a llenar.
+ * 4. **Recargar la página no echa a nadie, y cerrar sesión no se deshace al recargar.** La credencial
+ *    vive solo en memoria, así que una recarga siempre la pierde: lo que se prueba es que se
+ *    recupera **sin pedirle nada al usuario**. Es el fallo que llegó a producción justo por no estar
+ *    aquí.
+ * 5. **Una hoja en la papelera no deja al usuario sin sincronizar**: se crea otra y se vuelve a llenar.
  */
 const RECIPE_COUNT = Object.values(RECIPES).flat().length;
 
 test.describe('Cuenta · conexión y sincronización', () => {
-  test('sin conectar → conectar crea la hoja y sube el recetario → comprobar dice que está al día → sincronizar otra vez no duplica nada → cerrar sesión → hoja en la papelera → se crea otra con todo', async ({
+  test('sin conectar → conectar crea la hoja y sube el recetario → comprobar dice que está al día → sincronizar otra vez no duplica nada → recargar sigue conectada → cerrar sesión → recargar sigue desconectada → hoja en la papelera → se crea otra con todo', async ({
     google,
     account,
     syncBadge,
+    page,
   }) => {
     await account.goto();
 
@@ -134,14 +139,61 @@ test.describe('Cuenta · conexión y sincronización', () => {
     await expect(account.pending).toHaveText('0');
     await syncBadge.waitInvisible(5_000);
 
-    // ── Caso 5 · cerrar sesión olvida la hoja de esta cuenta, y el aviso sigue sin existir ───────
+    /*
+     * ── Caso 5 · RECARGAR NO ECHA A NADIE ────────────────────────────────────────────────────────
+     *
+     * El caso que este fichero no cubría, y por eso el fallo llegó a producción. La credencial vive
+     * solo en memoria, así que una recarga siempre la pierde: lo que tiene que funcionar es
+     * **recuperarla sin molestar al usuario**, y eso es lo único que se comprueba aquí.
+     *
+     * Con el flujo anterior era imposible: reanudar abría una ventana emergente de Google, y como la
+     * reanudación corre en el arranque de la página —sin ningún clic detrás— el navegador la
+     * bloqueaba. El doble de entonces concedía el token siempre y sin ventana, así que el test pasaba
+     * en verde mientras cada F5 desconectaba de verdad.
+     *
+     * Se pulsa cero veces. Si hiciera falta un clic, este bloque falla.
+     */
+    const tokensBeforeReload = google.tokenRequestCount;
+
+    await page.reload();
+    await expect(account.root).toBeVisible();
+
+    await expect(account.accountSummary).toContainText('Conectada');
+    await expect(account.connectedAs(E2E_ACCOUNT.name)).toBeVisible();
+    // Y volvió POR EL BACKEND, no por casualidad. Sin esta cuenta, el caso pasaría igual si la app se
+    // hubiera reconectado por cualquier otro camino — que es justo lo que no se puede dar por hecho.
+    expect(google.tokenRequestCount, 'recargar debe pedirle un token al backend').toBeGreaterThan(
+      tokensBeforeReload,
+    );
+    // La hoja es la misma: se recuperó la MISMA cuenta, no una sesión cualquiera.
+    await expect(account.sheetLink).toHaveAttribute('href', sheet.url);
+    // Y la sincronización vuelve sola, que es para lo que sirve tener sesión.
+    await expect(account.statusLabel).toHaveText('Al día', { timeout: 30_000 });
+    expect(rowCounts()).toEqual(before);
+
+    // ── Caso 6 · cerrar sesión olvida la hoja de esta cuenta, y el aviso sigue sin existir ───────
     await account.disconnect.click();
     await expect(account.accountSummary).toContainText('Sin conectar');
     await expect(account.connect).toBeEnabled();
     await expect(account.sheetLink).toHaveCount(0);
     await syncBadge.waitInvisible(5_000);
 
-    // ── Caso 6 · la hoja acaba en la papelera: se crea otra y se vuelve a llenar ─────────────────
+    // ── Caso 7 · y cerrar sesión TAMBIÉN sobrevive a la recarga ──────────────────────────────────
+    // El reverso del caso 5: si reanudar volviera a conectar a quien acaba de salir, sería peor que
+    // el fallo original. Recargar no puede resucitar una sesión cerrada.
+    const tokensAfterSignOut = google.tokenRequestCount;
+
+    await page.reload();
+    await expect(account.root).toBeVisible();
+    await expect(account.accountSummary).toContainText('Sin conectar');
+    await expect(account.connect).toBeEnabled();
+    // Ni siquiera se le pregunta al backend: al cerrar sesión se borra la pista de esta cuenta, y sin
+    // pista `ResumeSession` ni se molesta. Es lo que evita una petición por visita anónima.
+    expect(google.tokenRequestCount, 'sin sesión previa no se llama al backend').toBe(
+      tokensAfterSignOut,
+    );
+
+    // ── Caso 8 · la hoja acaba en la papelera: se crea otra y se vuelve a llenar ─────────────────
     // Va al final porque deja dos hojas en el Drive: es el estado menos predecible del journey.
     google.trash();
     await account.connectAndWait();

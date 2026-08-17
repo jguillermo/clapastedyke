@@ -1,8 +1,16 @@
-name: Desplegar en Firebase Hosting
+name: Desplegar el FRONTEND (Firebase Hosting)
 
 # Despliegue MANUAL: se lanza desde Actions → Run workflow, eligiendo el ambiente y la rama.
 # No hay disparador automático a propósito — la puerta de calidad es el CI del pull request
 # (`CI OK (required)`), y publicar es una decisión, no un efecto secundario de mergear.
+#
+# SOLO EL FRONTEND. El backend (`api/`) tiene su propio workflow, `deploy-backend.yml`, y esa
+# separación es deliberada: publicar la app y publicar la API son dos decisiones distintas, así que un
+# cambio de maquetación no puede tirar el servicio de sesión ni al revés.
+#
+# > Cuando un cambio necesita las dos cosas, el ORDEN importa: primero el backend y después el
+# > frontend. La app llama a `/api/auth/token` desde su arranque, así que publicar el front contra una
+# > API vieja deja a todo el mundo desconectado hasta que la API suba.
 #
 # LOS AMBIENTES NO SE DECLARAN AQUÍ: se leen de `deploy/firebase/environments.json`, que es el único sitio
 # donde viven. Añadir uno nuevo (stage, lab, qa…) no toca este fichero.

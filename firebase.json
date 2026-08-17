@@ -1,8 +1,26 @@
 {
+  "functions": [
+    {
+      "source": "api/auth",
+      "codebase": "auth",
+      "predeploy": ["npm --prefix api/auth ci", "npm --prefix api/auth run build"]
+    }
+  ],
+  "firestore": {
+    "rules": "deploy/firebase/firestore.rules",
+    "indexes": "deploy/firebase/firestore.indexes.json"
+  },
   "hosting": {
     "public": "dist/misaevol/browser",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "rewrites": [
+      {
+        "source": "/api/auth/**",
+        "function": {
+          "functionId": "auth",
+          "region": "us-central1"
+        }
+      },
       {
         "source": "**/!(*.*)",
         "destination": "/index.html"
@@ -51,6 +69,15 @@
           {
             "key": "Cache-Control",
             "value": "no-store, no-cache, max-age=0, must-revalidate"
+          }
+        ]
+      },
+      {
+        "source": "/api/**",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "private, no-store, max-age=0"
           }
         ]
       },

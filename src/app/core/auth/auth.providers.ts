@@ -11,28 +11,30 @@ import { AuthSettingsRepository } from './domain/repositories/auth-settings.repo
 import { SessionHintRepository } from './domain/repositories/session-hint.repository';
 import { Authenticator } from './domain/services/authenticator';
 import { Session } from './domain/services/session';
+import { BackendAuthenticator } from './infrastructure/backend-authenticator';
 import { ConfigAuthSettingsRepository } from './infrastructure/config-auth-settings.repository';
-import { GoogleAuthenticator } from './infrastructure/google-authenticator';
 import { IndexedDbSessionHintRepository } from './infrastructure/indexeddb-session-hint.repository';
 import { InMemorySession } from './infrastructure/in-memory-session';
 import { SessionCredentialsProvider } from './infrastructure/session-credentials-provider';
 import { SessionHintAccountHistory } from './infrastructure/session-hint-account-history';
 
 /**
- * DI del contexto `auth`. **Aquí se decide el proveedor de identidad**: cambiar Google por otro es
+ * DI del contexto `auth`. **Aquí se decide el proveedor de identidad**: cambiar de proveedor es
  * escribir otro `Authenticator` y tocar esta línea; ni el dominio ni los casos de uso se enteran.
  *
- * **La credencial nunca se persiste**: vive en memoria y muere con la pestaña. Lo único que se guarda
- * es una pista de con qué cuenta se estaba, que por sí sola no abre nada.
+ * **En el navegador no se persiste ninguna credencial**: la de acceso vive en memoria y muere con la
+ * pestaña, y lo único que se guarda aquí es una pista de con qué cuenta se estaba, que por sí sola no
+ * abre nada. Lo que sí dura es una cookie `HttpOnly` que emite el backend (`api/auth`) y que este
+ * código no puede leer — ni él ni un XSS. Ver `BackendAuthenticator`.
  *
  * El app-initializer intenta **reanudar** con esa pista, y lo hace sin esperar: pedirle un token al
- * proveedor tarda unas décimas y bloquear el arranque por eso dejaría la cocina en blanco. Mientras
+ * backend tarda unas décimas y bloquear el arranque por eso dejaría la cocina en blanco. Mientras
  * tanto la app funciona igual —local-first—, y cuando la sesión vuelve, la pantalla de cuenta se
  * entera sola porque lee una signal.
  */
 export function provideAuth(): EnvironmentProviders {
   return makeEnvironmentProviders([
-    { provide: Authenticator, useClass: GoogleAuthenticator },
+    { provide: Authenticator, useClass: BackendAuthenticator },
     { provide: Session, useClass: InMemorySession },
     { provide: AuthSettingsRepository, useClass: ConfigAuthSettingsRepository },
     { provide: SessionHintRepository, useClass: IndexedDbSessionHintRepository },

@@ -42,10 +42,18 @@ Los rótulos y las URLs van **en inglés** porque Google Cloud Console está en 
   | `https://www.googleapis.com/auth/userinfo.profile` | mostrar el nombre en `/cuenta` |
   | `https://www.googleapis.com/auth/drive.file` | crear y escribir **solo** la hoja de la app |
 
-- Mientras el proyecto esté en **Testing**, añade en **Audience → Test users** el correo de cada
-  persona que vaya a usarla (máximo 100): **quien no esté en la lista no puede conectar**. Con
-  **Publish app** se acaba esa tarea — sale un aviso de «app no verificada» que se salta con un
-  clic, y `drive.file` no exige verificación.
+- **Audience → Publish app**, para dejar el proyecto **«En producción»**. No es opcional y no es solo
+  por el techo de usuarios:
+
+  > ⚠️ **En «Testing», Google caduca los refresh tokens a los 7 días.** El backend
+  > ([`api/auth`](../api/auth/README.md)) es quien custodia ese permiso, así que con el proyecto en
+  > Testing **la sesión se perdería cada semana** — el fallo que este diseño arregla, volviendo por
+  > la puerta de atrás y sin ninguna pista de por qué.
+
+  Publicar sale gratis: aparece un aviso de «app no verificada» que se salta con un clic, y
+  `drive.file` **no exige verificación de Google**. Mientras siga en Testing hay además que dar de
+  alta en **Audience → Test users** el correo de cada persona (máximo 100): quien no esté no puede
+  conectar.
 
 ---
 
@@ -66,13 +74,36 @@ https://<projectId>.firebaseapp.com
   dos, o entrar por el otro da `Error 400: origin_mismatch`. Repite el par por cada ambiente.
 - `localhost` y `127.0.0.1` también son distintos, y el **puerto** cuenta. En la consola del
   navegador, `location.origin` dice el origen exacto que hay que registrar.
-- **Authorized redirect URIs**: ninguno. La app usa el flujo popup.
+- **Authorized redirect URIs**: ninguno, y sigue siendo así. El flujo de código por ventana emergente
+  canjea contra el `redirect_uri` reservado `postmessage`, que **no se da de alta aquí**.
 
-Copia el **Client ID** (`…apps.googleusercontent.com`). El *client secret* no se usa.
+Copia **las dos** cosas: el **Client ID** (`…apps.googleusercontent.com`) y el **Client secret**. El
+secreto sí se usa ahora — lo necesita el backend para obtener el permiso duradero, y es la única
+razón por la que la sesión sobrevive a una recarga.
 
 ---
 
-## 4 · Ponerlo en la app
+## 4 · El client secret → Secret Manager
+
+**Nunca al repositorio, nunca a `environments.json`, nunca a `config.json`.** Vive en Secret Manager
+y solo lo lee la función `auth`:
+
+```bash
+firebase functions:secrets:set GOOGLE_OAUTH_CLIENT_SECRET --project <projectId>
+```
+
+Para el emulador, en `api/auth/.secret.local` (que está en el `.gitignore`):
+
+```
+GOOGLE_OAUTH_CLIENT_SECRET=<el secreto>
+```
+
+El proyecto necesita además el **plan Blaze** (Cloud Functions lo exige) y **Firestore habilitado**.
+Ver [`manual/api.md`](../manual/api.md).
+
+---
+
+## 5 · Ponerlo en la app
 
 En [`firebase/environments.json`](firebase/environments.json), en el bloque `config` de su ambiente:
 
@@ -90,7 +121,12 @@ En [`firebase/environments.json`](firebase/environments.json), en el bloque `con
 `npm run config` si tocaste `dev`. **No edites `public/config.json`**: es un fichero generado
 ([`firebase/README.md`](firebase/README.md)).
 
-Para comprobarlo: **`/cuenta` → Conectar con Google**.
+El backend necesita **el mismo** Client ID, y lo lee de su propio fichero de parámetros —
+`api/auth/.env.<projectId>`, versionado, con `GOOGLE_OAUTH_CLIENT_ID=…`. Si los dos valores divergen,
+Google rechaza el canje con `invalid_client` y el mensaje no dice por qué.
+
+Para comprobarlo: **`/cuenta` → Conectar con Google**, y después **recargar la página** — tiene que
+seguir conectada sin pulsar nada.
 
 ---
 

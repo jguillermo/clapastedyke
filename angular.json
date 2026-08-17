@@ -60,7 +60,10 @@
               "buildTarget": "misaevol:build:development"
             }
           },
-          "defaultConfiguration": "development"
+          "defaultConfiguration": "development",
+          "options": {
+            "proxyConfig": "proxy.config.json"
+          }
         },
         "test": {
           "builder": "@angular/build:unit-test"
