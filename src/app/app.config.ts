@@ -6,6 +6,7 @@ import { ConfigDocument } from '@core/_common/infrastructure/config/app-config';
 import { provideAppConfig } from '@core/_common/infrastructure/config/app-config.providers';
 import { provideLogger } from '@core/_common/logger/logger.providers';
 import { provideEventBus, provideEventTracing } from '@core/_common/eventbus/event-bus.providers';
+import { provideLocalData } from '@core/_common/local-data/local-data.providers';
 import { provideRecipeBook } from '@core/recipe-book/recipe-book.providers';
 import { provideAuth } from '@core/auth/auth.providers';
 import { provideExternalSync } from '@core/external-sync/external-sync.providers';
@@ -55,6 +56,9 @@ export function appConfig(document: ConfigDocument | null): ApplicationConfig {
       // La configuración va primero: la autenticación y la sincronización leen de ella.
       provideAppConfig(document),
       provideEventBus(),
+      // Cómo se borra TODO lo que este navegador guarda (cerrar sesión lo usa). Va después del bus:
+      // vacía también su cola de eventos, que vive en otra base de datos.
+      provideLocalData(),
       // Diagnóstico: deja en consola todos los eventos que se reparten. Quitar esta línea lo apaga.
       provideEventTracing(),
       provideRecipeBook(),

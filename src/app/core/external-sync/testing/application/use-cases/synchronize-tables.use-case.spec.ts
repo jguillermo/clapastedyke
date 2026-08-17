@@ -326,6 +326,37 @@ describe('SynchronizeTables', () => {
     expect(remote.written[0].target.id).toBe('hoja-2');
   });
 
+  /**
+   * Cerrar sesión **vacía la base local** a propósito (ver `SignOut`), y lo hace en cuanto la sesión
+   * se cierra. Un ciclo que empezó antes y aterriza después la repoblaría con lo que acababa de bajar:
+   * el aparato se quedaría con datos de quien ya se fue, justo lo que cerrar sesión promete borrar.
+   *
+   * Comprobar la sesión solo al final del ciclo llega tarde para esto — descartaría el resultado, pero
+   * lo aplicado ya estaría en disco. Por eso se comprueba **antes de escribir**, y esto es lo que lo
+   * fija: ni una escritura, ni aquí ni en la hoja.
+   */
+  it('si la sesión se cierra mientras se lee la hoja, no escribe nada en ningún lado', async () => {
+    remote.snapshot = snapshotWith(
+      tableWith(TABLE, [
+        {
+          index: 2,
+          values: { id: 'ing-remoto', name: 'Manteca' },
+          version: '0000000000500-0000-otro',
+        },
+      ]),
+    );
+    remote.beforeRead = async () => {
+      credentials.credentials = null; // alguien pulsó «Cerrar sesión» mientras se leía
+    };
+
+    const result = await cycle.execute({});
+
+    expect(result.reason).toBe('stale-session');
+    expect(local.writes).toBe(0);
+    expect(remote.written).toEqual([]);
+    expect(await shadow.all()).toEqual([]);
+  });
+
   /** Dos ciclos a la vez se pisarían escribiendo: quien llegue mientras comparte el resultado. */
   it('solo corre un ciclo a la vez', async () => {
     local.tables.set(TABLE, [{ id: 'ing-1', name: 'Harina' }]);

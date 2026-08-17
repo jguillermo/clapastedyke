@@ -266,6 +266,37 @@ Merece la pena saber que la excepción era Apps Script: **un Web App no contesta
 que cualquier cabecera propia mataba la llamada antes de salir y obligaba a mandar el token dentro
 del cuerpo con `text/plain`. Todo aquel rodeo desapareció al quitar el script de en medio.
 
+### 4.3 Cerrar sesión vacía el aparato entero
+
+Cerrar sesión no es «salir de la cuenta»: deja el navegador **como recién instalado**. `SignOut`
+(`core/auth/application/use-cases/sign-out.use-case.ts`) borra las **dos** bases de datos locales —la
+de la app y la del bus de eventos—, así que no queda ni una receta, ni un insumo, ni la cola
+pendiente, ni la base de comparación con la hoja, ni el enlace a la hoja, ni la pista de sesión. El
+contrato es `LocalData` (`core/_common/local-data/`), en el shared kernel: lo que se borra es de todos
+los contextos y ninguno puede conocer a otro.
+
+Media limpieza sería peor que ninguna: quien usara después ese aparato vería recetas ajenas y, al
+conectar **su** cuenta, se le subirían a **su** hoja.
+
+Tres cosas que dependen del orden y de nada más:
+
+1. **Primero se pierde la conexión, después se borra.** `session.close()` va antes de tocar nada
+   local —y antes incluso de retirar la autorización, que es red y tarda—. Con sesión viva, un ciclo
+   de sincronización podría leer la base ya vacía y no concluiría «no hay nada que subir» sino que el
+   usuario **ha borrado su recetario entero**: escribiría esas bajas en la hoja. Cerrar quita la
+   credencial (el ciclo se niega a arrancar) y cambia el `epoch` (lo que esté en vuelo tira su
+   resultado).
+2. **Se borra antes de publicar el evento.** Publicar deja el evento en la cola, que también es
+   IndexedDB: al revés, el borrado se lo llevaría por delante y nadie lo recibiría.
+3. **La app rearranca** (`platform/restart/app-restart.ts`). Los app-initializers solo corren al
+   arrancar, así que solo una carga en frío vuelve a sembrar el recetario de ejemplo; y sin ella, la
+   pantalla seguiría enseñando lo que tenía leído de una base que ya no existe.
+
+Nada de esto pierde datos para su dueño: **lo que estuviera sincronizado sigue en su hoja de Drive** y
+baja de vuelta al conectar otra vez. Lo que sí se pierde es lo que quedara en la cola, así que la
+pantalla de cuenta pregunta antes y **dice cuántos cambios son** — es la única que lo sabe. El journey
+completo está en `e2e/specs/account/sign-out.spec.ts`.
+
 ---
 
 ## 5 · Puesta en marcha

@@ -172,9 +172,11 @@ test.describe('Cuenta · conexión y sincronización', () => {
     expect(rowCounts()).toEqual(before);
 
     // ── Caso 6 · cerrar sesión olvida la hoja de esta cuenta, y el aviso sigue sin existir ───────
-    await account.disconnect.click();
+    // Pregunta antes y rearranca la app: cerrar sesión borra todo lo local, así que es una operación
+    // con confirmación y carga en frío. Lo que eso borra y siembra de nuevo se prueba entero en
+    // `sign-out.spec.ts`; aquí solo interesa que la cuenta y su hoja dejan de estar.
+    await account.disconnectAndWait();
     await expect(account.accountSummary).toContainText('Sin conectar');
-    await expect(account.connect).toBeEnabled();
     await expect(account.sheetLink).toHaveCount(0);
     await syncBadge.waitInvisible(5_000);
 

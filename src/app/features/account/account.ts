@@ -22,6 +22,7 @@ import {
 } from '@core/external-sync/application/use-cases/synchronize-tables.use-case';
 import { VerifySyncConnection } from '@core/external-sync/application/use-cases/verify-sync-connection.use-case';
 import { WatchSyncStatus } from '@core/external-sync/application/use-cases/watch-sync-status.use-case';
+import { AppRestart } from '@platform/restart/app-restart';
 
 /** Una cosa concreta que puede hacer quien está delante, en imperativo. */
 interface RemedyAction {
@@ -107,6 +108,18 @@ interface ConnectFailure {
  * La feature solo orquesta casos de uso y traduce cada uno a un paso de la lista; ninguna de las
  * operaciones sabe que hay una lista.
  *
+ * ## Cerrar sesión vacía el aparato, y por eso se pregunta
+ *
+ * No es «salir»: `SignOut` borra **todo** lo que este navegador guarda —recetas, insumos, cola,
+ * enlace a la hoja, pista de sesión— y deja el aparato como recién instalado. Lo que estuviera
+ * sincronizado sigue en la hoja de Drive y vuelve al conectar; **lo que quedara en la cola se
+ * pierde**, así que la pregunta lleva esa cuenta (`status().pendingLabel`), que es lo único que esta
+ * pantalla sabe y el caso de uso no.
+ *
+ * Se pregunta en el pie, no en un diálogo, igual que borrar una receta. Y al terminar se rearranca la
+ * app (`AppRestart`): con el almacenamiento vacío, lo que quedara en memoria hablaría de datos que ya
+ * no existen, y solo una carga en frío vuelve a sembrar el recetario de ejemplo.
+ *
  * ## No queda ningún paso manual
  *
  * La app crea la hoja y la escribe ella misma con las APIs de Sheets y Drive. No hay nada que
@@ -148,6 +161,7 @@ export class Account {
   private readonly prepareTarget = inject(PrepareSyncTarget);
   private readonly verifyConnection = inject(VerifySyncConnection);
   private readonly sync = inject(SynchronizeTables);
+  private readonly restart = inject(AppRestart);
   private readonly log = inject(Logger).scoped('ui/account');
 
   /** Estado de la sesión y de la sincronización, tal como los publica cada caso de uso. */
@@ -155,6 +169,14 @@ export class Account {
   protected readonly status = this.watchStatus.state;
 
   protected readonly busy = signal(false);
+
+  /**
+   * La pregunta de «¿seguro que quieres cerrar sesión?» está en pantalla.
+   *
+   * Se pregunta **en el sitio**, en el pie de la tarjeta, igual que borrar una receta: un diálogo
+   * encima para una acción que ya está a la vista añade un paso sin añadir información.
+   */
+  protected readonly confirmingSignOut = signal(false);
   /** Error de la última acción del usuario (los de sincronización viven en `status`). */
   protected readonly actionError = signal('');
 
@@ -321,11 +343,39 @@ export class Account {
     await this.connect();
   }
 
+  /**
+   * Pregunta antes de cerrar sesión. **Siempre pregunta**, haya o no cambios pendientes: lo que está
+   * en juego no es la sesión sino todo lo guardado en este aparato, y eso no se pulsa sin querer.
+   *
+   * Lo que cambia con la cola llena es el aviso, no la pregunta: entonces se dice cuántos cambios se
+   * van a perder, que es lo único irrecuperable de la operación.
+   */
+  protected askToDisconnect(): void {
+    this.confirmingSignOut.set(true);
+  }
+
+  protected keepSession(): void {
+    this.confirmingSignOut.set(false);
+  }
+
+  /**
+   * Cierra la sesión, borra todo lo local y **rearranca la app**.
+   *
+   * El rearranque no es cosmético: al salir se vacía el almacenamiento entero, así que lo que la
+   * pantalla tuviera leído habla de datos que ya no existen. Con la carga en frío vuelve a correr la
+   * siembra y el recetario de ejemplo está de nuevo ahí, que es el estado que se prometió.
+   *
+   * Si cerrar sesión falla, **no se rearranca**: el mensaje de error se quedaría sin poder leerse.
+   */
   protected async disconnect(): Promise<void> {
+    this.confirmingSignOut.set(false);
     this.progress.set([]);
     this.failure.set(null);
     this.ready.set(false);
     await this.run('desconectar cuenta', () => this.signOut.execute());
+    if (!this.actionError()) {
+      this.restart.restart();
+    }
   }
 
   /**

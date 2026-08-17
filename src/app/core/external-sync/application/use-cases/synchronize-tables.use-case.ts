@@ -187,7 +187,13 @@ export class SynchronizeTables extends UseCase<SynchronizeRequest, SynchronizeRe
       if (!dryRun) {
         this.status.markSyncing();
       }
-      const outcome = await this.cycle(credentials.token, target, credentials.accountId, dryRun);
+      const outcome = await this.cycle(
+        credentials.token,
+        target,
+        credentials.accountId,
+        epoch,
+        dryRun,
+      );
 
       // La sesión pudo cambiar mientras se hablaba con el destino: si ahora hay otra cuenta, lo leído
       // y lo escrito eran de la anterior y no se puede tocar nada más con ellos.
@@ -212,6 +218,7 @@ export class SynchronizeTables extends UseCase<SynchronizeRequest, SynchronizeRe
     token: string,
     target: SyncTarget,
     accountId: string,
+    epoch: number,
     dryRun: boolean,
   ): Promise<SynchronizeResult> {
     const now = Date.now();
@@ -301,6 +308,21 @@ export class SynchronizeTables extends UseCase<SynchronizeRequest, SynchronizeRe
         problems: { duplicates, unreadable, ignored, barrier: null },
         byTable,
       };
+    }
+
+    /*
+     * La sesión pudo cerrarse mientras se leía la hoja, y entonces **no se puede escribir nada aquí**.
+     *
+     * Cerrar sesión vacía la base local a propósito (ver `SignOut`): un ciclo que empezó antes y
+     * aterriza después la repoblaría con lo que acababa de bajar, y el aparato quedaría con datos de
+     * alguien que ya se fue. Lo mismo vale si entró OTRA cuenta: lo leído es de la anterior.
+     *
+     * Se comprueba **antes de escribir** y no solo al final: la comprobación de `perform` llega tarde
+     * para esto — descarta el resultado, pero lo aplicado ya está en disco.
+     */
+    if (await this.sessionChanged(epoch)) {
+      this.log.debug('ciclo descartado antes de escribir: la sesión cambió mientras se leía');
+      return stopped('stale-session');
     }
 
     // Bajar primero: si se subiera antes y el proceso muriera, la hoja tendría cambios que aquí no

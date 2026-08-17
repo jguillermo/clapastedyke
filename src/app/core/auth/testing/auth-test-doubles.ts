@@ -1,6 +1,7 @@
-import { Injectable, Provider } from '@angular/core';
+import { inject, Injectable, Provider } from '@angular/core';
 import { DomainEvent } from '@core/_common/eventbus/domain-event';
 import { EventBus, EventHandler } from '@core/_common/eventbus/event-bus';
+import { LocalData } from '@core/_common/local-data/local-data';
 import { ConsoleLogger } from '@core/_common/logger/console-logger';
 import { Logger } from '@core/_common/logger/logger';
 import { AuthSettingsRepository } from '../domain/repositories/auth-settings.repository';
@@ -104,6 +105,30 @@ export class FakeSessionHintRepository extends SessionHintRepository {
   }
 }
 
+/** El borrado local, contado: lo que importa es si se pidió, y `failWith` cubre que no tumbe la salida. */
+@Injectable()
+export class FakeLocalData extends LocalData {
+  private readonly session = inject(Session);
+
+  wipes = 0;
+  failWith: Error | null = null;
+
+  /**
+   * Si todavía había sesión abierta cuando se pidió el borrado. **Tiene que ser `false`**: borrar con
+   * la sesión viva deja que un ciclo de sincronización lea la base ya vacía y suba esa matanza a la
+   * hoja del usuario. `null` mientras no se haya borrado nada.
+   */
+  sessionOpenAtWipe: boolean | null = null;
+
+  async wipe(): Promise<void> {
+    this.wipes += 1;
+    this.sessionOpenAtWipe = this.session.snapshot().account !== null;
+    if (this.failWith) {
+      throw this.failWith;
+    }
+  }
+}
+
 /** Bus que graba lo publicado y no reparte nada: aquí solo importa QUÉ evento sale. */
 @Injectable()
 export class RecordingEventBus extends EventBus {
@@ -128,9 +153,11 @@ export function provideAuthTestDoubles(): Provider[] {
     FakeAuthenticator,
     FakeAuthSettingsRepository,
     FakeSessionHintRepository,
+    FakeLocalData,
     { provide: Authenticator, useExisting: FakeAuthenticator },
     { provide: AuthSettingsRepository, useExisting: FakeAuthSettingsRepository },
     { provide: SessionHintRepository, useExisting: FakeSessionHintRepository },
+    { provide: LocalData, useExisting: FakeLocalData },
     { provide: Session, useClass: InMemorySession },
     { provide: EventBus, useClass: RecordingEventBus },
   ];
