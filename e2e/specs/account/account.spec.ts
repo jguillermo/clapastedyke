@@ -153,11 +153,18 @@ test.describe('Cuenta · conexión y sincronización', () => {
      *
      * Se pulsa cero veces. Si hiciera falta un clic, este bloque falla.
      */
+    const tokensBeforeReload = google.tokenRequestCount;
+
     await page.reload();
     await expect(account.root).toBeVisible();
 
     await expect(account.accountSummary).toContainText('Conectada');
     await expect(account.connectedAs(E2E_ACCOUNT.name)).toBeVisible();
+    // Y volvió POR EL BACKEND, no por casualidad. Sin esta cuenta, el caso pasaría igual si la app se
+    // hubiera reconectado por cualquier otro camino — que es justo lo que no se puede dar por hecho.
+    expect(google.tokenRequestCount, 'recargar debe pedirle un token al backend').toBeGreaterThan(
+      tokensBeforeReload,
+    );
     // La hoja es la misma: se recuperó la MISMA cuenta, no una sesión cualquiera.
     await expect(account.sheetLink).toHaveAttribute('href', sheet.url);
     // Y la sincronización vuelve sola, que es para lo que sirve tener sesión.
@@ -174,10 +181,17 @@ test.describe('Cuenta · conexión y sincronización', () => {
     // ── Caso 7 · y cerrar sesión TAMBIÉN sobrevive a la recarga ──────────────────────────────────
     // El reverso del caso 5: si reanudar volviera a conectar a quien acaba de salir, sería peor que
     // el fallo original. Recargar no puede resucitar una sesión cerrada.
+    const tokensAfterSignOut = google.tokenRequestCount;
+
     await page.reload();
     await expect(account.root).toBeVisible();
     await expect(account.accountSummary).toContainText('Sin conectar');
     await expect(account.connect).toBeEnabled();
+    // Ni siquiera se le pregunta al backend: al cerrar sesión se borra la pista de esta cuenta, y sin
+    // pista `ResumeSession` ni se molesta. Es lo que evita una petición por visita anónima.
+    expect(google.tokenRequestCount, 'sin sesión previa no se llama al backend').toBe(
+      tokensAfterSignOut,
+    );
 
     // ── Caso 8 · la hoja acaba en la papelera: se crea otra y se vuelve a llenar ─────────────────
     // Va al final porque deja dos hojas en el Drive: es el estado menos predecible del journey.

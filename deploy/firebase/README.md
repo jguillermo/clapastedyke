@@ -1,13 +1,25 @@
 # `deploy/firebase/` — todo el despliegue
 
-Aquí está **todo** lo que define cómo y a dónde se publica la app. En `.github/` solo queda el
-workflow de GitHub Actions, que lanza el despliegue pero no decide nada de él.
+Aquí está **todo** lo que define cómo y a dónde se publica la app. En `.github/` solo quedan los
+workflows de GitHub Actions, que lanzan el despliegue pero no deciden nada de él.
 
 | Fichero | Qué es |
 |---|---|
 | [`environments.json`](environments.json) | **La lista de ambientes y su configuración.** El único sitio donde se declaran |
 | [`config.mjs`](config.mjs) | Genera el `config.json` de un ambiente a partir del anterior |
-| [`../../firebase.json`](../../firebase.json) | Cómo se sirve el sitio. **Vive en la raíz y no puede moverse aquí** — ver abajo |
+| [`firestore.rules`](firestore.rules) | Quién puede leer y escribir Firestore: **nadie**. Solo entra el Admin SDK desde [`api/auth`](../../api/auth/README.md) |
+| [`firestore.indexes.json`](firestore.indexes.json) | Índices compuestos de Firestore. Vacío: las consultas de la API son de un solo campo, que Firestore indexa solo |
+| [`../../firebase.json`](../../firebase.json) | Cómo se sirve el sitio y qué funciones hay. **Vive en la raíz y no puede moverse aquí** — ver abajo |
+
+> Los dos ficheros de Firestore **sí** podrían estar en la raíz —es donde los deja `firebase init`—
+> pero nada lo obliga: `firebase.json` los referencia por ruta y cualquier sitio **dentro** de la raíz
+> del proyecto vale. Están aquí porque aquí es donde este repo dice que vive el despliegue.
+
+Son **dos despliegues distintos y dos workflows distintos**: el frontend
+([`deploy-frontend.yml`](../../.github/workflows/deploy-frontend.yml), Hosting) y el backend
+([`deploy-backend.yml`](../../.github/workflows/deploy-backend.yml), Cloud Functions + las reglas de
+Firestore). El procedimiento del backend está en [`manual/api.md`](../../manual/api.md); cuando hay
+que publicar los dos, **primero el backend**.
 
 Cada ambiente es un **proyecto de Firebase distinto** bajo la misma cuenta de Google. Hoy hay dos,
 `dev` y `prod`, pero el número no está fijado en ninguna parte: los ambientes son **datos**, no
@@ -86,9 +98,12 @@ Error: ../../dist/misaevol/browser is outside of project directory
 ```
 
 El CLI fija la **raíz del proyecto** en el directorio del `firebase.json` (`detectProjectRoot`) y
-después rechaza cualquier `public` relativo que se salga de ella (`Config.path`). Con el fichero en
+después rechaza cualquier ruta relativa que se salga de ella (`Config.path`). Con el fichero en
 `deploy/firebase/`, el build queda fuera y no hay ruta relativa legal que llegue a él. Es la única
 excepción a «todo el despliegue en esta carpeta», y la impone la herramienta.
+
+Fíjate en que la restricción es **salirse de la raíz**, no «estar en la raíz»: por eso las reglas de
+Firestore y el `source` de cada función sí pueden vivir en subcarpetas, y de hecho lo hacen.
 
 > **Cuidado con verificarlo solo con el emulador.** `emulators:start` **no** pasa por esa validación
 > y acepta `../../` tan tranquilo. Un `public` mal puesto arranca perfecto en local y revienta en el

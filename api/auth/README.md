@@ -43,7 +43,8 @@ sessions/{sid}  ← { sub, createdAt, expiresAt }. El `sid` es lo que va en la c
   aleatorio, caduca y se puede tirar sin tocar la concesión.
 - **La cookie se llama `__session` y no es negociable**: Firebase Hosting borra todas las cookies
   entrantes menos esa antes de pasar la petición a la función.
-- **Las reglas de Firestore deniegan todo** ([`firestore.rules`](../../firestore.rules)). Aquí solo
+- **Las reglas de Firestore deniegan todo**
+  ([`deploy/firebase/firestore.rules`](../../deploy/firebase/firestore.rules)). Aquí solo
   entra el Admin SDK.
 
 ## Configuración

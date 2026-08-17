@@ -317,6 +317,21 @@ export class GoogleDouble {
    */
   private session = false;
 
+  /**
+   * Cuántas veces se le ha pedido un token al backend (`POST /api/auth/token`).
+   *
+   * Existe para que un spec pueda asertar **por dónde** volvió la sesión, y no solo que la pantalla
+   * dice «Conectada». Sin esto, un journey de recarga pasaría igual si la app se hubiera reconectado
+   * por cualquier otro camino — y el fallo que originó todo esto era exactamente eso: la reanudación
+   * no ocurría y nadie se enteraba.
+   */
+  private tokenRequests = 0;
+
+  /** @see tokenRequests */
+  get tokenRequestCount(): number {
+    return this.tokenRequests;
+  }
+
   /** Puerta para retener las respuestas de Google (ver {@link hold}). */
   private gate: Promise<void> | null = null;
   private release: (() => void) | null = null;
@@ -397,7 +412,10 @@ export class GoogleDouble {
       }),
     );
     await page.route('**/api/auth/token', (route) =>
-      this.answerAuth(route, () => (this.session ? sessionPayload() : UNAUTHORIZED)),
+      this.answerAuth(route, () => {
+        this.tokenRequests += 1;
+        return this.session ? sessionPayload() : UNAUTHORIZED;
+      }),
     );
     await page.route('**/api/auth/sign-out', (route) =>
       this.answerAuth(route, () => {

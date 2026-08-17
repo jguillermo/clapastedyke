@@ -125,7 +125,10 @@ Los dos son `workflow_dispatch`: no hay despliegue automático a propósito (ver
 > desconectado hasta que la API suba.
 
 `deploy-backend.yml` despliega también `firestore:rules`, porque esas reglas protegen exactamente lo
-que guarda la API — no tendría sentido que viajaran con el frontend.
+que guarda la API — no tendría sentido que viajaran con el frontend. Viven en
+[`deploy/firebase/firestore.rules`](../deploy/firebase/firestore.rules), con el resto del despliegue:
+`firebase.json` las referencia por ruta y **solo** exige que estén dentro de la raíz del proyecto, no
+en la raíz misma.
 
 ## Requisitos del proyecto de Firebase
 

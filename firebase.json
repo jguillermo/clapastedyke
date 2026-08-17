@@ -7,8 +7,8 @@
     }
   ],
   "firestore": {
-    "rules": "firestore.rules",
-    "indexes": "firestore.indexes.json"
+    "rules": "deploy/firebase/firestore.rules",
+    "indexes": "deploy/firebase/firestore.indexes.json"
   },
   "hosting": {
     "public": "dist/misaevol/browser",
