@@ -10,6 +10,7 @@ marcha. Aquí no hay nada de producto ni de negocio — eso vive en [`.claude/do
 |---|---|
 | [`firebase-deploy.md`](firebase-deploy.md) | **Cómo se publica.** Los ambientes (hoy `dev` y `prod`, un proyecto de Firebase cada uno) declarados en un único `deploy/firebase/environments.json` (que además genera `public/config.json`), dónde vive cada valor y cuál es secreto, el alta manual paso a paso, cómo añadir un ambiente nuevo y cómo lanzar el despliegue, que es manual a propósito. Incluye qué hace cada clave de `firebase.json` y el diagnóstico de los fallos típicos. |
 | [`google-integration.md`](google-integration.md) | **El porqué.** Modelo mental de la integración con Google, las restricciones de la plataforma que la fuerzan (sin refresh token en un navegador, el alcance real de `drive.file`), las arquitecturas descartadas y los datos medidos que respaldan cada decisión. |
+| [`api.md`](api.md) | **El backend.** La carpeta `api/`, su regla de organización (una carpeta = un paquete = un despliegue independiente), cómo se comparte `api/_common/` sin bundler, cómo se añade una función, el desarrollo con el emulador y el despliegue manual por función. |
 | [`sync-architecture.md`](sync-architecture.md) | **Cómo se mantienen iguales la app y la hoja.** Las tres copias y por qué no bastan dos, el reloj lógico y su tope, qué pasa cuando alguien edita la hoja a mano, las barreras que impiden que un clic derecho borre el catálogo, cuándo se sincroniza, los límites aceptados y qué mirar en la consola cuando algo no cuadra. |
 
 ## Documentación que NO está aquí, y por qué
@@ -20,6 +21,7 @@ condena a desactualizarse, porque nadie la ve al tocar el fichero de al lado.
 | Documento | Qué cubre |
 |---|---|
 | [`deploy/google-client-id.md`](../deploy/google-client-id.md) | **Los pasos para crear el Client ID de Google** (proyecto de Cloud, consentimiento, orígenes autorizados) y dónde se pega. Vive junto a `deploy/firebase/environments.json`, que es el fichero donde acaba ese valor. Es el **único** sitio con ese procedimiento: no se duplica aquí. |
+| [`api/auth/README.md`](../api/auth/README.md) | **La función `auth`**: sus tres rutas, qué guarda en Firestore y qué nunca sale de ahí, su configuración, y los cinco detalles de OAuth que cuesta deducir leyendo el código (`redirect_uri: 'postmessage'`, el refresh token que Google no reemite, `invalid_grant`, la pantalla de consentimiento en producción). |
 | [`src/app/components/README.md`](../src/app/components/README.md) | Catálogo vivo de la librería de componentes: qué existe, cómo se usa cada pieza y qué falta por construir. Se actualiza en el mismo commit que añade un componente. |
 | [`src/app/core/_common/eventbus/README.md`](../src/app/core/_common/eventbus/README.md) | Especificación del bus de eventos: cola persistente, entrega *at-least-once*, y por qué los manejadores tienen que tolerar ejecutarse dos veces. |
 | [`src/app/core/_common/logger/README.md`](../src/app/core/_common/logger/README.md) | El puerto de registro y su configuración. |

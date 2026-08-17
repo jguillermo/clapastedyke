@@ -306,6 +306,17 @@ export class GoogleDouble {
   private nextFileId = 1;
   private nextSheetId = 1;
 
+  /**
+   * Si el backend de la sesión tiene una sesión abierta.
+   *
+   * **Vive aquí y no en una cookie del navegador, a propósito.** Lo que un E2E tiene que poder
+   * demostrar es que *recargar no echa a nadie* y que *cerrar sesión sí*, y eso es exactamente lo que
+   * modela este booleano: sobrevive a un `reload()` porque el estado es del servidor, no de la página.
+   * La mecánica de la cookie `HttpOnly` es plomería entre el navegador y Cloud Functions —no la
+   * escribe esta app— y se comprueba en los tests de `api/` y a mano.
+   */
+  private session = false;
+
   /** Puerta para retener las respuestas de Google (ver {@link hold}). */
   private gate: Promise<void> | null = null;
   private release: (() => void) | null = null;
@@ -377,9 +388,22 @@ export class GoogleDouble {
       }),
     );
 
-    // 3 · El perfil (OIDC). Es de donde sale el id de cuenta con el que se recuerda la hoja.
-    await page.route('https://openidconnect.googleapis.com/v1/userinfo', (route) =>
-      this.answer(route, () => ({ ...E2E_ACCOUNT, picture: null })),
+    // 3 · El backend de la sesión (`api/auth`). Es quien identifica la cuenta y emite los tokens;
+    //     la app ya no le pregunta el perfil a Google.
+    await page.route('**/api/auth/exchange', (route) =>
+      this.answerAuth(route, () => {
+        this.session = true;
+        return sessionPayload();
+      }),
+    );
+    await page.route('**/api/auth/token', (route) =>
+      this.answerAuth(route, () => (this.session ? sessionPayload() : UNAUTHORIZED)),
+    );
+    await page.route('**/api/auth/sign-out', (route) =>
+      this.answerAuth(route, () => {
+        this.session = false;
+        return NO_CONTENT;
+      }),
     );
 
     // 4 · Drive: buscar la hoja de la cuenta (la colección) y preguntar si una sigue viva (un fichero).
@@ -396,6 +420,29 @@ export class GoogleDouble {
       this.answer(route, () => this.sheetsApi(route));
     await page.route('https://sheets.googleapis.com/v4/spreadsheets', onSheets);
     await page.route('https://sheets.googleapis.com/v4/spreadsheets/**', onSheets);
+  }
+
+  /**
+   * Las respuestas del backend de la sesión, que **no** hablan el idioma de Google: llevan su propio
+   * estado y su propia forma de error (`{ error, message }`), igual que `api/auth`.
+   *
+   * Respeta la misma puerta de retención que el resto: si un spec retiene «la red», la reanudación de
+   * la sesión también se queda esperando, que es lo que pasaría de verdad.
+   */
+  private async answerAuth(route: Route, handle: () => AuthReply): Promise<void> {
+    if (this.gate) {
+      await this.gate;
+    }
+
+    const reply = handle();
+    await route
+      .fulfill({
+        status: reply.status,
+        contentType: 'application/json; charset=utf-8',
+        body: reply.body === null ? '' : JSON.stringify(reply.body),
+        headers: { 'cache-control': 'private, no-store' },
+      })
+      .catch(ignore);
   }
 
   /** Envuelve cada respuesta: la puerta de retención y la traducción de errores. */
@@ -800,31 +847,58 @@ interface StructuralRequest {
 /**
  * El sustituto de Google Identity Services que se le sirve a la página.
  *
- * Concede el token **siempre**, con o sin `prompt`, así que la reanudación silenciosa de una recarga
- * también funciona. Lo que **no** se puede montar desde aquí es el estado «se caducó el token, hay que
- * reconectar»: haría falta que la credencial de la sesión envejeciera en memoria, y eso no se puede
- * provocar desde fuera sin un reloj falso dentro de la app. Ese camino lo cubre el spec unitario del
- * ciclo, que sí puede quitar las credenciales a mitad.
+ * Expone **solo `initCodeClient`**, que es lo único que la app usa desde que la sesión la custodia el
+ * backend: entrega un código de autorización y ahí acaba su papel. Ni tokens, ni `revoke` — de eso
+ * responde ahora `/api/auth/*`, que también tiene su doble aquí.
+ *
+ * Un detalle que importa: el modelo de código solo entra en juego al **conectar**, así que si algún
+ * día la app volviera a necesitar a Google para reanudar, este stub no la salvaría — el spec de
+ * recarga fallaría, que es justo lo que se quiere.
  */
 const GIS_STUB = `
 (() => {
-  const respond = (config) => {
-    setTimeout(() => {
-      config.callback({
-        access_token: '${TOKEN}',
-        expires_in: 3600,
-        scope: '${SCOPES}',
-      });
-    }, 0);
-  };
-
   window.google = {
     accounts: {
       oauth2: {
-        initTokenClient: (config) => ({ requestAccessToken: () => respond(config) }),
-        revoke: (token, done) => setTimeout(done, 0),
+        initCodeClient: (config) => ({
+          requestCode: () => setTimeout(() => config.callback({
+            code: 'e2e-authorization-code',
+            scope: '${SCOPES}',
+          }), 0),
+        }),
       },
     },
   };
 })();
 `;
+
+/** Lo que responde el doble de `api/auth`: un estado y un cuerpo (o ninguno). */
+interface AuthReply {
+  status: number;
+  body: unknown | null;
+}
+
+const UNAUTHORIZED: AuthReply = {
+  status: 401,
+  body: { error: 'no_session', message: 'No hay sesión en este navegador.' },
+};
+
+const NO_CONTENT: AuthReply = { status: 204, body: null };
+
+/** La misma forma que devuelven `/auth/exchange` y `/auth/token` en `api/auth/payload.ts`. */
+function sessionPayload(): AuthReply {
+  return {
+    status: 200,
+    body: {
+      account: {
+        id: E2E_ACCOUNT.sub,
+        email: E2E_ACCOUNT.email,
+        name: E2E_ACCOUNT.name,
+        pictureUrl: null,
+      },
+      accessToken: TOKEN,
+      expiresIn: 3600,
+      scope: SCOPES,
+    },
+  };
+}

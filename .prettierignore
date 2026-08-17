@@ -11,6 +11,10 @@ coverage/
 documentation.json
 package-lock.json
 
+# La salida de `tsc` de cada función de `api/` (lo que se despliega). `lib-test/` es la de sus tests.
+api/*/lib/
+api/*/lib-test/
+
 # Google Apps Script: `.gs` no es una extensión que Prettier entienda y el fichero se copia y pega
 # tal cual en el editor de Apps Script (ver appscript.md).
 apps-script/*.gs

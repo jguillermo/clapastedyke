@@ -346,11 +346,16 @@ más (5 s → 5 min).
 `BroadcastChannel` y las demás releen de IndexedDB. Sin esas APIs, **todas las pestañas trabajan**: es
 el comportamiento anterior (más cuota, posible pisarse), no uno peor.
 
-## La sesión caduca, y no es un error
+## La sesión caduca, y se renueva sola
 
-El token de Google dura ~1 h y **en un navegador no hay refresh token** — es una propiedad de la
-plataforma, no un defecto. Primero se intenta renovar en silencio; si no se puede, el estado pasa a
-**`reconnect`** y no a `error`, porque lo que hay que hacer es distinto y no se ha roto nada.
+El token de Google dura ~1 h, y en un navegador no hay forma de renovarlo sin abrir una ventana. Por
+eso el permiso duradero lo custodia el backend ([`api/auth`](../api/auth/README.md)): cuando el token
+muere —o cuando se recarga la página— se pide otro con un POST de mismo origen, sin ventana y sin
+gesto del usuario. Renovar **no toca el `epoch`**: es la misma sesión.
+
+Si tampoco eso funciona (se retiró el acceso desde la cuenta de Google, o nunca se conectó en este
+navegador), el estado pasa a **`reconnect`** y no a `error`: no se ha roto nada, simplemente hay que
+volver a conectar.
 
 ## Límites aceptados (se documentan, no se arreglan)
 

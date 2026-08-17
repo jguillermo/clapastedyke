@@ -1,0 +1,41 @@
+{
+  // `rootDir: ".."` es lo que hace desplegable la carpeta compartida.
+  //
+  // Firebase empaqueta ÚNICAMENTE el directorio `source` de la función (`api/auth`), así que un
+  // `require('../_common/http')` en el JavaScript compilado no encontraría nada en producción. Con
+  // la raíz en `api/`, la salida queda en `lib/auth/*.js` Y `lib/_common/*.js` — las dos dentro de
+  // `api/auth/`, que es lo que se sube. Por eso `main` apunta a `lib/auth/index.js` y no a
+  // `lib/index.js`.
+  "compilerOptions": {
+    // `node16` y no `commonjs`/`node`: TypeScript 6 deprecó la resolución `node10` (TS5107) y en TS 7
+    // deja de funcionar. Como este `package.json` NO declara `"type": "module"`, `node16` sigue
+    // emitiendo CommonJS —que es lo que espera el runtime de Cloud Functions— pero resuelve los
+    // paquetes por su mapa de `exports`, que es como los publican `firebase-functions` y
+    // `firebase-admin`.
+    "module": "node16",
+    "moduleResolution": "node16",
+    "target": "es2023",
+    "lib": ["es2023"],
+    "rootDir": "..",
+    "outDir": "lib",
+    "sourceMap": true,
+    "strict": true,
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "types": ["node"]
+  },
+  "include": ["./**/*.ts", "../_common/**/*.ts"],
+  // Los dos patrones de spec hacen falta: `**/*.spec.ts` se resuelve relativo a ESTA carpeta y no
+  // alcanza lo que hay fuera de ella, así que sin el segundo los specs de `_common` acababan
+  // compilados dentro de `lib/` y viajaban al despliegue.
+  "exclude": ["lib", "lib-test", "node_modules", "**/*.spec.ts", "../_common/**/*.spec.ts"]
+}

@@ -50,46 +50,64 @@ En OAuth el usuario **nunca** teclea su contraseña en tu app — ni en popup ni
 casos la ventana es de Google, en `accounts.google.com`, y tu app solo recibe un token al final. Tu
 app no podría capturar esa contraseña aunque quisiera: es otro origen y el navegador lo aísla.
 
-Lo que hoy usa el proyecto es el **modelo de token de Google Identity Services** (popup). El modelo
-de código con `ux_mode: 'redirect'` existe, pero devuelve un `code` que hay que canjear **en un
-servidor**: redirect exige backend.
+El proyecto usa el **modelo de código** de Google Identity Services con `ux_mode: 'popup'`: la ventana
+de Google devuelve un `code` de un solo uso que hay que canjear **en un servidor** con el
+`client_secret`. Ese servidor es [`api/auth`](../api/auth/README.md).
 
-### 2.3 Un cliente de navegador no obtiene refresh token
+Antes usaba el **modelo de token** (también popup), que entrega el token directamente al navegador y
+no necesita backend. Se cambió porque no se sostenía; el porqué está en 2.3.
 
-El token caduca en **~1 hora** y no hay forma fiable de renovarlo en silencio. El flujo implícito
+### 2.3 Un cliente de navegador no obtiene refresh token — y por eso hay backend
+
+**Esta es la restricción que decide toda la arquitectura de la sesión.**
+
+Un cliente público (una SPA) no puede guardar un `client_secret`, así que Google no le entrega
+**refresh token**. Solo le da tokens de acceso de **~1 hora**. El flujo implícito
 (`response_type=token`), que sería la vía sin backend, **fue eliminado en OAuth 2.1** por fuga de
-tokens en la URL — y arrastraba el mismo problema.
+tokens en la URL, y arrastraba el mismo problema.
 
-Por tanto: **la reconexión periódica no es un defecto de la implementación, es una propiedad de la
-plataforma.** La única forma de evitarla es un cliente confidencial (un servidor que custodie
-refresh tokens), que es justamente lo que este proyecto no quiere ser.
+Durante un tiempo el proyecto intentó vivir con eso, apoyándose en la reanudación silenciosa de GIS:
+pedir otro token con `prompt: ''` al arrancar la página. **No funcionaba, y no podía funcionar.**
+`requestAccessToken()` abre siempre una **ventana emergente** —`prompt: ''` solo significa «no fuerces
+el selector de cuenta», no «no enseñes nada»— y Google documenta que hay que llamarlo desde un gesto
+del usuario para que el navegador no la bloquee. Al correr en el arranque de la página no hay ningún
+gesto: la ventana se bloqueaba, el error se tragaba en un `catch` mudo y **cada recarga desconectaba**.
 
-### 2.4 La credencial no se persiste — pero recargar ya no echa a nadie
+La única solución real es dejar de ser un cliente público. `api/auth` es un **cliente confidencial**:
+tiene el `client_secret`, obtiene un refresh token que no caduca y emite tokens de acceso frescos
+cuando la app se los pide. Reanudar pasa a ser **un POST de mismo origen**: sin ventana, sin gesto y
+sin depender de que la persona tenga su sesión de Google abierta.
 
-`Credential` vive **solo en memoria** (`core/auth/domain/value-objects/credential.ts`). No está en
-`localStorage`, ni en IndexedDB, ni en una cookie. Es deliberado: cerrar sesión o recargar la borra
-sin que haya que acordarse de limpiar nada, y un token no se queda olvidado en el disco del usuario.
+> **Lo que esto cuesta, y se acepta a sabiendas.** El proyecto nació queriendo no custodiar
+> credenciales de nadie, y ahora las custodia: en Firestore hay refresh tokens de larga vida con
+> permiso `drive.file`. Se compensa con lo más estrecho posible en cada eje —un solo permiso, reglas
+> de Firestore que deniegan todo, y un token que nunca se devuelve al navegador— pero el modelo de
+> amenaza **cambió**, y conviene saberlo antes que descubrirlo.
 
-Durante un tiempo eso significó **F5 = reconectar**, y era inaceptable. La salida no fue guardar el
-token, sino **volver a pedirlo**:
+### 2.4 En el navegador no se persiste ninguna credencial
 
-| Dónde guardar el token | Sobrevive a… | Coste |
+`Credential` sigue viviendo **solo en memoria** (`core/auth/domain/value-objects/credential.ts`) y
+durando una hora. No está en `localStorage`, ni en IndexedDB, ni en una cookie legible.
+
+| Dónde guardar el token de acceso | Sobrevive a… | Coste |
 |---|---|---|
 | **Memoria** (lo actual) | nada, por sí solo | ninguno |
 | `sessionStorage` | recarga sí, cerrar pestaña no | legible por cualquier XSS mientras dure |
 | IndexedDB / `localStorage` | todo, hasta que caduque | igual, y además persiste en disco |
 
 Ninguna de las dos últimas pasa de **1 hora** —ahí caduca el token—, así que ni siquiera resolvían el
-problema entero. Lo que sí lo resuelve es `ResumeSession`: se guarda **solo con qué cuenta se estaba**
-(id y correo, nunca el token) y al arrancar se le pide al proveedor un token nuevo con `prompt: ''`.
-Si esa persona ya consintió y sigue con su sesión de Google abierta, Google lo emite **sin enseñar
-nada**. Recargar deja de echar a nadie, y funciona igual pasada la hora.
+problema. Lo que lo resuelve es no guardar el token sino **poder pedir otro**, y esa capacidad vive en
+una cookie **`HttpOnly`** que emite `api/auth`: el JavaScript de la app no puede leerla, y un XSS
+tampoco.
 
-Lo guardado no abre nada por sí solo: sin la sesión de Google del propio navegador, esa pista es un
-correo y un identificador. Y al cerrar sesión se borra, porque si no la siguiente carga volvería a
-entrar sola.
+En IndexedDB se sigue guardando **solo con qué cuenta se estaba** (id y correo, nunca un token). Es la
+puerta de `ResumeSession`: sin pista, a un visitante que nunca conectó ni se le pregunta al backend.
 
-**La misma pieza cubre la caducidad en caliente.** Si el token muere con la app abierta,
+> **Efecto lateral aceptado:** quien borre IndexedDB pero conserve las cookies tendrá que pulsar
+> «Conectar» una vez, aunque el backend pudiera reanudar. Es el precio de no hacer una petición en
+> cada arranque de un visitante anónimo.
+
+**La misma pieza cubre la caducidad en caliente.** Si el token de una hora muere con la app abierta,
 `SessionCredentialsProvider` no devuelve `null` —que haría creer a todo el mundo que el usuario cerró
 sesión—: pide la renovación y entrega el token nuevo. `ResumeSession` comparte un solo intento entre
 todos los que lo descubran a la vez, y renovar **no toca el `epoch`**: es la misma sesión, y si el
@@ -182,8 +200,15 @@ El tercero era el que de verdad protegía contra corrupción silenciosa, y es el
 ## 4 · La arquitectura montada
 
 ```
-Navegador                                            Drive del usuario
-─────────                                            ─────────────────
+Navegador                        api/auth (Cloud Function)      Drive del usuario
+─────────                        ───────────────────────        ─────────────────
+                                 Firestore
+«Conectar» ─ code ─────────────►  canje + client_secret ──────►  Google
+                                 refresh token ▸ Firestore
+           ◄─ cookie __session ─  token de acceso (1 h)
+recarga / cada hora ───────────►  refresh ────────────────────►  Google
+           ◄──────────────────── token de acceso (1 h)
+
 IndexedDB (fuente de verdad)
     │
     │ evento de dominio
@@ -197,13 +222,17 @@ SyncOutbox (cola durable)
     ├─ POST sheets/v4/spreadsheets       crearla, SOLO si no tiene ninguna
     ├─ GET  …/values:batchGet            leer lo que ya hay
     │       (fusionar por id, en la app)
-    └─ POST …/values:batchUpdate  ───────────────────►  «Clapastedyke — Recetario»
+    └─ POST …/values:batchUpdate  ────────────────────────────►  «Clapastedyke — Recetario»
 ```
 
-**Entre la app y la hoja no hay nada.** No hay servidor, ni script alojado, ni intermediario que
-custodie credenciales: la autorización es el token del propio usuario, que vive en memoria y muere
-con la sesión. Lo único que se recuerda entre sesiones es **el id de su hoja** — un identificador de
-fichero, no un secreto.
+**Entre la app y la hoja sigue sin haber nada.** El backend solo interviene en la **sesión**: emite
+tokens y custodia el permiso duradero. Los datos del recetario no pasan por él —no los ve, no los
+guarda— y todo el motor de sincronización sigue en el navegador, hablando directamente con Sheets y
+Drive con el token del propio usuario.
+
+Es una distinción que conviene no perder: **el backend es de identidad, no de datos.** La app sigue
+siendo local-first y funcionando entera sin conexión; lo único que necesita del servidor es poder
+volver a autorizarse.
 
 Y por `drive.file`, ese token solo alcanza los ficheros que esta app creó. Aunque alguien se lo
 llevara, no podría leer nada más del Drive de esa persona.
@@ -258,15 +287,19 @@ Con los cuatro scopes de este diseño, el usuario ve **una sola casilla**: la de
 primeros (`openid`, `email`, `profile`) no suman ninguna. Esa es la razón de no añadir scopes a la
 ligera.
 
-> `GoogleAuthenticator` se protege de esto comprobando `credential.allows(DRIVE_FILE_PERMISSION)`
-> nada más recibir el token, y falla con un mensaje accionable. **Cualquier scope nuevo necesita su
-> comprobación equivalente.**
+> `api/auth` se protege de esto comprobando el permiso de Drive en el `scope` concedido **antes de
+> guardar nada**, y responde con un mensaje accionable. El navegador lo vuelve a comprobar sobre la
+> credencial. **Cualquier scope nuevo necesita su comprobación equivalente.**
 
-### 5.2 El techo de 100 usuarios, y cómo se quita
+### 5.2 Publicar la app no es opcional
 
-El único límite operativo que queda es el modo *Testing* de la pantalla de consentimiento: 100
-correos, dados de alta a mano. Se quita **publicando** la app, y publicarla no cuesta nada porque
-`drive.file` no es sensible y no hay verificación que pasar (2.6). El trámite, en
+El modo *Testing* de la pantalla de consentimiento tenía un solo inconveniente conocido —el techo de
+100 correos dados de alta a mano— y ahora tiene otro **mucho peor**: en *Testing*, Google **caduca los
+refresh tokens a los 7 días**. Con el backend custodiando esos tokens, eso significa que el problema
+original —«se pierde la sesión»— volvería cada semana, y sin ninguna pista de por qué.
+
+Así que la pantalla de consentimiento tiene que estar **«En producción»**. Publicarla no cuesta nada:
+`drive.file` no es un permiso sensible y no hay verificación de Google que pasar (2.6). El trámite, en
 [`deploy/google-client-id.md`](../deploy/google-client-id.md) §2.
 
 ---
@@ -276,7 +309,8 @@ correos, dados de alta a mano. Se quita **publicando** la app, y publicarla no c
 | Síntoma | Causa | Arreglo |
 |---|---|---|
 | `Error 400: origin_mismatch` | El origen no está registrado, o es `127.0.0.1` vs `localhost`, o el puerto cambió | [`deploy/google-client-id.md`](../deploy/google-client-id.md) §3 |
-| `UNAUTHENTICATED` | El token caducó (dura una hora) | Reconectar; lo pendiente se reintenta |
+| `UNAUTHENTICATED` | El token de una hora caducó y el backend no ha podido emitir otro | Mirar la respuesta de `/api/auth/token`: `401 revoked` = se retiró el acceso (reconectar); `502` = Google no contestó (se reintenta solo) |
+| Al recargar pide reconectar | El backend no tiene sesión para este navegador: falta la cookie `__session`, o su concesión ya no vale | Si es sistemático, comprobar que `/api/auth/**` llega a la función (rewrite en `firebase.json`) y que la pantalla de consentimiento está **En producción** (5.2) |
 | `REJECTED` | El usuario no marcó la casilla de Drive, o revocó el acceso | Reconectar y marcarla |
 | `TARGET_GONE` | La hoja se borró o está en la papelera | Se recrea sola al reconectar; también **Crear una hoja nueva** |
 | Al recargar pide reconectar | **Es el comportamiento correcto** | Ver 2.4 |
@@ -401,8 +435,10 @@ los tecleara un usuario: un insumo llamado «12/03» se volvería fecha y uno qu
 
 | Qué | Dónde |
 |---|---|
-| Todo lo que sabe que el proveedor es Google | `core/auth/infrastructure/google-authenticator.ts` |
+| Todo lo que sabe que el proveedor es Google, en el navegador | `core/auth/infrastructure/google-code-client.ts` |
 | Los scopes que se piden | mismo fichero, constante `SCOPES` |
+| El adaptador que habla con el backend | `core/auth/infrastructure/backend-authenticator.ts` |
+| El cliente confidencial (canje, refresco, revocación) | `api/auth/` — ver [su README](../api/auth/README.md) |
 | La credencial y su caducidad | `core/auth/domain/value-objects/credential.ts` |
 | Traducción de sesión → contrato compartido | `core/auth/infrastructure/session-credentials-provider.ts` |
 | El puerto agnóstico del destino | `core/external-sync/domain/services/sync.gateway.ts` |

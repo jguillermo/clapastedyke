@@ -51,6 +51,8 @@ npm run test:e2e    # E2E: ng build + Playwright over e2e/ (projects: desktop 12
 npm run test:e2e:ui # the same, in Playwright's UI mode
 npm run sb          # Storybook (component states/variants live in *.stories.ts `play`)
 npm run sb:test     # the stories' `play` as tests (vitest browser + chromium)
+npm run emulators   # Firebase emulators (functions + firestore) — needed by `ng serve` for /api/**
+npm run api:install # npm ci inside api/auth  ·  api:typecheck · api:test · api:deploy
 npm run lint        # ESLint (angular-eslint) — `npm run lint:fix` to autofix
 npm run format      # Prettier --write .   (npm run format:check to verify only)
 npm run typecheck   # tsc over app + stories, unit specs, and the E2E suite
@@ -68,9 +70,11 @@ npm run typecheck   # tsc over app + stories, unit specs, and the E2E suite
 
 ## What this app is
 
-A 3D in-browser cooking game (`misaevol` / "clapastedyke"). The user navigates a three.js kitchen world (`/home`); the real data-entry forms are the screens reached from it. `/ui` is the living component showcase. State is persisted locally in IndexedDB — **that is the source of truth and it has no backend**.
+A 3D in-browser cooking game (`misaevol` / "clapastedyke"). The user navigates a three.js kitchen world (`/home`); the real data-entry forms are the screens reached from it. `/ui` is the living component showcase. State is persisted locally in IndexedDB — **that is the source of truth, and no server ever holds the user's data**.
 
-The one network integration is **optional and additive**: from `/cuenta` a user can connect a Google account and mirror recipes and supplies into a spreadsheet in their own Drive. The app creates that spreadsheet and writes it **itself**, with the Sheets and Drive REST APIs and the user's own token — no Apps Script, nothing deployed into anyone's account, one consent checkbox (`drive.file`, which only reaches files the app created). The one-time setup for whoever publishes the app (Cloud project, consent screen, Client ID) is in [`deploy/google-client-id.md`](deploy/google-client-id.md) — the **only** place that procedure is documented; the design reasoning, the platform constraints (no refresh token in a browser, what `drive.file` actually covers) and the alternatives that were measured and rejected are in [`manual/google-integration.md`](manual/google-integration.md). Nothing about local persistence changes when it is off (which is the default: `public/config.json` ships with `googleClientId` empty).
+The one network integration is **optional and additive**: from `/cuenta` a user can connect a Google account and mirror recipes and supplies into a spreadsheet in their own Drive. The app creates that spreadsheet and writes it **itself**, with the Sheets and Drive REST APIs and the user's own token — no Apps Script, nothing deployed into anyone's account, one consent checkbox (`drive.file`, which only reaches files the app created). The one-time setup for whoever publishes the app (Cloud project, consent screen, Client ID **and client secret**) is in [`deploy/google-client-id.md`](deploy/google-client-id.md) — the **only** place that procedure is documented; the design reasoning, the platform constraints and the alternatives that were measured and rejected are in [`manual/google-integration.md`](manual/google-integration.md). Nothing about local persistence changes when it is off (which is the default: `public/config.json` ships with `googleClientId` empty).
+
+**There is exactly one piece of backend, and it is about identity — never data.** A browser client cannot hold a `client_secret`, so Google gives it no refresh token: its access tokens die in an hour and the only way to get another is a popup, which the browser blocks when it isn't triggered by a click. That is why reloading the page used to sign you out. [`api/auth`](api/auth/README.md) — a Cloud Function — is the confidential OAuth client that custodies the long-lived grant and mints fresh access tokens on demand, behind an `HttpOnly` `__session` cookie. The recipe data never passes through it: the whole sync engine still runs in the browser. The folder rule (**one folder = one package = one independent deploy**, shared code in `api/_common/`, deployed manually and separately from hosting) is in [`manual/api.md`](manual/api.md), and it governs every backend function added from now on.
 
 ## Architecture: four layers under `src/app/`
 

@@ -1,9 +1,15 @@
 # Despliegue en Firebase Hosting
 
 La app se publica en **Firebase Hosting** con un workflow **manual**
-([`.github/workflows/deploy-firebase.yml`](../.github/workflows/deploy-firebase.yml)). No hay
+([`.github/workflows/deploy-frontend.yml`](../.github/workflows/deploy-frontend.yml)). No hay
 despliegue automático: mergear a `main` no publica nada. Publicar es una decisión que se toma
 eligiendo un ambiente y pulsando un botón.
+
+> **Este documento es solo el frontend.** El backend (`api/`) se publica con **otro** workflow,
+> [`deploy-backend.yml`](../.github/workflows/deploy-backend.yml), y su procedimiento está en
+> [`api.md`](api.md). Son dos ficheros y dos decisiones a propósito: un cambio de maquetación no
+> puede tirar el servicio de sesión ni al revés. Cuando hay que publicar los dos, **primero el
+> backend**.
 
 Un **ambiente** es un **proyecto de Firebase independiente** bajo la misma cuenta de Google: no
 comparten hosting, ni cuota, ni credenciales. Hoy hay dos, `dev` y `prod`, pero **el número no está
