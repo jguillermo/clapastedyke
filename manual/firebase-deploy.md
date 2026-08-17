@@ -102,6 +102,13 @@ Si al desplegar diera un error de permisos, dale a esa cuenta el rol **Firebase 
 (`roles/firebasehosting.admin`) en [IAM](https://console.cloud.google.com/iam-admin/iam) del
 proyecto correspondiente.
 
+> ⚠️ **Ese rol basta para el frontend y NO basta para el backend.** La cuenta de servicio es la
+> misma, pero desplegar `api/` compila una imagen, crea un servicio de Cloud Run, lee un secreto y
+> escribe las reglas de Firestore: son media docena de APIs más, y la cuenta recién generada aquí no
+> tiene permiso ni para consultar si están habilitadas (`403 Permission denied to get service …`).
+> La lista completa de roles del backend está en [`api.md`](api.md) → «Requisitos del proyecto de
+> Firebase». Si este ambiente va a servir la API, concédelos **ahora**, en la misma visita a IAM.
+
 ### Paso 4 · El *environment* de GitHub y su secret
 
 Aquí es donde se separan de verdad los ambientes.
@@ -259,7 +266,8 @@ salga de ella**. Con el fichero en `deploy/firebase/`, el deploy muere con
 | `El environment 'x' no tiene el secret FIREBASE_SERVICE_ACCOUNT` | El secret está en los de repositorio, o en otro environment, o el environment no existe | Paso 4 — tiene que ser un **environment secret** del environment homónimo |
 | `Failed to authenticate, have you run firebase login?` | `FIREBASE_SERVICE_ACCOUNT` mal pegado: la ruta en vez del contenido, falta una llave, o se «limpiaron» los `\n` del `private_key`. El mensaje es genérico y tapa la causa — con `--debug` sale la de verdad (`invalid_grant`, `error:1E08010C`…) | Volver a pegar el JSON entero, tal cual |
 | `invalid_grant: Invalid grant: account not found` | La cuenta de servicio se borró, o la clave se revocó | Generar una clave nueva (paso 3) |
-| `HTTP Error: 403` al desplegar | La cuenta de servicio no tiene permiso en ese proyecto | Rol **Firebase Hosting Admin** en IAM (paso 3) |
+| `HTTP Error: 403` desplegando el **frontend** | La cuenta de servicio no tiene permiso en ese proyecto | Rol **Firebase Hosting Admin** en IAM (paso 3) |
+| `HTTP Error: 403` desplegando el **backend** (`Permission denied to get service …`) | Los roles de hosting no cubren funciones, Cloud Run, Artifact Registry, Secret Manager ni las reglas de Firestore | [`api.md`](api.md) → «Requisitos del proyecto de Firebase», requisito 3 |
 | `Failed to get Firebase project …` | El `projectId` no existe o es el nombre en vez del ID | Cópialo de la consola de Firebase |
 | El deploy a prod se queda «Waiting» | Está pidiendo aprobación (protección del environment) | Apruébalo desde la propia ejecución en Actions |
 | Desplegué a dev y se actualizó prod | El secret está como secret de repositorio, no de environment | Paso 4 |

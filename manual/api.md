@@ -132,8 +132,106 @@ en la raíz misma.
 
 ## Requisitos del proyecto de Firebase
 
-- **Plan Blaze.** Cloud Functions lo exige. A este volumen el coste es prácticamente cero, pero hace
-  falta una cuenta de facturación.
-- **Firestore habilitado.**
-- La cuenta de servicio del *environment* de GitHub necesita, además de lo de hosting, los roles
-  **Cloud Functions Admin** y **Service Account User**.
+Tres cosas, y las tres son de **una sola vez por ambiente**. Ninguna la crea el workflow: si falta
+alguna, el despliegue muere con un 403 o con un error de configuración, no con un mensaje que diga
+«te falta esto».
+
+### 1 · Plan Blaze
+
+Cloud Functions lo exige. A este volumen el coste es prácticamente cero, pero hace falta una cuenta
+de facturación asociada al proyecto.
+
+### 2 · La base de datos de Firestore, creada
+
+**Habilitar la API no crea la base.** Son dos cosas distintas, y desplegar `firestore:rules` contra
+un proyecto sin base de datos falla. Se comprueba y se crea una sola vez:
+
+```bash
+gcloud firestore databases list --project <projectId>
+gcloud firestore databases create --location=eur3 --project <projectId>   # si no hay ninguna
+```
+
+O desde la consola de Firebase: **Compilación → Firestore Database → Crear base de datos**, en modo
+producción (las reglas de
+[`deploy/firebase/firestore.rules`](../deploy/firebase/firestore.rules) las sobrescriben en el primer
+despliegue de todas formas).
+
+### CRITICAL: 3 · Los roles de la cuenta de servicio — los del backend NO son los del frontend
+
+La cuenta de servicio es la misma (el secret `FIREBASE_SERVICE_ACCOUNT` del *environment* de GitHub,
+[`firebase-deploy.md`](firebase-deploy.md) paso 3), pero **lo que necesita poder hacer no lo es**.
+Publicar el frontend es subir ficheros a Hosting; publicar el backend es compilar una imagen,
+subirla a un registro, crear un servicio de Cloud Run, darle acceso a un secreto y escribir las
+reglas de Firestore. Son media docena de APIs distintas.
+
+Y hay una trampa de origen: la clave que indica el paso 3 se genera desde *Firebase Console →
+Cuentas de servicio*, que devuelve la cuenta `firebase-adminsdk-…@<projectId>.iam.gserviceaccount.com`.
+Esa cuenta viene con `firebase.sdkAdminServiceAgent`, que sirve para **usar** el Admin SDK en
+ejecución — no para **desplegar** nada. Recién creada, no puede ni consultar si la API de Firestore
+está encendida.
+
+Los roles, en el proyecto del ambiente:
+
+| Rol | Sin él falla en |
+|---|---|
+| `roles/serviceusage.serviceUsageAdmin` | Lo **primero** de todo: el CLI comprueba y habilita las APIs antes de subir nada |
+| `roles/cloudfunctions.admin` | Crear/actualizar la función |
+| `roles/run.admin` | Las funciones de 2ª generación **son** servicios de Cloud Run |
+| `roles/cloudbuild.builds.editor` | La compilación de la imagen |
+| `roles/artifactregistry.admin` | Dónde se guarda esa imagen |
+| `roles/iam.serviceAccountUser` | *Actuar como* la cuenta de ejecución de la función |
+| `roles/secretmanager.admin` | `GOOGLE_OAUTH_CLIENT_SECRET`: resolverlo y dar acceso a la función |
+| `roles/firebaserules.admin` | `firestore:rules` |
+| `roles/firebase.developAdmin` | Leer el proyecto de Firebase como tal |
+
+Se conceden de golpe, porque cada uno que falte es otro despliegue fallido de veinte minutos:
+
+```bash
+SA="LA-CUENTA@<projectId>.iam.gserviceaccount.com"   # el `client_email` del JSON del secret
+PROJECT="<projectId>"
+
+for ROLE in \
+  roles/serviceusage.serviceUsageAdmin \
+  roles/cloudfunctions.admin \
+  roles/run.admin \
+  roles/cloudbuild.builds.editor \
+  roles/artifactregistry.admin \
+  roles/iam.serviceAccountUser \
+  roles/secretmanager.admin \
+  roles/firebaserules.admin \
+  roles/firebase.developAdmin
+do
+  gcloud projects add-iam-policy-binding "$PROJECT" \
+    --member="serviceAccount:$SA" --role="$ROLE" --condition=None
+done
+```
+
+También se pueden añadir a mano en [IAM](https://console.cloud.google.com/iam-admin/iam). **Los
+cambios tardan un minuto largo en propagarse**: si relanzas el workflow inmediatamente, puede volver
+a dar el mismo 403.
+
+### 4 · El secreto de OAuth, puesto
+
+`api/auth` no arranca sin él ([`api/auth/README.md`](../api/auth/README.md)):
+
+```bash
+npx --yes firebase-tools functions:secrets:set GOOGLE_OAUTH_CLIENT_SECRET --project <projectId>
+```
+
+El **Client ID** no va aquí: no es un secreto y vive en `.env.<projectId>` versionado, con el mismo
+valor que el `googleClientId` de ese ambiente en `deploy/firebase/environments.json`.
+
+## Cuando el despliegue del backend falla
+
+| Síntoma | Causa | Arreglo |
+|---|---|---|
+| `403 … Permission denied to get service [firestore.googleapis.com]` (o `cloudfunctions`, `run`, `artifactregistry`…) justo tras el `predeploy` | La cuenta de servicio no tiene `serviceusage.serviceUsageAdmin`: el CLI ni siquiera puede mirar si las APIs están encendidas | Requisito 3 — concede **todos** los roles, no solo ese |
+| `403` más adelante, ya subiendo o compilando | Falta uno de los otros roles | Requisito 3 |
+| `NOT_FOUND … database (default)` al desplegar las reglas | La API de Firestore está habilitada pero **la base no existe** | Requisito 2 |
+| `Billing account … required` / `Your project must be on the Blaze plan` | Proyecto en Spark | Requisito 1 |
+| `Secret GOOGLE_OAUTH_CLIENT_SECRET … does not exist` | Nunca se puso en Secret Manager | Requisito 4 |
+| La función responde 500 con «La función auth no está configurada» | Está desplegada, pero le falta el Client ID (`.env.<projectId>`) o el secreto | Requisito 4 y [`api/auth/README.md`](../api/auth/README.md) |
+| `No existe la función 'x'` en el job `Validar` | Errata en el input `funcion`: tiene que ser una carpeta de `api/` | El error lista las que hay |
+
+Los fallos de **autenticación** (el JSON del secret mal pegado, la clave revocada) son comunes a los
+dos workflows y están en la tabla de [`firebase-deploy.md`](firebase-deploy.md).
