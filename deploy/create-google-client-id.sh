@@ -1,14 +1,19 @@
 #!/usr/bin/env bash
 #
-# Crea un proyecto de Google Cloud y, dentro de él, el cliente OAuth con permiso para Drive,
-# Sheets y la identidad del usuario.
+# Crea un cliente OAuth con permiso para Drive, Sheets y la identidad del usuario, dentro de un
+# proyecto de Google Cloud —uno que ya tengas, o uno nuevo que crea él.
 #
 # Esa es TODA su responsabilidad. Lo que concede aquí es el permiso que da EL USUARIO sobre SU
 # cuenta —openid, email, profile y drive.file—, y para que esos permisos existan al proyecto solo
 # le hacen falta dos APIs: Sheets y Drive.
 #
+# UN PROYECTO ADMITE VARIOS CLIENTES. La pantalla de consentimiento —el nombre que ve el usuario,
+# los scopes y el estado de publicación— es UNA por proyecto y la comparten todos sus clientes.
+# Por eso reutilizar un proyecto ya configurado ahorra volver a publicarla, que es la parte cara;
+# y por eso cada cliente solo aporta su par ID/secret y su lista de orígenes.
+#
 # Qué deja hecho:
-#   · la cuenta y un proyecto de Cloud nuevo
+#   · la cuenta y el proyecto de Cloud (creado o reutilizado)
 #   · Sheets API y Drive API habilitadas en él
 #   · el Client ID y el client secret anotados en deploy/.env-secret (que NO se versiona)
 #
@@ -47,6 +52,11 @@ die() {
 
 lower() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
 trim() { printf '%s' "$1" | tr -d '[:space:]'; }
+
+# Las pantallas de la consola se nombran en cada paso, para poder mirar —o deshacer— a mano lo
+# que el script va dejando. `cloud-resource-manager` es la única desde la que se BORRA un
+# proyecto: la lista normal no ofrece esa acción.
+PROJECTS_URL="https://console.cloud.google.com/cloud-resource-manager"
 
 open_url() {
     if command -v open >/dev/null 2>&1; then
@@ -113,46 +123,82 @@ bold "  ✓ ${ACCOUNT}"
 # ─────────────────────────────────────────────────────────────────────────────
 # 2 · Proyecto de Google Cloud
 #
-# Es donde viven la pantalla de consentimiento y el cliente, y siempre se crea uno: este script
-# da de alta un cliente nuevo, no añade credenciales a un proyecto que ya tuvieras.
+# UN PROYECTO ADMITE MUCHOS CLIENTES, y esa es la razón de poder reutilizar uno: la pantalla de
+# consentimiento es UNA por proyecto y la comparten todos sus clientes, así que configurarla y
+# publicarla —que es la parte cara— se hace una sola vez. Cada cliente solo aporta su par
+# ID/secret y su lista de orígenes.
 # ─────────────────────────────────────────────────────────────────────────────
 step "2 · Proyecto de Google Cloud"
 
 cat <<'EOF'
+  Un proyecto puede tener VARIOS clientes. Lo que comparten es la pantalla de consentimiento:
+  el nombre que ve el usuario, los scopes y el estado de publicación son del proyecto, no del
+  cliente. Por eso reutilizar un proyecto ya configurado te ahorra volver a publicarla.
+
+EOF
+
+info "Proyectos de esta cuenta:"
+gcloud projects list --format='table(projectId, name)' 2>/dev/null | sed 's/^/    /' || true
+
+printf '\n'
+info "Verlos y BORRARLOS en la consola:"
+info "    ${PROJECTS_URL}"
+printf '\n'
+
+read -r -p "  Project ID a usar (vacío = crear uno nuevo): " PROJECT_ID
+PROJECT_ID="$(trim "${PROJECT_ID}")"
+
+if [[ -n "${PROJECT_ID}" ]]; then
+    PROYECTO_NUEVO="no"
+    gcloud projects describe "${PROJECT_ID}" >/dev/null 2>&1 ||
+        die "El proyecto '${PROJECT_ID}' no existe o esta cuenta no lo ve."
+else
+    PROYECTO_NUEVO="si"
+    cat <<'EOF'
+
   El Project ID es único en TODO Google, no solo en tu cuenta, así que el que quieras puede
   estar cogido. Reglas: 6 a 30 caracteres, minúsculas, dígitos y guiones, empieza por letra y
   no acaba en guion.
 
 EOF
+    # Se valida ANTES de llamar a Google: su API responde a un identificador mal formado con un
+    # error que no dice cuál de las reglas has roto. Y se reintenta, porque acertar con uno libre
+    # es prueba y error por definición.
+    while true; do
+        read -r -p "  Project ID del proyecto nuevo (vacío = salir): " PROJECT_ID
+        PROJECT_ID="$(trim "${PROJECT_ID}")"
+        [[ -n "${PROJECT_ID}" ]] || die "Sin proyecto no hay dónde crear el cliente."
 
-# Se valida ANTES de llamar a Google: su API responde a un identificador mal formado con un error
-# que no dice cuál de las reglas has roto. Y se reintenta, porque acertar con un identificador
-# libre es prueba y error por definición.
-while true; do
-    read -r -p "  Project ID del proyecto nuevo (vacío = salir): " PROJECT_ID
-    PROJECT_ID="$(trim "${PROJECT_ID}")"
-    [[ -n "${PROJECT_ID}" ]] || die "Sin proyecto no hay dónde crear el cliente."
+        if [[ "${#PROJECT_ID}" -lt 6 || "${#PROJECT_ID}" -gt 30 ]]; then
+            warn "'${PROJECT_ID}' tiene ${#PROJECT_ID} caracteres: tienen que ser entre 6 y 30."
+            continue
+        fi
+        if [[ ! "${PROJECT_ID}" =~ ^[a-z][a-z0-9-]*[a-z0-9]$ ]]; then
+            warn "'${PROJECT_ID}' no vale: minúsculas, dígitos y guiones, empezando por letra y sin acabar en guion."
+            continue
+        fi
 
-    if [[ "${#PROJECT_ID}" -lt 6 || "${#PROJECT_ID}" -gt 30 ]]; then
-        warn "'${PROJECT_ID}' tiene ${#PROJECT_ID} caracteres: tienen que ser entre 6 y 30."
-        continue
-    fi
-    if [[ ! "${PROJECT_ID}" =~ ^[a-z][a-z0-9-]*[a-z0-9]$ ]]; then
-        warn "'${PROJECT_ID}' no vale: minúsculas, dígitos y guiones, empezando por letra y sin acabar en guion."
-        continue
-    fi
+        read -r -p "  Nombre visible del proyecto: " PROJECT_NAME
+        [[ -n "${PROJECT_NAME}" ]] || die "Hace falta un nombre de proyecto."
 
-    read -r -p "  Nombre visible del proyecto: " PROJECT_NAME
-    [[ -n "${PROJECT_NAME}" ]] || die "Hace falta un nombre de proyecto."
-
-    info "Creando ${PROJECT_ID}…"
-    if gcloud projects create "${PROJECT_ID}" --name="${PROJECT_NAME}"; then
-        break
-    fi
-    warn "No se ha podido crear '${PROJECT_ID}'. Si el identificador ya está cogido, prueba otro."
-done
+        info "Creando ${PROJECT_ID}…"
+        if gcloud projects create "${PROJECT_ID}" --name="${PROJECT_NAME}"; then
+            break
+        fi
+        warn "No se ha podido crear '${PROJECT_ID}'. Si el identificador ya está cogido, prueba otro."
+    done
+fi
 
 bold "  ✓ ${PROJECT_ID}"
+
+# Ya se sabe el proyecto, así que las pantallas que dependen de él quedan resueltas aquí y se
+# nombran en los pasos siguientes.
+CONSENT_URL="https://console.cloud.google.com/auth/overview?project=${PROJECT_ID}"
+CLIENTS_LIST_URL="https://console.cloud.google.com/auth/clients?project=${PROJECT_ID}"
+CLIENTS_URL="https://console.cloud.google.com/auth/clients/create?project=${PROJECT_ID}"
+
+info "Clientes de este proyecto (verlos y borrarlos):"
+info "    ${CLIENTS_LIST_URL}"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 3 · APIs
@@ -179,6 +225,9 @@ cat <<'EOF'
   Ejemplo:  Migo web
 
 EOF
+
+info "Los que ya tiene el proyecto: ${CLIENTS_LIST_URL}"
+printf '\n'
 
 read -r -p "  Nombre del OAuth client: " CLIENT_NAME
 [[ -n "${CLIENT_NAME}" ]] || die "Hace falta un nombre para el cliente."
@@ -236,42 +285,96 @@ else
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 6 · Crear el cliente en la consola (único paso manual)
+# 6 · La pantalla de consentimiento (primer paso manual)
+#
+# VA ANTES QUE EL CLIENTE, y no es un detalle de orden: Google se niega a crear un OAuth client
+# mientras el proyecto no tenga pantalla de consentimiento —«To create an OAuth client ID, you
+# must first configure your consent screen»—. En un proyecto recién creado no la hay nunca, así
+# que abrir directamente la pantalla de crear el cliente sería mandarte a un muro.
 # ─────────────────────────────────────────────────────────────────────────────
-step "6 · Crear el cliente"
+step "6 · La pantalla de consentimiento"
 
-cat <<EOF
+# Un proyecto recién creado nunca la tiene. Uno reutilizado casi siempre sí — y entonces este
+# paso sobra: la pantalla es del proyecto, no del cliente, así que el cliente nuevo hereda su
+# nombre, sus scopes y su estado de publicación sin tocar nada.
+CONSENT_PENDIENTE="si"
+if [[ "${PROYECTO_NUEVO}" == "no" ]]; then
+    read -r -p "  ¿'${PROJECT_ID}' ya tiene pantalla de consentimiento? [S/n] " YA_HAY_CONSENT
+    case "$(lower "${YA_HAY_CONSENT}")" in
+        n | no) ;;
+        *) CONSENT_PENDIENTE="no" ;;
+    esac
+fi
 
-  Google no permite crear este cliente por CLI. En la consola que se abre ahora:
+if [[ "${CONSENT_PENDIENTE}" == "no" ]]; then
+    info "Se salta: el cliente nuevo hereda la del proyecto (nombre, scopes y publicación)."
+    info "Si le faltara algún scope, se añade en Data Access y vale para todos sus clientes."
+else
 
-    1. Si es la primera vez, completa el consent screen (Google Auth Platform):
-       Branding      → App name, User support email, Developer contact.
-                       NO subas App logo: obliga a pasar la verificación de Google.
-       Audience      → User type: External
-       Data Access   → los 4 scopes, y solo esos:
-                         openid
-                         https://www.googleapis.com/auth/userinfo.email
-                         https://www.googleapis.com/auth/userinfo.profile
-                         https://www.googleapis.com/auth/drive.file
-       Audience      → Publish app   ← NO es opcional, ver abajo
+cat <<'EOF'
 
-    2. Clients → Create client
-       Application type:  Web application
-       Name:              ${CLIENT_NAME}
-       Authorized JavaScript origins:  los ${ORIGIN_COUNT} de arriba
-       Authorized redirect URIs:       ninguno
-                                       (el flujo popup canjea contra el 'postmessage'
-                                        reservado, que no se da de alta aquí)
+  Es lo que el usuario lee cuando le pides permiso, y el proyecto no la tiene todavía.
+  Sin ella Google NO deja crear el cliente.
+
+  En la consola que se abre ahora (Google Auth Platform → Get started):
+
+    App name              el nombre que verá quien dé el permiso
+    User support email    tu correo
+    Audience              External
+    Contact information   tu correo
+
+    NO subas App logo: obliga a pasar la verificación de Google.
+
+  Y después, en el menú de la izquierda:
+
+    Data Access → Add or remove scopes → los 4, y solo esos:
+                    openid
+                    https://www.googleapis.com/auth/userinfo.email
+                    https://www.googleapis.com/auth/userinfo.profile
+                    https://www.googleapis.com/auth/drive.file
+
+    Audience    → Publish app
 
   ⚠️  Publish app no es opcional: en "Testing", Google CADUCA LOS REFRESH TOKENS A LOS 7 DÍAS,
       así que el permiso concedido se cae solo cada semana y sin avisar. Además hay que dar de
       alta a mano el correo de cada persona que vaya a conectar (máximo 100).
       Publicar sale gratis: drive.file no exige verificación de Google.
 
+  Si la página que se abre no es ese formulario, es el mismo al que lleva el botón
+  "Configure consent screen", y también está en el menú izquierdo bajo Branding.
+
 EOF
 
-CLIENTS_URL="https://console.cloud.google.com/auth/clients/create?project=${PROJECT_ID}"
+info "Abriendo ${CONSENT_URL}"
+open_url "${CONSENT_URL}"
+
+echo
+read -r -p "  Cuando la pantalla de consentimiento esté creada, pulsa Enter… " _
+
+fi
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 7 · Crear el cliente en la consola
+# ─────────────────────────────────────────────────────────────────────────────
+step "7 · Crear el cliente"
+
+cat <<EOF
+
+  Google no permite crear este cliente por CLI. En la pantalla que se abre ahora:
+
+    Application type:  Web application
+    Name:              ${CLIENT_NAME}
+    Authorized JavaScript origins:  los ${ORIGIN_COUNT} de arriba
+    Authorized redirect URIs:       ninguno
+                                    (el flujo popup canjea contra el 'postmessage'
+                                     reservado, que no se da de alta aquí)
+
+  Al guardar, Google enseña el Client ID y el client secret. El secret solo se ve UNA vez.
+
+EOF
+
 info "Abriendo ${CLIENTS_URL}"
+info "La lista completa está en ${CLIENTS_LIST_URL}"
 open_url "${CLIENTS_URL}"
 
 # Se reintenta en vez de morir: una errata al pegar no debería costarte volver a empezar, con lo
@@ -285,24 +388,43 @@ while true; do
     warn "Eso no parece un Client ID: tiene que acabar en .apps.googleusercontent.com."
 done
 
+# Es el dato MÁS caro del flujo: Google no lo vuelve a enseñar. Por eso se reintenta en vez de
+# morir, y por eso la salida es una palabra explícita y no una línea vacía — un Enter de más no
+# puede costarte tener que regenerar el cliente.
+#
+# Y no se guarda un lote a medias: `wire-environment.sh` lee la última aparición de cada clave por
+# separado, así que un lote con Client ID pero sin secret emparejaría ese ID nuevo con el secret
+# viejo de otro cliente, y el fallo aparecería mucho después y sin relación visible.
 echo
 info "Ahora el Client secret. La consola solo lo enseña una vez; no se verá al teclearlo."
-read -r -s -p "  Client secret: " CLIENT_SECRET
-echo
-CLIENT_SECRET="$(trim "${CLIENT_SECRET}")"
-[[ -n "${CLIENT_SECRET}" ]] ||
-    die "Hace falta el client secret: sin él el cliente queda a medias y hay que generar otro."
+while true; do
+    read -r -s -p "  Client secret (o 'salir' para abortar): " CLIENT_SECRET
+    echo
+    CLIENT_SECRET="$(trim "${CLIENT_SECRET}")"
+
+    if [[ "${CLIENT_SECRET}" == "salir" ]]; then
+        die "Cancelado: no se ha guardado nada.
+  El cliente ya existe en la consola; su secret se regenera desde ahí cuando lo necesites."
+    fi
+    [[ -n "${CLIENT_SECRET}" ]] && break
+    warn "Vacío. Cópialo de la consola, o escribe 'salir'."
+done
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 7 · Volcar los dos valores, y parar
+# 8 · Volcar los dos valores, y parar
 #
 # Van los DOS al mismo sitio aunque solo uno sea secreto: son la pareja que produce una misma
 # visita a la consola, y separarlos obligaría a acordarse de cuál iba dónde. Anotarlos es el
 # final del trabajo de este script; repartirlos, el principio de otro.
 # ─────────────────────────────────────────────────────────────────────────────
-step "7 · Guardando el resultado"
+step "8 · Guardando el resultado"
 
 # Que el cuaderno no se versiona ya se comprobó en el arranque, antes de pedirte nada.
+
+# `>>` crearía el fichero con el umask por defecto, que en macOS deja 644: un secreto legible por
+# cualquier usuario de la máquina. Se crea vacío y se cierra ANTES de escribir nada dentro.
+[[ -f "${ENV_SECRET}" ]] || : >"${ENV_SECRET}"
+chmod 600 "${ENV_SECRET}"
 
 # El cuaderno: se AÑADE, nunca se reescribe. Si el cliente se rota, el lote nuevo va debajo y el
 # viejo queda como registro de que existió. Con semántica .env, gana el último.
@@ -329,5 +451,10 @@ cat <<EOF
   Client ID:   ${CLIENT_ID}
 
   El Client ID y el client secret están en deploy/.env-secret, en el último lote.
+
+  Para revisar o deshacer a mano:
+    Proyectos (y borrarlos)   ${PROJECTS_URL}
+    Clientes del proyecto     ${CLIENTS_LIST_URL}
+    Consentimiento            ${CONSENT_URL}
 
 EOF
