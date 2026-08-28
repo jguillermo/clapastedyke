@@ -3,7 +3,11 @@
     {
       "source": "api/auth",
       "codebase": "auth",
-      "predeploy": ["npm --prefix api/auth ci", "npm --prefix api/auth run build"]
+      "predeploy": [
+        "node deploy/firebase/api-env.mjs --project-id $PROJECT_ID",
+        "npm --prefix api/auth ci",
+        "npm --prefix api/auth run build"
+      ]
     }
   ],
   "firestore": {

@@ -110,6 +110,31 @@ jobs:
           printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "${RUNNER_TEMP}/gcp-key.json"
           echo "GOOGLE_APPLICATION_CREDENTIALS=${RUNNER_TEMP}/gcp-key.json" >> "$GITHUB_ENV"
 
+      # El client secret de OAuth vive en el *environment* de GitHub, junto a las credenciales de
+      # despliegue, y de ahí lo pone este paso en Secret Manager, que es donde lo resuelve el
+      # `defineSecret` de la función. Así montar un ambiente es elegirlo aquí: no hay ningún valor
+      # que alguien tenga que subir a mano desde su portátil.
+      #
+      # Va por **stdin** (`--data-file -`) a propósito: pasarlo como argumento lo dejaría en la
+      # línea de comandos, visible para cualquier proceso de la máquina.
+      #
+      # Cada ejecución crea una VERSIÓN nueva del secreto y el `defineSecret` apunta a la última;
+      # las viejas se limpian de vez en cuando con `functions:secrets:prune`.
+      - name: Client secret de OAuth en Secret Manager
+        env:
+          AMBIENTE: ${{ needs.validar.outputs.ambiente }}
+          PROJECT_ID: ${{ needs.validar.outputs.project-id }}
+          GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
+        run: |
+          if [ -z "$GOOGLE_OAUTH_CLIENT_SECRET" ]; then
+            echo "::error::El environment '$AMBIENTE' no tiene el secret GOOGLE_OAUTH_CLIENT_SECRET. Se obtiene con deploy/create-google-client-id.sh (ver deploy/google-client-id.md)."
+            exit 1
+          fi
+          printf '%s' "$GOOGLE_OAUTH_CLIENT_SECRET" | npx --yes firebase-tools@latest \
+            functions:secrets:set GOOGLE_OAUTH_CLIENT_SECRET \
+            --project "$PROJECT_ID" \
+            --data-file -
+
       # `--only functions:<codebase>` empaqueta y sube SOLO esa carpeta: las demás funciones ni se
       # recompilan ni se tocan. Es lo que hace que cada una sea un despliegue independiente.
       #

@@ -132,9 +132,65 @@ en la raíz misma.
 
 ## Requisitos del proyecto de Firebase
 
-Tres cosas, y las tres son de **una sola vez por ambiente**. Ninguna la crea el workflow: si falta
+Cinco cosas, y las cinco son de **una sola vez por ambiente**. Ninguna la crea el workflow: si falta
 alguna, el despliegue muere con un 403 o con un error de configuración, no con un mensaje que diga
 «te falta esto».
+
+> **Que el frontend despliegue bien no dice nada del backend.** Publicar el frontend solo necesita
+> Hosting; el backend necesita las cinco. Si `deploy-frontend` está en verde y `deploy-backend` en
+> rojo, el problema está en esta lista, no en el código ni en el workflow.
+
+### El atajo: un script lo deja hecho
+
+Los cinco requisitos, más el proyecto de Firebase y el secret de GitHub, los monta
+[`deploy/setup-firebase-project.sh`](../deploy/setup-firebase-project.sh) sobre un ambiente de
+`deploy/firebase/environments.json`. Es **idempotente**: comprueba antes de actuar, así que se puede
+relanzar sobre un ambiente a medias.
+
+```bash
+./deploy/setup-firebase-project.sh
+```
+
+Ese script es **solo infraestructura**. Montar un ambiente entero son tres comandos, cada uno con
+una responsabilidad:
+
+```bash
+./deploy/create-google-client-id.sh   # crea el cliente de Google → deploy/.env-secret
+./deploy/setup-firebase-project.sh    # ESTE: la infraestructura del proyecto
+./deploy/wire-environment.sh          # reparte los valores al ambiente
+```
+
+Lo que sigue es lo que hace el segundo, a mano.
+
+### El paso a paso, en orden
+
+Sobre un ambiente nuevo (aquí `<projectId>`), de arriba abajo:
+
+1. **Plan Blaze** — Firebase Console → ⚙ → *Uso y facturación* → *Modifica el plan* → **Blaze**
+   (requisito 1).
+2. **Base de datos de Firestore creada** (requisito 2):
+   ```bash
+   gcloud firestore databases list --project <projectId>
+   gcloud firestore databases create --location=eur3 --project <projectId>   # si no hay ninguna
+   ```
+3. **Habilitar las APIs que el CLI no enciende solo** (requisito 3):
+   ```bash
+   gcloud services enable \
+     secretmanager.googleapis.com \
+     cloudfunctions.googleapis.com \
+     run.googleapis.com \
+     cloudbuild.googleapis.com \
+     artifactregistry.googleapis.com \
+     firestore.googleapis.com \
+     --project <projectId>
+   ```
+4. **Conceder los roles a la cuenta de servicio del despliegue** — el `client_email` del JSON que hay
+   en el secret `FIREBASE_SERVICE_ACCOUNT` del *environment* de GitHub (requisito 4, el bucle
+   `for ROLE in …` de más abajo).
+5. **El secreto de OAuth en el *environment* de GitHub** (requisito 5): `GOOGLE_OAUTH_CLIENT_SECRET`,
+   que lo pone en Secret Manager el propio workflow.
+6. **Esperar 2–3 minutos** a que propaguen las APIs y los roles.
+7. **Relanzar el workflow `deploy-backend`.**
 
 ### 1 · Plan Blaze
 
@@ -156,7 +212,39 @@ producción (las reglas de
 [`deploy/firebase/firestore.rules`](../deploy/firebase/firestore.rules) las sobrescriben en el primer
 despliegue de todas formas).
 
-### CRITICAL: 3 · Los roles de la cuenta de servicio — los del backend NO son los del frontend
+### CRITICAL: 3 · Las APIs habilitadas — el CLI NO enciende todas
+
+`firebase deploy` enciende sobre la marcha las que sabe que va a necesitar (`cloudfunctions`,
+`cloudbuild`, `artifactregistry`, `firebaseextensions`… se ven en el log con «Enabling now…»).
+**Secret Manager no está en esa lista.** Para resolver `GOOGLE_OAUTH_CLIENT_SECRET` el CLI llama
+directo a `secretmanager.googleapis.com` sin habilitarla antes, así que en un proyecto recién creado
+el despliegue muere con un 403 que **no** es de permisos:
+
+```
+Error: Request to https://secretmanager.googleapis.com/v1/projects/<projectId>/secrets/GOOGLE_OAUTH_CLIENT_SECRET
+had HTTP Error: 403, Secret Manager API has not been used in project <projectId> before or it is disabled.
+```
+
+Se encienden todas de golpe, una sola vez:
+
+```bash
+gcloud services enable \
+  secretmanager.googleapis.com \
+  cloudfunctions.googleapis.com \
+  run.googleapis.com \
+  cloudbuild.googleapis.com \
+  artifactregistry.googleapis.com \
+  firestore.googleapis.com \
+  --project <projectId>
+```
+
+Las otras cinco no hacen falta estrictamente —el CLI las habilitaría él— pero encenderlas aquí quita
+de en medio los reintentos y los tiempos de propagación en mitad del primer despliegue.
+
+**Habilitar tarda un par de minutos en propagarse.** Si relanzas el workflow al instante, puede
+repetir el mismo 403.
+
+### CRITICAL: 4 · Los roles de la cuenta de servicio — los del backend NO son los del frontend
 
 La cuenta de servicio es la misma (el secret `FIREBASE_SERVICE_ACCOUNT` del *environment* de GitHub,
 [`firebase-deploy.md`](firebase-deploy.md) paso 3), pero **lo que necesita poder hacer no lo es**.
@@ -164,11 +252,14 @@ Publicar el frontend es subir ficheros a Hosting; publicar el backend es compila
 subirla a un registro, crear un servicio de Cloud Run, darle acceso a un secreto y escribir las
 reglas de Firestore. Son media docena de APIs distintas.
 
-Y hay una trampa de origen: la clave que indica el paso 3 se genera desde *Firebase Console →
-Cuentas de servicio*, que devuelve la cuenta `firebase-adminsdk-…@<projectId>.iam.gserviceaccount.com`.
-Esa cuenta viene con `firebase.sdkAdminServiceAgent`, que sirve para **usar** el Admin SDK en
-ejecución — no para **desplegar** nada. Recién creada, no puede ni consultar si la API de Firestore
-está encendida.
+Y hay una trampa de origen: la clave que se genera desde *Firebase Console → Cuentas de servicio*
+devuelve la cuenta `firebase-adminsdk-…@<projectId>.iam.gserviceaccount.com`, que viene con
+`firebase.sdkAdminServiceAgent` — sirve para **usar** el Admin SDK en ejecución, no para
+**desplegar** nada. Recién creada, no puede ni consultar si la API de Firestore está encendida.
+
+Por eso [`setup-firebase-project.sh`](../deploy/setup-firebase-project.sh) crea una cuenta propia,
+`clapastedyke-deploy@<projectId>.iam.gserviceaccount.com`, y le concede estos roles explícitamente en
+vez de confiar en los que trae una cuenta prefabricada.
 
 Los roles, en el proyecto del ambiente:
 
@@ -210,27 +301,44 @@ También se pueden añadir a mano en [IAM](https://console.cloud.google.com/iam-
 cambios tardan un minuto largo en propagarse**: si relanzas el workflow inmediatamente, puede volver
 a dar el mismo 403.
 
-### 4 · El secreto de OAuth, puesto
+### 5 · El secreto de OAuth, puesto
 
-`api/auth` no arranca sin él ([`api/auth/README.md`](../api/auth/README.md)):
+`api/auth` no arranca sin él ([`api/auth/README.md`](../api/auth/README.md)), pero **no lo subes tú**:
+va como *environment secret* `GOOGLE_OAUTH_CLIENT_SECRET` en GitHub, y `deploy-backend.yml` lo escribe
+en Secret Manager antes de desplegar. Es lo que hace que montar un ambiente sea **elegirlo en
+Actions**: no queda ningún valor pendiente de que alguien se acuerde de subirlo desde su portátil.
+
+De dónde sale ese valor: [`deploy/google-client-id.md`](../deploy/google-client-id.md). El script de
+allí lo deja en `deploy/.env-secret` y, si tienes `gh`, en el *environment* directamente.
+
+Si alguna vez hace falta ponerlo a mano:
 
 ```bash
 npx --yes firebase-tools functions:secrets:set GOOGLE_OAUTH_CLIENT_SECRET --project <projectId>
 ```
 
-El **Client ID** no va aquí: no es un secreto y vive en `.env.<projectId>` versionado, con el mismo
-valor que el `googleClientId` de ese ambiente en `deploy/firebase/environments.json`.
+**Va después del requisito 3**: este comando también habla con Secret Manager, así que sin la API
+habilitada falla con el mismo 403 y parece que el secreto no se puede crear. Le pasa igual al paso
+del workflow.
+
+El **Client ID** no va aquí: no es un secreto, y su `.env.<projectId>` es un fichero **generado** —lo
+escribe `deploy/firebase/api-env.mjs` desde el `googleClientId` de ese ambiente en
+`deploy/firebase/environments.json`, y el `predeploy` lo regenera en cada despliegue, así que no
+puede quedarse viejo ni divergir.
 
 ## Cuando el despliegue del backend falla
 
 | Síntoma | Causa | Arreglo |
 |---|---|---|
-| `403 … Permission denied to get service [firestore.googleapis.com]` (o `cloudfunctions`, `run`, `artifactregistry`…) justo tras el `predeploy` | La cuenta de servicio no tiene `serviceusage.serviceUsageAdmin`: el CLI ni siquiera puede mirar si las APIs están encendidas | Requisito 3 — concede **todos** los roles, no solo ese |
-| `403` más adelante, ya subiendo o compilando | Falta uno de los otros roles | Requisito 3 |
+| `403 … Secret Manager API has not been used in project … before or it is disabled` | La API de Secret Manager no está encendida: el CLI la llama directa, sin habilitarla | Requisito 3 |
+| `403 … Permission denied to get service [firestore.googleapis.com]` (o `cloudfunctions`, `run`, `artifactregistry`…) justo tras el `predeploy` | La cuenta de servicio no tiene `serviceusage.serviceUsageAdmin`: el CLI ni siquiera puede mirar si las APIs están encendidas | Requisito 4 — concede **todos** los roles, no solo ese |
+| `403` más adelante, ya subiendo o compilando | Falta uno de los otros roles | Requisito 4 |
 | `NOT_FOUND … database (default)` al desplegar las reglas | La API de Firestore está habilitada pero **la base no existe** | Requisito 2 |
 | `Billing account … required` / `Your project must be on the Blaze plan` | Proyecto en Spark | Requisito 1 |
-| `Secret GOOGLE_OAUTH_CLIENT_SECRET … does not exist` | Nunca se puso en Secret Manager | Requisito 4 |
-| La función responde 500 con «La función auth no está configurada» | Está desplegada, pero le falta el Client ID (`.env.<projectId>`) o el secreto | Requisito 4 y [`api/auth/README.md`](../api/auth/README.md) |
+| `El environment '<amb>' no tiene el secret GOOGLE_OAUTH_CLIENT_SECRET` | El *environment* de GitHub no lo declara | Requisito 5 |
+| `Secret GOOGLE_OAUTH_CLIENT_SECRET … does not exist` | El paso que lo pone no llegó a correr (o se desplegó a mano saltándose el workflow) | Requisito 5 |
+| La función responde 500 con «La función auth no está configurada» | Está desplegada, pero le falta el Client ID o el secreto | Requisito 5 y [`api/auth/README.md`](../api/auth/README.md) |
+| `El ambiente "<amb>" no tiene "googleClientId"` en el `predeploy` | El bloque `config` de ese ambiente está vacío: la función se habría desplegado sin poder canjear | [`deploy/google-client-id.md`](../deploy/google-client-id.md) |
 | `No existe la función 'x'` en el job `Validar` | Errata en el input `funcion`: tiene que ser una carpeta de `api/` | El error lista las que hay |
 
 Los fallos de **autenticación** (el JSON del secret mal pegado, la clave revocada) son comunes a los

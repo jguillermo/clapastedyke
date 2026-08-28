@@ -49,18 +49,33 @@ sessions/{sid}  ← { sub, createdAt, expiresAt }. El `sid` es lo que va en la c
 
 ## Configuración
 
+**Un solo build; lo que cambia por ambiente son estas dos variables.** Firebase carga el
+`.env.<projectId>` de esta carpeta según el `--project` del despliegue, así que el mismo código
+compilado sirve para todos.
+
 | Valor | Dónde | Secreto |
 |---|---|---|
-| `GOOGLE_OAUTH_CLIENT_ID` | `.env.<projectId>`, versionado | No — viaja en cada petición del navegador |
+| `GOOGLE_OAUTH_CLIENT_ID` | `.env.<projectId>`, versionado y **generado** | No — viaja en cada petición del navegador |
 | `GOOGLE_OAUTH_CLIENT_SECRET` | Secret Manager (`.secret.local` en el emulador) | **Sí** |
 
-El Client ID **tiene que ser el mismo** que declara el ambiente en
-[`deploy/firebase/environments.json`](../../deploy/firebase/environments.json). Si divergen, Google
-rechaza el canje con `invalid_client` y el mensaje no dice por qué.
+**El `.env.<projectId>` no se edita a mano.** Lo escribe
+[`deploy/firebase/api-env.mjs`](../../deploy/firebase/api-env.mjs) desde el `googleClientId` que
+declara el ambiente en
+[`deploy/firebase/environments.json`](../../deploy/firebase/environments.json), y el `predeploy` de
+`firebase.json` lo regenera en cada despliegue. Antes el mismo valor se copiaba a mano aquí y allí, y
+en cuanto divergían Google rechazaba el canje con `invalid_client` sin decir por qué.
 
 ```bash
-firebase functions:secrets:set GOOGLE_OAUTH_CLIENT_SECRET --project <projectId>
+npm run api:env dev        # regenerarlo a mano (lo hace también `npm run emulators`)
 ```
+
+El **secreto** no se sube a mano: vive en el *environment secret* `GOOGLE_OAUTH_CLIENT_SECRET` de
+GitHub y `deploy-backend.yml` lo pone en Secret Manager antes de desplegar. Para el emulador,
+`api/auth/.secret.local` (ignorado por git).
+
+De dónde salen los dos valores: [`create-google-client-id.sh`](../../deploy/create-google-client-id.sh)
+crea el cliente de Google y los anota en `deploy/.env-secret`;
+[`wire-environment.sh`](../../deploy/wire-environment.sh) los reparte al ambiente.
 
 ## Desarrollo y despliegue
 

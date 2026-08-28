@@ -6,9 +6,11 @@
  * En el emulador se lee de `api/auth/.secret.local`, que está en el `.gitignore`.
  *
  * **El Client ID no es un secreto** (viaja en cada petición del navegador), así que va en un
- * `.env.<projectId>` versionado. Tiene que ser **el mismo** que el `googleClientId` del ambiente en
- * `deploy/firebase/environments.json`: si no coinciden, Google rechaza el canje con
- * `invalid_client` y no hay forma de deducirlo del mensaje.
+ * `.env.<projectId>` versionado. Ese fichero es **generado**: lo escribe
+ * `deploy/firebase/api-env.mjs` a partir del `googleClientId` del ambiente en
+ * `deploy/firebase/environments.json`, y el `predeploy` de `firebase.json` lo regenera en cada
+ * despliegue. Antes se copiaba a mano en los dos sitios, y en cuanto divergían Google rechazaba el
+ * canje con `invalid_client` sin que el mensaje dijera por qué; ahora no pueden divergir.
  */
 import { defineSecret, defineString } from 'firebase-functions/params';
 

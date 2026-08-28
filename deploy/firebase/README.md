@@ -6,7 +6,8 @@ workflows de GitHub Actions, que lanzan el despliegue pero no deciden nada de é
 | Fichero | Qué es |
 |---|---|
 | [`environments.json`](environments.json) | **La lista de ambientes y su configuración.** El único sitio donde se declaran |
-| [`config.mjs`](config.mjs) | Genera el `config.json` de un ambiente a partir del anterior |
+| [`config.mjs`](config.mjs) | Genera el `config.json` **del frontend** de un ambiente a partir del anterior |
+| [`api-env.mjs`](api-env.mjs) | Genera el `.env.<projectId>` **de cada función de `api/`** a partir del mismo fichero. Lo llama el `predeploy` de `firebase.json`, así que no se puede desplegar con un valor viejo |
 | [`firestore.rules`](firestore.rules) | Quién puede leer y escribir Firestore: **nadie**. Solo entra el Admin SDK desde [`api/auth`](../../api/auth/README.md) |
 | [`firestore.indexes.json`](firestore.indexes.json) | Índices compuestos de Firestore. Vacío: las consultas de la API son de un solo campo, que Firestore indexa solo |
 | [`../../firebase.json`](../../firebase.json) | Cómo se sirve el sitio y qué funciones hay. **Vive en la raíz y no puede moverse aquí** — ver abajo |
@@ -63,6 +64,45 @@ npm run config -- prod      # public/config.json ← ambiente prod (para reprodu
 
 El despliegue usa **el mismo script** con otra salida
 (`--out dist/misaevol/browser/config.json`), así que local y CI no pueden divergir.
+
+### El backend bebe del mismo sitio
+
+`api-env.mjs` hace lo mismo para las funciones: escribe `api/<función>/.env.<projectId>` con los
+parámetros que esa función necesita, tomados del mismo bloque `config`. Hoy uno solo,
+`GOOGLE_OAUTH_CLIENT_ID`, que sale de `googleClientId`.
+
+```bash
+npm run api:env dev         # api/auth/.env.migo-dev-20b41
+```
+
+Quien lo dispara al montar un ambiente es
+[`../wire-environment.sh`](../wire-environment.sh), que escribe el `googleClientId` en
+`environments.json` y encadena los dos generadores detrás.
+
+**Es lo que impide que el Client ID divergiera.** Antes estaba escrito a mano aquí y otra vez en el
+`.env`, y en cuanto los dos valores dejaban de coincidir Google rechazaba el canje con
+`invalid_client` sin decir por qué. Ahora se deriva, y el `predeploy` de `firebase.json` lo regenera
+en cada despliegue, así que tampoco se puede publicar con uno viejo.
+
+**Ningún secreto pasa por aquí.** `environments.json` está versionado: solo entra lo que ya es
+público (el Client ID viaja en cada petición del navegador). El client secret vive en el
+*environment secret* de GitHub y en `deploy/.env-secret`, que no se versiona.
+
+### El guardián de CI
+
+Los dos generados están **commiteados** —`ng serve`, los E2E y el emulador los necesitan tal cual—,
+así que se pueden editar a mano y nadie se entera. Por eso el job `static` de
+[`ci.yml`](../../.github/workflows/ci.yml) los **regenera y compara**: si el diff no está vacío,
+alguien tocó el generado en vez de la fuente y la PR se pone en rojo.
+
+```bash
+npm run config
+npm run api:env -- --all     # todos los ambientes con projectId real
+git diff --quiet             # esto es lo que mira CI
+```
+
+No es un riesgo teórico: así fue como `public/config.json` llegó a `main` con un Client ID distinto
+del que declaraba su ambiente.
 
 ---
 

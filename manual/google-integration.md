@@ -301,10 +301,13 @@ completo está en `e2e/specs/account/sign-out.spec.ts`.
 
 ## 5 · Puesta en marcha
 
-**Este documento no explica cómo montarlo.** Los pasos —proyecto de Cloud, consentimiento, Client ID
-y orígenes, y dónde se pega el valor— viven **solo** en
+**Este documento no explica cómo montarlo.** Los pasos —proyecto de Cloud, consentimiento, Client ID,
+client secret y orígenes, y dónde acaba cada valor— viven **solo** en
 [`deploy/google-client-id.md`](../deploy/google-client-id.md), junto al fichero de ambientes donde
-acaba el Client ID. Lo que falla al usarlo está en [6 · Diagnóstico](#6--diagnóstico).
+acaba el Client ID. La **infraestructura** que necesita `api/auth` para existir (proyecto de Firebase,
+Blaze, Firestore, la cuenta de despliegue) es otra cosa y está en [`api.md`](api.md): el permiso que
+concede el usuario sobre su cuenta y el permiso para desplegar lo tuyo no se mezclan. Lo que falla al
+usarlo está en [6 · Diagnóstico](#6--diagnóstico).
 
 Lo único que pertenece aquí es la consecuencia de diseño:
 
@@ -344,7 +347,6 @@ Así que la pantalla de consentimiento tiene que estar **«En producción»**. P
 | Al recargar pide reconectar | El backend no tiene sesión para este navegador: falta la cookie `__session`, o su concesión ya no vale | Si es sistemático, comprobar que `/api/auth/**` llega a la función (rewrite en `firebase.json`) y que la pantalla de consentimiento está **En producción** (5.2) |
 | `REJECTED` | El usuario no marcó la casilla de Drive, o revocó el acceso | Reconectar y marcarla |
 | `TARGET_GONE` | La hoja se borró o está en la papelera | Se recrea sola al reconectar; también **Crear una hoja nueva** |
-| Al recargar pide reconectar | **Es el comportamiento correcto** | Ver 2.4 |
 | `INTERNAL` con «*… API has not been used in project …*» | Falta habilitar Sheets o Drive API | *APIs & Services → Library* |
 | La ventana de Google no llega a abrirse | Bloqueador de ventanas emergentes | Permitir las emergentes de este sitio y reintentar |
 | «*El dato de prueba no ha vuelto igual*» | La hoja existe pero la escritura no cuaja | **Crear una hoja nueva** desde `/cuenta` |

@@ -30,7 +30,8 @@ lo secreto está fuera del repo. Nada de configuración vive dentro del workflow
 | Sitio | Qué contiene | Secreto |
 |---|---|---|
 | [`deploy/firebase/environments.json`](../deploy/firebase/environments.json) | **La lista de ambientes**: a qué proyecto de Firebase va cada uno (`projectId`) y el `config.json` con el que corre la app | No |
-| **Environments de GitHub**, uno por ambiente | `FIREBASE_SERVICE_ACCOUNT` | Sí |
+| **Environments de GitHub**, uno por ambiente | `FIREBASE_SERVICE_ACCOUNT` y `GOOGLE_OAUTH_CLIENT_SECRET` | Sí |
+| [`deploy/.env-secret`](../deploy/.env-secret) | El cuaderno local del que salen esos dos, **ignorado por git** | Sí |
 
 **El formato de `environments.json`** —sus dos niveles, qué va en `config` y qué fuera, y por qué
 `public/config.json` es un fichero **generado** que no se edita a mano— está documentado junto al
@@ -90,7 +91,14 @@ sin llegar a compilar ni a desplegar nada.
 GitHub Actions no puede abrir un navegador para iniciar sesión, así que despliega con una **cuenta
 de servicio**: un usuario de máquina con su propia clave.
 
-En el proyecto de Firebase: ⚙️ **Configuración del proyecto → Cuentas de servicio →
+> **El atajo:** [`deploy/setup-firebase-project.sh`](../deploy/setup-firebase-project.sh) crea esa
+> cuenta, le concede los diez roles (los de hosting **y** los del backend), genera su clave fuera del
+> repositorio y sube `FIREBASE_SERVICE_ACCOUNT` al *environment* si tienes `gh`. Hace además los
+> cinco requisitos de [`api.md`](api.md). El otro secret del paso 4,
+> `GOOGLE_OAUTH_CLIENT_SECRET`, lo pone [`wire-environment.sh`](../deploy/wire-environment.sh). Lo
+> que sigue es lo mismo, a mano.
+
+A mano, en el proyecto de Firebase: ⚙️ **Configuración del proyecto → Cuentas de servicio →
 Generar nueva clave privada** → se descarga un `.json`.
 
 > Ese fichero es una credencial con permiso para publicar en ese proyecto. **No se commitea, no se
@@ -116,11 +124,18 @@ Aquí es donde se separan de verdad los ambientes.
 En `Settings → Environments → New environment`, crea uno con **exactamente la misma clave** que en
 `environments.json`, en minúsculas: `dev`, `prod`, …
 
-Dentro de **cada** environment, `Add environment secret`. Solo hay uno:
+Dentro de **cada** environment, `Add environment secret`. Son dos:
 
-| Secret | Valor |
-|---|---|
-| `FIREBASE_SERVICE_ACCOUNT` | El **contenido íntegro** del JSON del paso 3 — ábrelo con un editor y pega todo, desde la `{` hasta la `}`. **Uno distinto por ambiente**: cada JSON abre su proyecto |
+| Secret | Valor | Quién lo usa |
+|---|---|---|
+| `FIREBASE_SERVICE_ACCOUNT` | El **contenido íntegro** del JSON del paso 3 — ábrelo con un editor y pega todo, desde la `{` hasta la `}`. **Uno distinto por ambiente**: cada JSON abre su proyecto | Los dos workflows |
+| `GOOGLE_OAUTH_CLIENT_SECRET` | El client secret de Google de ese ambiente ([`deploy/google-client-id.md`](../deploy/google-client-id.md)) | Solo el backend: el workflow lo pone en Secret Manager antes de desplegar |
+
+Los dos acaban en `deploy/.env-secret` —que **no** se versiona— y de ahí los suben al *environment*,
+si tienes `gh`, los scripts que los producen: el de la cuenta de servicio
+([`setup-firebase-project.sh`](../deploy/setup-firebase-project.sh)) y el del cliente de Google
+([`wire-environment.sh`](../deploy/wire-environment.sh)). Que estén aquí y no en la máquina de nadie
+es lo que permite **montar un ambiente eligiéndolo en Actions**.
 
 Dos avisos sobre ese pegado, que son los fallos habituales: no es la **ruta** al fichero, es su
 contenido; y **no le quites los `\n`** del `private_key`, que son los que permiten firmar el JWT.
@@ -267,7 +282,8 @@ salga de ella**. Con el fichero en `deploy/firebase/`, el deploy muere con
 | `Failed to authenticate, have you run firebase login?` | `FIREBASE_SERVICE_ACCOUNT` mal pegado: la ruta en vez del contenido, falta una llave, o se «limpiaron» los `\n` del `private_key`. El mensaje es genérico y tapa la causa — con `--debug` sale la de verdad (`invalid_grant`, `error:1E08010C`…) | Volver a pegar el JSON entero, tal cual |
 | `invalid_grant: Invalid grant: account not found` | La cuenta de servicio se borró, o la clave se revocó | Generar una clave nueva (paso 3) |
 | `HTTP Error: 403` desplegando el **frontend** | La cuenta de servicio no tiene permiso en ese proyecto | Rol **Firebase Hosting Admin** en IAM (paso 3) |
-| `HTTP Error: 403` desplegando el **backend** (`Permission denied to get service …`) | Los roles de hosting no cubren funciones, Cloud Run, Artifact Registry, Secret Manager ni las reglas de Firestore | [`api.md`](api.md) → «Requisitos del proyecto de Firebase», requisito 3 |
+| `HTTP Error: 403` desplegando el **backend** (`Permission denied to get service …`) | Los roles de hosting no cubren funciones, Cloud Run, Artifact Registry, Secret Manager ni las reglas de Firestore | [`api.md`](api.md) → «Requisitos del proyecto de Firebase», requisito 4 |
+| `HTTP Error: 403` desplegando el **backend** (`Secret Manager API has not been used in project …`) | No son permisos: esa API no está habilitada en el proyecto, y el CLI no la enciende él | [`api.md`](api.md) → «Requisitos del proyecto de Firebase», requisito 3 |
 | `Failed to get Firebase project …` | El `projectId` no existe o es el nombre en vez del ID | Cópialo de la consola de Firebase |
 | El deploy a prod se queda «Waiting» | Está pidiendo aprobación (protección del environment) | Apruébalo desde la propia ejecución en Actions |
 | Desplegué a dev y se actualizó prod | El secret está como secret de repositorio, no de environment | Paso 4 |

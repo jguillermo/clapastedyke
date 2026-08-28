@@ -68,14 +68,22 @@ user's own token and the `drive.file` scope — which reaches only the files the
 is deployed into anyone's account, and users grant a single consent checkbox.
 
 Publishing the app needs a one-time pass through Google Cloud (project, consent screen, OAuth Client
-ID). Every step is in [`deploy/google-client-id.md`](deploy/google-client-id.md) — start there. Once
-configured, users connect from the `/cuenta` screen; without it the app keeps working exactly as
-before, fully local.
+ID **and client secret**). Every step is in
+[`deploy/google-client-id.md`](deploy/google-client-id.md) — start there, and run
+`./deploy/create-google-client-id.sh` if you want it done for you. Once configured, users connect
+from the `/cuenta` screen; without it the app keeps working exactly as before, fully local.
 
-The reasoning behind that design — why a Google login is unavoidable, why the token travels in the
-POST body, why reloading the page forces a reconnect, and which alternatives were measured and
-rejected — is in [`manual/google-integration.md`](manual/google-integration.md). All technical
-documentation lives in [`manual/`](manual/).
+The session itself is the one piece of backend: [`api/auth`](api/auth/README.md), a Cloud Function
+that holds the long-lived grant behind an `HttpOnly` cookie so **reloading the page no longer signs
+you out**. It never sees a recipe — the sync engine still runs entirely in the browser. Setting up
+its environment (Firebase project, Blaze, Firestore, deploy service account) is a separate concern
+with its own script, `./deploy/setup-firebase-project.sh`, documented in
+[`manual/api.md`](manual/api.md).
+
+The reasoning behind that design — why a Google login is unavoidable, why a browser client can never
+hold a refresh token, and which alternatives were measured and rejected — is in
+[`manual/google-integration.md`](manual/google-integration.md). All technical documentation lives in
+[`manual/`](manual/).
 
 ## Deployment
 

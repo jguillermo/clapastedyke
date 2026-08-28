@@ -67,6 +67,23 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
+      # `public/config.json` y `api/<fn>/.env.<projectId>` son ficheros GENERADOS, pero están
+      # commiteados porque `ng serve`, los E2E y el emulador los necesitan tal cual. Eso los deja
+      # editables a mano sin que nadie se entere: aquí se regeneran y se compara con lo commiteado.
+      #
+      # No es un riesgo teórico. Así fue como `public/config.json` llegó a `main` con un Client ID
+      # distinto del que declaraba su ambiente. En el `.env` de la función la consecuencia es peor:
+      # Google rechaza el canje con `invalid_client` y el mensaje no dice por qué.
+      - name: Los ficheros generados salen de environments.json
+        run: |
+          npm run config
+          node deploy/firebase/api-env.mjs --all
+          if ! git diff --quiet; then
+            echo "::error::Un fichero generado no coincide con deploy/firebase/environments.json. La fuente es ese fichero: edítalo y regenera con 'npm run config' y 'npm run api:env -- --all'."
+            git --no-pager diff
+            exit 1
+          fi
+
       - name: Prettier (formato)
         run: npm run format:check
 

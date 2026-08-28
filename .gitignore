@@ -59,3 +59,4 @@ Thumbs.db
 storybook-static
 /documentation.json
 /dist-dev/
+/deploy/.env-secret
