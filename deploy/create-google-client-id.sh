@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
 #
-# Crea el cliente de Google (OAuth) que la app usa para Drive, Sheets y el login.
+# Crea un proyecto de Google Cloud y, dentro de él, el cliente OAuth con permiso para Drive,
+# Sheets y la identidad del usuario.
 #
-# SOLO OAUTH, Y NADA DE DESPLIEGUE. Este script produce dos valores —el Client ID y el client
-# secret— y los deja en `deploy/.env-secret`. Ahí acaba su trabajo: no toca `environments.json`,
-# no genera `config.json` ni el `.env` de ninguna función, no escribe el secreto del emulador y
-# no sube nada a GitHub. Todo eso es cablear un ambiente, y lo hace
-# `deploy/setup-firebase-project.sh`, que es quien sabe qué es un ambiente.
-#
-# Lo de aquí es el permiso que concede EL USUARIO sobre SU cuenta —openid, email, profile y
-# drive.file—, y para eso al proyecto de Cloud solo le hacen falta dos APIs: Sheets y Drive.
+# Esa es TODA su responsabilidad. Lo que concede aquí es el permiso que da EL USUARIO sobre SU
+# cuenta —openid, email, profile y drive.file—, y para que esos permisos existan al proyecto solo
+# le hacen falta dos APIs: Sheets y Drive.
 #
 # Qué deja hecho:
-#   · la cuenta, el proyecto de Cloud y esas dos APIs
-#   · el Client ID y el client secret volcados en deploy/.env-secret (que NO se versiona)
+#   · la cuenta y un proyecto de Cloud nuevo
+#   · Sheets API y Drive API habilitadas en él
+#   · el Client ID y el client secret anotados en deploy/.env-secret (que NO se versiona)
+#
+# Y ahí para: los dos valores quedan escritos, sin repartir. Quién los usa después y dónde acaba
+# cada uno no es asunto de este script.
 #
 # El ÚNICO paso manual es la consola: Google no tiene API ni comando para crear un OAuth client
 # de tipo "Web application" con Authorized JavaScript origins (`gcloud alpha iap oauth-clients`
@@ -76,6 +76,16 @@ command -v gcloud >/dev/null 2>&1 || die "Hace falta la CLI de Google Cloud (gcl
 
   o desde https://cloud.google.com/sdk/docs/install , y vuelve a lanzar el script."
 
+command -v git >/dev/null 2>&1 || die "Hace falta git para comprobar que el cuaderno no se versiona."
+
+# Se comprueba AQUÍ, antes de tocar nada, y no en el paso que escribe. La consola enseña el
+# client secret UNA sola vez: morir después de habértelo pedido te obligaría a volver a la
+# consola a generar otro. Lo que puede fallar al final, se comprueba al principio.
+if ! (cd "${REPO_ROOT}" && git check-ignore -q "deploy/.env-secret"); then
+    die "deploy/.env-secret NO está ignorado por git. Añádelo al .gitignore antes de seguir:
+  un secreto versionado hay que rotarlo, no borrarlo."
+fi
+
 # ─────────────────────────────────────────────────────────────────────────────
 # 1 · Cuenta de Google
 # ─────────────────────────────────────────────────────────────────────────────
@@ -103,38 +113,52 @@ bold "  ✓ ${ACCOUNT}"
 # ─────────────────────────────────────────────────────────────────────────────
 # 2 · Proyecto de Google Cloud
 #
-# Es donde viven la pantalla de consentimiento y el cliente. NO se pregunta por «ambiente»: eso
-# es vocabulario de despliegue, y aquí no se despliega nada.
+# Es donde viven la pantalla de consentimiento y el cliente, y siempre se crea uno: este script
+# da de alta un cliente nuevo, no añade credenciales a un proyecto que ya tuvieras.
 # ─────────────────────────────────────────────────────────────────────────────
 step "2 · Proyecto de Google Cloud"
 
-info "Proyectos de esta cuenta:"
-gcloud projects list --format='table(projectId, name)' 2>/dev/null | sed 's/^/    /' || true
+cat <<'EOF'
+  El Project ID es único en TODO Google, no solo en tu cuenta, así que el que quieras puede
+  estar cogido. Reglas: 6 a 30 caracteres, minúsculas, dígitos y guiones, empieza por letra y
+  no acaba en guion.
 
-read -r -p "  Project ID a usar (vacío = crear uno nuevo): " PROJECT_ID
-PROJECT_ID="$(trim "${PROJECT_ID}")"
+EOF
 
-if [[ -z "${PROJECT_ID}" ]]; then
-    read -r -p "  Project ID del proyecto NUEVO (minúsculas, guiones): " PROJECT_ID
+# Se valida ANTES de llamar a Google: su API responde a un identificador mal formado con un error
+# que no dice cuál de las reglas has roto. Y se reintenta, porque acertar con un identificador
+# libre es prueba y error por definición.
+while true; do
+    read -r -p "  Project ID del proyecto nuevo (vacío = salir): " PROJECT_ID
     PROJECT_ID="$(trim "${PROJECT_ID}")"
-    [[ -n "${PROJECT_ID}" ]] || die "Hace falta un Project ID."
+    [[ -n "${PROJECT_ID}" ]] || die "Sin proyecto no hay dónde crear el cliente."
+
+    if [[ "${#PROJECT_ID}" -lt 6 || "${#PROJECT_ID}" -gt 30 ]]; then
+        warn "'${PROJECT_ID}' tiene ${#PROJECT_ID} caracteres: tienen que ser entre 6 y 30."
+        continue
+    fi
+    if [[ ! "${PROJECT_ID}" =~ ^[a-z][a-z0-9-]*[a-z0-9]$ ]]; then
+        warn "'${PROJECT_ID}' no vale: minúsculas, dígitos y guiones, empezando por letra y sin acabar en guion."
+        continue
+    fi
+
     read -r -p "  Nombre visible del proyecto: " PROJECT_NAME
     [[ -n "${PROJECT_NAME}" ]] || die "Hace falta un nombre de proyecto."
-    info "Creando ${PROJECT_ID}…"
-    gcloud projects create "${PROJECT_ID}" --name="${PROJECT_NAME}"
-fi
 
-gcloud projects describe "${PROJECT_ID}" >/dev/null 2>&1 ||
-    die "El proyecto '${PROJECT_ID}' no existe o esta cuenta no lo ve."
+    info "Creando ${PROJECT_ID}…"
+    if gcloud projects create "${PROJECT_ID}" --name="${PROJECT_NAME}"; then
+        break
+    fi
+    warn "No se ha podido crear '${PROJECT_ID}'. Si el identificador ya está cogido, prueba otro."
+done
 
 bold "  ✓ ${PROJECT_ID}"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 3 · APIs
 #
-# Solo estas dos, y a propósito: son las que hacen que EXISTAN los scopes de Sheets y Drive. Las
-# APIs de infraestructura (Functions, Run, Secret Manager…) no tienen nada que ver con el
-# consentimiento del usuario y las enciende deploy/setup-firebase-project.sh.
+# Solo estas dos, y a propósito: son las que hacen que EXISTAN los scopes de Sheets y Drive. Lo
+# que un proyecto necesite encendido para otras cosas no es asunto de este script.
 # ─────────────────────────────────────────────────────────────────────────────
 step "3 · Habilitando Sheets API y Drive API"
 
@@ -152,7 +176,7 @@ cat <<'EOF'
   NO es lo que ve el usuario en la pantalla de permisos (eso es el "App name" del consent
   screen). Google lo pide al crear el cliente, y se puede renombrar después.
 
-  Ejemplos:  Clapastedyke web (dev)   ·   Clapastedyke web (prod)
+  Ejemplo:  Migo web
 
 EOF
 
@@ -239,9 +263,9 @@ cat <<EOF
                                        (el flujo popup canjea contra el 'postmessage'
                                         reservado, que no se da de alta aquí)
 
-  ⚠️  Publish app no es opcional: en "Testing", Google CADUCA LOS REFRESH TOKENS A LOS 7 DÍAS.
-      Como es el backend quien los custodia, con el proyecto en Testing la sesión se perdería
-      cada semana — justo el fallo que este diseño arregla, y sin ninguna pista de por qué.
+  ⚠️  Publish app no es opcional: en "Testing", Google CADUCA LOS REFRESH TOKENS A LOS 7 DÍAS,
+      así que el permiso concedido se cae solo cada semana y sin avisar. Además hay que dar de
+      alta a mano el correo de cada persona que vaya a conectar (máximo 100).
       Publicar sale gratis: drive.file no exige verificación de Google.
 
 EOF
@@ -250,12 +274,16 @@ CLIENTS_URL="https://console.cloud.google.com/auth/clients/create?project=${PROJ
 info "Abriendo ${CLIENTS_URL}"
 open_url "${CLIENTS_URL}"
 
+# Se reintenta en vez de morir: una errata al pegar no debería costarte volver a empezar, con lo
+# que cuesta llegar hasta aquí. Línea vacía para salir.
 echo
-read -r -p "  Pega aquí el Client ID: " CLIENT_ID
-CLIENT_ID="$(trim "${CLIENT_ID}")"
-
-[[ "${CLIENT_ID}" == *.apps.googleusercontent.com ]] ||
-    die "Eso no parece un Client ID (tiene que acabar en .apps.googleusercontent.com)."
+while true; do
+    read -r -p "  Pega aquí el Client ID (vacío = salir): " CLIENT_ID
+    CLIENT_ID="$(trim "${CLIENT_ID}")"
+    [[ -n "${CLIENT_ID}" ]] || die "Sin Client ID no hay nada que guardar. El proyecto y las APIs quedan hechos."
+    [[ "${CLIENT_ID}" == *.apps.googleusercontent.com ]] && break
+    warn "Eso no parece un Client ID: tiene que acabar en .apps.googleusercontent.com."
+done
 
 echo
 info "Ahora el Client secret. La consola solo lo enseña una vez; no se verá al teclearlo."
@@ -263,21 +291,18 @@ read -r -s -p "  Client secret: " CLIENT_SECRET
 echo
 CLIENT_SECRET="$(trim "${CLIENT_SECRET}")"
 [[ -n "${CLIENT_SECRET}" ]] ||
-    die "Hace falta el client secret: sin él el backend no puede canjear el código."
+    die "Hace falta el client secret: sin él el cliente queda a medias y hay que generar otro."
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 7 · Volcar los dos valores, y parar
 #
 # Van los DOS al mismo sitio aunque solo uno sea secreto: son la pareja que produce una misma
-# visita a la consola, y separarlos obligaría a acordarse de cuál iba dónde. Dónde acaba cada uno
-# lo decide el cableado del ambiente, que es otro script.
+# visita a la consola, y separarlos obligaría a acordarse de cuál iba dónde. Anotarlos es el
+# final del trabajo de este script; repartirlos, el principio de otro.
 # ─────────────────────────────────────────────────────────────────────────────
 step "7 · Guardando el resultado"
 
-if ! (cd "${REPO_ROOT}" && git check-ignore -q "deploy/.env-secret"); then
-    die "deploy/.env-secret NO está ignorado por git. Añádelo al .gitignore antes de seguir:
-  un secreto versionado hay que rotarlo, no borrarlo."
-fi
+# Que el cuaderno no se versiona ya se comprobó en el arranque, antes de pedirte nada.
 
 # El cuaderno: se AÑADE, nunca se reescribe. Si el cliente se rota, el lote nuevo va debajo y el
 # viejo queda como registro de que existió. Con semántica .env, gana el último.
@@ -303,12 +328,6 @@ cat <<EOF
   Cliente:     ${CLIENT_NAME}
   Client ID:   ${CLIENT_ID}
 
-  Los dos valores están en deploy/.env-secret. Este script no los reparte: repartirlos es
-  cablear un ambiente, y lo hace
-
-    ./deploy/setup-firebase-project.sh
-
-  que coge el último lote y lo lleva a environments.json, a los ficheros generados, al emulador
-  y a los environment secrets de GitHub.
+  El Client ID y el client secret están en deploy/.env-secret, en el último lote.
 
 EOF

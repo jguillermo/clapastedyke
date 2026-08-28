@@ -71,16 +71,26 @@ const conocidos = Object.keys(environments);
 // marcador de projectId. Es lo que usa el guardián de CI, que no puede saberse los nombres: si
 // alguien edita un `.env` a mano, la comparación con lo generado lo caza en el PR.
 if (todos) {
-  const listos = conocidos.filter(
-    (clave) => environments[clave].projectId && !environments[clave].projectId.startsWith('TU-PROJECT-ID'),
-  );
+  // «Ya montado» = tiene projectId real Y todos los parámetros que las funciones necesitan. Un
+  // ambiente recién creado y todavía sin cablear no es un error: es un ambiente a medias, y
+  // hacerlo fallar pondría el CI en rojo por trabajo en curso. Pedirlo por su nombre SÍ falla.
+  const ready = (clave) => {
+    const { projectId, config } = environments[clave];
+    if (!projectId || projectId.startsWith('TU-PROJECT-ID')) return false;
+    if (!config) return false;
+    return Object.values(PARAMETERS).every((variables) =>
+      Object.values(variables).every(({ key }) => typeof config[key] === 'string' && config[key] !== ''),
+    );
+  };
 
-  if (listos.length === 0) {
-    fail('Ningún ambiente de deploy/firebase/environments.json tiene todavía un projectId real.');
-  }
+  const listos = conocidos.filter(ready);
+  const pendientes = conocidos.filter((clave) => !ready(clave));
 
   for (const clave of listos) {
     write(clave);
+  }
+  for (const clave of pendientes) {
+    console.log(`· ${clave} saltado: todavía sin montar (falta projectId o algún parámetro).`);
   }
   process.exit(0);
 }

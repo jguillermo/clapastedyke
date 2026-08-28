@@ -5,10 +5,11 @@ copia del recetario en su propio Drive. Diez minutos.
 
 Los rótulos y las URLs van **en inglés** porque Google Cloud Console está en inglés.
 
-> **Atajo:** [`create-google-client-id.sh`](create-google-client-id.sh) hace por ti el login, el
-> proyecto y las dos APIs, te abre la consola con los datos listos, y deja el **Client ID** y el
-> **client secret** que le pegues en `deploy/.env-secret`. Ahí para. Estos pasos son lo mismo, a
-> mano.
+> **Atajo:** [`create-google-client-id.sh`](create-google-client-id.sh) hace por ti el login,
+> **crea el proyecto** y habilita las dos APIs, te abre la consola con los datos listos, y deja el
+> **Client ID** y el **client secret** que le pegues en `deploy/.env-secret`. Ahí para: los anota,
+> no los reparte. Crea siempre un proyecto nuevo —es el alta de un cliente, no un añadido a algo
+> que ya tengas—. Estos pasos son lo mismo, a mano.
 >
 > ```bash
 > ./deploy/create-google-client-id.sh

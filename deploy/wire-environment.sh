@@ -54,6 +54,7 @@ ENV_SECRET="${REPO_ROOT}/deploy/.env-secret"
 SECRET_LOCAL="${REPO_ROOT}/api/auth/.secret.local"
 
 command -v node >/dev/null 2>&1 || die "Hace falta Node para leer y escribir environments.json."
+command -v git >/dev/null 2>&1 || die "Hace falta git para comprobar qué ficheros se versionan."
 [[ -f "${ENVIRONMENTS}" ]] || die "No encuentro ${ENVIRONMENTS}."
 
 GH_DISPONIBLE="no"
@@ -69,6 +70,11 @@ env_keys() {
 
 env_project_id() {
     node -e 'const e=require(process.argv[1])[process.argv[2]];process.stdout.write(e&&e.projectId?e.projectId:"")' \
+        "${ENVIRONMENTS}" "$1"
+}
+
+env_has_config() {
+    node -e 'const e=require(process.argv[1])[process.argv[2]];process.exit(e&&e.config?0:1)' \
         "${ENVIRONMENTS}" "$1"
 }
 
@@ -184,25 +190,69 @@ elif [[ -n "${ANTERIOR}" ]]; then
     esac
 fi
 
+# El bloque `config` ES el config.json que publica la app, así que lo crea este script y no el
+# de infraestructura: allí sería configuración de la app en el sitio equivocado. Si el ambiente
+# lo estrena, se clona el del primero que haya para que ninguna clave nueva se quede fuera.
+DEBUG_VALOR=""
+if ! env_has_config "${AMBIENTE}"; then
+    info "El ambiente '${AMBIENTE}' estrena su bloque de configuración."
+    DEBUG_DEFECTO="true"
+    case "${AMBIENTE}" in
+        prod | production) DEBUG_DEFECTO="false" ;;
+    esac
+    read -r -p "  ¿Trazas de depuración encendidas? [${DEBUG_DEFECTO}] " DEBUG_RESP
+    case "$(lower "$(trim "${DEBUG_RESP}")")" in
+        s | si | sí | y | yes | true) DEBUG_VALOR="true" ;;
+        n | no | false) DEBUG_VALOR="false" ;;
+        *) DEBUG_VALOR="${DEBUG_DEFECTO}" ;;
+    esac
+fi
+
 node -e '
 const { readFileSync, writeFileSync } = require("node:fs");
-const [file, ambiente, clientId] = process.argv.slice(1);
+const [file, ambiente, clientId, debug] = process.argv.slice(1);
 const doc = JSON.parse(readFileSync(file, "utf8"));
-doc[ambiente].config.googleClientId = clientId;
+const entrada = doc[ambiente];
+
+if (!entrada.config) {
+  const plantilla = Object.values(doc).find((e) => e.config);
+  entrada.config = plantilla
+    ? { ...plantilla.config }
+    : { debug: true, googleClientId: "", syncPollSeconds: 120 };
+  entrada.config.debug = debug === "true";
+}
+
+entrada.config.googleClientId = clientId;
 writeFileSync(file, JSON.stringify(doc, null, 2) + "\n");
-' "${ENVIRONMENTS}" "${AMBIENTE}" "${CLIENT_ID}"
+' "${ENVIRONMENTS}" "${AMBIENTE}" "${CLIENT_ID}" "${DEBUG_VALOR}"
 
 info "deploy/firebase/environments.json → ${AMBIENTE}.config.googleClientId"
 
 (cd "${REPO_ROOT}" && node deploy/firebase/api-env.mjs "${AMBIENTE}" | sed 's/^/  /')
 
-# public/config.json es el de DESARROLLO LOCAL: solo lo regenera el ambiente que lo sirve. El del
-# despliegue lo genera el workflow con --out, así que aquí sería mentira.
-if [[ "${AMBIENTE}" == "dev" ]]; then
-    (cd "${REPO_ROOT}" && node deploy/firebase/config.mjs "${AMBIENTE}" | sed 's/^/  /')
+# public/config.json es el fichero que sirve `ng serve` y los E2E: es el de DESARROLLO LOCAL, no
+# el de ningún despliegue (ese lo genera el workflow con --out). Se pregunta en vez de asumir que
+# el ambiente local se llama "dev": puede no existir tal ambiente.
+#
+# En un ambiente de producción el defecto es NO: darle a Enter sin leer dejaría el config.json de
+# desarrollo apuntando a prod, y trabajarías en local contra el proyecto de verdad sin enterarte.
+LOCAL_DEFECTO="S"
+case "${AMBIENTE}" in
+    prod | production) LOCAL_DEFECTO="n" ;;
+esac
+
+if [[ "${LOCAL_DEFECTO}" == "S" ]]; then
+    read -r -p "  ¿Es '${AMBIENTE}' el ambiente que usas en local? [S/n] " ES_LOCAL
 else
-    info "public/config.json no se toca: es el de desarrollo local (ambiente dev)."
+    read -r -p "  ¿Es '${AMBIENTE}' el ambiente que usas en local? [s/N] " ES_LOCAL
 fi
+ES_LOCAL="$(lower "$(trim "${ES_LOCAL}")")"
+[[ -n "${ES_LOCAL}" ]] || ES_LOCAL="$(lower "${LOCAL_DEFECTO}")"
+
+case "${ES_LOCAL}" in
+    s | si | sí | y | yes) (cd "${REPO_ROOT}" && node deploy/firebase/config.mjs "${AMBIENTE}" | sed 's/^/  /') ;;
+    *) info "public/config.json no se toca." ;;
+esac
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 4 · El client secret → emulador y GitHub

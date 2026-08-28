@@ -109,7 +109,9 @@ del que declaraba su ambiente.
 ## Añadir un ambiente (`stage`, `lab`, `qa`…)
 
 Un bloque más en `environments.json` y un *environment* homónimo en GitHub con su secret. **El
-workflow no se toca.** El procedimiento paso a paso está en
+workflow no se toca**, y el bloque **no hay que escribirlo a mano**: lo crea
+[`../setup-firebase-project.sh`](../setup-firebase-project.sh) cuando le das un nombre de ambiente
+que aún no existe. El procedimiento paso a paso está en
 [`manual/firebase-deploy.md`](../../manual/firebase-deploy.md) → «Añadir un ambiente»; aquí solo el
 diseño que lo hace posible.
 

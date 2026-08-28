@@ -86,6 +86,13 @@ Después, `npm run config` para regenerar `public/config.json`, y commitea los d
 placeholder `TU-PROJECT-ID-…`, el workflow falla en el primer job con un mensaje que te manda aquí,
 sin llegar a compilar ni a desplegar nada.
 
+> **Este bloque no hace falta escribirlo a mano.**
+> [`deploy/setup-firebase-project.sh`](../deploy/setup-firebase-project.sh) lo crea si le das un
+> nombre de ambiente que todavía no existe: te pregunta el proyecto (y lo crea en Cloud si hace
+> falta), clona el `config` del primer ambiente para que no se te olvide ninguna clave, y deja
+> `googleClientId` vacío hasta que lo cablees. Montar un ambiente desde cero no exige tocar este
+> fichero antes.
+
 ### Paso 3 · Una cuenta de servicio por proyecto
 
 GitHub Actions no puede abrir un navegador para iniciar sesión, así que despliega con una **cuenta
