@@ -66,15 +66,6 @@ open_url() {
     fi
 }
 
-copy_clipboard() {
-    if command -v pbcopy >/dev/null 2>&1; then
-        printf '%s' "$1" | pbcopy && return 0
-    elif command -v xclip >/dev/null 2>&1; then
-        printf '%s' "$1" | xclip -selection clipboard && return 0
-    fi
-    return 1
-}
-
 # Lo único que escribe, y por eso lo único que necesita saber del repositorio.
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENV_SECRET="${REPO_ROOT}/deploy/.env-secret"
@@ -243,66 +234,14 @@ read -r -p "  Nombre del OAuth client: " CLIENT_NAME
 [[ -n "${CLIENT_NAME}" ]] || die "Hace falta un nombre para el cliente."
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 5 · Orígenes autorizados
-#
-# Es un campo DEL CLIENTE, no del despliegue: Google solo abre la ventana si la página que la
-# pide viene de uno de estos orígenes.
-# ─────────────────────────────────────────────────────────────────────────────
-step "5 · Authorized JavaScript origins"
-
-cat <<'EOF'
-  El origen es el dominio SIN ruta. Son orígenes distintos, y cada uno cuenta:
-    · localhost y 127.0.0.1
-    · cada puerto
-    · el dominio de publicación y su alias, si el hosting sirve dos
-
-  En desarrollo suelen ser  http://localhost:4200  y  http://127.0.0.1:4200 .
-
-  Escribe uno por línea. Línea vacía para terminar.
-
-EOF
-
-ORIGINS=""
-ORIGIN_COUNT=0
-while true; do
-    read -r -p "  origen> " ORIGIN
-    ORIGIN="$(trim "${ORIGIN}")"
-    [[ -z "${ORIGIN}" ]] && break
-
-    if [[ ! "${ORIGIN}" =~ ^https?://[^/]+$ ]]; then
-        warn "'${ORIGIN}' no vale: tiene que empezar por http:// o https:// y no llevar ruta ni / final."
-        continue
-    fi
-
-    if [[ -z "${ORIGINS}" ]]; then
-        ORIGINS="${ORIGIN}"
-    else
-        ORIGINS="${ORIGINS}
-${ORIGIN}"
-    fi
-    ORIGIN_COUNT=$((ORIGIN_COUNT + 1))
-done
-
-if [[ "${ORIGIN_COUNT}" -eq 0 ]]; then
-    warn "Sin orígenes, conectar dará 'Error 400: origin_mismatch'. Podrás añadirlos luego en la consola."
-else
-    printf '\n'
-    printf '%s\n' "${ORIGINS}" | sed 's/^/    /'
-    if copy_clipboard "${ORIGINS}"; then
-        printf '\n'
-        info "(${ORIGIN_COUNT} orígenes copiados al portapapeles)"
-    fi
-fi
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 6 · La pantalla de consentimiento (primer paso manual)
+# 5 · La pantalla de consentimiento (primer paso manual)
 #
 # VA ANTES QUE EL CLIENTE, y no es un detalle de orden: Google se niega a crear un OAuth client
 # mientras el proyecto no tenga pantalla de consentimiento —«To create an OAuth client ID, you
 # must first configure your consent screen»—. En un proyecto recién creado no la hay nunca, así
 # que abrir directamente la pantalla de crear el cliente sería mandarte a un muro.
 # ─────────────────────────────────────────────────────────────────────────────
-step "6 · La pantalla de consentimiento"
+step "5 · La pantalla de consentimiento"
 
 # Lo que se puede verificar, se verifica; lo que no, se pregunta — y con la forma de averiguarlo.
 #
@@ -410,9 +349,9 @@ read -r -p "  Pulsa Enter para ir a crear el cliente… " _
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 7 · Crear el cliente en la consola
+# 6 · Crear el cliente en la consola
 # ─────────────────────────────────────────────────────────────────────────────
-step "7 · Crear el cliente"
+step "6 · Crear el cliente"
 
 cat <<EOF
 
@@ -424,7 +363,23 @@ cat <<EOF
 
     Application type:  Web application
     Name:              ${CLIENT_NAME}
-    Authorized JavaScript origins:  los de arriba (${ORIGIN_COUNT})
+
+    Authorized JavaScript origins:  uno por cada sitio desde el que se abrirá la ventana de
+                                    Google. Con "Add URI", de uno en uno:
+
+                                      http://localhost:4200     el servidor de desarrollo
+                                      http://127.0.0.1:4200     el mismo, y AUN ASÍ hace falta
+                                      https://tu-dominio        donde publiques la app
+
+                                    El origen es el dominio SIN ruta, y son distintos:
+                                      · localhost y 127.0.0.1
+                                      · cada puerto
+                                      · cada dominio y cada alias del hosting
+
+                                    Si falta el origen desde el que entras, conectar da
+                                    "Error 400: origin_mismatch". Se añaden y se quitan aquí
+                                    cuando quieras, sin recrear el cliente.
+
     Authorized redirect URIs:       ninguno
                                     (el flujo popup canjea contra el 'postmessage'
                                      reservado, que no se da de alta aquí)
@@ -471,13 +426,13 @@ while true; do
 done
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 8 · Volcar los dos valores, y parar
+# 7 · Volcar los dos valores, y parar
 #
 # Van los DOS al mismo sitio aunque solo uno sea secreto: son la pareja que produce una misma
 # visita a la consola, y separarlos obligaría a acordarse de cuál iba dónde. Anotarlos es el
 # final del trabajo de este script; repartirlos, el principio de otro.
 # ─────────────────────────────────────────────────────────────────────────────
-step "8 · Guardando el resultado"
+step "7 · Guardando el resultado"
 
 # Que el cuaderno no se versiona ya se comprobó en el arranque, antes de pedirte nada.
 
