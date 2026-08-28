@@ -150,8 +150,17 @@ PROJECT_ID="$(trim "${PROJECT_ID}")"
 
 if [[ -n "${PROJECT_ID}" ]]; then
     PROYECTO_NUEVO="no"
-    gcloud projects describe "${PROJECT_ID}" >/dev/null 2>&1 ||
-        die "El proyecto '${PROJECT_ID}' no existe o esta cuenta no lo ve."
+    # No basta con que `describe` responda: también responde OK para un proyecto BORRADO. Google
+    # los deja 30 días en DELETE_REQUESTED antes de destruirlos, y en ese estado no admiten ni
+    # habilitar una API. Sin mirar el estado, el script lo daba por bueno y moría tres pasos
+    # después con un "not found or permission denied" que contradecía lo que acababa de aceptar.
+    ESTADO="$(gcloud projects describe "${PROJECT_ID}" --format='value(lifecycleState)' 2>/dev/null || true)"
+    [[ "${ESTADO}" == "ACTIVE" ]] ||
+        die "El proyecto '${PROJECT_ID}' no está utilizable (estado: ${ESTADO:-no existe o esta cuenta no lo ve}).
+
+  Si lo borraste, sigue 30 días en DELETE_REQUESTED y no admite cambios. Puedes restaurarlo, o
+  usar otro, desde:
+    ${PROJECTS_URL}"
 else
     PROYECTO_NUEVO="si"
     cat <<'EOF'
@@ -194,6 +203,7 @@ bold "  ✓ ${PROJECT_ID}"
 # Ya se sabe el proyecto, así que las pantallas que dependen de él quedan resueltas aquí y se
 # nombran en los pasos siguientes.
 CONSENT_URL="https://console.cloud.google.com/auth/overview?project=${PROJECT_ID}"
+BRANDING_URL="https://console.cloud.google.com/auth/branding?project=${PROJECT_ID}"
 CLIENTS_LIST_URL="https://console.cloud.google.com/auth/clients?project=${PROJECT_ID}"
 CLIENTS_URL="https://console.cloud.google.com/auth/clients/create?project=${PROJECT_ID}"
 
@@ -294,15 +304,31 @@ fi
 # ─────────────────────────────────────────────────────────────────────────────
 step "6 · La pantalla de consentimiento"
 
-# Un proyecto recién creado nunca la tiene. Uno reutilizado casi siempre sí — y entonces este
-# paso sobra: la pantalla es del proyecto, no del cliente, así que el cliente nuevo hereda su
-# nombre, sus scopes y su estado de publicación sin tocar nada.
-CONSENT_PENDIENTE="si"
-if [[ "${PROYECTO_NUEVO}" == "no" ]]; then
-    read -r -p "  ¿'${PROJECT_ID}' ya tiene pantalla de consentimiento? [S/n] " YA_HAY_CONSENT
-    case "$(lower "${YA_HAY_CONSENT}")" in
-        n | no) ;;
-        *) CONSENT_PENDIENTE="no" ;;
+# Lo que se puede verificar, se verifica; lo que no, se pregunta — y con la forma de averiguarlo.
+#
+# SE VERIFICA: si el proyecto lo acaba de crear este script, no tiene pantalla de consentimiento.
+# Ahí no hay nada que preguntar y preguntarlo sería absurdo.
+#
+# NO SE PUEDE VERIFICAR en un proyecto que ya existía. La única API que lo expone es la de IAP
+# (`projects.brands`), y probada contra un proyecto de cuenta personal contesta:
+#     { "code": 400, "message": "Project must belong to an organization." }
+# Solo sirve para proyectos de Workspace. No hay otra que lo diga.
+#
+# Por eso el defecto es NO: enseñar las instrucciones a quien ya la tiene cuesta unas líneas;
+# ocultárselas a quien no la tiene lo manda a una pantalla donde no se puede hacer nada.
+if [[ "${PROYECTO_NUEVO}" == "si" ]]; then
+    CONSENT_PENDIENTE="si"
+    info "El proyecto acaba de crearse, así que todavía no la tiene. Instrucciones abajo."
+else
+    info "Para saberlo, abre esta y mira si sale el aviso amarillo:"
+    info "    ${CLIENTS_URL}"
+    info "        con aviso  →  falta, contesta n"
+    info "        sin aviso  →  ya está, contesta s"
+    echo
+    read -r -p "  ¿'${PROJECT_ID}' ya tiene pantalla de consentimiento? [s/N] " YA_HAY_CONSENT
+    case "$(lower "$(trim "${YA_HAY_CONSENT}")")" in
+        s | si | sí | y | yes) CONSENT_PENDIENTE="no" ;;
+        *) CONSENT_PENDIENTE="si" ;;
     esac
 fi
 
@@ -313,15 +339,27 @@ else
 
 cat <<'EOF'
 
-  Es lo que el usuario lee cuando le pides permiso, y el proyecto no la tiene todavía.
-  Sin ella Google NO deja crear el cliente.
+  Es el diálogo que verá quien conecte su cuenta: "Migo quiere acceder a tu cuenta", con el
+  nombre de la app, tu correo de soporte y la casilla de Drive.
 
-  En la consola que se abre ahora (Google Auth Platform → Get started):
+  LA PANTALLA ES DE GOOGLE: la pinta él y tú no la ves nunca. Lo que rellenas son sus huecos,
+  porque Google no sabe cómo se llama tu app, a quién escribir si algo va mal, ni qué le vas a
+  pedir al usuario. No estás creando una pantalla: estás registrando una identidad.
 
-    App name              el nombre que verá quien dé el permiso
-    User support email    tu correo
-    Audience              External
-    Contact information   tu correo
+  Y sin ella Google no deja crear el cliente, porque el cliente es QUIEN pregunta y esto es lo
+  que el usuario LEE cuando pregunta. Va una por proyecto, y la comparten todos sus clientes.
+
+  ESTO NO SE PUEDE AUTOMATIZAR: la única API que lo haría (IAP) solo atiende a proyectos de
+  una organización de Workspace, y contesta "Project must belong to an organization" a los de
+  una cuenta personal. Así que son estos cinco pasos a mano, una sola vez por proyecto:
+
+    1. La página que se abre dice "Google Auth Platform not configured yet".
+       Pulsa GET STARTED  (el formulario no sale solo).
+    2. App Information   → App name: el nombre que verá quien dé el permiso
+                           User support email: tu correo
+    3. Audience          → External   (es la única opción sin Workspace)
+    4. Contact Information → tu correo
+    5. Finish            → acepta la política y pulsa Create
 
     NO subas App logo: obliga a pasar la verificación de Google.
 
@@ -340,16 +378,34 @@ cat <<'EOF'
       alta a mano el correo de cada persona que vaya a conectar (máximo 100).
       Publicar sale gratis: drive.file no exige verificación de Google.
 
-  Si la página que se abre no es ese formulario, es el mismo al que lleva el botón
-  "Configure consent screen", y también está en el menú izquierdo bajo Branding.
+  Una vez creada, esos mismos datos se editan en el menú izquierdo bajo Branding, y el botón
+  "Configure consent screen" que sale al crear un cliente lleva justo aquí.
 
 EOF
 
 info "Abriendo ${CONSENT_URL}"
+info "Si esa página no trae el formulario: ${BRANDING_URL}"
 open_url "${CONSENT_URL}"
 
+# NI SE COMPRUEBA NI SE CREA DESDE AQUÍ, y no por pereza: no se puede.
+#
+# La única API que lee o crea la pantalla de consentimiento es la de IAP
+# (`iap.googleapis.com`, projects.brands), y contestó esto al probarla:
+#
+#     { "code": 400, "message": "Project must belong to an organization." }
+#
+# Es decir: solo atiende a proyectos que cuelgan de una organización de Workspace. Un proyecto
+# de una cuenta Gmail personal no tiene organización, así que ese camino no existe — ni para
+# consultarla ni para crearla. No hay otra API que lo exponga.
+#
+# Tampoco se te pregunta «¿ya la tienes?»: sería trasladarte una duda que tú tampoco puedes
+# resolver sin ir a mirar, y una respuesta al azar te manda a una pantalla que no deja hacer nada.
+#
+# EL CLIENT ID ES LA PRUEBA. Si Google te deja crear el cliente, el consentimiento existía; y si
+# no, la pantalla siguiente enseña el aviso amarillo con su botón para arreglarlo sin moverse de
+# ahí. El script se limita a esperar en el paso 7 a que le pegues uno válido.
 echo
-read -r -p "  Cuando la pantalla de consentimiento esté creada, pulsa Enter… " _
+read -r -p "  Pulsa Enter para ir a crear el cliente… " _
 
 fi
 
@@ -360,11 +416,15 @@ step "7 · Crear el cliente"
 
 cat <<EOF
 
+  Esta pantalla es además la COMPROBACIÓN del paso anterior: si sale el aviso amarillo
+  "you must first configure your consent screen", es que aún no está — y su propio botón
+  "Configure consent screen" te lleva a hacerlo. Si no sale, ya está.
+
   Google no permite crear este cliente por CLI. En la pantalla que se abre ahora:
 
     Application type:  Web application
     Name:              ${CLIENT_NAME}
-    Authorized JavaScript origins:  los ${ORIGIN_COUNT} de arriba
+    Authorized JavaScript origins:  los de arriba (${ORIGIN_COUNT})
     Authorized redirect URIs:       ninguno
                                     (el flujo popup canjea contra el 'postmessage'
                                      reservado, que no se da de alta aquí)
