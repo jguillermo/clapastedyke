@@ -83,15 +83,26 @@ env_client_id() {
         "${ENVIRONMENTS}" "$1"
 }
 
-# El último valor de una clave en el cuaderno. `deploy/.env-secret` es append-only y con
-# semántica .env gana el último, así que `tail -1` ES la respuesta correcta. `cut -f2-` conserva
-# los '=' que pueda llevar el valor.
-secret_note() {
-    [[ -f "${ENV_SECRET}" ]] || return 1
-    local value
-    value="$(grep -E "^$1=" "${ENV_SECRET}" 2>/dev/null | tail -1 | cut -d= -f2-)"
-    [[ -n "${value}" ]] || return 1
-    printf '%s' "${value}"
+# El cuaderno es append-only y cada alta escribe un LOTE —su cabecera y sus claves— separado del
+# anterior por una línea en blanco. Se lee EL LOTE ENTERO, el último que tenga un Client ID, y no
+# la última aparición de cada clave por separado.
+#
+# La diferencia importa desde que un proyecto puede tener varios clientes: con dos altas
+# anotadas, leer clave a clave puede emparejar el Client ID de una con el secret de la otra, y
+# entonces Google rechaza el canje con `invalid_client` sin dar ninguna pista de por qué.
+#
+# `RS=""` es el modo párrafo de awk: cada registro es un lote.
+ultimo_lote() {
+    [[ -f "${ENV_SECRET}" ]] || return 0
+    awk 'BEGIN { RS = "" }
+         /GOOGLE_OAUTH_CLIENT_ID=/ { lote = $0 }
+         END { if (lote != "") print lote }' "${ENV_SECRET}"
+}
+
+# Un campo del lote ya leído. El `|| true` es necesario: con `pipefail`, un grep sin resultado
+# haría fallar la asignación y `set -e` mataría el script.
+campo_lote() {
+    printf '%s\n' "${LOTE}" | grep -E "^$1=" | head -1 | cut -d= -f2- || true
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -133,11 +144,18 @@ bold "  ✓ ${AMBIENTE} → ${PROJECT_ID}"
 # ─────────────────────────────────────────────────────────────────────────────
 step "2 · El cliente de Google"
 
-CLIENT_ID="$(secret_note GOOGLE_OAUTH_CLIENT_ID || true)"
-CLIENT_SECRET="$(secret_note GOOGLE_OAUTH_CLIENT_SECRET || true)"
+LOTE="$(ultimo_lote)"
+CLIENT_ID="$(campo_lote GOOGLE_OAUTH_CLIENT_ID)"
+CLIENT_SECRET="$(campo_lote GOOGLE_OAUTH_CLIENT_SECRET)"
+LOTE_CABECERA="$(printf '%s\n' "${LOTE}" | grep -E '^# ───' | head -1 | sed 's/^# ─── //' || true)"
 
 if [[ -n "${CLIENT_ID}" ]]; then
-    info "Último lote de deploy/.env-secret:"
+    info "Último cliente anotado en deploy/.env-secret:"
+    # La cabecera del lote lleva fecha, proyecto y nombre del cliente — con varios anotados, es
+    # lo único que permite reconocer cuál es sin ir a la consola.
+    if [[ -n "${LOTE_CABECERA}" ]]; then
+        info "    ${LOTE_CABECERA}"
+    fi
     info "    ${CLIENT_ID}"
     read -r -p "  ¿Es el cliente de '${AMBIENTE}'? [S/n] " USE_NOTE
     case "$(lower "${USE_NOTE}")" in
@@ -269,6 +287,10 @@ if [[ -z "${CLIENT_SECRET}" ]]; then
 else
     # Este SÍ se reescribe: es configuración del emulador, no cuaderno.
     if (cd "${REPO_ROOT}" && git check-ignore -q "api/auth/.secret.local"); then
+        # Se crea vacío y se cierra ANTES de escribir el secreto dentro: con `>` a secas nacería
+        # con el umask por defecto (644), legible por cualquier usuario de la máquina.
+        : >"${SECRET_LOCAL}"
+        chmod 600 "${SECRET_LOCAL}"
         printf 'GOOGLE_OAUTH_CLIENT_SECRET=%s\n' "${CLIENT_SECRET}" >"${SECRET_LOCAL}"
         info "api/auth/.secret.local ← para el emulador"
     else

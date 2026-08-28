@@ -189,8 +189,19 @@ step "3 · Proyecto de Firebase"
 info "Consultando (la primera llamada a firebase-tools tarda)…"
 if ! ${FIREBASE_CLI} login:list 2>/dev/null | grep -q '@'; then
     info "No hay sesión de firebase-tools. Se abrirá el navegador…"
-    ${FIREBASE_CLI} login
+    ${FIREBASE_CLI} login || true
 fi
+
+# Se comprueba DESPUÉS del intento, y no solo antes: `projects:list` se muestra con `|| true`
+# —para que un proyecto sin permisos no aborte el script—, y ese `|| true` también se tragaría
+# un «Failed to authenticate». Sin esta guarda, quedarse sin sesión se ve como «no tienes ningún
+# proyecto», que manda a buscar el problema justo donde no está.
+${FIREBASE_CLI} login:list 2>/dev/null | grep -q '@' ||
+    die "firebase-tools sigue sin sesión. Entra a mano con:
+
+    npx --yes firebase-tools@latest login
+
+  y vuelve a lanzar el script. (La sesión de gcloud es otra distinta: tener una no da la otra.)"
 
 es_proyecto_firebase() {
     ${FIREBASE_CLI} projects:list --json 2>/dev/null |
@@ -368,6 +379,12 @@ if [[ -n "${KEY_FILE}" ]]; then
     step "8 · El secret de GitHub"
 
     # Que el cuaderno no se versiona ya se comprobó al arrancar.
+
+    # `>>` crearía el fichero con el umask por defecto, que en macOS deja 644. Aquí dentro va una
+    # CLAVE PRIVADA con permiso para publicar en el proyecto: no puede nacer legible por
+    # cualquier usuario de la máquina. Se crea vacío y se cierra antes de escribir nada.
+    [[ -f "${ENV_SECRET}" ]] || : >"${ENV_SECRET}"
+    chmod 600 "${ENV_SECRET}"
 
     # El cuaderno: se AÑADE, nunca se reescribe. El JSON va en una sola línea; sus saltos ya
     # están escapados dentro de la cadena `private_key`, así que sobrevive intacto.
