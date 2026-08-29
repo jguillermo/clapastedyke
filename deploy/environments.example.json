@@ -3,7 +3,7 @@
     "EJEMPLO. Nada lee este fichero: está aquí para que se vea de un vistazo qué configura cada",
     "ambiente y dónde vive cada valor. Editarlo no cambia nada.",
     "",
-    "Lo que de verdad configura un ambiente son sus dos secrets y sus dos variables en GitHub",
+    "Lo que de verdad configura un ambiente son sus DOS SECRETS en GitHub (no hay variables)",
     "(Settings -> Environments -> <ambiente>), más los ficheros con MARCADORES que el pipeline",
     "sustituye al publicar. Ver deploy/README.md.",
     "",
@@ -14,20 +14,21 @@
   "dev": {
     "__": "Un ambiente = un proyecto de Firebase = un environment de GitHub con el mismo nombre.",
 
+    "proyecto": "NO se configura en ningún sitio: es el project_id que trae FIREBASE_SERVICE_ACCOUNT.",
+
     "github": {
       "secrets": {
         "GOOGLE_OAUTH_CLIENT": "el fichero de cliente que descarga Google, ENTERO: {\"web\":{…}}",
         "FIREBASE_SERVICE_ACCOUNT": "la clave JSON de la cuenta de servicio de despliegue"
       },
       "variables": {
-        "PROJECT_ID": "migo-dev-20b41",
-        "DEBUG": "true"
+        "__": "NINGUNA. El proyecto sale del project_id de FIREBASE_SERVICE_ACCOUNT, y debug es un input del workflow del frontend."
       }
     },
 
     "marcadores": {
       "public/config.json": {
-        "debug": "\"DEBUG\"  ->  la variable DEBUG del environment",
+        "debug": "\"DEBUG\"  ->  el input `debug` del workflow del frontend (por defecto false)",
         "googleClientId": "GOOGLE_OAUTH_CLIENT_ID  ->  web.client_id del secret GOOGLE_OAUTH_CLIENT",
         "syncPollSeconds": "no es marcador: es el mismo valor en todos los ambientes"
       },
