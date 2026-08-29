@@ -1,8 +1,0 @@
-node_modules/
-lib/
-lib-test/
-
-# Los valores de verdad del cliente de OAuth para el emulador. NUNCA se versionan: el `.env`
-# versionado solo lleva marcadores, y en la nube los sustituye el workflow de despliegue.
-.env.local
-.secret.local
