@@ -29,8 +29,8 @@ paquete — ver [`manual/api.md`](../manual/api.md).
    lleva un **marcador** con el nombre de la variable, versionado y a la vista.
 2. **El pipeline sustituye ese marcador** en el artefacto, justo antes de publicar. El repositorio
    nunca contiene un Client ID.
-3. **Un ambiente se declara en su *environment* de GitHub**, no en el repositorio: dos secrets y dos
-   variables. Añadir `stage` no toca ni un fichero.
+3. **Un ambiente se declara en su *environment* de GitHub**, no en el repositorio: **dos secrets, y
+   nada más**. Añadir `stage` no toca ni un fichero.
 
 ## Los marcadores
 
@@ -70,10 +70,15 @@ ambiente: eso es lo que hace que `secrets.*` y `vars.*` resuelvan a los de ese p
 |---|---|---|
 | secret | `GOOGLE_OAUTH_CLIENT` | el fichero de cliente que descarga Google, **entero** |
 | secret | `FIREBASE_SERVICE_ACCOUNT` | la clave JSON de la cuenta de servicio de despliegue |
-| var | `PROJECT_ID` | el proyecto de Firebase de ese ambiente |
-| var | `DEBUG` | `true` / `false` |
 
-Y nada más. [`environments.example.json`](environments.example.json) enseña esa misma foto en un
+**Y nada más: no hay variables.** Los dos valores que antes eran variables ya no se configuran:
+
+- **`PROJECT_ID`** se **deduce** del `project_id` de la propia cuenta de servicio. Un solo sitio que
+  mantener, y desaparece la clase entera de fallos en que se despliega a un proyecto con las
+  credenciales de otro: si la clave es la de `migo-dev-c5e23`, se publica en `migo-dev-c5e23`.
+- **`DEBUG`** es un **input del workflow del frontend**, con la casilla en el mismo formulario de
+  `Run workflow`. Publicar ya es una decisión manual, así que la toma quien publica, en ese momento,
+  sin editar nada en GitHub ni volver a desplegar para cambiarla. [`environments.example.json`](environments.example.json) enseña esa misma foto en un
 fichero, para poder mirarla sin entrar en GitHub; **no lo lee nadie**.
 
 ### Por qué el cliente va entero y en un solo secret
@@ -250,8 +255,7 @@ Tres cosas, y ninguna la hace un script del proyecto:
 2. **El proyecto de Firebase** — a mano: plan Blaze, base de Firestore creada, seis APIs, cuenta de
    servicio con diez roles. El paso a paso está en [`manual/api.md`](../manual/api.md) →
    «Requisitos del proyecto de Firebase».
-3. **El environment de GitHub** con el nombre del ambiente, sus dos secrets y sus dos variables (la
-   tabla de arriba).
+3. **El environment de GitHub** con el nombre del ambiente y sus dos secrets (la tabla de arriba).
 
 Después, `Actions → Desplegar el BACKEND` y luego el FRONTEND.
 
@@ -273,8 +277,8 @@ entrada aparte.
 
 **3 · El ambiente se teclea en Actions.** Un `type: choice` obligaría a duplicar la lista de
 ambientes en los dos workflows. GitHub crea al vuelo cualquier environment que un job referencie, así
-que una errata deja un environment vacío — y el primer paso del workflow lo caza diciendo que le
-falta `PROJECT_ID`, antes de compilar nada.
+que una errata deja un environment vacío — y el primer paso del workflow lo caza diciendo qué
+secret le falta, antes de compilar nada.
 
 ---
 

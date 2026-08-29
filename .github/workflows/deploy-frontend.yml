@@ -14,7 +14,11 @@ name: Desplegar el FRONTEND (Firebase Hosting)
 #
 # TODA LA EJECUCIÓN VIVE AQUÍ. El repositorio no tiene scripts de despliegue: lo que hace falta para
 # publicar son los pasos de este fichero. Y un ambiente no se declara en el repositorio, se declara
-# en su *environment* de GitHub — dos secrets y dos variables. Ver `deploy/README.md`.
+# en su *environment* de GitHub — DOS SECRETS, y nada más. Ver `deploy/README.md`.
+#
+# No hay variables de environment: el proyecto de Firebase NO se configura aparte, se lee del
+# `project_id` de la propia cuenta de servicio. Un solo sitio que mantener, y es imposible desplegar
+# en un proyecto distinto del de las credenciales con las que se despliega.
 on:
   workflow_dispatch:
     inputs:
@@ -23,6 +27,14 @@ on:
         type: string
         required: true
         default: dev
+      # `debug` es un input y no una variable del environment a propósito: publicar ya es una
+      # decisión manual, así que se elige en el mismo formulario. `warn` y `error` se ven siempre;
+      # esto solo enciende el detalle del flujo (`public/config.json` → `"debug"`).
+      debug:
+        description: '¿Publicar con el detalle del flujo visible en la consola?'
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
@@ -37,15 +49,18 @@ jobs:
     name: Build y deploy · ${{ inputs.ambiente }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    # El *environment* de GitHub del mismo nombre que el ambiente es lo que hace que `secrets.*` y
-    # `vars.*` resuelvan a los de ESE proyecto de Firebase. Es también donde se configuran las
-    # aprobaciones y las ramas permitidas.
+    # El *environment* de GitHub del mismo nombre que el ambiente es lo que hace que `secrets.*`
+    # resuelva a los de ESE proyecto de Firebase. Es también donde se configuran las aprobaciones y
+    # las ramas permitidas.
     #
-    # Un nombre mal escrito crea aquí un environment vacío: el primer paso lo caza y dice que le
-    # falta `PROJECT_ID`, en vez de fallar más tarde con un error del CLI.
+    # Un nombre mal escrito crea aquí un environment vacío: el primer paso lo caza y dice qué secret
+    # le falta, en vez de fallar más tarde con un error del CLI.
+    #
+    # La URL sale del paso de comprobación porque el proyecto se deduce ahí, de la cuenta de
+    # servicio (el contexto `steps` está disponible en `environment.url`).
     environment:
       name: ${{ inputs.ambiente }}
-      url: https://${{ vars.PROJECT_ID }}.web.app
+      url: ${{ steps.ambiente.outputs.url }}
     steps:
       - uses: actions/checkout@v4
 
@@ -58,20 +73,29 @@ jobs:
       # Se comprueba TODO antes de compilar nada. Publicar a medias es peor que no publicar, y un
       # secret que falta es el fallo más frecuente al estrenar un ambiente.
       - name: Comprobar el environment
+        id: ambiente
         env:
           AMBIENTE: ${{ inputs.ambiente }}
-          PROJECT_ID: ${{ vars.PROJECT_ID }}
           GOOGLE_OAUTH_CLIENT: ${{ secrets.GOOGLE_OAUTH_CLIENT }}
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
         run: |
           faltan=""
-          [ -n "$PROJECT_ID" ]               || faltan="$faltan variable:PROJECT_ID"
           [ -n "$GOOGLE_OAUTH_CLIENT" ]      || faltan="$faltan secret:GOOGLE_OAUTH_CLIENT"
           [ -n "$FIREBASE_SERVICE_ACCOUNT" ] || faltan="$faltan secret:FIREBASE_SERVICE_ACCOUNT"
           if [ -n "$faltan" ]; then
             echo "::error::Al environment '$AMBIENTE' le falta:$faltan. Settings → Environments → $AMBIENTE (ver deploy/README.md)."
             exit 1
           fi
+
+          # El proyecto de Firebase NO se configura: es el de la cuenta de servicio con la que se
+          # despliega. Se publica en `GITHUB_ENV` para el resto de pasos, y como salida para la URL
+          # del environment. No es un secreto (va en la URL pública del sitio), así que no se enmascara.
+          PROJECT_ID="$(printf '%s' "$FIREBASE_SERVICE_ACCOUNT" | jq -er '.project_id')" || {
+            echo "::error::El secret FIREBASE_SERVICE_ACCOUNT no es la clave JSON de una cuenta de servicio (falta .project_id)."
+            exit 1
+          }
+          echo "PROJECT_ID=$PROJECT_ID" >> "$GITHUB_ENV"
+          echo "url=https://$PROJECT_ID.web.app" >> "$GITHUB_OUTPUT"
           echo "Ambiente **$AMBIENTE** → proyecto \`$PROJECT_ID\`" >> "$GITHUB_STEP_SUMMARY"
 
       # Sin `--base-href`: Firebase sirve desde la raíz del dominio y `src/index.html` ya trae
@@ -90,7 +114,7 @@ jobs:
       - name: Sustituir los marcadores del artefacto
         env:
           GOOGLE_OAUTH_CLIENT: ${{ secrets.GOOGLE_OAUTH_CLIENT }}
-          DEBUG: ${{ vars.DEBUG }}
+          DEBUG: ${{ inputs.debug }}
         run: |
           CONFIG=deploy/dist/hosting/config.json
           CLIENT_ID="$(printf '%s' "$GOOGLE_OAUTH_CLIENT" | jq -er '.web.client_id')" || {
@@ -124,8 +148,6 @@ jobs:
       # `firestore.rules`) son relativas a `deploy/`. Desde la raíz del repositorio, el deploy muere
       # con «… is outside of project directory».
       - name: Deploy a Firebase Hosting
-        env:
-          PROJECT_ID: ${{ vars.PROJECT_ID }}
         run: |
           cd deploy
           npx --yes firebase-tools@latest deploy \

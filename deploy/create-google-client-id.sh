@@ -469,8 +469,10 @@ cat <<EOF
   El mismo ambiente necesita además, en ese environment:
 
        secret    FIREBASE_SERVICE_ACCOUNT   la clave de la cuenta de servicio de despliegue
-       variable  PROJECT_ID                 el proyecto de Firebase
-       variable  DEBUG                      true / false
+
+  Y nada más: no hay variables de environment. El proyecto de Firebase sale del project_id de esa
+  misma cuenta de servicio, y el detalle del flujo en la consola es una casilla del formulario de
+  Run workflow del frontend.
 
   EN LOCAL no hace falta nada de esto: la app arranca sin cliente y funciona entera salvo conectar
   con Google. Si quieres probar ESE flujo en el emulador, pon el client_secret a mano en

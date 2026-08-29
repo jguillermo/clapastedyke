@@ -99,8 +99,11 @@ Three rules that make this hold:
   `sed` over the file, then a grep that fails the job if a placeholder survived). The repository
   never contains a Client ID.
 - **An environment is declared in its GitHub environment**, not in the repo: two secrets
-  (`GOOGLE_OAUTH_CLIENT` — the client JSON, whole — and `FIREBASE_SERVICE_ACCOUNT`) and two variables
-  (`PROJECT_ID`, `DEBUG`). Adding `stage` touches no file.
+  (`GOOGLE_OAUTH_CLIENT` — the client JSON, whole — and `FIREBASE_SERVICE_ACCOUNT`) and **no
+  variables**. The Firebase project is not configured anywhere: both workflows read it from the
+  service account's own `project_id`, so you cannot deploy to a project other than the one the
+  credentials belong to. `debug` is an input of the frontend workflow, ticked on the Run form.
+  Adding `stage` touches no file.
 
 **A surviving placeholder does not break the app.** `PublicFileAppConfig` only accepts a
 `googleClientId` ending in `.apps.googleusercontent.com`; anything else is treated as absent, so the

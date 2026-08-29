@@ -29,7 +29,7 @@ lo secreto está fuera del repo. Nada de configuración vive dentro del workflow
 
 | Sitio | Qué contiene | Secreto |
 |---|---|---|
-| **Environments de GitHub**, uno por ambiente | Los secrets `GOOGLE_OAUTH_CLIENT` (el JSON del cliente de Google, entero) y `FIREBASE_SERVICE_ACCOUNT`; las variables `PROJECT_ID` y `DEBUG` | Sí, los dos secrets |
+| **Environments de GitHub**, uno por ambiente | Los secrets `GOOGLE_OAUTH_CLIENT` (el JSON del cliente de Google, entero) y `FIREBASE_SERVICE_ACCOUNT`. **Ninguna variable** | Sí, los dos |
 | `public/config.json` y `api/auth/.env` | **Marcadores**, versionados: `GOOGLE_OAUTH_CLIENT_ID`, `"DEBUG"`. El pipeline los sustituye en el artefacto | No |
 | [`deploy/environments.example.json`](../deploy/environments.example.json) | Un **ejemplo** de qué configura un ambiente. **Nadie lo lee** | No |
 
@@ -67,13 +67,16 @@ Firebase a veces le añade un sufijo aleatorio).
 
 | | Nombre | Valor |
 |---|---|---|
-| variable | `PROJECT_ID` | el Project ID del paso 1 |
-| variable | `DEBUG` | `true` en dev, `false` en prod |
 | secret | `GOOGLE_OAUTH_CLIENT` | el JSON del cliente de Google, entero (paso 5) |
 | secret | `FIREBASE_SERVICE_ACCOUNT` | la clave de la cuenta de servicio (pasos 3 y 4) |
 
+**Y no hay variables.** El Project ID del paso 1 no se declara en ninguna parte: los workflows lo
+leen del `project_id` que trae la propia cuenta de servicio, así que es imposible desplegar en un
+proyecto distinto del de las credenciales con las que se despliega. Y `debug` es un **input** del
+workflow del frontend: se marca al lanzarlo.
+
 **No hay nada que commitear**: un ambiente nuevo no toca ni un fichero del repositorio. Si falta
-cualquiera de las cuatro cosas, el primer paso del workflow se para y dice exactamente cuál.
+cualquiera de los dos secrets, el primer paso del workflow se para y dice exactamente cuál.
 
 ### Paso 3 · Una cuenta de servicio por proyecto
 
@@ -166,8 +169,8 @@ contra el *environment* de GitHub, así que la lista de ambientes que existen es
    [`api.md`](api.md) (pasos 1 y 2).
 
 2. **Un environment `stage` en GitHub** con sus dos secrets —`FIREBASE_SERVICE_ACCOUNT` y
-   `GOOGLE_OAUTH_CLIENT`— y sus dos variables —`PROJECT_ID` y `DEBUG`— (pasos 3 y 4), y los dos orígenes del
-   proyecto nuevo dados de alta en el cliente de Google (paso 5).
+   `GOOGLE_OAUTH_CLIENT`— (pasos 3 y 4), y los dos orígenes del proyecto nuevo dados de alta en el
+   cliente de Google (paso 5).
 
 **No se toca ni un fichero del repositorio.**
 
@@ -189,11 +192,12 @@ validación va en un job aparte) en [`deploy/README.md`](../deploy/README.md).
 
 El workflow:
 
-1. Comprueba que el *environment* tiene sus dos secrets y sus dos variables, antes de compilar nada.
+1. Comprueba que el *environment* tiene sus dos secrets y deduce el proyecto de la cuenta de
+   servicio, antes de compilar nada.
 2. Compila con `npm run build` (producción, con presupuestos de tamaño). El artefacto sale con los
    **marcadores** dentro: es el mismo para todos los ambientes.
 3. **Sustituye los marcadores** en `deploy/dist/hosting/config.json` con el `client_id` del secret y
-   la variable `DEBUG`, y falla si alguno sobrevive.
+   el input `debug`, y falla si alguno sobrevive.
 4. Sube `deploy/dist/hosting` con `firebase deploy --only hosting`, desde `deploy/`.
 
 La URL publicada queda enlazada en la propia ejecución (el recuadro del environment) y en el
@@ -205,7 +209,8 @@ dev es lo que se publica en prod.
 
 ### Cambiar la configuración de un ambiente
 
-- `debug` → cambiar la variable `DEBUG` de **ese** environment y **volver a desplegar**.
+- `debug` → marcar la casilla **debug** al lanzar el workflow del frontend. No es configuración del
+  environment: se elige en cada publicación.
 - El **cliente de Google** → cambiar el secret `GOOGLE_OAUTH_CLIENT` de **ese** environment (el JSON
   entero) y **volver a desplegar**.
 - `syncPollSeconds` → es el mismo en todos los ambientes: se edita `public/config.json` y se
@@ -261,7 +266,7 @@ en [`deploy/README.md`](../deploy/README.md).
 
 | Síntoma | Causa | Arreglo |
 |---|---|---|
-| `Al environment 'x' le falta: variable:PROJECT_ID …` | Ese *environment* de GitHub no existe, o está vacío (una errata lo crea al vuelo) | `Settings → Environments`: créalo con sus dos secrets y sus dos variables |
+| `Al environment 'x' le falta: secret:… ` | Ese *environment* de GitHub no existe, o está vacío (una errata lo crea al vuelo) | `Settings → Environments`: créalo con sus dos secrets |
 | `no tiene un projectId real` | Sigue el placeholder `TU-PROJECT-ID-…` | Paso 2 |
 | `El environment 'x' no tiene el secret FIREBASE_SERVICE_ACCOUNT` | El secret está en los de repositorio, o en otro environment, o el environment no existe | Paso 4 — tiene que ser un **environment secret** del environment homónimo |
 | `Failed to authenticate, have you run firebase login?` | `FIREBASE_SERVICE_ACCOUNT` mal pegado: la ruta en vez del contenido, falta una llave, o se «limpiaron» los `\n` del `private_key`. El mensaje es genérico y tapa la causa — con `--debug` sale la de verdad (`invalid_grant`, `error:1E08010C`…) | Volver a pegar el JSON entero, tal cual |
