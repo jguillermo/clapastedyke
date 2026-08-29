@@ -122,10 +122,110 @@ ambientes coincide con el literal que llevan `deploy/firebase.json` (el rewrite 
 
 ---
 
-## Compilar y publicar
+## Compilar y publicar, paso a paso
+
+**El despliegue de verdad se hace SIEMPRE desde GitHub Actions, a mano.** Nada se publica al mezclar
+a `main`: los dos workflows son `workflow_dispatch` puro. Los comandos locales de más abajo existen
+para depurar y para poder reproducir en un portátil exactamente lo que hace el CI — no para publicar
+a diario.
+
+### Paso 0 · Comprobar que el ambiente está listo
+
+Una sola vez por ambiente. Si algo de esto falta, el despliegue falla a mitad y deja el ambiente a
+medias:
 
 ```bash
-npm run build -- dev                      # deploy/dist/hosting + deploy/dist/functions/auth
+./deploy/env.sh dev            # → migo-dev-20b41   (falla si el ambiente no existe o no está montado)
+./deploy/check.sh              # → los dos Client ID coinciden y la región cuadra
+```
+
+Y en GitHub, `Settings → Environments`: tiene que existir un environment **llamado igual que el
+ambiente**, en minúsculas, con sus dos secrets:
+
+| Secret | Para qué |
+|---|---|
+| `FIREBASE_SERVICE_ACCOUNT` | el JSON de la cuenta de servicio con la que se despliega |
+| `GOOGLE_OAUTH_CLIENT_SECRET` | solo el backend: lo copia a Secret Manager antes de subir |
+
+Ese nombre es la bisagra de todo: es lo que hace que `secrets.*` resuelva a las credenciales del
+proyecto correcto sin un solo `if` en el workflow. Montar el ambiente desde cero:
+[«Montar un ambiente nuevo»](#montar-un-ambiente-nuevo).
+
+### Paso 1 · Desplegar el BACKEND
+
+`Actions → Desplegar el BACKEND (Cloud Functions) → Run workflow`, y rellenar:
+
+| Campo | Valor |
+|---|---|
+| **Use workflow from** | la rama que quieres publicar |
+| **ambiente** | `dev` · `prod` … la clave de `deploy/environments.json` |
+| **funcion** | `auth` (el nombre de una carpeta de `api/`) |
+
+Con `gh`, lo mismo desde la terminal:
+
+```bash
+gh workflow run deploy-backend.yml --ref <rama> -f ambiente=dev -f funcion=auth
+gh run watch                                    # sigue la ejecución
+```
+
+Lo que hace, en este orden: valida el ambiente y la función · corre los tests de la función ·
+`npm run build -- dev --only functions` · escribe el client secret en Secret Manager ·
+`./deploy/deploy.sh dev --only functions:auth,firestore:rules`.
+
+### Paso 2 · Desplegar el FRONTEND
+
+`Actions → Desplegar el FRONTEND (Firebase Hosting) → Run workflow`:
+
+| Campo | Valor |
+|---|---|
+| **Use workflow from** | la misma rama |
+| **ambiente** | el mismo ambiente |
+
+```bash
+gh workflow run deploy-frontend.yml --ref <rama> -f ambiente=dev
+gh run watch
+```
+
+Hace: valida el ambiente · `npm run build -- dev --only hosting` ·
+`./deploy/deploy.sh dev --only hosting`. La URL publicada queda enlazada en el recuadro del
+environment de la propia ejecución y en el resumen del job.
+
+> ### El orden importa: BACKEND primero, FRONTEND después
+>
+> La app pide `/api/auth/token` **en cuanto arranca**, para reanudar la sesión. Si publicas el front
+> contra una API vieja, todo el mundo aparece desconectado hasta que suba la API. Al revés no pasa
+> nada: la API nueva atiende igual a la app vieja.
+>
+> Si el cambio toca solo una de las dos mitades, despliega solo esa.
+
+### Paso 3 · Comprobar que funcionó
+
+```bash
+gh run list --workflow=deploy-backend.yml  --limit 3
+gh run list --workflow=deploy-frontend.yml --limit 3
+```
+
+Y en el sitio publicado (`https://<projectId>.web.app`):
+
+1. **`/config.json` es el del ambiente.** `curl -s https://<projectId>.web.app/config.json` tiene que
+   devolver el bloque `front.valores` de ese ambiente — el `googleClientId` es el que se ve a simple
+   vista.
+2. **La función contesta.** `curl -si https://<projectId>.web.app/api/auth/token` debe dar **401**
+   (sin cookie no hay sesión), no 404 ni 500. Un **404** significa que el rewrite no llegó o la
+   función no está desplegada; un **500** con «La función auth no está configurada» significa que
+   falta `GOOGLE_OAUTH_CLIENT_SECRET` en Secret Manager.
+3. **La sesión sobrevive a una recarga.** `/cuenta` → Conectar con Google → **recargar** → sigue
+   conectada. Esto es lo único que ejercita las tres piezas a la vez: el Client ID del front, el del
+   back, y el secreto.
+
+---
+
+### Los mismos comandos, en local
+
+Los workflows no hacen nada más que esto, así que sirve para depurar sin gastar una ejecución:
+
+```bash
+npm run build -- dev                      # las dos mitades → deploy/dist
 npm run build -- dev --only hosting       # solo la app        (lo que usan los E2E)
 npm run build -- dev --only functions     # solo la función
 
@@ -133,14 +233,14 @@ npm run build -- dev --only functions     # solo la función
 ./deploy/deploy.sh dev --only functions:auth,firestore:rules
 ```
 
+Para desplegar desde un portátil hacen falta credenciales:
+`export GOOGLE_APPLICATION_CREDENTIALS=~/.config/clapastedyke/<projectId>-deploy.json` (la clave que
+deja `setup-firebase-project.sh`), o `npx firebase-tools login`.
+
 **El ambiente se elige al compilar, no al desplegar.** Así el artefacto que se prueba es exactamente
 el que se sube; si se decidiera en el `deploy`, el `config.json` del artefacto probado y el publicado
 podrían no ser el mismo fichero. `deploy.sh` lo comprueba antes de subir: si el `config.json` de
-`deploy/dist` no coincide con el ambiente que le pides, se niega.
-
-Los dos workflows (`Desplegar el FRONTEND` / `Desplegar el BACKEND`) hacen exactamente estos dos
-comandos. **El orden importa cuando van los dos: primero el backend**, porque la app llama a
-`/api/auth/token` en cuanto arranca.
+`deploy/dist` no coincide con el ambiente que le pides, se niega y te dice que recompiles.
 
 `deploy.sh` es el **único** sitio del repositorio desde el que se invoca el CLI de Firebase, y lo
 hace con `cd deploy`, de forma que `deploy/firebase.json` y todas sus rutas (`dist/hosting`,

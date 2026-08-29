@@ -10,13 +10,13 @@ name: Desplegar el BACKEND (Cloud Functions)
 # > Cuando un despliegue necesita las dos cosas, el ORDEN importa: primero este y después el
 # > frontend, porque la app llama a `/api/auth/token` desde su arranque.
 #
-# Los ambientes NO se declaran aquí: se leen de `deploy/firebase/environments.json`, igual que en el
+# Los ambientes NO se declaran aquí: se leen de `deploy/environments.json`, igual que en el
 # workflow de hosting. Las funciones tampoco: son las carpetas de `api/`.
 on:
   workflow_dispatch:
     inputs:
       ambiente:
-        description: 'Ambiente: una clave de deploy/firebase/environments.json (dev, prod, …)'
+        description: 'Ambiente: una clave de deploy/environments.json (dev, prod, …)'
         type: string
         required: true
         default: dev

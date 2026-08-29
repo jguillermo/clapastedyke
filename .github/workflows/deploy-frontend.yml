@@ -12,15 +12,15 @@ name: Desplegar el FRONTEND (Firebase Hosting)
 # > frontend. La app llama a `/api/auth/token` desde su arranque, así que publicar el front contra una
 # > API vieja deja a todo el mundo desconectado hasta que la API suba.
 #
-# LOS AMBIENTES NO SE DECLARAN AQUÍ: se leen de `deploy/firebase/environments.json`, que es el único sitio
+# LOS AMBIENTES NO SE DECLARAN AQUÍ: se leen de `deploy/environments.json`, que es el único sitio
 # donde viven. Añadir uno nuevo (stage, lab, qa…) no toca este fichero.
-# Casi todo lo del despliegue vive en `deploy/firebase/` — ver `deploy/firebase/README.md`.
+# Casi todo lo del despliegue vive en `deploy/` — ver `deploy/README.md`.
 # La excepción es `firebase.json`, que el CLI obliga a tener en la raíz.
 on:
   workflow_dispatch:
     inputs:
       ambiente:
-        description: 'Ambiente: una clave de deploy/firebase/environments.json (dev, prod, …)'
+        description: 'Ambiente: una clave de deploy/environments.json (dev, prod, …)'
         type: string
         required: true
         default: dev
