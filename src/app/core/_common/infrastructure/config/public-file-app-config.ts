@@ -54,6 +54,13 @@ export async function readConfigDocument(): Promise<ConfigDocument | null> {
 
 const EMPTY: IntegrationConfig = { googleClientId: null };
 
+/**
+ * Todo Client ID de Google acaba así. Es la forma de distinguir un valor de verdad del **marcador**
+ * `GOOGLE_OAUTH_CLIENT_ID` que lleva el `config.json` versionado y que el pipeline sustituye al
+ * publicar.
+ */
+const CLIENT_ID_SUFFIX = '.apps.googleusercontent.com';
+
 /** El intervalo de siempre, para no cambiar el comportamiento cuando la clave está ausente. */
 const DEFAULT_SYNC_POLL_SECONDS = 120;
 
@@ -79,7 +86,7 @@ export class PublicFileAppConfig extends AppConfig {
     if (!this.document) {
       return EMPTY;
     }
-    return { googleClientId: trimmedOrNull(this.document.googleClientId) };
+    return { googleClientId: clientIdOrNull(this.document.googleClientId) };
   }
 
   get sync(): SyncConfig {
@@ -87,12 +94,31 @@ export class PublicFileAppConfig extends AppConfig {
   }
 }
 
-function trimmedOrNull(value: string | undefined): string | null {
+/**
+ * El Client ID, o `null` si lo que hay no lo es.
+ *
+ * Vacío significa «sin integración» y es un estado normal. Lo que **no** es normal es un valor que
+ * no tiene forma de Client ID: eso solo pasa cuando el marcador del `config.json` versionado llegó
+ * al navegador **sin que el pipeline lo sustituyera**, y tratarlo como bueno pintaría un botón de
+ * «Conectar con Google» que falla con `invalid_client` al pulsarlo.
+ *
+ * Se prefiere apagar la integración: la app sigue siendo utilizable entera —el recetario vive en
+ * IndexedDB— y el `warn` deja dicho qué pasó. Es también lo que hace que un clon recién hecho
+ * funcione sin ejecutar nada.
+ */
+function clientIdOrNull(value: string | undefined): string | null {
   const trimmed = (value ?? '').trim();
-  return trimmed.length > 0 ? trimmed : null;
+
+  if (trimmed.length === 0) {
+    return null;
+  }
+  if (!trimmed.endsWith(CLIENT_ID_SUFFIX)) {
+    return null;
+  }
+  return trimmed;
 }
 
-/** La misma tolerancia que `trimmedOrNull`: el fichero lo escribe una persona a mano. */
+/** La misma tolerancia que `clientIdOrNull`: el fichero lo escribe una persona a mano. */
 function positiveOrDefault(value: number | undefined): number {
   return typeof value === 'number' && Number.isFinite(value) && value > 0
     ? value

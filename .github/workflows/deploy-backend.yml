@@ -1,22 +1,22 @@
 name: Desplegar el BACKEND (Cloud Functions)
 
-# Despliegue MANUAL y SEPARADO del frontend: se lanza desde Actions → Run workflow.
+# Despliegue MANUAL de UNA función. Se lanza desde Actions → Run workflow, eligiendo el ambiente, la
+# función y la rama. No hay disparador automático a propósito: la puerta de calidad es el CI del pull
+# request, y publicar es una decisión.
 #
 # SOLO EL BACKEND (`api/`). El frontend tiene su propio workflow, `deploy-frontend.yml`. Publicar la
-# app y publicar la API son dos decisiones distintas, y por eso son dos ficheros: un cambio de
-# maquetación no puede tirar el servicio de sesión, y arreglar el servicio de sesión no obliga a
-# republicar el front.
+# app y publicar la API son dos decisiones distintas.
 #
-# > Cuando un despliegue necesita las dos cosas, el ORDEN importa: primero este y después el
+# > Cuando un cambio necesita las dos cosas, el ORDEN importa: primero el backend y después el
 # > frontend, porque la app llama a `/api/auth/token` desde su arranque.
 #
-# Los ambientes NO se declaran aquí: se leen de `deploy/environments.json`, igual que en el
-# workflow de hosting. Las funciones tampoco: son las carpetas de `api/`.
+# TODA LA EJECUCIÓN VIVE AQUÍ. El repositorio no tiene scripts de despliegue. Las funciones son las
+# carpetas de `api/`; los ambientes son los *environments* de GitHub. Ver `deploy/README.md`.
 on:
   workflow_dispatch:
     inputs:
       ambiente:
-        description: 'Ambiente: una clave de deploy/environments.json (dev, prod, …)'
+        description: 'Ambiente: el nombre de un environment de GitHub (dev, prod, …)'
         type: string
         required: true
         default: dev
@@ -29,62 +29,17 @@ on:
 permissions:
   contents: read
 
-# Por ambiente y función: desplegar `auth` en dev no espera a un despliegue de otra cosa en prod.
 concurrency:
   group: firebase-api-${{ inputs.ambiente }}-${{ inputs.funcion }}
   cancel-in-progress: false
 
 jobs:
-  # Job aparte y SIN `environment:`, por el mismo motivo que en el workflow de hosting: GitHub crea al
-  # vuelo cualquier environment que un job referencie, así que un nombre mal escrito dejaría sembrado
-  # un environment fantasma antes de fallar.
-  validar:
-    name: Validar ambiente y función
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    outputs:
-      ambiente: ${{ steps.resolver.outputs.ambiente }}
-      funcion: ${{ steps.resolver.outputs.funcion }}
-      project-id: ${{ steps.resolver.outputs.project-id }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Resolver ambiente y función
-        id: resolver
-        env:
-          AMBIENTE_INPUT: ${{ inputs.ambiente }}
-          FUNCION_INPUT: ${{ inputs.funcion }}
-        run: |
-          AMBIENTE="$(printf '%s' "$AMBIENTE_INPUT" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
-          FUNCION="$(printf '%s' "$FUNCION_INPUT" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
-
-          # El mismo script que el workflow de hosting: un solo sitio donde viven los ambientes.
-          if ! project_id="$(./deploy/env.sh "$AMBIENTE" 2>&1)"; then
-            echo "::error::$project_id"
-            exit 1
-          fi
-
-          # Una función es una carpeta de `api/` con su propio paquete. Comprobarlo aquí
-          # convierte una errata en un mensaje claro en vez de en un error del CLI de Firebase.
-          if [ ! -f "api/$FUNCION/package.json" ]; then
-            echo "::error::No existe la función '$FUNCION': falta api/$FUNCION/package.json. Las que hay: $(ls -d api/*/ 2>/dev/null | xargs -n1 basename | tr '\n' ' ')."
-            exit 1
-          fi
-
-          echo "ambiente=$AMBIENTE" >> "$GITHUB_OUTPUT"
-          echo "funcion=$FUNCION" >> "$GITHUB_OUTPUT"
-          echo "project-id=$project_id" >> "$GITHUB_OUTPUT"
-          echo "Función **$FUNCION** → ambiente **$AMBIENTE** → proyecto \`$project_id\`" >> "$GITHUB_STEP_SUMMARY"
-
   desplegar:
-    name: Deploy · ${{ needs.validar.outputs.funcion }} · ${{ needs.validar.outputs.ambiente }}
-    needs: validar
+    name: Deploy · ${{ inputs.funcion }} · ${{ inputs.ambiente }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    # El *environment* de GitHub del mismo nombre que el ambiente es lo que hace que `secrets.*`
-    # resuelva a las credenciales de ESE proyecto de Firebase.
     environment:
-      name: ${{ needs.validar.outputs.ambiente }}
+      name: ${{ inputs.ambiente }}
     steps:
       - uses: actions/checkout@v4
 
@@ -92,63 +47,103 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Tests de la función
-        run: npm --prefix "api/${{ needs.validar.outputs.funcion }}" ci && npm --prefix "api/${{ needs.validar.outputs.funcion }}" test
-
-      # El mismo comando que en un portátil. Deja en `deploy/dist/functions/<fn>/` la función
-      # compilada, su `package.json` y su `.env.<projectId>` con los parámetros públicos del
-      # ambiente — todo dentro de `deploy/`, que es lo único que ve el despliegue.
-      # El Client ID NO está en el repositorio: vive aquí, en el *environment* de GitHub, y de aquí
-      # lo toma el build para escribirlo en el `config.json` del artefacto y en el `.env` de la
-      # función. Un solo origen para las dos mitades, así que no pueden divergir.
-      #
-      # No es un secreto (viaja en cada petición del navegador); está como secret para que el
-      # cliente de Google viva en UN solo sitio, junto a su client secret, y no repartido.
-      - name: Build del backend
+      # Todo lo que puede faltar, comprobado ANTES de compilar o de tocar Secret Manager.
+      - name: Comprobar el environment y la función
         env:
-          AMBIENTE: ${{ needs.validar.outputs.ambiente }}
-          GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
-        run: |
-          if [ -z "$GOOGLE_OAUTH_CLIENT_ID" ]; then
-            echo "::error::El environment '$AMBIENTE' no tiene el secret GOOGLE_OAUTH_CLIENT_ID. Sin él la función se despliega sin poder canjear el código y /exchange contesta 500."
-            exit 1
-          fi
-          npm run build -- "$AMBIENTE" --only functions
-
-      # Fuera del árbol del repositorio: `runner.temp` no está dentro de `api/`.
-      - name: Credenciales de la cuenta de servicio
-        env:
-          AMBIENTE: ${{ needs.validar.outputs.ambiente }}
+          AMBIENTE: ${{ inputs.ambiente }}
+          FUNCION: ${{ inputs.funcion }}
+          PROJECT_ID: ${{ vars.PROJECT_ID }}
+          GOOGLE_OAUTH: ${{ secrets.GOOGLE_OAUTH }}
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
         run: |
-          if [ -z "$FIREBASE_SERVICE_ACCOUNT" ]; then
-            echo "::error::El environment '$AMBIENTE' no tiene el secret FIREBASE_SERVICE_ACCOUNT (manual/firebase-deploy.md, paso 4)."
+          faltan=""
+          [ -n "$PROJECT_ID" ]               || faltan="$faltan variable:PROJECT_ID"
+          [ -n "$GOOGLE_OAUTH" ]             || faltan="$faltan secret:GOOGLE_OAUTH"
+          [ -n "$FIREBASE_SERVICE_ACCOUNT" ] || faltan="$faltan secret:FIREBASE_SERVICE_ACCOUNT"
+          if [ -n "$faltan" ]; then
+            echo "::error::Al environment '$AMBIENTE' le falta:$faltan. Settings → Environments → $AMBIENTE (ver deploy/README.md)."
             exit 1
           fi
+
+          # Una función es una carpeta de `api/` con su propio paquete. Comprobarlo aquí convierte
+          # una errata en un mensaje claro en vez de en un error del CLI de Firebase.
+          if [ ! -f "api/$FUNCION/package.json" ]; then
+            echo "::error::No existe la función '$FUNCION': falta api/$FUNCION/package.json. Las que hay: $(ls -d api/*/ 2>/dev/null | xargs -n1 basename | tr '\n' ' ')."
+            exit 1
+          fi
+          echo "Función **$FUNCION** → ambiente **$AMBIENTE** → proyecto \`$PROJECT_ID\`" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Tests de la función
+        env:
+          FUNCION: ${{ inputs.funcion }}
+        run: npm --prefix "api/$FUNCION" ci && npm --prefix "api/$FUNCION" test
+
+      # Se compila y se **copia** a `deploy/dist/`, que es lo único que ve el despliegue.
+      #
+      # `lib/` lleva DOS árboles, `lib/<fn>/` y `lib/_common/`, porque el tsconfig de la función usa
+      # `rootDir: ".."`. No es un detalle: Firebase empaqueta solo la carpeta de la función, así que
+      # sin `lib/_common/` un `require("../_common/http")` no encontraría nada en producción.
+      #
+      # `node_modules` NO se copia: lo instala Cloud Build desde el lockfile.
+      - name: Build y empaquetado
+        env:
+          FUNCION: ${{ inputs.funcion }}
+        run: |
+          npm --prefix "api/$FUNCION" run build
+
+          DEST="deploy/dist/functions/$FUNCION"
+          rm -rf "$DEST" && mkdir -p "$DEST"
+          cp -R "api/$FUNCION/lib" "$DEST/lib"
+          cp "api/$FUNCION/package.json" "api/$FUNCION/package-lock.json" "api/$FUNCION/.env" "$DEST/"
+
+      # El mismo mecanismo que en el frontend: el marcador vive versionado en `api/<fn>/.env` y se
+      # sustituye SOLO en la copia que viaja.
+      - name: Sustituir los marcadores del artefacto
+        env:
+          FUNCION: ${{ inputs.funcion }}
+          GOOGLE_OAUTH: ${{ secrets.GOOGLE_OAUTH }}
+        run: |
+          ENV_FILE="deploy/dist/functions/$FUNCION/.env"
+          CLIENT_ID="$(printf '%s' "$GOOGLE_OAUTH" | jq -er '.web.client_id')" || {
+            echo "::error::El secret GOOGLE_OAUTH no es el JSON del cliente de Google (falta .web.client_id)."
+            exit 1
+          }
+
+          sed -i "s|GOOGLE_OAUTH_CLIENT_ID=GOOGLE_OAUTH_CLIENT_ID|GOOGLE_OAUTH_CLIENT_ID=${CLIENT_ID}|g" "$ENV_FILE"
+
+          if grep -q '^GOOGLE_OAUTH_CLIENT_ID=GOOGLE_OAUTH_CLIENT_ID$' "$ENV_FILE"; then
+            echo "::error::Ha quedado el marcador sin sustituir en $ENV_FILE."
+            exit 1
+          fi
+
+      - name: Credenciales de la cuenta de servicio
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
           printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "${RUNNER_TEMP}/gcp-key.json"
           echo "GOOGLE_APPLICATION_CREDENTIALS=${RUNNER_TEMP}/gcp-key.json" >> "$GITHUB_ENV"
 
-      # El client secret de OAuth vive en el *environment* de GitHub, junto a las credenciales de
-      # despliegue, y de ahí lo pone este paso en Secret Manager, que es donde lo resuelve el
-      # `defineSecret` de la función. Así montar un ambiente es elegirlo aquí: no hay ningún valor
-      # que alguien tenga que subir a mano desde su portátil.
+      # El client secret NO viaja en el artefacto: la función lo resuelve en ejecución desde Secret
+      # Manager (`defineSecret`). Este paso lo pone ahí, sacándolo del mismo JSON del cliente.
       #
-      # Va por **stdin** (`--data-file -`) a propósito: pasarlo como argumento lo dejaría en la
-      # línea de comandos, visible para cualquier proceso de la máquina.
+      # Va por **stdin** (`--data-file -`) a propósito: como argumento quedaría en la línea de
+      # comandos, visible para cualquier proceso de la máquina. Y `::add-mask::` es obligatorio:
+      # GitHub enmascara el secret ENTERO en los logs, pero no un campo extraído de él.
       #
       # Cada ejecución crea una VERSIÓN nueva del secreto y el `defineSecret` apunta a la última;
       # las viejas se limpian de vez en cuando con `functions:secrets:prune`.
       - name: Client secret de OAuth en Secret Manager
         env:
-          AMBIENTE: ${{ needs.validar.outputs.ambiente }}
-          PROJECT_ID: ${{ needs.validar.outputs.project-id }}
-          GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
+          PROJECT_ID: ${{ vars.PROJECT_ID }}
+          GOOGLE_OAUTH: ${{ secrets.GOOGLE_OAUTH }}
         run: |
-          if [ -z "$GOOGLE_OAUTH_CLIENT_SECRET" ]; then
-            echo "::error::El environment '$AMBIENTE' no tiene el secret GOOGLE_OAUTH_CLIENT_SECRET. Se obtiene con deploy/create-google-client-id.sh (ver deploy/README.md)."
+          CLIENT_SECRET="$(printf '%s' "$GOOGLE_OAUTH" | jq -er '.web.client_secret')" || {
+            echo "::error::El secret GOOGLE_OAUTH no trae .web.client_secret."
             exit 1
-          fi
-          printf '%s' "$GOOGLE_OAUTH_CLIENT_SECRET" | npx --yes firebase-tools@latest \
+          }
+          echo "::add-mask::$CLIENT_SECRET"
+
+          printf '%s' "$CLIENT_SECRET" | npx --yes firebase-tools@latest \
             functions:secrets:set GOOGLE_OAUTH_CLIENT_SECRET \
             --project "$PROJECT_ID" \
             --data-file -
@@ -157,8 +152,15 @@ jobs:
       # recompilan ni se tocan. Es lo que hace que cada una sea un despliegue independiente.
       #
       # Las reglas de Firestore van con la API y no con el hosting: protegen lo que guarda la API.
+      #
+      # `cd deploy` y no `--config`: las rutas de `deploy/firebase.json` son relativas a esa carpeta.
       - name: Deploy de la función
         env:
-          AMBIENTE: ${{ needs.validar.outputs.ambiente }}
-          FUNCION: ${{ needs.validar.outputs.funcion }}
-        run: ./deploy/deploy.sh "$AMBIENTE" --only "functions:$FUNCION,firestore:rules"
+          FUNCION: ${{ inputs.funcion }}
+          PROJECT_ID: ${{ vars.PROJECT_ID }}
+        run: |
+          cd deploy
+          npx --yes firebase-tools@latest deploy \
+            --only "functions:$FUNCION,firestore:rules" \
+            --project "$PROJECT_ID" \
+            --non-interactive

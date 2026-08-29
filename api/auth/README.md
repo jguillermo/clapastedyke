@@ -50,63 +50,63 @@ sessions/{sid}  ← { sub, createdAt, expiresAt }. El `sid` es lo que va en la c
 ## Configuración
 
 **Un solo build; lo que cambia por ambiente son estas dos variables.** Firebase carga el
-`.env.<projectId>` de esta carpeta según el `--project` del despliegue, así que el mismo código
-compilado sirve para todos.
+`.env` de esta carpeta —sin sufijo de proyecto, así que vale para cualquier `--project`—, y por eso
+el mismo artefacto sirve para todos los ambientes.
 
 | Valor | Dónde | Secreto |
 |---|---|---|
-| `GOOGLE_OAUTH_CLIENT_ID` | `.env.<projectId>`, **generado** y no versionado | No — viaja en cada petición del navegador |
+| `GOOGLE_OAUTH_CLIENT_ID` | `.env`, **versionado con un marcador** | No — viaja en cada petición del navegador |
 | `GOOGLE_OAUTH_CLIENT_SECRET` | Secret Manager (`.secret.local` en el emulador) | **Sí** |
 
-**El `.env.<projectId>` no se edita a mano, y no se versiona.** Lo escriben
-[`wire-environment.sh`](../../deploy/wire-environment.sh) (el de esta carpeta, para el emulador) y
-[`build.sh`](../../deploy/build.sh) (el que viaja dentro de `deploy/dist/functions/auth/`).
+**El `.env` está versionado, pero con un MARCADOR dentro, no con un valor:**
 
-```bash
-npm run wire -- local                    # el de aquí — lo pide `npm run emulators`
-npm run build -- dev --only functions    # el del artefacto
+```sh
+GOOGLE_OAUTH_CLIENT_ID=GOOGLE_OAUTH_CLIENT_ID
 ```
 
-**El Client ID tampoco está en `environments.json`.** Ese fichero solo declara, en
-`back.delEntorno`, que sale de la variable `GOOGLE_OAUTH_CLIENT_ID`; el valor lo pone el
-*environment* de GitHub en el CI, y `deploy/.env-secret` en un portátil. El frontend declara **la
-misma** variable, así que hay un solo origen y no pueden divergir —lo vigila
-[`deploy/check.sh`](../../deploy/check.sh)—; cuando divergían, Google rechazaba el canje con
-`invalid_client` sin decir por qué.
+Quien lo sustituye es [`deploy-backend.yml`](../../.github/workflows/deploy-backend.yml), sobre la
+copia que viaja en `deploy/dist/functions/auth/`, con el `web.client_id` del secret `GOOGLE_OAUTH`
+del *environment*. **En el repositorio no hay ningún Client ID**, y en un portátil tampoco: el
+marcador se queda como está y el emulador arranca con él.
 
-El **secreto** sí se reparte a mano, y son dos destinos: `api/auth/.secret.local` (emulador,
-ignorado por git) y el *environment secret* `GOOGLE_OAUTH_CLIENT_SECRET` de GitHub, de donde
-`deploy-backend.yml` lo pone en Secret Manager antes de desplegar. Ningún script lo hace por ti.
+Ese secret trae también el `client_secret`, que el mismo workflow copia a Secret Manager. Un solo
+sitio para las dos cosas, así que no se pueden emparejar el id de un cliente con el secreto de otro
+—que es lo que Google rechaza con `invalid_client` sin decir por qué—.
 
-De dónde salen los dos valores: [`create-google-client-id.sh`](../../deploy/create-google-client-id.sh) crea
-el cliente de Google y los anota en `deploy/.env-secret`. El reparto está en
+Para el **emulador**, el secreto sí se pone a mano, porque la función lo resuelve de un fichero y no
+del JSON:
+
+```sh
+# api/auth/.secret.local   (gitignored)
+GOOGLE_OAUTH_CLIENT_SECRET=<el client_secret>
+```
+
+De dónde sale el cliente: [`create-google-client-id.sh`](../../deploy/create-google-client-id.sh) lo
+crea y te enseña su JSON. El procedimiento completo está en
 [`deploy/README.md`](../../deploy/README.md).
 
 ## Desarrollo y despliegue
 
-Los comandos se lanzan **desde la raíz del repositorio**; el CLI de Firebase lo invoca solo
-[`deploy/deploy.sh`](../../deploy/deploy.sh), que hace `cd deploy` — allí está `firebase.json`, con todas
-sus rutas relativas a esa carpeta.
+Los comandos se lanzan **desde la raíz del repositorio**. El CLI de Firebase solo lo invocan los
+workflows, y siempre con `cd deploy` — allí está `firebase.json`, con todas sus rutas relativas a esa
+carpeta.
 
 ```bash
-npm run api:install                       # npm ci dentro de api/auth
-npm run api:test                          # tests unitarios (node:test)
-npm run wire -- local                     # el .env de esta carpeta y el proxy de ng serve
-npm run emulators                         # functions + firestore, contra el proyecto de `local`
-
-npm run build -- <amb> --only functions   # deja el artefacto en deploy/dist/functions/auth
-./deploy/deploy.sh <amb> --only functions:auth,firestore:rules
+npm run api:install     # npm ci dentro de api/auth
+npm run api:test        # tests unitarios (node:test)
+npm run emulators       # functions + firestore, contra el emulador
+npm start               # ng serve en otra terminal, con el proxy de deploy/proxy.config.json
 ```
 
-En CI, el despliegue va por el workflow `deploy-backend.yml` (manual, con ambiente y función como
-inputs) — separado del `deploy-frontend.yml` a propósito. El workflow corre **esos mismos dos
-comandos**, así que las dos vías hacen literalmente lo mismo.
+**Publicar no es un comando**: es `Actions → Desplegar el BACKEND → Run workflow`, eligiendo ambiente
+y función. Ese workflow compila, empaqueta, sustituye el marcador, pone el `client_secret` en Secret
+Manager y despliega. No hay script equivalente en el repositorio.
 
-Lo que se sube **no es esta carpeta**: es `deploy/dist/functions/auth/`, donde `build.sh` deja el
-`lib/` compilado, el `package.json` y el `.env.<projectId>` del ambiente. `node_modules` no viaja —lo
-instala Cloud Build desde el lockfile—. El `lib/` lleva **dos** árboles, `lib/auth/` y `lib/_common/`,
-porque el `tsconfig.json` usa `rootDir: ".."`: sin eso, un `require("../_common/http")` no encontraría
-nada en producción, donde solo se sube la carpeta de la función.
+Lo que se sube **no es esta carpeta**: es `deploy/dist/functions/auth/`, con el `lib/` compilado, el
+`package.json` y el `.env` ya sustituido. `node_modules` no viaja —lo instala Cloud Build desde el
+lockfile—. El `lib/` lleva **dos** árboles, `lib/auth/` y `lib/_common/`, porque el `tsconfig.json`
+usa `rootDir: ".."`: sin eso, un `require("../_common/http")` no encontraría nada en producción,
+donde solo se sube la carpeta de la función.
 
 ## Detalles que cuesta deducir leyendo
 

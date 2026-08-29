@@ -31,6 +31,19 @@ export function provideAppConfig(document: ConfigDocument | null): EnvironmentPr
       }
       // Un booleano, nunca el valor: el identificador de cliente no va a un registro.
       const { integration, debug } = inject(AppConfig);
+
+      // El `config.json` versionado lleva un MARCADOR donde va el Client ID, y lo sustituye el
+      // pipeline al publicar. Que llegue algo que no es un Client ID significa que esa sustitución
+      // no ocurrió: la integración queda apagada (mejor que un botón que falla al pulsarlo) y aquí
+      // se dice por qué, porque si no es una degradación que nadie ve.
+      const declarado = (document.googleClientId ?? '').trim();
+      if (declarado.length > 0 && integration.googleClientId === null) {
+        log.warn(
+          'el googleClientId de config.json no es un Client ID: la integración queda apagada. ' +
+            'Si esto es un despliegue, el pipeline no sustituyó el marcador',
+        );
+      }
+
       log.debug('configuración cargada', {
         debug,
         oauth: integration.googleClientId !== null,

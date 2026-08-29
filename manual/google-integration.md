@@ -480,7 +480,7 @@ los tecleara un usuario: un insumo llamado «12/03» se volvería fecha y uno qu
 | El esquema de la hoja y la fusión | `core/external-sync/infrastructure/sheet-schema.ts` + `sheet-merge.ts` |
 | La cola durable | `core/external-sync/infrastructure/indexeddb-sync-outbox.ts` |
 | Las cinco ramas de salida de la sincronización | `core/external-sync/application/use-cases/synchronize.use-case.ts` |
-| La configuración del despliegue | `deploy/environments.json` (de ahí se copia a `public/config.json` y al `.env` de la función) |
+| La configuración del despliegue | `public/config.json` y `api/auth/.env`, con marcadores que sustituye el pipeline |
 | La pantalla | `features/account/` |
 
 **Cambiar de proveedor de identidad** es escribir otro `Authenticator` y tocar una línea de

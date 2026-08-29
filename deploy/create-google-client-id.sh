@@ -15,10 +15,11 @@
 # Qué deja hecho:
 #   · la cuenta y el proyecto de Cloud (creado o reutilizado)
 #   · Sheets API y Drive API habilitadas en él
-#   · el Client ID y el client secret anotados en deploy/.env-secret (que NO se versiona)
+#   · el fichero del cliente de Google, en pantalla, listo para pegar
 #
-# Y ahí para: los dos valores quedan escritos, sin repartir. Quién los usa después y dónde acaba
-# cada uno no es asunto de este script.
+# Y ahí para. **No escribe nada, en ningún sitio**: el Client ID y el client secret no se guardan en
+# el repositorio ni en un fichero suelto, se pegan una vez en el secret `GOOGLE_OAUTH` del
+# *environment* de GitHub del ambiente. Ese es su único domicilio.
 #
 # El ÚNICO paso manual es la consola: Google no tiene API ni comando para crear un OAuth client
 # de tipo "Web application" con Authorized JavaScript origins (`gcloud alpha iap oauth-clients`
@@ -66,9 +67,6 @@ open_url() {
     fi
 }
 
-# Lo único que escribe, y por eso lo único que necesita saber del repositorio.
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-ENV_SECRET="${REPO_ROOT}/deploy/.env-secret"
 SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}")"
 
 command -v gcloud >/dev/null 2>&1 || die "Hace falta la CLI de Google Cloud (gcloud). Instálala con:
@@ -76,16 +74,6 @@ command -v gcloud >/dev/null 2>&1 || die "Hace falta la CLI de Google Cloud (gcl
     brew install --cask google-cloud-sdk
 
   o desde https://cloud.google.com/sdk/docs/install , y vuelve a lanzar el script."
-
-command -v git >/dev/null 2>&1 || die "Hace falta git para comprobar que el cuaderno no se versiona."
-
-# Se comprueba AQUÍ, antes de tocar nada, y no en el paso que escribe. La consola enseña el
-# client secret UNA sola vez: morir después de habértelo pedido te obligaría a volver a la
-# consola a generar otro. Lo que puede fallar al final, se comprueba al principio.
-if ! (cd "${REPO_ROOT}" && git check-ignore -q "deploy/.env-secret"); then
-    die "deploy/.env-secret NO está ignorado por git. Añádelo al .gitignore antes de seguir:
-  un secreto versionado hay que rotarlo, no borrarlo."
-fi
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 1 · Cuenta de Google
@@ -392,103 +380,70 @@ info "Abriendo ${CLIENTS_URL}"
 info "La lista completa está en ${CLIENTS_LIST_URL}"
 open_url "${CLIENTS_URL}"
 
-# Se reintenta en vez de morir: una errata al pegar no debería costarte volver a empezar, con lo
-# que cuesta llegar hasta aquí. Línea vacía para salir.
-echo
-while true; do
-    read -r -p "  Pega aquí el Client ID (vacío = salir): " CLIENT_ID
-    CLIENT_ID="$(trim "${CLIENT_ID}")"
-    [[ -n "${CLIENT_ID}" ]] || die "Sin Client ID no hay nada que guardar. El proyecto y las APIs quedan hechos."
-    [[ "${CLIENT_ID}" == *.apps.googleusercontent.com ]] && break
-    warn "Eso no parece un Client ID: tiene que acabar en .apps.googleusercontent.com."
-done
-
-# Es el dato MÁS caro del flujo: Google no lo vuelve a enseñar. Por eso se reintenta en vez de
-# morir, y por eso la salida es una palabra explícita y no una línea vacía — un Enter de más no
-# puede costarte tener que regenerar el cliente.
+# Se pide el fichero ENTERO, no los dos valores por separado: al guardar el cliente, la consola
+# ofrece «Download JSON», y ese fichero ya trae la pareja. Pedir el JSON en vez de dos campos quita
+# de un plumazo el fallo que más cuesta diagnosticar —emparejar el id de un cliente con el secreto
+# de otro—, que Google rechaza con `invalid_client` sin decir por qué.
 #
-# Y no se guarda un lote a medias: el fichero se lee por lotes, y uno con Client ID pero sin secret
-# dejaría emparejado ese ID nuevo con el secret viejo de otro cliente — un fallo que aparecería
-# mucho después y sin relación visible.
+# Se reintenta en vez de morir: una errata al pegar no debería costarte volver a empezar, con lo que
+# cuesta llegar hasta aquí. La salida es la palabra literal `salir` y no una línea vacía — un Enter
+# de más no puede costarte tener que regenerar el secret, que Google solo enseña UNA vez.
 echo
-info "Ahora el Client secret. La consola solo lo enseña una vez; no se verá al teclearlo."
+info "Descarga el JSON del cliente (botón «Download JSON» al guardarlo) y pega su contenido."
+info "Es una sola línea; no se verá al pegarlo, porque lleva el client secret dentro."
 while true; do
-    read -r -s -p "  Client secret (o 'salir' para abortar): " CLIENT_SECRET
+    read -r -s -p "  Pega aquí el JSON del cliente (o 'salir' para abortar): " GOOGLE_OAUTH
     echo
-    CLIENT_SECRET="$(trim "${CLIENT_SECRET}")"
+    GOOGLE_OAUTH="$(printf '%s' "${GOOGLE_OAUTH}" | tr -d '\n')"
 
-    if [[ "${CLIENT_SECRET}" == "salir" ]]; then
+    if [[ "${GOOGLE_OAUTH}" == "salir" ]]; then
         die "Cancelado: no se ha guardado nada.
   El cliente ya existe en la consola; su secret se regenera desde ahí cuando lo necesites."
     fi
-    [[ -n "${CLIENT_SECRET}" ]] && break
-    warn "Vacío. Cópialo de la consola, o escribe 'salir'."
+
+    if [[ -z "${GOOGLE_OAUTH}" ]]; then
+        warn "Vacío. Pega el contenido del fichero, o escribe 'salir'."
+        continue
+    fi
+
+    # Se valida ANTES de escribir: un JSON a medias es un cliente que parece
+    # anotado y no lo está.
+    if ! CLIENT_ID="$(node -e '
+      try {
+        const web = JSON.parse(process.argv[1]).web;
+        if (!web?.client_id || !web?.client_secret) throw new Error("faltan campos");
+        if (!String(web.client_id).endsWith(".apps.googleusercontent.com")) throw new Error("client_id raro");
+        process.stdout.write(web.client_id);
+      } catch (error) {
+        console.error(error.message);
+        process.exit(1);
+      }
+    ' "${GOOGLE_OAUTH}" 2>/dev/null)"; then
+        warn "Eso no es el JSON de un cliente web de Google: tiene que traer web.client_id y web.client_secret."
+        continue
+    fi
+    break
 done
 
+info "Cliente ${CLIENT_ID}"
+
 # ─────────────────────────────────────────────────────────────────────────────
-# 7 · Volcar los dos valores, y parar
+# 7 · Enseñarlo, y parar
 #
-# Van los DOS al mismo sitio aunque solo uno sea secreto: son la pareja que produce una misma
-# visita a la consola, y separarlos obligaría a acordarse de cuál iba dónde. Anotarlos es el
-# final del trabajo de este script; repartirlos, el principio de otro.
+# **No se escribe en ningún sitio.** El cliente tiene un único domicilio, el secret `GOOGLE_OAUTH`
+# del *environment* de GitHub, y de ahí lo saca el pipeline al publicar. Guardar una copia en un
+# fichero del repositorio —aunque estuviera en el .gitignore— solo añadiría un sitio del que puede
+# escaparse y otro que puede quedarse viejo cuando el cliente se rote.
+#
+# Va el fichero ENTERO, no sus campos por separado: es lo que se copia y se pega de una vez, y así
+# no se pueden emparejar el id de un cliente con el secreto de otro.
 # ─────────────────────────────────────────────────────────────────────────────
-step "7 · Guardando el resultado"
+step "7 · El cliente, para pegar"
 
-# Que el cuaderno no se versiona ya se comprobó en el arranque, antes de pedirte nada.
-
-# `>>` crearía el fichero con el umask por defecto, que en macOS deja 644: un secreto legible por
-# cualquier usuario de la máquina. Se crea vacío y se cierra ANTES de escribir nada dentro.
-[[ -f "${ENV_SECRET}" ]] || : >"${ENV_SECRET}"
-chmod 600 "${ENV_SECRET}"
-
-# La leyenda va DENTRO del cuaderno, y una sola vez. Un fichero con dos claves y ninguna pista de
-# a dónde van es un acertijo: se lee semanas después, cuando ya no recuerdas cuál era secreta ni
-# en qué pantalla de GitHub iba. Va arriba, separada por una línea en blanco, así que el lector de
-# lotes (modo párrafo de awk) la trata como un registro más y la ignora.
-if ! grep -q '^# DÓNDE VA CADA DATO' "${ENV_SECRET}" 2>/dev/null; then
-    {
-        printf '# deploy/.env-secret — CUADERNO DE SECRETOS. No se versiona (.gitignore) ni se pega en un chat.\n'
-        printf '#\n'
-        printf '# Se AÑADE, nunca se reescribe: cada alta pega su lote debajo del anterior, y gana el último.\n'
-        printf '# Así, rotar una credencial deja rastro de que la vieja existió.\n'
-        printf '#\n'
-        printf '# DÓNDE VA CADA DATO\n'
-        printf '#\n'
-        printf '#   GOOGLE_OAUTH_CLIENT_ID      NO es secreto: viaja en cada petición del navegador.\n'
-        printf '#                               NO va a ningun fichero versionado. Va a DOS sitios:\n'
-        printf '#                               · GitHub: Settings -> Environments -> <ambiente> ->\n'
-        printf '#                                 secret GOOGLE_OAUTH_CLIENT_ID. De ahi lo lee el paso\n'
-        printf '#                                 de build de los DOS workflows de despliegue.\n'
-        printf '#                               · aqui mismo, para el desarrollo local: los scripts de\n'
-        printf '#                                 deploy/ leen el ultimo lote de este cuaderno.\n'
-        printf '#\n'
-        printf '#   GOOGLE_OAUTH_CLIENT_SECRET  Secreto. Va a DOS sitios:\n'
-        printf '#                               · GitHub: Settings -> Environments -> <ambiente> ->\n'
-        printf '#                                 secret GOOGLE_OAUTH_CLIENT_SECRET. De ahí lo toma\n'
-        printf '#                                 deploy-backend.yml y lo pone en Secret Manager.\n'
-        printf '#                               · api/auth/.secret.local, para el emulador local.\n'
-        printf '#\n'
-        printf '#   FIREBASE_SERVICE_ACCOUNT    Secreto (clave privada). GitHub: mismo environment,\n'
-        printf '#                               secret FIREBASE_SERVICE_ACCOUNT.\n'
-        printf '#\n'
-        printf '# NO HACE FALTA REPARTIRLO A MANO: ./deploy/wire-environment.sh coge el último lote y\n'
-        printf '# lo hace por ti (environments.json, los generados, el emulador y el secret de GitHub).\n'
-    } >>"${ENV_SECRET}"
-fi
-
-# El cuaderno: se AÑADE, nunca se reescribe. Si el cliente se rota, el lote nuevo va debajo y el
-# viejo queda como registro de que existió. Con semántica .env, gana el último.
-{
-    printf '\n# ─── %s · proyecto %s · cliente %s · %s\n' \
-        "$(date '+%Y-%m-%d %H:%M')" "${PROJECT_ID}" "${CLIENT_NAME}" "${SCRIPT_NAME}"
-    printf 'GOOGLE_OAUTH_CLIENT_ID=%s\n' "${CLIENT_ID}"
-    printf 'GOOGLE_OAUTH_CLIENT_SECRET=%s\n' "${CLIENT_SECRET}"
-} >>"${ENV_SECRET}"
-
-unset CLIENT_SECRET
-
-bold "  ✓ deploy/.env-secret ← lote nuevo"
-warn "Ese fichero lleva un secreto en claro: no se versiona y no se pega en un chat."
+warn "Lo que viene lleva el client secret en claro. Cópialo a GitHub y limpia la terminal."
+echo
+printf '%s\n' "${GOOGLE_OAUTH}"
+echo
 
 # ─────────────────────────────────────────────────────────────────────────────
 step "Listo"
@@ -500,24 +455,27 @@ cat <<EOF
   Cliente:     ${CLIENT_NAME}
   Client ID:   ${CLIENT_ID}
 
-  El Client ID y el client secret están en deploy/.env-secret, en el último lote, con una
-  leyenda arriba del fichero que dice a dónde va cada uno.
+  LO QUE SIGUE — pegarlo. Es UNA sola cosa, y va a UN solo sitio:
 
-  LO QUE SIGUE — repartirlos. Ninguno de los dos va a un fichero versionado.
+    GitHub -> Settings -> Environments -> <ambiente> -> Add environment secret
 
-  1. En LOCAL ya está hecho: los scripts de deploy/ leen este cuaderno. Solo falta el secret del
-     emulador, que sí es a mano:
+       Nombre:  GOOGLE_OAUTH
+       Valor:   el JSON de arriba, ENTERO, tal cual
 
-       api/auth/.secret.local     GOOGLE_OAUTH_CLIENT_SECRET=<valor>
+  De ahí sacan los dos workflows lo que necesitan: el `client_id`, que sustituye el marcador del
+  config.json y del .env de la función al publicar, y el `client_secret`, que va a Secret Manager.
+  Sin ese secret, el despliegue se para antes de subir nada.
 
-     y luego cablear:  ./deploy/wire-environment.sh <ambiente>
+  El mismo ambiente necesita además, en ese environment:
 
-  2. En GITHUB, en Settings -> Environments -> <ambiente> -> Add environment secret, los dos:
+       secret    FIREBASE_SERVICE_ACCOUNT   la clave de la cuenta de servicio de despliegue
+       variable  PROJECT_ID                 el proyecto de Firebase
+       variable  DEBUG                      true / false
 
-       GOOGLE_OAUTH_CLIENT_ID       lo lee el paso de build de los dos workflows
-       GOOGLE_OAUTH_CLIENT_SECRET   lo pone en Secret Manager deploy-backend.yml
-
-     Sin cualquiera de los dos, el despliegue se para antes de subir nada.
+  EN LOCAL no hace falta nada de esto: la app arranca sin cliente y funciona entera salvo conectar
+  con Google. Si quieres probar ESE flujo en el emulador, pon el client_secret a mano en
+  api/auth/.secret.local (GOOGLE_OAUTH_CLIENT_SECRET=<valor>) y el client_id en public/config.json,
+  y acuérdate de no commitear ese cambio.
 
   Para revisar o deshacer a mano:
     Proyectos (y borrarlos)   ${PROJECTS_URL}

@@ -75,12 +75,14 @@ export interface AppFixtures {
    * El doble de Google (Identity Services + Sheets + Drive) enganchado a la página.
    *
    * **Solo lo tienen los tests que lo piden**: el resto de la suite carga el `config.json` de verdad,
-   * que trae el `googleClientId` vacío, así que la integración está apagada y no se toca nada de red.
+   * que trae el **marcador** `GOOGLE_OAUTH_CLIENT_ID` sin sustituir. La app solo acepta como Client
+   * ID lo que acaba en `.apps.googleusercontent.com`, así que lo ignora: la integración está
+   * apagada y no se toca nada de red.
    *
-   * Que venga vacío no es casualidad: el Client ID sale de la variable `GOOGLE_OAUTH_CLIENT_ID`, y
-   * `npm run test:e2e` compila con ella **explícitamente vacía**. Así el artefacto que prueba la
-   * suite es el mismo en CI y en un portátil, tenga quien lo lance un cliente de Google cableado o
-   * no. Ver `deploy/README.md`.
+   * Que venga así no es casualidad ni depende de la máquina: ese fichero está **versionado con el
+   * marcador dentro**, y quien lo sustituye es el pipeline, sobre el artefacto que publica. El build
+   * que prueba la suite es idéntico en el CI y en un portátil, tenga quien lo lance un cliente de
+   * Google a mano o no. Ver `deploy/README.md`.
    *
    * Pedirlo instala las rutas **antes de cualquier navegación** (Playwright resuelve los fixtures del
    * test antes del cuerpo), y su estado es la hoja del usuario: se lee y se edita desde el test como lo

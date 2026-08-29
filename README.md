@@ -77,8 +77,7 @@ The session itself is the one piece of backend: [`api/auth`](api/auth/README.md)
 that holds the long-lived grant behind an `HttpOnly` cookie so **reloading the page no longer signs
 you out**. It never sees a recipe — the sync engine still runs entirely in the browser. Setting up
 its environment (Firebase project, Blaze, Firestore, deploy service account) is a separate concern
-with its own script, `./deploy/setup-firebase-project.sh`, documented in
-[`manual/api.md`](manual/api.md).
+a manual one-time setup documented in [`manual/api.md`](manual/api.md).
 
 The reasoning behind that design — why a Google login is unavoidable, why a browser client can never
 hold a refresh token, and which alternatives were measured and rejected — is in
@@ -92,36 +91,33 @@ deploy anything. Run it from `Actions → Desplegar el FRONTEND → Run workflow
 an environment. The Cloud Function has its own workflow; when a change needs both, **deploy the
 backend first**.
 
-**`deploy/` is the only place that knows Firebase.** Nothing outside it names a project id, a region
-or the CLI: the folder holds the environment declaration, the Cloud Function's source, the scripts,
-and `deploy/dist/` — the compiled artifact that is actually published.
+**`deploy/` is the only place that knows Firebase — and it holds no deployment logic.** Compiling,
+substituting and publishing live entirely in the two workflows; the folder keeps configuration, the
+compiled artifact, and one script that registers a Google client and writes nothing.
 
-Environments are **data, not code**:
-[`deploy/environments.json`](deploy/environments.json) is the one and only place where they are
-declared. Each block holds `projectId`, `region`, and the configuration split into `front` (what the
-browser publishes) and `back` (what the Cloud Function resolves), each stating its own `destino` —
-where things get copied to — plus `delEntorno`, which names the **environment variable** a key comes
-from instead of holding its value. That is how the Google Client ID stays out of the repository
-entirely: it lives in the GitHub environment secret, and locally in the gitignored
-`deploy/.env-secret`. A third block, `secretos`, holds **no values**: only the key names and where to
-put them by hand. Today there are three environments — `local`, `dev`, `prod` — and adding one is a
-block in that file plus a matching GitHub Environment holding its three secrets.
+**A value that must not be versioned is never written anywhere.** The file that needs it carries a
+**placeholder** named after the variable — `public/config.json` has
+`"googleClientId": "GOOGLE_OAUTH_CLIENT_ID"` and `"debug": "DEBUG"`, `api/auth/.env` has
+`GOOGLE_OAUTH_CLIENT_ID=GOOGLE_OAUTH_CLIENT_ID` — and both files are versioned, placeholder and all.
+The deploy workflow substitutes them **in the artifact**, right before publishing, and fails the job
+if one survives.
 
-**Nothing generated is versioned**: `public/config.json`, `api/*/.env.*`,
-`deploy/proxy.config.json` and `deploy/dist/`. After cloning, run `npm run wire -- local` to write
-them. Edit `deploy/environments.json`, never a generated file.
+A surviving placeholder does not break anything: the app only accepts a `googleClientId` ending in
+`.apps.googleusercontent.com`, so anything else leaves the integration off with a `warn`, and
+connecting fails with a local, diagnosable message instead of Google's `invalid_client`. That is why
+a fresh clone runs with **nothing executed** — `npm ci && npm start` and you are working.
 
-```bash
-npm run build -- dev --only hosting     # artifact of THAT environment → deploy/dist
-./deploy/deploy.sh dev --only hosting   # the only place `firebase deploy` is invoked
-```
+An environment is declared in its **GitHub environment**, not in this repo: two secrets
+(`GOOGLE_OAUTH`, the client JSON kept whole, and `FIREBASE_SERVICE_ACCOUNT`) and two variables
+(`PROJECT_ID`, `DEBUG`). Adding `stage` touches no file.
+[`deploy/environments.example.json`](deploy/environments.example.json) shows that same picture as a
+file you can read at a glance; nothing consumes it.
 
-The environment is chosen **at build time**, so the artifact that was tested is the one that ships —
-`deploy.sh` refuses to publish a `deploy/dist` built for a different environment. The two workflows
-run exactly these two commands.
+Publishing is `Actions → Desplegar el BACKEND / FRONTEND → Run workflow`, in that order — the app
+calls `/api/auth/token` on boot, so a front published against an old API signs everyone out.
 
-The folder's own guide — the shape of `environments.json`, what each script does, where every secret
-goes, and three things that look like mistakes but are not — is
+The folder's own guide — the placeholders, what each environment configures, publishing step by
+step, and three things that look like mistakes but are not — is
 [`deploy/README.md`](deploy/README.md). The one-time setup (one Firebase project and service account
 per environment, the environment secret, OAuth origins) and the troubleshooting table are in
 [`manual/firebase-deploy.md`](manual/firebase-deploy.md). Start there before the first deploy.

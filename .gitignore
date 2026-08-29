@@ -59,11 +59,10 @@ Thumbs.db
 storybook-static
 /documentation.json
 /dist-dev/
-/deploy/.env-secret
 
-# Todo lo que sale de deploy/environments.json es GENERADO y no se versiona: la única verdad es ese
-# fichero. Lo escriben deploy/wire-environment.sh (local) y deploy/build.sh (el artefacto).
+# El artefacto compilado. Lo produce `ng build` y lo publica el pipeline; nada de él se versiona.
 /deploy/dist/
-/deploy/proxy.config.json
+
+# Los `.env.<projectId>` de las funciones: Firebase los cargaría por encima del `.env` versionado,
+# así que uno olvidado en el disco cambiaría el despliegue sin que se vea en el diff.
 /api/*/.env.*
-/public/config.json

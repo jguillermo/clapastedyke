@@ -30,7 +30,7 @@ Cada carpeta que no empiece por `_` es **una función desplegable**, y es autón
 |---|---|
 | Sus dependencias | su propio `package.json` y su propio `package-lock.json` |
 | Su compilación | su propio `tsconfig.json` |
-| Su despliegue | `./deploy/deploy.sh <ambiente> --only functions:<carpeta>` |
+| Su despliegue | `Actions → Desplegar el BACKEND`, con esa carpeta como `funcion` |
 | Su ruta | `/api/<carpeta>/**`, por un rewrite de Hosting |
 
 **No hay ningún punto de entrada común.** No existe un `api/index.ts` que reexporte las funciones, y
@@ -85,11 +85,9 @@ estructuralmente, y de paso los ayudantes se pueden probar sin levantar nada.
    deliberada: el de despliegue apunta a `dist/functions/<nombre>` (el artefacto, dentro de
    `deploy/`) y el del emulador a `../api/<nombre>` (el fuente, en la raíz).
 4. `.github/workflows/ci.yml`: añadir el nombre a la matriz del job `api`.
-5. `deploy/build.sh` compila y copia cualquier función que tenga un `back.destino.artefacto`
-   declarado; hoy `environments.json` declara uno solo. Una segunda función necesita su propio
-   destino en ese fichero.
-6. Si necesita configuración por ambiente: la clave va a `back.valores` de **cada** ambiente en
-   `deploy/environments.json` (público) y a Secret Manager (secreto).
+5. Si necesita un parámetro público, un `.env` **versionado con su marcador**
+   (`MI_PARAMETRO=MI_PARAMETRO`), y un paso de sustitución en `deploy-backend.yml` como el que ya
+   hay para el Client ID. Si es un secreto, va a Secret Manager con `defineSecret`.
 
 ## El router: la misma ruta llega de dos formas
 
@@ -101,8 +99,7 @@ que acabar en el mismo manejador, y de eso responde `normalizePath()` en
 ## Desarrollo local
 
 ```bash
-npm run wire -- local   # escribe el .env de la función y el proxy (no se versionan)
-npm run emulators       # deploy/emulators.sh: compila la función y arranca functions + firestore
+npm run emulators       # compila la función y arranca functions + firestore
 npm start               # ng serve, con el proxy de deploy/proxy.config.json
 ```
 
@@ -111,8 +108,8 @@ el backend se ve como mismo origen que la app**. Llamando al emulador por su URL
 (`127.0.0.1:5001`) la sesión no se reanudaría nunca en local.
 
 Los secretos del emulador van en `api/<función>/.secret.local`, que está en el `.gitignore` y
-**no lo escribe ningún script**: se copia a mano del último lote de `deploy/.env-secret`. Sin él, el
-emulador arranca igual y `/exchange` contesta 500 — `emulators.sh` avisa antes de arrancar.
+**no lo escribe ningún script**: se copia a mano del JSON del cliente. Sin él, el emulador arranca
+igual y `/exchange` contesta 500.
 
 El emulador usa `deploy/firebase.emulators.json`, no el de despliegue: ejecuta el **fuente** con su
 `lib/` recién compilado, sin `npm ci` ni copiar árboles.
@@ -123,12 +120,12 @@ Publicar la app y publicar la API son **dos decisiones distintas**, y por eso so
 
 | Qué | Workflow | Comando local (desde la raíz) |
 |---|---|---|
-| El frontend | [`deploy-frontend.yml`](../.github/workflows/deploy-frontend.yml) (input: ambiente) | `npm run build -- <amb> --only hosting` + `./deploy/deploy.sh <amb> --only hosting` |
-| El backend, una función | [`deploy-backend.yml`](../.github/workflows/deploy-backend.yml) (inputs: ambiente + función) | `npm run build -- <amb> --only functions` + `./deploy/deploy.sh <amb> --only functions:<fn>,firestore:rules` |
+| El frontend | [`deploy-frontend.yml`](../.github/workflows/deploy-frontend.yml) | input: ambiente |
+| El backend, una función | [`deploy-backend.yml`](../.github/workflows/deploy-backend.yml) | inputs: ambiente + función |
 
-Los workflows corren **esos mismos comandos**, ni uno más. El CLI de Firebase se invoca solo desde
-`deploy/deploy.sh`, que hace `cd deploy`: ahí está `firebase.json`, y sus `source` y `public` son
-relativos a esa carpeta.
+**No hay comando local equivalente, y es deliberado**: el repositorio no tiene scripts de despliegue,
+así que publicar es lanzar el workflow. El CLI de Firebase se invoca solo desde ahí, siempre con
+`cd deploy`: en esa carpeta está `firebase.json`, y sus `source` y `public` son relativos a ella.
 
 Los dos son `workflow_dispatch`: no hay despliegue automático a propósito (ver
 [`firebase-deploy.md`](firebase-deploy.md)).
@@ -151,27 +148,20 @@ alguna, el despliegue muere con un 403 o con un error de configuración, no con 
 > Hosting; el backend necesita las cinco. Si `deploy-frontend` está en verde y `deploy-backend` en
 > rojo, el problema está en esta lista, no en el código ni en el workflow.
 
-### El atajo: un script lo deja hecho
+### No hay atajo: los cinco son a mano
 
-Los cinco requisitos, más el proyecto de Firebase y el secret de GitHub, los monta
-[`deploy/setup-firebase-project.sh`](../deploy/setup-firebase-project.sh) sobre un ambiente de
-`deploy/environments.json`. Es **idempotente**: comprueba antes de actuar, así que se puede
-relanzar sobre un ambiente a medias.
+Antes había un script que los montaba. Ya no: en `deploy/` solo queda
+[`create-google-client-id.sh`](../deploy/create-google-client-id.sh), que da de alta el **cliente de
+Google** y nada más. La infraestructura del proyecto de Firebase se monta una vez por ambiente, con
+los comandos de aquí abajo.
 
-```bash
-./deploy/setup-firebase-project.sh
+Montar un ambiente entero son tres cosas independientes:
+
 ```
-
-Ese script es **solo infraestructura**. Montar un ambiente entero son tres comandos, cada uno con
-una responsabilidad:
-
-```bash
-./deploy/create-google-client-id.sh   # crea el cliente de Google → deploy/.env-secret
-./deploy/setup-firebase-project.sh    # ESTE: la infraestructura del proyecto
-./deploy/wire-environment.sh          # reparte los valores al ambiente
+1. ./deploy/create-google-client-id.sh   el cliente de Google → te enseña su JSON
+2. lo que sigue en esta página           la infraestructura del proyecto de Firebase
+3. Settings → Environments → <amb>       los dos secrets y las dos variables
 ```
-
-Lo que sigue es lo que hace el segundo, a mano.
 
 ### El paso a paso, en orden
 
@@ -198,8 +188,8 @@ Sobre un ambiente nuevo (aquí `<projectId>`), de arriba abajo:
 4. **Conceder los roles a la cuenta de servicio del despliegue** — el `client_email` del JSON que hay
    en el secret `FIREBASE_SERVICE_ACCOUNT` del *environment* de GitHub (requisito 4, el bucle
    `for ROLE in …` de más abajo).
-5. **El secreto de OAuth en el *environment* de GitHub** (requisito 5): `GOOGLE_OAUTH_CLIENT_SECRET`,
-   que lo pone en Secret Manager el propio workflow.
+5. **El cliente de OAuth en el *environment* de GitHub** (requisito 5): el secret `GOOGLE_OAUTH`,
+   con el JSON entero. De él saca el workflow el `client_secret` que pone en Secret Manager.
 6. **Esperar 2–3 minutos** a que propaguen las APIs y los roles.
 7. **Relanzar el workflow `deploy-backend`.**
 
@@ -268,7 +258,7 @@ devuelve la cuenta `firebase-adminsdk-…@<projectId>.iam.gserviceaccount.com`, 
 `firebase.sdkAdminServiceAgent` — sirve para **usar** el Admin SDK en ejecución, no para
 **desplegar** nada. Recién creada, no puede ni consultar si la API de Firestore está encendida.
 
-Por eso [`setup-firebase-project.sh`](../deploy/setup-firebase-project.sh) crea una cuenta propia,
+Por eso se crea una cuenta de servicio propia,
 `clapastedyke-deploy@<projectId>.iam.gserviceaccount.com`, y le concede estos roles explícitamente en
 vez de confiar en los que trae una cuenta prefabricada.
 
@@ -314,13 +304,14 @@ a dar el mismo 403.
 
 ### 5 · El secreto de OAuth, puesto
 
-`api/auth` no arranca sin él ([`api/auth/README.md`](../api/auth/README.md)), pero **no lo subes tú**:
-va como *environment secret* `GOOGLE_OAUTH_CLIENT_SECRET` en GitHub, y `deploy-backend.yml` lo escribe
-en Secret Manager antes de desplegar. Es lo que hace que montar un ambiente sea **elegirlo en
+`api/auth` no arranca sin él ([`api/auth/README.md`](../api/auth/README.md)), pero **no lo subes tú a
+Secret Manager**: lo que subes al *environment* de GitHub es el secret `GOOGLE_OAUTH` —el fichero de
+cliente que descarga Google, entero—, y `deploy-backend.yml` le saca el `client_secret` (con
+`jq`, enmascarándolo con `::add-mask::`) y lo escribe en Secret Manager antes de desplegar. Es lo que hace que montar un ambiente sea **elegirlo en
 Actions**: no queda ningún valor pendiente de que alguien se acuerde de subirlo desde su portátil.
 
 De dónde sale ese valor: [`deploy/README.md`](../deploy/README.md). El script de
-allí lo deja en `deploy/.env-secret` y, si tienes `gh`, en el *environment* directamente.
+allí te lo enseña en pantalla; al *environment* de GitHub se pega a mano.
 
 Si alguna vez hace falta ponerlo a mano:
 
@@ -333,12 +324,9 @@ habilitada falla con el mismo 403 y parece que el secreto no se puede crear. Le 
 del workflow.
 
 El **Client ID** no va en Secret Manager: no es un secreto, y la función lo resuelve de su
-`.env.<projectId>`, un fichero **generado y no versionado**. Lo escribe
-`deploy/wire-environment.sh` (el del emulador) o `deploy/build.sh` (el que viaja en el artefacto),
-en cada cableado y en cada build, leyendo la variable `GOOGLE_OAUTH_CLIENT_ID` que declara
-`back.delEntorno` en `deploy/environments.json` — la misma que usa el frontend, así que no puede
-quedarse vieja ni divergir. El valor sale del *environment* de GitHub en el CI, y de
-`deploy/.env-secret` en local. Ver [`deploy/README.md`](../deploy/README.md).
+`.env`, un fichero **versionado con un marcador** que el workflow sustituye en el artefacto con el
+`web.client_id` del secret `GOOGLE_OAUTH`. El frontend sale del **mismo** secret, así que no pueden
+divergir. Ver [`deploy/README.md`](../deploy/README.md).
 
 ## Cuando el despliegue del backend falla
 
@@ -349,10 +337,10 @@ quedarse vieja ni divergir. El valor sale del *environment* de GitHub en el CI, 
 | `403` más adelante, ya subiendo o compilando | Falta uno de los otros roles | Requisito 4 |
 | `NOT_FOUND … database (default)` al desplegar las reglas | La API de Firestore está habilitada pero **la base no existe** | Requisito 2 |
 | `Billing account … required` / `Your project must be on the Blaze plan` | Proyecto en Spark | Requisito 1 |
-| `El environment '<amb>' no tiene el secret GOOGLE_OAUTH_CLIENT_SECRET` | El *environment* de GitHub no lo declara | Requisito 5 |
+| `El environment '<amb>' no tiene el secret GOOGLE_OAUTH` | El *environment* de GitHub no declara el cliente | Requisito 5 |
 | `Secret GOOGLE_OAUTH_CLIENT_SECRET … does not exist` | El paso que lo pone no llegó a correr (o se desplegó a mano saltándose el workflow) | Requisito 5 |
 | La función responde 500 con «La función auth no está configurada» | Está desplegada, pero le falta el Client ID o el secreto | Requisito 5 y [`api/auth/README.md`](../api/auth/README.md) |
-| `El environment '<amb>' no tiene el secret GOOGLE_OAUTH_CLIENT_ID` | Falta ese secret en el *environment* de GitHub: la función se habría desplegado sin poder canjear el código | [`deploy/README.md`](../deploy/README.md) |
+| `El cliente de GOOGLE_OAUTH no tiene "client_secret"` | El secret está, pero no es el JSON completo del cliente | [`deploy/README.md`](../deploy/README.md) |
 | `No existe la función 'x'` en el job `Validar` | Errata en el input `funcion`: tiene que ser una carpeta de `api/` | El error lista las que hay |
 
 Los fallos de **autenticación** (el JSON del secret mal pegado, la clave revocada) son comunes a los

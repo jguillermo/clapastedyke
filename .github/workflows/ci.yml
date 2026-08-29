@@ -67,23 +67,9 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      # Los ficheros generados (`public/config.json`, el `.env` de cada función, el proxy) ya no se
-      # versionan, así que no pueden derivar. Lo que sí puede es `deploy/environments.json` mismo:
-      # el Client ID está escrito dos veces a propósito (front y back), y la región vive literal en
-      # `deploy/firebase.json` y en el `setGlobalOptions` de la función. Eso es lo que se comprueba.
-      #
-      # No es un riesgo teórico: si el Client ID diverge, Google rechaza el canje con
-      # `invalid_client` y el mensaje no dice por qué.
-      - name: deploy/environments.json es coherente
-        run: ./deploy/check.sh
-
-      # Cablear el ambiente `local` deja `public/config.json` y el proxy, que es lo que `ng serve` y
-      # los E2E esperan encontrar. Si el cableado se rompiera, el CI lo ve aquí y no tres jobs más
-      # tarde con un error incomprensible.
-      - name: Cablear el ambiente local
-        env:
-          GOOGLE_OAUTH_CLIENT_ID: ''
-        run: ./deploy/wire-environment.sh local
+      # Ya no hay guardián de configuración: no hay nada generado que pueda derivar. Los ficheros
+      # que el despliegue necesita están VERSIONADOS con un marcador dentro, y sustituirlo es cosa
+      # del pipeline de despliegue, no de este job.
 
       - name: Prettier (formato)
         run: npm run format:check
@@ -176,17 +162,13 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      # `--only hosting`: los E2E prueban la app, no la función, y compilar el backend costaría un
-      # `npm ci` más. El backend lo cubre el job `api` con sus propios tests.
+      # Compila la app tal cual está en el repositorio: el `config.json` que viaja dentro lleva sus
+      # MARCADORES, así que la integración de Google queda apagada y la suite prueba siempre lo
+      # mismo, aquí y en un portátil. Los tests que necesitan Google instalan su propio doble.
       #
-      # Ambiente `local` porque es el que usan los E2E. `GOOGLE_OAUTH_CLIENT_ID` vacío **a
-      # propósito**: la suite prueba la app con la integración de Google APAGADA, y los tests que
-      # la necesitan instalan su propio doble. Se pone explícito y no se deja al azar de que este
-      # job no tenga `environment:`, para que el build sea el mismo aquí y en un portátil.
+      # El backend no se compila: los E2E prueban la app. Lo cubre el job `api` con sus tests.
       - name: ng build (production, con budgets)
-        env:
-          GOOGLE_OAUTH_CLIENT_ID: ''
-        run: npm run build -- local --only hosting
+        run: npm run build
 
       # Lo consume el job de E2E: la suite prueba el BUILD COMPILADO, no `ng serve`.
       # Sin comprimir: el artefacto vive un día y se descarga dos veces en la misma
