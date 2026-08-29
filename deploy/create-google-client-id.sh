@@ -441,6 +441,38 @@ step "7 · Guardando el resultado"
 [[ -f "${ENV_SECRET}" ]] || : >"${ENV_SECRET}"
 chmod 600 "${ENV_SECRET}"
 
+# La leyenda va DENTRO del cuaderno, y una sola vez. Un fichero con dos claves y ninguna pista de
+# a dónde van es un acertijo: se lee semanas después, cuando ya no recuerdas cuál era secreta ni
+# en qué pantalla de GitHub iba. Va arriba, separada por una línea en blanco, así que el lector de
+# lotes (modo párrafo de awk) la trata como un registro más y la ignora.
+if ! grep -q '^# DÓNDE VA CADA DATO' "${ENV_SECRET}" 2>/dev/null; then
+    {
+        printf '# deploy/.env-secret — CUADERNO DE SECRETOS. No se versiona (.gitignore) ni se pega en un chat.\n'
+        printf '#\n'
+        printf '# Se AÑADE, nunca se reescribe: cada alta pega su lote debajo del anterior, y gana el último.\n'
+        printf '# Así, rotar una credencial deja rastro de que la vieja existió.\n'
+        printf '#\n'
+        printf '# DÓNDE VA CADA DATO\n'
+        printf '#\n'
+        printf '#   GOOGLE_OAUTH_CLIENT_ID      NO es secreto: viaja en cada petición del navegador.\n'
+        printf '#                               Va a deploy/firebase/environments.json, en el\n'
+        printf '#                               config.googleClientId de su ambiente. De ahí se GENERAN\n'
+        printf '#                               public/config.json y api/<funcion>/.env.<projectId>.\n'
+        printf '#\n'
+        printf '#   GOOGLE_OAUTH_CLIENT_SECRET  Secreto. Va a DOS sitios:\n'
+        printf '#                               · GitHub: Settings -> Environments -> <ambiente> ->\n'
+        printf '#                                 secret GOOGLE_OAUTH_CLIENT_SECRET. De ahí lo toma\n'
+        printf '#                                 deploy-backend.yml y lo pone en Secret Manager.\n'
+        printf '#                               · api/auth/.secret.local, para el emulador local.\n'
+        printf '#\n'
+        printf '#   FIREBASE_SERVICE_ACCOUNT    Secreto (clave privada). GitHub: mismo environment,\n'
+        printf '#                               secret FIREBASE_SERVICE_ACCOUNT.\n'
+        printf '#\n'
+        printf '# NO HACE FALTA REPARTIRLO A MANO: ./deploy/wire-environment.sh coge el último lote y\n'
+        printf '# lo hace por ti (environments.json, los generados, el emulador y el secret de GitHub).\n'
+    } >>"${ENV_SECRET}"
+fi
+
 # El cuaderno: se AÑADE, nunca se reescribe. Si el cliente se rota, el lote nuevo va debajo y el
 # viejo queda como registro de que existió. Con semántica .env, gana el último.
 {
@@ -465,7 +497,16 @@ cat <<EOF
   Cliente:     ${CLIENT_NAME}
   Client ID:   ${CLIENT_ID}
 
-  El Client ID y el client secret están en deploy/.env-secret, en el último lote.
+  El Client ID y el client secret están en deploy/.env-secret, en el último lote, con una
+  leyenda arriba del fichero que dice a dónde va cada uno.
+
+  LO QUE SIGUE — repartirlos. No lo hagas a mano:
+
+    ./deploy/wire-environment.sh
+
+  escribe el Client ID en environments.json (y regenera de ahí config.json y el .env de la
+  función), deja el secret en api/auth/.secret.local para el emulador, y lo sube al environment
+  secret GOOGLE_OAUTH_CLIENT_SECRET de GitHub, que es de donde lo toma el despliegue.
 
   Para revisar o deshacer a mano:
     Proyectos (y borrarlos)   ${PROJECTS_URL}
