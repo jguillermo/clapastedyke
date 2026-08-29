@@ -24,7 +24,7 @@ import { SessionHintAccountHistory } from './infrastructure/session-hint-account
  *
  * **En el navegador no se persiste ninguna credencial**: la de acceso vive en memoria y muere con la
  * pestaña, y lo único que se guarda aquí es una pista de con qué cuenta se estaba, que por sí sola no
- * abre nada. Lo que sí dura es una cookie `HttpOnly` que emite el backend (`api/auth`) y que este
+ * abre nada. Lo que sí dura es una cookie `HttpOnly` que emite el backend (`firebase/functions`) y que este
  * código no puede leer — ni él ni un XSS. Ver `BackendAuthenticator`.
  *
  * El app-initializer intenta **reanudar** con esa pista, y lo hace sin esperar: pedirle un token al

@@ -82,7 +82,7 @@ export default defineConfig<AppOptions>({
   ],
 
   /**
-   * Se sirve el **build compilado** (`deploy/dist/hosting`) con un servidor estático
+   * Se sirve el **build compilado** (`firebase/public`) con un servidor estático
    * sin dependencias, no `ng serve`: los tests no necesitan dev server ni watch, y el
    * bundle ya construido carga como en producción (más rápido y determinista).
    * `npm run test:e2e` hace el `ng build` antes de arrancar Playwright.

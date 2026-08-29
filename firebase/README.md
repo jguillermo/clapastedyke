@@ -1,25 +1,40 @@
-# `deploy/` — la configuración y la publicación
+# `firebase/` — la configuración y la publicación
 
 **Fuera de esta carpeta nadie nombra Firebase.** Ni un `projectId`, ni una región, ni el CLI.
 
-Y **aquí dentro no hay lógica de despliegue**: hay *configuración*. La ejecución —compilar,
-sustituir, publicar— vive entera en los dos workflows de `.github/workflows/`. En esta carpeta solo
-queda un script, y no despliega nada: da de alta el cliente de Google.
+Y **aquí dentro no hay lógica de despliegue**: hay *configuración* y el *fuente del backend*. La
+ejecución —compilar, sustituir, publicar— vive entera en
+[`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml).
 
 ```
-deploy/
-├── create-google-client-id.sh    el ÚNICO script; no despliega, no escribe nada
-├── environments.example.json     EJEMPLO. Nadie lo lee. Qué configura un ambiente, de un vistazo
-├── firebase.json                 config de despliegue (rutas relativas a deploy/)
-├── firebase.emulators.json       config del emulador (apunta al FUENTE, no al artefacto)
-├── firestore.rules               + firestore.indexes.json
-├── proxy.config.json             el proxy de `ng serve` hacia el emulador — versionado
+firebase/
+├── firebase.json          config de despliegue Y del emulador (rutas relativas a firebase/)
+├── .firebaserc            el proyecto por defecto, solo para el emulador y los comandos a mano
+├── firestore.rules        + firestore.indexes.json
+├── proxy.config.json      el proxy de `ng serve` hacia el emulador — versionado
 ├── README.md
-└── dist/                         el ARTEFACTO que produce `ng build`  ·  gitignored
+├── functions/             EL BACKEND: un paquete npm independiente, con su tsconfig y su ESLint
+│   ├── .env               VERSIONADO, con MARCADORES — nunca con valores
+│   ├── package.json       sus dependencias, su build, su lint
+│   └── src/index.ts       exporta `auth` → /api/auth/**
+└── public/                el ARTEFACTO que produce `ng build`  ·  gitignored
 ```
 
-El **fuente** no está aquí: la app es `src/` y las Cloud Functions son `api/`, cada una con su
-paquete — ver [`manual/api.md`](../manual/api.md).
+## CRITICAL: `ng build` compila DENTRO de `firebase/public`
+
+No hay carpeta `dist/` que copiar a ninguna parte. `angular.json` declara
+`outputPath: "firebase/public"`, que es exactamente lo que `firebase.json` publica
+(`"hosting": { "public": "public" }`). **Compilar es preparar el deploy**: lo que hay en esa carpeta
+después de `npm run build` es, fichero a fichero, lo que se sube.
+
+De ahí salen dos reglas:
+
+- **`firebase/public/` está en `.gitignore`.** Es artefacto, no fuente. No se versiona nada de lo
+  que hay dentro, y por eso se borró el `index.html` de bienvenida que dejó `firebase init`: el
+  build lo pisaba en cada compilación.
+- **`ng build` vacía la carpeta antes de escribir.** No dejes ahí nada que quieras conservar.
+
+El **fuente** de la app es `src/`; el del backend, `functions/`.
 
 ---
 
@@ -27,7 +42,7 @@ paquete — ver [`manual/api.md`](../manual/api.md).
 
 1. **Un valor que no debe versionarse no se escribe en ningún sitio.** El fichero que lo necesita
    lleva un **marcador** con el nombre de la variable, versionado y a la vista.
-2. **El pipeline sustituye ese marcador** en el artefacto, justo antes de publicar. El repositorio
+2. **El pipeline sustituye ese marcador** en el runner, justo antes de publicar. El repositorio
    nunca contiene un Client ID.
 3. **Un ambiente se declara en su *environment* de GitHub**, no en el repositorio: **dos secrets, y
    nada más**. Añadir `stage` no toca ni un fichero.
@@ -39,12 +54,18 @@ lo que se publica es una copia con el valor real:
 
 | Fichero | Marcador | Lo sustituye |
 |---|---|---|
-| `public/config.json` | `"googleClientId": "GOOGLE_OAUTH_CLIENT_ID"` · `"debug": "DEBUG"` | los dos workflows, sobre `deploy/dist/hosting/config.json` |
-| `api/auth/.env` | `GOOGLE_OAUTH_CLIENT_ID=GOOGLE_OAUTH_CLIENT_ID` | `deploy-backend.yml`, sobre la copia de `deploy/dist/functions/auth/` |
+| `public/config.json` | `"googleClientId": "GOOGLE_OAUTH_CLIENT_ID"` · `"debug": "DEBUG"` | `deploy.yml`, sobre `firebase/public/config.json` ya compilado |
+| `firebase/functions/.env` | `GOOGLE_OAUTH_CLIENT_ID=…` · `GOOGLE_OAUTH_CLIENT_SECRET=…` | `deploy.yml`, sobre la copia del runner |
 
-`api/auth/.env` va **sin sufijo de proyecto** a propósito: Firebase carga ese fichero para cualquier
-`--project`, así que el mismo artefacto sirve para todos los ambientes. Un `.env.<projectId>` olvidado
-en el disco lo pisaría sin que se vea en el diff, y por eso ese patrón sigue en el `.gitignore`.
+> **El `.env` se sustituye en el árbol de trabajo del runner, no en una copia aparte.** Firebase
+> empaqueta `functions/` desde el fuente, así que no hay artefacto intermedio donde hacerlo. El
+> runner es efímero y el paso **no imprime el fichero** (lleva el client secret, además enmascarado
+> con `::add-mask::`). Lo que no se puede hacer nunca es ejecutar esa sustitución en tu portátil y
+> olvidarte de revertirla.
+
+`functions/.env` va **sin sufijo de proyecto** a propósito: Firebase carga ese fichero para cualquier
+`--project`, así que el mismo código sirve para todos los ambientes. Un `.env.<projectId>` olvidado
+en el disco lo pisaría sin que se vea en el diff, y por eso ese patrón está en el `.gitignore`.
 
 > ### Un marcador sin sustituir NO rompe la app
 >
@@ -63,23 +84,24 @@ en el disco lo pisaría sin que se vea en el diff, y por eso ese patrón sigue e
 ## Lo que se configura por ambiente
 
 En GitHub, `Settings → Environments → <ambiente>`. El nombre del environment **es** el nombre del
-ambiente: eso es lo que hace que `secrets.*` y `vars.*` resuelvan a los de ese proyecto sin un solo
-`if` en el workflow.
+ambiente: eso es lo que hace que `secrets.*` resuelva a los de ese proyecto sin un solo `if` en el
+workflow.
 
 | | Nombre | Qué es |
 |---|---|---|
 | secret | `GOOGLE_OAUTH_CLIENT` | el fichero de cliente que descarga Google, **entero** |
 | secret | `FIREBASE_SERVICE_ACCOUNT` | la clave JSON de la cuenta de servicio de despliegue |
 
-**Y nada más: no hay variables.** Los dos valores que antes eran variables ya no se configuran:
+**Y nada más: no hay variables.**
 
 - **`PROJECT_ID`** se **deduce** del `project_id` de la propia cuenta de servicio. Un solo sitio que
   mantener, y desaparece la clase entera de fallos en que se despliega a un proyecto con las
   credenciales de otro: si la clave es la de `migo-dev-c5e23`, se publica en `migo-dev-c5e23`.
+  El `.firebaserc` de esta carpeta **no interviene** en los despliegues: los workflows pasan siempre
+  `--project` explícito. Solo lo usan el emulador y los comandos que lances a mano.
 - **`DEBUG`** es un **input del workflow del frontend**, con la casilla en el mismo formulario de
   `Run workflow`. Publicar ya es una decisión manual, así que la toma quien publica, en ese momento,
-  sin editar nada en GitHub ni volver a desplegar para cambiarla. [`environments.example.json`](environments.example.json) enseña esa misma foto en un
-fichero, para poder mirarla sin entrar en GitHub; **no lo lee nadie**.
+  sin editar nada en GitHub ni volver a desplegar para cambiarla.
 
 ### Por qué el cliente va entero y en un solo secret
 
@@ -92,8 +114,8 @@ De los siete campos del JSON, el despliegue usa **dos**:
 | Campo | ¿Se usa? | Para qué |
 |---|---|---|
 | `client_id` | **Sí** | sustituye el marcador en el `config.json` y en el `.env` de la función |
-| `client_secret` | **Sí** | lo copia `deploy-backend.yml` a Secret Manager |
-| `token_uri` | No | está literal en `api/auth/google-oauth.ts`, y es el mismo para todo el mundo |
+| `client_secret` | **Sí** | sustituye el marcador del `.env` de la función |
+| `token_uri` | No | está literal en el código de la función, y es el mismo para todo el mundo |
 | `auth_uri` | No | la app usa la ventana de GIS (`initCodeClient`), no el flujo de redirección |
 | `auth_provider_x509_cert_url` | No | el `id_token` **no se verifica**: llega del propio canje contra Google por TLS (OIDC §3.1.3.7) |
 | `project_id` | No | ⚠ es el proyecto de **Cloud del cliente OAuth**, que **no** es el de Firebase |
@@ -103,28 +125,27 @@ De los siete campos del JSON, el despliegue usa **dos**:
 
 ## Qué tiene que existir ya en Firebase
 
-**El pipeline publica; no aprovisiona.** Antes había un script que montaba el proyecto —ya no—, así
-que si algo de esto falta el despliegue **falla**, y el error del CLI casi nunca dice cuál es. Es de
-**una sola vez por ambiente**:
+**El pipeline publica; no aprovisiona.** Si algo de esto falta el despliegue **falla**, y el error
+del CLI casi nunca dice cuál es. Es de **una sola vez por ambiente**:
 
 | Qué | Lo necesita | Si falta |
 |---|---|---|
 | **Plan Blaze** | functions | `Your project must be on the Blaze plan` |
 | **Hosting activado** en la consola (*Compilación → Hosting → Comenzar*) | hosting | el deploy no encuentra sitio al que publicar |
 | **Base de datos de Firestore creada** — habilitar la API **no** la crea | `firestore:rules` | `NOT_FOUND … database (default)` |
-| **Seis APIs**: `secretmanager`, `cloudfunctions`, `run`, `cloudbuild`, `artifactregistry`, `firestore` | functions | `403 … has not been used in project` |
-| **Cuenta de servicio con diez roles** | los dos | `403 … Permission denied` |
+| **Cinco APIs**: `cloudfunctions`, `run`, `cloudbuild`, `artifactregistry`, `firestore` | functions | `403 … has not been used in project` |
+| **Cuenta de servicio con ocho roles** | los dos | `403 … Permission denied` |
 
-Los cinco, con los comandos exactos, están en [`manual/api.md`](../manual/api.md) → «Requisitos del
-proyecto de Firebase». **El frontend necesita mucho menos que el backend**: si `deploy-frontend` va
-en verde y `deploy-backend` en rojo, el problema está en esa lista, no en el código.
+Los cinco, con los comandos exactos, están en [`manual/functions.md`](../manual/functions.md) →
+«Requisitos del proyecto de Firebase». **El frontend necesita mucho menos que el backend**: si
+el deploy falla en la parte de la función, el problema está en esa lista, no en el código.
 
 ```bash
 # comprobación rápida antes de lanzar nada
 gcloud projects describe <projectId> --format='value(lifecycleState)'   # ACTIVE
 gcloud billing projects describe <projectId> --format='value(billingEnabled)'
 gcloud firestore databases list --project <projectId>
-gcloud services list --enabled --project <projectId> | grep -E 'secretmanager|cloudfunctions|run\.|cloudbuild|artifactregistry|firestore'
+gcloud services list --enabled --project <projectId> | grep -E 'cloudfunctions|run\.|cloudbuild|artifactregistry|firestore'
 ```
 
 ---
@@ -132,46 +153,51 @@ gcloud services list --enabled --project <projectId> | grep -E 'secretmanager|cl
 ## Publicar, paso a paso
 
 **El despliegue se hace SIEMPRE desde GitHub Actions, a mano.** Nada se publica al mezclar a `main`:
-los dos workflows son `workflow_dispatch` puro.
+el workflow es `workflow_dispatch` puro. Los dos que `firebase init` generaba
+—`firebase-hosting-merge.yml` y `firebase-hosting-pull-request.yml`— se borraron por eso mismo: si
+`firebase init` vuelve a crearlos, se borran otra vez.
 
-### Paso 1 · Desplegar el BACKEND
+### Paso 1 · Lanzar el workflow
 
-`Actions → Desplegar el BACKEND (Cloud Functions) → Run workflow`:
+`Actions → Desplegar (Firebase) → Run workflow`:
 
 | Campo | Valor |
 |---|---|
 | **Use workflow from** | la rama que quieres publicar |
 | **ambiente** | `dev` · `prod` … el nombre de un environment de GitHub |
-| **funcion** | `auth` (el nombre de una carpeta de `api/`) |
+| **debug** | ¿se ve el detalle del flujo en la consola? |
 
 ```bash
-gh workflow run deploy-backend.yml --ref <rama> -f ambiente=dev -f funcion=auth
+gh workflow run deploy.yml --ref <rama> -f ambiente=dev
 gh run watch
 ```
 
-Hace: comprobar el environment · tests de la función · `tsc` y empaquetar en
-`deploy/dist/functions/auth/` · sustituir el marcador del `.env` · `client_secret` → Secret Manager ·
-`firebase deploy --only functions:auth,firestore:rules`.
+**No se elige qué se publica: siempre se despliega todo.** Hace: comprobar el environment ·
+`npm run build` (que escribe en `firebase/public`) · `npm ci` en `functions/` · sustituir los
+marcadores de `config.json` y de `.env` · **`firebase deploy`**. **Nada más que Firebase**: publicar
+no habla con ninguna otra API de Google.
 
-### Paso 2 · Desplegar el FRONTEND
-
-`Actions → Desplegar el FRONTEND (Firebase Hosting) → Run workflow`, con la misma rama y ambiente.
-
-```bash
-gh workflow run deploy-frontend.yml --ref <rama> -f ambiente=dev
-gh run watch
-```
-
-Hace: comprobar el environment · `npm run build` · sustituir los marcadores de
-`deploy/dist/hosting/config.json` · `firebase deploy --only hosting`.
-
-> ### El orden importa: BACKEND primero, FRONTEND después
+> ### Por qué UN workflow y UN comando
 >
-> La app pide `/api/auth/token` **en cuanto arranca**, para reanudar la sesión. Si publicas el front
-> contra una API vieja, todo el mundo aparece desconectado hasta que suba la API. Al revés no pasa
-> nada. Si el cambio toca solo una mitad, despliega solo esa.
+> Hay un solo `firebase.json`, y `firebase deploy` **sin `--only`** despliega sus tres targets
+> —`firestore`, `functions` y `hosting`— de una vez. Antes eran dos workflows porque el backend
+> vivía en `api/`, con una carpeta y un *codebase* por función, y publicar una no debía tocar las
+> demás. Con `firebase/functions` como paquete único eso dejó de aplicar.
+>
+> Que se despliegue **todo, siempre** es lo que impide que la app y la función que le sirve
+> `/api/auth/**` queden desparejadas. La app pide `/api/auth/token` **en cuanto arranca**: con dos
+> lanzamientos manuales, hacerlos al revés dejaba a todo el mundo desconectado hasta el segundo.
+>
+> Los cuatro pasos anteriores están porque `firebase deploy` **no** compila Angular, **no** instala
+> las dependencias de la función (sus `predeploy` —lint + `tsc`— corren en el runner, dentro del
+> propio deploy), **no** sustituye marcadores y **no** se autentica solo. Nada de eso es una
+> decisión: es lo que el comando no hace.
 
-### Paso 3 · Comprobar que funcionó
+> **Si el despliegue implicara borrar una función ya publicada**, `--non-interactive` planta el CLI
+> y pide `--force` en vez de hacerlo callando. Es la red que evita que un `src/index.ts` vacío se
+> lleve por delante lo que ya estaba.
+
+### Paso 2 · Comprobar que funcionó
 
 En el sitio publicado (`https://<PROJECT_ID>.web.app`):
 
@@ -180,8 +206,8 @@ En el sitio publicado (`https://<PROJECT_ID>.web.app`):
    alguno, pero esto lo confirma en el sitio servido.)
 2. **La función contesta.** `curl -si https://<projectId>.web.app/api/auth/token` debe dar **401**
    (sin cookie no hay sesión), no 404 ni 500. Un **404** significa que el rewrite no llegó o la
-   función no está desplegada; un **500** con «La función auth no está configurada» significa que
-   falta `GOOGLE_OAUTH_CLIENT_SECRET` en Secret Manager.
+   función no está desplegada; un **500** con «La función auth no está configurada» significa que un
+   marcador del `.env` llegó sin sustituir.
 3. **La sesión sobrevive a una recarga.** `/cuenta` → Conectar con Google → **recargar** → sigue
    conectada. Es lo único que ejercita las tres piezas a la vez: el Client ID del front, el del back
    y el secreto.
@@ -193,22 +219,23 @@ Los workflows no hacen nada que no puedas hacer tú; sirve para depurar sin gast
 ```bash
 npm run build
 CLIENT_ID=123-abc.apps.googleusercontent.com
-sed -i '' "s|GOOGLE_OAUTH_CLIENT_ID|${CLIENT_ID}|g" deploy/dist/hosting/config.json
-sed -i '' 's|"DEBUG"|true|g'                        deploy/dist/hosting/config.json
-npm run e2e:serve          # sirve deploy/dist/hosting en :4200
+sed -i '' "s|GOOGLE_OAUTH_CLIENT_ID|${CLIENT_ID}|g" firebase/public/config.json
+sed -i '' 's|"DEBUG"|true|g'                        firebase/public/config.json
+npm run e2e:serve          # sirve firebase/public en :4200
 ```
 
 (En el runner es `sed -i`; el `''` es cosa del sed de macOS.)
 
-Desplegar a mano se puede, pero se hace **desde `deploy/`**, nunca desde la raíz:
+Desplegar a mano se puede, pero se hace **desde `firebase/`**, nunca desde la raíz:
 
 ```bash
-cd deploy && npx --yes firebase-tools@latest deploy --only hosting --project <projectId>
+cd firebase && npx --yes firebase-tools@latest deploy --only hosting --project <projectId>
 ```
 
 El CLI fija la raíz del proyecto en el directorio de su `firebase.json` y **rechaza cualquier ruta
-que se salga de ella**. Como el artefacto se genera en `deploy/dist`, todo queda dentro — y eso es
-justo lo que permite que Firebase no aparezca en ningún otro sitio del repositorio.
+que se salga de ella**. Como el artefacto se genera en `firebase/public` y el backend está en
+`firebase/functions`, todo queda dentro — y eso es justo lo que permite que Firebase no aparezca en
+ningún otro sitio del repositorio.
 
 ---
 
@@ -228,18 +255,21 @@ cliente.
 llamaría al emulador por su URL directa y la cookie `HttpOnly` + `SameSite=Lax` no viajaría nunca —la
 sesión no se reanudaría jamás en local—.
 
-El emulador usa [`firebase.emulators.json`](firebase.emulators.json) y no el de despliegue: ejecuta
-el **fuente** de `api/auth` con su `lib/` recién compilado, sin `npm ci` ni copiar árboles.
+**Hay un solo `firebase.json`**, con la sección `emulators` dentro: el emulador ejecuta el mismo
+`functions/` que se despliega, con su `lib/` recién compilado. (Antes había un
+`firebase.emulators.json` aparte porque el despliegue apuntaba a un artefacto copiado y el emulador
+al fuente; ahora los dos apuntan al mismo sitio y ese fichero sobra.)
 
 ### Si de verdad necesitas probar el login en local
 
 Es el único caso que pide tocar algo a mano, y **no se commitea**:
 
 ```bash
-# api/auth/.secret.local     (gitignored; la función lo lee en el emulador)
+# firebase/functions/.env.local   (gitignored; lo carga el emulador POR ENCIMA del .env versionado)
+GOOGLE_OAUTH_CLIENT_ID=<el client_id>
 GOOGLE_OAUTH_CLIENT_SECRET=<el client_secret>
 
-# public/config.json         (versionado: acuérdate de revertirlo)
+# public/config.json              (versionado: acuérdate de revertirlo)
 "googleClientId": "<el client_id>"
 ```
 
@@ -249,15 +279,15 @@ GOOGLE_OAUTH_CLIENT_SECRET=<el client_secret>
 
 Tres cosas, y ninguna la hace un script del proyecto:
 
-1. **El cliente de Google** — [`create-google-client-id.sh`](create-google-client-id.sh) crea el
+1. **El cliente de Google** — [`create-google-client-id.sh`](../create-google-client-id.sh) crea el
    proyecto de Cloud, habilita Sheets y Drive, te lleva a la consola y te enseña el JSON del cliente.
    No escribe nada.
-2. **El proyecto de Firebase** — a mano: plan Blaze, base de Firestore creada, seis APIs, cuenta de
-   servicio con diez roles. El paso a paso está en [`manual/api.md`](../manual/api.md) →
-   «Requisitos del proyecto de Firebase».
+2. **El proyecto de Firebase** — a mano: plan Blaze, base de Firestore creada, cinco APIs, cuenta de
+   servicio con ocho roles. El paso a paso está en
+   [`manual/functions.md`](../manual/functions.md) → «Requisitos del proyecto de Firebase».
 3. **El environment de GitHub** con el nombre del ambiente y sus dos secrets (la tabla de arriba).
 
-Después, `Actions → Desplegar el BACKEND` y luego el FRONTEND.
+Después, `Actions → Desplegar (Firebase) → Run workflow`.
 
 ---
 
@@ -265,18 +295,19 @@ Después, `Actions → Desplegar el BACKEND` y luego el FRONTEND.
 
 **1 · `firebase.json` está aquí, y sus rutas son relativas a esta carpeta.** El CLI fija la raíz del
 proyecto en el directorio de su `firebase.json` y se niega a servir nada de fuera
-(`… is outside of project directory`). Como el artefacto se genera en `deploy/dist`, todas las rutas
-quedan dentro. Por eso los workflows hacen `cd deploy` en vez de usar `--config`: así el CLI no tiene
-margen para deducir otra raíz.
+(`… is outside of project directory`). Como el artefacto se genera en `public/` y el backend está en
+`functions/`, todas las rutas quedan dentro. Por eso los workflows hacen `cd firebase` en vez de usar
+`--config`: así el CLI no tiene margen para deducir otra raíz.
 
 **2 · No hay rewrite de SPA, y el shell va `no-cache`.** La app enruta por fragmento
-(`withHashLocation`), así que `/` es la **única** ruta que llega al servidor. Un fallback `**`
-devolvería `index.html` con 200 para un chunk borrado, y el navegador intentaría ejecutarlo como
-JavaScript. La cabecera de `/index.html` no bastaba porque el shell se sirve en `/`; de ahí la
-entrada aparte.
+(`withHashLocation`), así que `/` es la **única** ruta que llega al servidor. El `"source": "**" →
+/index.html` que mete `firebase init` **se quitó a propósito**: devolvería `index.html` con 200 para
+un chunk borrado —y el navegador intentaría ejecutarlo como JavaScript— y además se tragaría
+`/api/auth/token`, que no lleva punto. La cabecera de `/index.html` no basta porque el shell se sirve
+en `/`; de ahí la entrada aparte.
 
 **3 · El ambiente se teclea en Actions.** Un `type: choice` obligaría a duplicar la lista de
-ambientes en los dos workflows. GitHub crea al vuelo cualquier environment que un job referencie, así
+ambientes dentro del propio workflow. GitHub crea al vuelo cualquier environment que un job referencie, así
 que una errata deja un environment vacío — y el primer paso del workflow lo caza diciendo qué
 secret le falta, antes de compilar nada.
 
@@ -289,15 +320,15 @@ cuenta y guardar copia del recetario en su propio Drive. Diez minutos.
 
 Los rótulos y las URLs van **en inglés** porque Google Cloud Console está en inglés.
 
-> **Atajo:** [`create-google-client-id.sh`](create-google-client-id.sh) hace por ti el login,
-> **crea el proyecto** y habilita las dos APIs, te abre **las dos pantallas de la consola en su
-> orden** —primero el consentimiento (§2), después el cliente (§3)— y te **enseña el JSON del
-> cliente** para que lo pegues en GitHub. Ahí para: **no escribe nada, en ningún sitio**.
-> Crea siempre un proyecto nuevo —es el alta de un cliente, no un añadido a algo que ya tengas—.
-> Estos pasos son lo mismo, a mano.
+> **Atajo:** [`create-google-client-id.sh`](../create-google-client-id.sh) (en la raíz del
+> repositorio) hace por ti el login, **crea el proyecto** y habilita las dos APIs, te abre **las dos
+> pantallas de la consola en su orden** —primero el consentimiento (§2), después el cliente (§3)— y
+> te **enseña el JSON del cliente** para que lo pegues en GitHub. Ahí para: **no escribe nada, en
+> ningún sitio**. Crea siempre un proyecto nuevo —es el alta de un cliente, no un añadido a algo que
+> ya tengas—. Estos pasos son lo mismo, a mano.
 >
 > ```bash
-> ./deploy/create-google-client-id.sh
+> ./create-google-client-id.sh
 > ```
 
 > **Esto es OAuth, y solo OAuth.** Lo de aquí es el permiso que **el usuario** te concede sobre
@@ -307,7 +338,7 @@ Los rótulos y las URLs van **en inglés** porque Google Cloud Console está en 
 > Pegar el JSON en el environment es
 > [«Montar un ambiente nuevo»](#montar-un-ambiente-nuevo). La infraestructura del ambiente —Blaze,
 > Firestore, las APIs de despliegue, la cuenta de servicio— es una tercera cosa, y va a mano, con el
-> paso a paso de [`manual/api.md`](../manual/api.md).
+> paso a paso de [`manual/functions.md`](../manual/functions.md).
 
 ---
 
@@ -321,10 +352,10 @@ Los rótulos y las URLs van **en inglés** porque Google Cloud Console está en 
 > habilitadas.
 
 **Estas dos, y ninguna más.** Son las que hacen que existan los scopes de Sheets y Drive. Las de la
-infraestructura —`secretmanager`, `cloudfunctions`, `run`, `cloudbuild`, `artifactregistry`,
-`firestore`— no tienen nada que ver con el consentimiento del usuario: van en el proyecto de
+infraestructura —`cloudfunctions`, `run`, `cloudbuild`, `artifactregistry`, `firestore`— no tienen
+nada que ver con el consentimiento del usuario: van en el proyecto de
 **Firebase**, se habilitan a mano al montar el ambiente, y su porqué está en
-[`manual/api.md`](../manual/api.md) → requisito 3.
+[`manual/functions.md`](../manual/functions.md) → requisito 3.
 
 ---
 
@@ -348,7 +379,7 @@ infraestructura —`secretmanager`, `cloudfunctions`, `run`, `cloudbuild`, `arti
   por el techo de usuarios:
 
   > ⚠️ **En «Testing», Google caduca los refresh tokens a los 7 días.** El backend
-  > ([`api/auth`](../api/auth/README.md)) es quien custodia ese permiso, así que con el proyecto en
+  > ([`firebase/functions`](functions/)) es quien custodia ese permiso, así que con el proyecto en
   > Testing **la sesión se perdería cada semana** — el fallo que este diseño arregla, volviendo por
   > la puerta de atrás y sin ninguna pista de por qué.
 
@@ -415,5 +446,5 @@ entero, que vive en IndexedDB— sigue igual.
 
 Por qué la integración está hecha así, y qué hacer cuando falla:
 [`manual/google-integration.md`](../manual/google-integration.md).
-Cómo se organiza el backend: [`manual/api.md`](../manual/api.md).
+Cómo se organiza el backend: [`manual/functions.md`](../manual/functions.md).
 El despliegue en detalle: [`manual/firebase-deploy.md`](../manual/firebase-deploy.md).

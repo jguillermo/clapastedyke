@@ -463,7 +463,8 @@ cat <<EOF
        Valor:   el JSON de arriba, ENTERO, tal cual
 
   De ahí sacan los dos workflows lo que necesitan: el `client_id`, que sustituye el marcador del
-  config.json y del .env de la función al publicar, y el `client_secret`, que va a Secret Manager.
+  config.json y del .env de la función al publicar, y el `client_secret`, que va al .env de la
+  función en esa misma copia.
   Sin ese secret, el despliegue se para antes de subir nada.
 
   El mismo ambiente necesita además, en ese environment:
@@ -476,7 +477,7 @@ cat <<EOF
 
   EN LOCAL no hace falta nada de esto: la app arranca sin cliente y funciona entera salvo conectar
   con Google. Si quieres probar ESE flujo en el emulador, pon el client_secret a mano en
-  api/auth/.secret.local (GOOGLE_OAUTH_CLIENT_SECRET=<valor>) y el client_id en public/config.json,
+  api/auth/.env.local (los dos valores) y el client_id en public/config.json,
   y acuérdate de no commitear ese cambio.
 
   Para revisar o deshacer a mano:

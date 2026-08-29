@@ -88,9 +88,11 @@ export default tseslint.config(
     // Artefactos, informes y los scripts JS sueltos (el estático de los E2E no se lintea).
     ignores: [
       'dist/**',
-      'deploy/dist/**',
-      'api/*/lib/**',
-      'api/*/lib-test/**',
+      // El artefacto de Hosting: lo escribe `ng build` dentro de la carpeta que publica Firebase.
+      'firebase/public/**',
+      // La función tiene su PROPIO ESLint (`firebase/functions/.eslintrc.js`, estilo Google) y su
+      // propio `npm run lint`. Lintearla con la config de Angular del repo no tiene sentido.
+      'firebase/functions/**',
       'dist-dev/**',
       'out-tsc/**',
       '.angular/**',

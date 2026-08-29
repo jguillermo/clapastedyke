@@ -1,7 +1,7 @@
 # Integración con Google — modelo mental y decisiones
 
 Este documento es el **por qué**. El paso a paso para ponerlo en marcha está en
-[`deploy/README.md`](../deploy/README.md); aquí está lo que hay que entender antes de tocarlo, las
+[`firebase/README.md`](../firebase/README.md); aquí está lo que hay que entender antes de tocarlo, las
 alternativas que se evaluaron y los datos medidos que respaldan cada decisión.
 
 Se escribió después de una investigación con pruebas reales contra la API de Google (agosto 2026).
@@ -52,7 +52,7 @@ app no podría capturar esa contraseña aunque quisiera: es otro origen y el nav
 
 El proyecto usa el **modelo de código** de Google Identity Services con `ux_mode: 'popup'`: la ventana
 de Google devuelve un `code` de un solo uso que hay que canjear **en un servidor** con el
-`client_secret`. Ese servidor es [`api/auth`](../api/auth/README.md).
+`client_secret`. Ese servidor es [`firebase/functions`](../firebase/functions/).
 
 Antes usaba el **modelo de token** (también popup), que entrega el token directamente al navegador y
 no necesita backend. Se cambió porque no se sostenía; el porqué está en 2.3.
@@ -73,7 +73,7 @@ el selector de cuenta», no «no enseñes nada»— y Google documenta que hay q
 del usuario para que el navegador no la bloquee. Al correr en el arranque de la página no hay ningún
 gesto: la ventana se bloqueaba, el error se tragaba en un `catch` mudo y **cada recarga desconectaba**.
 
-La única solución real es dejar de ser un cliente público. `api/auth` es un **cliente confidencial**:
+La única solución real es dejar de ser un cliente público. La función `auth` es un **cliente confidencial**:
 tiene el `client_secret`, obtiene un refresh token que no caduca y emite tokens de acceso frescos
 cuando la app se los pide. Reanudar pasa a ser **un POST de mismo origen**: sin ventana, sin gesto y
 sin depender de que la persona tenga su sesión de Google abierta.
@@ -97,7 +97,7 @@ durando una hora. No está en `localStorage`, ni en IndexedDB, ni en una cookie 
 
 Ninguna de las dos últimas pasa de **1 hora** —ahí caduca el token—, así que ni siquiera resolvían el
 problema. Lo que lo resuelve es no guardar el token sino **poder pedir otro**, y esa capacidad vive en
-una cookie **`HttpOnly`** que emite `api/auth`: el JavaScript de la app no puede leerla, y un XSS
+una cookie **`HttpOnly`** que emite la función `auth`: el JavaScript de la app no puede leerla, y un XSS
 tampoco.
 
 En IndexedDB se sigue guardando **solo con qué cuenta se estaba** (id y correo, nunca un token). Es la
@@ -200,7 +200,7 @@ El tercero era el que de verdad protegía contra corrupción silenciosa, y es el
 ## 4 · La arquitectura montada
 
 ```
-Navegador                        api/auth (Cloud Function)      Drive del usuario
+Navegador                        auth (Cloud Function)          Drive del usuario
 ─────────                        ───────────────────────        ─────────────────
                                  Firestore
 «Conectar» ─ code ─────────────►  canje + client_secret ──────►  Google
@@ -303,9 +303,9 @@ completo está en `e2e/specs/account/sign-out.spec.ts`.
 
 **Este documento no explica cómo montarlo.** Los pasos —proyecto de Cloud, consentimiento, Client ID,
 client secret y orígenes, y dónde acaba cada valor— viven **solo** en
-[`deploy/README.md`](../deploy/README.md), junto al fichero de ambientes donde
-acaba el Client ID. La **infraestructura** que necesita `api/auth` para existir (proyecto de Firebase,
-Blaze, Firestore, la cuenta de despliegue) es otra cosa y está en [`api.md`](api.md): el permiso que
+[`firebase/README.md`](../firebase/README.md), junto al fichero de ambientes donde
+acaba el Client ID. La **infraestructura** que necesita la función para existir (proyecto de Firebase,
+Blaze, Firestore, la cuenta de despliegue) es otra cosa y está en [`functions.md`](functions.md): el permiso que
 concede el usuario sobre su cuenta y el permiso para desplegar lo tuyo no se mezclan. Lo que falla al
 usarlo está en [6 · Diagnóstico](#6--diagnóstico).
 
@@ -321,7 +321,7 @@ Con los cuatro scopes de este diseño, el usuario ve **una sola casilla**: la de
 primeros (`openid`, `email`, `profile`) no suman ninguna. Esa es la razón de no añadir scopes a la
 ligera.
 
-> `api/auth` se protege de esto comprobando el permiso de Drive en el `scope` concedido **antes de
+> La función se protege de esto comprobando el permiso de Drive en el `scope` concedido **antes de
 > guardar nada**, y responde con un mensaje accionable. El navegador lo vuelve a comprobar sobre la
 > credencial. **Cualquier scope nuevo necesita su comprobación equivalente.**
 
@@ -334,7 +334,7 @@ original —«se pierde la sesión»— volvería cada semana, y sin ninguna pis
 
 Así que la pantalla de consentimiento tiene que estar **«En producción»**. Publicarla no cuesta nada:
 `drive.file` no es un permiso sensible y no hay verificación de Google que pasar (2.6). El trámite, en
-[`deploy/README.md`](../deploy/README.md) §2.
+[`firebase/README.md`](../firebase/README.md) §2.
 
 ---
 
@@ -342,7 +342,7 @@ Así que la pantalla de consentimiento tiene que estar **«En producción»**. P
 
 | Síntoma | Causa | Arreglo |
 |---|---|---|
-| `Error 400: origin_mismatch` | El origen no está registrado, o es `127.0.0.1` vs `localhost`, o el puerto cambió | [`deploy/README.md`](../deploy/README.md) §3 |
+| `Error 400: origin_mismatch` | El origen no está registrado, o es `127.0.0.1` vs `localhost`, o el puerto cambió | [`firebase/README.md`](../firebase/README.md) §3 |
 | `UNAUTHENTICATED` | El token de una hora caducó y el backend no ha podido emitir otro | Mirar la respuesta de `/api/auth/token`: `401 revoked` = se retiró el acceso (reconectar); `502` = Google no contestó (se reintenta solo) |
 | Al recargar pide reconectar | El backend no tiene sesión para este navegador: falta la cookie `__session`, o su concesión ya no vale | Si es sistemático, comprobar que `/api/auth/**` llega a la función (rewrite en `firebase.json`) y que la pantalla de consentimiento está **En producción** (5.2) |
 | `REJECTED` | El usuario no marcó la casilla de Drive, o revocó el acceso | Reconectar y marcarla |
@@ -471,7 +471,7 @@ los tecleara un usuario: un insumo llamado «12/03» se volvería fecha y uno qu
 | Todo lo que sabe que el proveedor es Google, en el navegador | `core/auth/infrastructure/google-code-client.ts` |
 | Los scopes que se piden | mismo fichero, constante `SCOPES` |
 | El adaptador que habla con el backend | `core/auth/infrastructure/backend-authenticator.ts` |
-| El cliente confidencial (canje, refresco, revocación) | `api/auth/` — ver [su README](../api/auth/README.md) |
+| El cliente confidencial (canje, refresco, revocación) | `firebase/functions/` — ver [`functions.md`](functions.md) |
 | La credencial y su caducidad | `core/auth/domain/value-objects/credential.ts` |
 | Traducción de sesión → contrato compartido | `core/auth/infrastructure/session-credentials-provider.ts` |
 | El puerto agnóstico del destino | `core/external-sync/domain/services/sync.gateway.ts` |
@@ -480,7 +480,7 @@ los tecleara un usuario: un insumo llamado «12/03» se volvería fecha y uno qu
 | El esquema de la hoja y la fusión | `core/external-sync/infrastructure/sheet-schema.ts` + `sheet-merge.ts` |
 | La cola durable | `core/external-sync/infrastructure/indexeddb-sync-outbox.ts` |
 | Las cinco ramas de salida de la sincronización | `core/external-sync/application/use-cases/synchronize.use-case.ts` |
-| La configuración del despliegue | `public/config.json` y `api/auth/.env`, con marcadores que sustituye el pipeline |
+| La configuración del despliegue | `public/config.json` y `firebase/functions/.env`, con marcadores que sustituye el pipeline |
 | La pantalla | `features/account/` |
 
 **Cambiar de proveedor de identidad** es escribir otro `Authenticator` y tocar una línea de

@@ -1,7 +1,0 @@
-node_modules/
-lib/
-lib-test/
-
-# El client secret para el emulador. NUNCA se versiona: en la nube vive en Secret Manager.
-.secret.local
-.env.local
