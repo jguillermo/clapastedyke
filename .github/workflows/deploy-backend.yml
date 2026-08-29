@@ -59,13 +59,13 @@ jobs:
           FUNCION="$(printf '%s' "$FUNCION_INPUT" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
 
           # El mismo script que el workflow de hosting: un solo sitio donde viven los ambientes.
-          if ! project_id="$(node deploy/firebase/config.mjs "$AMBIENTE" --project-id 2>&1)"; then
+          if ! project_id="$(./deploy/env.sh "$AMBIENTE" 2>&1)"; then
             echo "::error::$project_id"
             exit 1
           fi
 
-          # Una función es una carpeta de `api/` con su propio paquete. Comprobarlo aquí convierte una
-          # errata en un mensaje claro en vez de en un error del CLI de Firebase.
+          # Una función es una carpeta de `api/` con su propio paquete. Comprobarlo aquí
+          # convierte una errata en un mensaje claro en vez de en un error del CLI de Firebase.
           if [ ! -f "api/$FUNCION/package.json" ]; then
             echo "::error::No existe la función '$FUNCION': falta api/$FUNCION/package.json. Las que hay: $(ls -d api/*/ 2>/dev/null | xargs -n1 basename | tr '\n' ' ')."
             exit 1
@@ -92,10 +92,16 @@ jobs:
         with:
           node-version: '22'
 
-      # Instalar y compilar los hace el `predeploy` de firebase.json, para que el despliegue a mano
-      # desde un portátil haga exactamente lo mismo que este workflow.
       - name: Tests de la función
         run: npm --prefix "api/${{ needs.validar.outputs.funcion }}" ci && npm --prefix "api/${{ needs.validar.outputs.funcion }}" test
+
+      # El mismo comando que en un portátil. Deja en `deploy/dist/functions/<fn>/` la función
+      # compilada, su `package.json` y su `.env.<projectId>` con los parámetros públicos del
+      # ambiente — todo dentro de `deploy/`, que es lo único que ve el despliegue.
+      - name: Build del backend
+        env:
+          AMBIENTE: ${{ needs.validar.outputs.ambiente }}
+        run: npm run build -- "$AMBIENTE" --only functions
 
       # Fuera del árbol del repositorio: `runner.temp` no está dentro de `api/`.
       - name: Credenciales de la cuenta de servicio
@@ -127,7 +133,7 @@ jobs:
           GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
         run: |
           if [ -z "$GOOGLE_OAUTH_CLIENT_SECRET" ]; then
-            echo "::error::El environment '$AMBIENTE' no tiene el secret GOOGLE_OAUTH_CLIENT_SECRET. Se obtiene con deploy/create-google-client-id.sh (ver deploy/google-client-id.md)."
+            echo "::error::El environment '$AMBIENTE' no tiene el secret GOOGLE_OAUTH_CLIENT_SECRET. Se obtiene con deploy/create-google-client-id.sh (ver deploy/README.md)."
             exit 1
           fi
           printf '%s' "$GOOGLE_OAUTH_CLIENT_SECRET" | npx --yes firebase-tools@latest \
@@ -140,8 +146,7 @@ jobs:
       #
       # Las reglas de Firestore van con la API y no con el hosting: protegen lo que guarda la API.
       - name: Deploy de la función
-        run: |
-          npx --yes firebase-tools@latest deploy \
-            --only "functions:${{ needs.validar.outputs.funcion }},firestore:rules" \
-            --project "${{ needs.validar.outputs.project-id }}" \
-            --non-interactive
+        env:
+          AMBIENTE: ${{ needs.validar.outputs.ambiente }}
+          FUNCION: ${{ needs.validar.outputs.funcion }}
+        run: ./deploy/deploy.sh "$AMBIENTE" --only "functions:$FUNCION,firestore:rules"

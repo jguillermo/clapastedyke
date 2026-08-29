@@ -67,22 +67,21 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      # `public/config.json` y `api/<fn>/.env.<projectId>` son ficheros GENERADOS, pero están
-      # commiteados porque `ng serve`, los E2E y el emulador los necesitan tal cual. Eso los deja
-      # editables a mano sin que nadie se entere: aquí se regeneran y se compara con lo commiteado.
+      # Los ficheros generados (`public/config.json`, el `.env` de cada función, el proxy) ya no se
+      # versionan, así que no pueden derivar. Lo que sí puede es `deploy/environments.json` mismo:
+      # el Client ID está escrito dos veces a propósito (front y back), y la región vive literal en
+      # `deploy/firebase.json` y en el `setGlobalOptions` de la función. Eso es lo que se comprueba.
       #
-      # No es un riesgo teórico. Así fue como `public/config.json` llegó a `main` con un Client ID
-      # distinto del que declaraba su ambiente. En el `.env` de la función la consecuencia es peor:
-      # Google rechaza el canje con `invalid_client` y el mensaje no dice por qué.
-      - name: Los ficheros generados salen de environments.json
-        run: |
-          npm run config
-          node deploy/firebase/api-env.mjs --all
-          if ! git diff --quiet; then
-            echo "::error::Un fichero generado no coincide con deploy/firebase/environments.json. La fuente es ese fichero: edítalo y regenera con 'npm run config' y 'npm run api:env -- --all'."
-            git --no-pager diff
-            exit 1
-          fi
+      # No es un riesgo teórico: si el Client ID diverge, Google rechaza el canje con
+      # `invalid_client` y el mensaje no dice por qué.
+      - name: deploy/environments.json es coherente
+        run: ./deploy/check.sh
+
+      # Cablear el ambiente `local` deja `public/config.json` y el proxy, que es lo que `ng serve` y
+      # los E2E esperan encontrar. Si el cableado se rompiera, el CI lo ve aquí y no tres jobs más
+      # tarde con un error incomprensible.
+      - name: Cablear el ambiente local
+        run: ./deploy/wire-environment.sh local
 
       - name: Prettier (formato)
         run: npm run format:check
@@ -175,8 +174,13 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
+      # `--only hosting`: los E2E prueban la app, no la función, y compilar el backend costaría un
+      # `npm ci` más. El backend lo cubre el job `api` con sus propios tests.
+      #
+      # Ambiente `local` porque es el que usan los E2E: su `config.json` es el que el fixture espera
+      # cuando un test NO instala el doble de Google.
       - name: ng build (production, con budgets)
-        run: npm run build
+        run: npm run build -- local --only hosting
 
       # Lo consume el job de E2E: la suite prueba el BUILD COMPILADO, no `ng serve`.
       # Sin comprimir: el artefacto vive un día y se descarga dos veces en la misma
@@ -185,7 +189,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: dist
-          path: dist/
+          path: deploy/dist/hosting/
           retention-days: 1
           compression-level: 0
           if-no-files-found: error
@@ -236,7 +240,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: dist
-          path: dist/
+          path: deploy/dist/hosting/
 
       # Sin `npm run test:e2e` a propósito: ese script vuelve a hacer `ng build`, y aquí el
       # build ya viene del job anterior. El type-check de la suite lo cubre el job `static`.

@@ -39,7 +39,7 @@ testem.log
 /typings
 __screenshots__/
 
-# Firebase — la CLI deja su caché y sus logs junto al firebase.json (deploy/firebase/)
+# Firebase — la CLI deja su caché y sus logs junto al firebase.json (deploy/)
 .firebase/
 firebase-debug.log
 firebase-*-debug.log
@@ -60,3 +60,10 @@ storybook-static
 /documentation.json
 /dist-dev/
 /deploy/.env-secret
+
+# Todo lo que sale de deploy/environments.json es GENERADO y no se versiona: la única verdad es ese
+# fichero. Lo escriben deploy/wire-environment.sh (local) y deploy/build.sh (el artefacto).
+/deploy/dist/
+/deploy/proxy.config.json
+/api/*/.env.*
+/public/config.json

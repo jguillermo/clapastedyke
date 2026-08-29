@@ -11,7 +11,7 @@
 # repartir sus valores es `deploy/wire-environment.sh`. Lo de aquí es permiso para desplegar y
 # ejecutar TU infraestructura: otra cosa, que solo coincide con OAuth en el número de proyecto.
 #
-# Empieza donde tú quieras: si el ambiente no existe en deploy/firebase/environments.json, LO
+# Empieza donde tú quieras: si el ambiente no existe en deploy/environments.json, LO
 # DECLARA —su nombre y su projectId, creando el proyecto si hace falta—, así que montar uno desde
 # cero no exige haber editado ningún fichero antes. El bloque `config` lo estrena el cableado.
 #
@@ -56,7 +56,7 @@ lower() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
 trim() { printf '%s' "$1" | tr -d '[:space:]'; }
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-ENVIRONMENTS="${REPO_ROOT}/deploy/firebase/environments.json"
+ENVIRONMENTS="${REPO_ROOT}/deploy/environments.json"
 ENV_SECRET="${REPO_ROOT}/deploy/.env-secret"
 SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}")"
 
@@ -97,7 +97,7 @@ command -v gcloud >/dev/null 2>&1 || die "Hace falta la CLI de Google Cloud (gcl
 
   o desde https://cloud.google.com/sdk/docs/install , y vuelve a lanzar el script."
 
-command -v node >/dev/null 2>&1 || die "Hace falta Node para leer deploy/firebase/environments.json."
+command -v node >/dev/null 2>&1 || die "Hace falta Node para leer deploy/environments.json."
 command -v npx >/dev/null 2>&1 || die "Hace falta npx para usar firebase-tools."
 command -v git >/dev/null 2>&1 || die "Hace falta git para comprobar que el cuaderno no se versiona."
 
@@ -154,7 +154,7 @@ step "2 · Ambiente"
 AMBIENTES="$(env_keys)"
 
 if [[ -n "${AMBIENTES}" ]]; then
-    info "Ambientes ya declarados en deploy/firebase/environments.json:"
+    info "Ambientes ya declarados en deploy/environments.json:"
     for CLAVE in ${AMBIENTES}; do
         printf '    %-10s → %s\n' "${CLAVE}" "$(env_project_id "${CLAVE}")"
     done
@@ -242,16 +242,44 @@ else
   Si existe y es de otra cuenta, entra con la que lo administra."
 fi
 
-# El bloque del ambiente: SOLO el projectId. Sin `config` — ese lo crea wire-environment.sh.
+# El bloque del ambiente: el projectId y el ESQUELETO vacío de front/back/secretos, con sus
+# destinos ya escritos. Los VALORES no los pone este script — el Client ID lo trae
+# create-google-client-id.sh y se copia a mano al bloque (ver deploy/README.md).
+#
+# El esqueleto se clona del primer ambiente que ya tenga uno, para que un ambiente nuevo herede
+# cualquier clave que se haya añadido desde que se escribió esto y no nazca incompleto.
 if [[ "$(env_project_id "${AMBIENTE}")" != "${PROJECT_ID}" ]]; then
     node -e '
 const { readFileSync, writeFileSync } = require("node:fs");
 const [file, ambiente, projectId] = process.argv.slice(1);
 const doc = JSON.parse(readFileSync(file, "utf8"));
-doc[ambiente] = { ...doc[ambiente], projectId };
+
+const plantilla = Object.values(doc).find((e) => e.front && e.back);
+const vaciar = (valores) =>
+  Object.fromEntries(Object.entries(valores).map(([k, v]) => [k, typeof v === "boolean" ? false : typeof v === "number" ? v : ""]));
+const soloArtefacto = (destino) =>
+  Object.fromEntries(Object.entries(destino).filter(([rol]) => rol === "artefacto"));
+
+const entrada = doc[ambiente] ?? {};
+entrada.projectId = projectId;
+entrada.region = entrada.region ?? plantilla?.region ?? "us-central1";
+
+if (!entrada.front && plantilla) {
+  entrada.front = { destino: soloArtefacto(plantilla.front.destino), valores: vaciar(plantilla.front.valores) };
+  entrada.back = { destino: soloArtefacto(plantilla.back.destino), valores: vaciar(plantilla.back.valores) };
+  entrada.secretos = {
+    destino: {
+      origen: "deploy/.env-secret — cuaderno local, nunca se versiona",
+      nube: `GitHub -> Settings -> Environments -> ${ambiente} -> Add environment secret`,
+    },
+    claves: plantilla.secretos?.claves ?? ["GOOGLE_OAUTH_CLIENT_SECRET", "FIREBASE_SERVICE_ACCOUNT"],
+  };
+}
+
+doc[ambiente] = entrada;
 writeFileSync(file, JSON.stringify(doc, null, 2) + "\n");
 ' "${ENVIRONMENTS}" "${AMBIENTE}" "${PROJECT_ID}"
-    info "deploy/firebase/environments.json → ${AMBIENTE}.projectId"
+    info "deploy/environments.json → ${AMBIENTE} (projectId + esqueleto front/back/secretos)"
 fi
 
 bold "  ✓ ${AMBIENTE} → ${PROJECT_ID}"

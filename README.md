@@ -56,7 +56,7 @@ npm run test:e2e:ui       # the same, in Playwright's UI mode
 npm run test:e2e:report   # open the last HTML report
 ```
 
-The suite runs against the **compiled build** (`dist/misaevol/browser`), served by
+The suite runs against the **compiled build** (`deploy/dist/hosting`), served by
 `e2e/support/static-server.mjs` — no dev server needed. Conventions for writing them are in
 [`.claude/rules/e2e-tests-conventions.md`](.claude/rules/e2e-tests-conventions.md).
 
@@ -69,7 +69,7 @@ is deployed into anyone's account, and users grant a single consent checkbox.
 
 Publishing the app needs a one-time pass through Google Cloud (project, consent screen, OAuth Client
 ID **and client secret**). Every step is in
-[`deploy/google-client-id.md`](deploy/google-client-id.md) — start there, and run
+[`deploy/README.md`](deploy/README.md) — start there, and run
 `./deploy/create-google-client-id.sh` if you want it done for you. Once configured, users connect
 from the `/cuenta` screen; without it the app keeps working exactly as before, fully local.
 
@@ -88,22 +88,39 @@ hold a refresh token, and which alternatives were measured and rejected — is i
 ## Deployment
 
 The app is published to **Firebase Hosting** by a **manual** workflow — merging to `main` does not
-deploy anything. Run it from `Actions → Desplegar en Firebase Hosting → Run workflow`, picking a
-branch and an environment.
+deploy anything. Run it from `Actions → Desplegar el FRONTEND → Run workflow`, picking a branch and
+an environment. The Cloud Function has its own workflow; when a change needs both, **deploy the
+backend first**.
+
+**`deploy/` is the only place that knows Firebase.** Nothing outside it names a project id, a region
+or the CLI: the folder holds the environment declaration, the Cloud Function's source, the scripts,
+and `deploy/dist/` — the compiled artifact that is actually published.
 
 Environments are **data, not code**:
-[`deploy/firebase/environments.json`](deploy/firebase/environments.json) is the one and only place
-where they are declared — which Firebase project each one deploys to, and the `config.json` it runs
-with. Today there are two, `dev` and `prod`, backed by two separate Firebase projects; adding
-`stage` or `lab` is one block in that file plus a matching GitHub Environment holding its service
-account. The workflow itself never names an environment.
+[`deploy/environments.json`](deploy/environments.json) is the one and only place where they are
+declared. Each block holds `projectId`, `region`, and the public values split into `front` (what the
+browser publishes) and `back` (what the Cloud Function resolves), each stating its own `destino` —
+where those values get copied to. A third block, `secretos`, holds **no values**: only the key names
+and where to put them by hand. Today there are three environments — `local`, `dev`, `prod` — and
+adding one is a block in that file plus a matching GitHub Environment holding its secrets.
 
-**`public/config.json` is generated**, not hand-written — `npm run config` rebuilds it from the
-`dev` block, and a deploy does the same with the target environment's block. Edit
-`environments.json`, never `config.json`.
+**Nothing generated is versioned**: `public/config.json`, `api/*/.env.*`,
+`deploy/proxy.config.json` and `deploy/dist/`. After cloning, run `npm run wire -- local` to write
+them. Edit `deploy/environments.json`, never a generated file.
 
-The one-time setup (one Firebase project and service account per environment, the environment
-secret, OAuth origins) and the troubleshooting table are in
+```bash
+npm run build -- dev --only hosting     # artifact of THAT environment → deploy/dist
+./deploy/deploy.sh dev --only hosting   # the only place `firebase deploy` is invoked
+```
+
+The environment is chosen **at build time**, so the artifact that was tested is the one that ships —
+`deploy.sh` refuses to publish a `deploy/dist` built for a different environment. The two workflows
+run exactly these two commands.
+
+The folder's own guide — the shape of `environments.json`, what each script does, where every secret
+goes, and three things that look like mistakes but are not — is
+[`deploy/README.md`](deploy/README.md). The one-time setup (one Firebase project and service account
+per environment, the environment secret, OAuth origins) and the troubleshooting table are in
 [`manual/firebase-deploy.md`](manual/firebase-deploy.md). Start there before the first deploy.
 
 ## Additional Resources

@@ -123,14 +123,14 @@ npm run typecheck:e2e     # type-check SOLO de la suite (tsc -p e2e/tsconfig.jso
 npm run e2e:serve         # sirve el build ya compilado en :4200 (para depurar a mano)
 ```
 
-Se sirve el **build compilado** (`dist/misaevol/browser`) con `support/static-server.mjs`, no
+Se sirve el **build compilado** (`deploy/dist/hosting`) con `support/static-server.mjs`, no
 `ng serve`: la app carga como en producción y cada navegación es un fichero estático — más rápido y
 determinista.
 
 ## CRITICAL: la suite es independiente de `src/` (por construcción)
 
 Los E2E prueban la app como **caja negra**, a través del **build compilado**. Su única dependencia
-del proyecto Angular es ese artefacto (`dist/misaevol/browser`), producido por `ng build` antes de
+del proyecto Angular es ese artefacto (`deploy/dist/hosting`), producido por `ng build` antes de
 arrancar Playwright. **Nada bajo `e2e/` importa código de `src/`** — ni con alias (`@core/*`,
 `@app/*`, `@components/*`, `@features/*`, `@platform/*`) ni con rutas relativas (`../src/app/…`).
 

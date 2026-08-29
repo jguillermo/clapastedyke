@@ -27,7 +27,7 @@
 #
 # Uso:  ./deploy/create-google-client-id.sh [-h]
 #
-# Documentación: deploy/google-client-id.md
+# Documentación: deploy/README.md
 
 set -euo pipefail
 
@@ -407,9 +407,9 @@ done
 # morir, y por eso la salida es una palabra explícita y no una línea vacía — un Enter de más no
 # puede costarte tener que regenerar el cliente.
 #
-# Y no se guarda un lote a medias: `wire-environment.sh` lee la última aparición de cada clave por
-# separado, así que un lote con Client ID pero sin secret emparejaría ese ID nuevo con el secret
-# viejo de otro cliente, y el fallo aparecería mucho después y sin relación visible.
+# Y no se guarda un lote a medias: el fichero se lee por lotes, y uno con Client ID pero sin secret
+# dejaría emparejado ese ID nuevo con el secret viejo de otro cliente — un fallo que aparecería
+# mucho después y sin relación visible.
 echo
 info "Ahora el Client secret. La consola solo lo enseña una vez; no se verá al teclearlo."
 while true; do
@@ -455,9 +455,11 @@ if ! grep -q '^# DÓNDE VA CADA DATO' "${ENV_SECRET}" 2>/dev/null; then
         printf '# DÓNDE VA CADA DATO\n'
         printf '#\n'
         printf '#   GOOGLE_OAUTH_CLIENT_ID      NO es secreto: viaja en cada petición del navegador.\n'
-        printf '#                               Va a deploy/firebase/environments.json, en el\n'
-        printf '#                               config.googleClientId de su ambiente. De ahí se GENERAN\n'
-        printf '#                               public/config.json y api/<funcion>/.env.<projectId>.\n'
+        printf '#                               Va a deploy/environments.json, DOS veces en el mismo\n'
+        printf '#                               ambiente: front.valores.googleClientId (lo publica el\n'
+        printf '#                               navegador) y back.valores.GOOGLE_OAUTH_CLIENT_ID (lo\n'
+        printf '#                               resuelve la funcion). De ahi lo copian\n'
+        printf '#                               wire-environment.sh y build.sh a sus destinos.\n'
         printf '#\n'
         printf '#   GOOGLE_OAUTH_CLIENT_SECRET  Secreto. Va a DOS sitios:\n'
         printf '#                               · GitHub: Settings -> Environments -> <ambiente> ->\n'
@@ -500,13 +502,23 @@ cat <<EOF
   El Client ID y el client secret están en deploy/.env-secret, en el último lote, con una
   leyenda arriba del fichero que dice a dónde va cada uno.
 
-  LO QUE SIGUE — repartirlos. No lo hagas a mano:
+  LO QUE SIGUE — repartirlos. Son dos cosas distintas:
 
-    ./deploy/wire-environment.sh
+  1. El Client ID (público). Se escribe en deploy/environments.json, en el ambiente que toque y
+     en LOS DOS sitios — front.valores.googleClientId y back.valores.GOOGLE_OAUTH_CLIENT_ID —,
+     y luego se cablea:
 
-  escribe el Client ID en environments.json (y regenera de ahí config.json y el .env de la
-  función), deja el secret en api/auth/.secret.local para el emulador, y lo sube al environment
-  secret GOOGLE_OAUTH_CLIENT_SECRET de GitHub, que es de donde lo toma el despliegue.
+       ./deploy/wire-environment.sh <ambiente>
+
+     `./deploy/check.sh` falla si te dejas uno de los dos o no coinciden.
+
+  2. El client secret. NINGÚN script lo reparte: es a mano, y son dos destinos.
+
+       api/auth/.secret.local          GOOGLE_OAUTH_CLIENT_SECRET=<valor>   (emulador)
+       GitHub -> Settings -> Environments -> <ambiente> -> Add environment secret
+                                              GOOGLE_OAUTH_CLIENT_SECRET           (despliegue)
+
+     De ese environment secret lo toma deploy-backend.yml y lo pone en Secret Manager.
 
   Para revisar o deshacer a mano:
     Proyectos (y borrarlos)   ${PROJECTS_URL}

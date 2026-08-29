@@ -1,6 +1,6 @@
 /**
  * Servidor estático mínimo para los E2E: sirve el **build compilado** de Angular
- * (`dist/misaevol/browser`) en vez de levantar `ng serve`.
+ * (`deploy/dist/hosting`) en vez de levantar `ng serve`.
  *
  * Por qué: los tests no necesitan el dev server (watch, HMR, transformaciones por
  * petición). Sirviendo el bundle ya construido, la app carga como en producción y
@@ -23,7 +23,7 @@ const flag = (name, fallback) => {
   return index >= 0 && args[index + 1] ? args[index + 1] : fallback;
 };
 
-const ROOT = resolve(flag('dir', process.env.E2E_DIST ?? 'dist/misaevol/browser'));
+const ROOT = resolve(flag('dir', process.env.E2E_DIST ?? 'deploy/dist/hosting'));
 const PORT = Number(flag('port', process.env.E2E_PORT ?? 4200));
 
 if (!existsSync(join(ROOT, 'index.html'))) {

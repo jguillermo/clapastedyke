@@ -44,7 +44,7 @@ sessions/{sid}  ← { sub, createdAt, expiresAt }. El `sid` es lo que va en la c
 - **La cookie se llama `__session` y no es negociable**: Firebase Hosting borra todas las cookies
   entrantes menos esa antes de pasar la petición a la función.
 - **Las reglas de Firestore deniegan todo**
-  ([`deploy/firebase/firestore.rules`](../../deploy/firebase/firestore.rules)). Aquí solo
+  ([`deploy/firestore.rules`](../../deploy/firestore.rules)). Aquí solo
   entra el Admin SDK.
 
 ## Configuración
@@ -55,43 +55,57 @@ compilado sirve para todos.
 
 | Valor | Dónde | Secreto |
 |---|---|---|
-| `GOOGLE_OAUTH_CLIENT_ID` | `.env.<projectId>`, versionado y **generado** | No — viaja en cada petición del navegador |
+| `GOOGLE_OAUTH_CLIENT_ID` | `.env.<projectId>`, **generado** y no versionado | No — viaja en cada petición del navegador |
 | `GOOGLE_OAUTH_CLIENT_SECRET` | Secret Manager (`.secret.local` en el emulador) | **Sí** |
 
-**El `.env.<projectId>` no se edita a mano.** Lo escribe
-[`deploy/firebase/api-env.mjs`](../../deploy/firebase/api-env.mjs) desde el `googleClientId` que
-declara el ambiente en
-[`deploy/firebase/environments.json`](../../deploy/firebase/environments.json), y el `predeploy` de
-`firebase.json` lo regenera en cada despliegue. Antes el mismo valor se copiaba a mano aquí y allí, y
-en cuanto divergían Google rechazaba el canje con `invalid_client` sin decir por qué.
+**El `.env.<projectId>` no se edita a mano, y no se versiona.** Sale del bloque `back.valores` que
+declara el ambiente en [`deploy/environments.json`](../../deploy/environments.json), copiado tal cual:
+[`wire-environment.sh`](../../deploy/wire-environment.sh) escribe el de esta carpeta (para el emulador) y
+[`build.sh`](../../deploy/build.sh) el que viaja dentro de `deploy/dist/functions/auth/`.
 
 ```bash
-npm run api:env dev        # regenerarlo a mano (lo hace también `npm run emulators`)
+npm run wire -- local                    # el de aquí — lo pide `npm run emulators`
+npm run build -- dev --only functions    # el del artefacto
 ```
 
-El **secreto** no se sube a mano: vive en el *environment secret* `GOOGLE_OAUTH_CLIENT_SECRET` de
-GitHub y `deploy-backend.yml` lo pone en Secret Manager antes de desplegar. Para el emulador,
-`api/auth/.secret.local` (ignorado por git).
+Ese mismo Client ID está escrito **otra vez** en el bloque `front` del ambiente, que es el que publica
+el navegador. Es a propósito —los scripts copian, no derivan— y lo vigila
+[`deploy/check.sh`](../../deploy/check.sh): cuando los dos divergen, Google rechaza el canje con
+`invalid_client` sin decir por qué.
 
-De dónde salen los dos valores: [`create-google-client-id.sh`](../../deploy/create-google-client-id.sh)
-crea el cliente de Google y los anota en `deploy/.env-secret`;
-[`wire-environment.sh`](../../deploy/wire-environment.sh) los reparte al ambiente.
+El **secreto** sí se reparte a mano, y son dos destinos: `api/auth/.secret.local` (emulador,
+ignorado por git) y el *environment secret* `GOOGLE_OAUTH_CLIENT_SECRET` de GitHub, de donde
+`deploy-backend.yml` lo pone en Secret Manager antes de desplegar. Ningún script lo hace por ti.
+
+De dónde salen los dos valores: [`create-google-client-id.sh`](../../deploy/create-google-client-id.sh) crea
+el cliente de Google y los anota en `deploy/.env-secret`. El reparto está en
+[`deploy/README.md`](../../deploy/README.md).
 
 ## Desarrollo y despliegue
 
-Todo se lanza **desde la raíz del repositorio**: `firebase.json` vive allí y es lo que fija la raíz
-del proyecto para el CLI de Firebase.
+Los comandos se lanzan **desde la raíz del repositorio**; el CLI de Firebase lo invoca solo
+[`deploy/deploy.sh`](../../deploy/deploy.sh), que hace `cd deploy` — allí está `firebase.json`, con todas
+sus rutas relativas a esa carpeta.
 
 ```bash
-npm run api:install                            # npm ci dentro de api/auth
-npm run api:test                               # tests unitarios (node:test)
-npm run emulators                              # functions + firestore, contra el proyecto dev
-npm run api:deploy -- --project <projectId>    # despliegue manual
+npm run api:install                       # npm ci dentro de api/auth
+npm run api:test                          # tests unitarios (node:test)
+npm run wire -- local                     # el .env de esta carpeta y el proxy de ng serve
+npm run emulators                         # functions + firestore, contra el proyecto de `local`
+
+npm run build -- <amb> --only functions   # deja el artefacto en deploy/dist/functions/auth
+./deploy/deploy.sh <amb> --only functions:auth,firestore:rules
 ```
 
 En CI, el despliegue va por el workflow `deploy-backend.yml` (manual, con ambiente y función como
-inputs) — separado del `deploy-frontend.yml` a propósito. El `predeploy` de `firebase.json` instala y
-compila, así que las dos vías hacen lo mismo.
+inputs) — separado del `deploy-frontend.yml` a propósito. El workflow corre **esos mismos dos
+comandos**, así que las dos vías hacen literalmente lo mismo.
+
+Lo que se sube **no es esta carpeta**: es `deploy/dist/functions/auth/`, donde `build.sh` deja el
+`lib/` compilado, el `package.json` y el `.env.<projectId>` del ambiente. `node_modules` no viaja —lo
+instala Cloud Build desde el lockfile—. El `lib/` lleva **dos** árboles, `lib/auth/` y `lib/_common/`,
+porque el `tsconfig.json` usa `rootDir: ".."`: sin eso, un `require("../_common/http")` no encontraría
+nada en producción, donde solo se sube la carpeta de la función.
 
 ## Detalles que cuesta deducir leyendo
 
@@ -107,7 +121,7 @@ compila, así que las dos vías hacen lo mismo.
 4. **La pantalla de consentimiento tiene que estar «En producción».** En «Testing», Google caduca los
    refresh tokens a los **7 días** y el problema original volvería cada semana. Como `drive.file` no
    es un permiso sensible, publicarla **no exige verificación de Google**. Ver
-   [`deploy/google-client-id.md`](../../deploy/google-client-id.md).
+   [`deploy/README.md`](../../deploy/README.md).
 5. **La firma del `id_token` no se verifica, y es correcto.** No lo entrega un cliente: lo devuelve el
    endpoint de Google por TLS en respuesta a una petición autenticada con el `client_secret`. La
    propia especificación de OpenID Connect (§3.1.3.7) admite la validación TLS en lugar de la firma en

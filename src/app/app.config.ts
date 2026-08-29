@@ -34,7 +34,7 @@ export function appConfig(document: ConfigDocument | null): ApplicationConfig {
        * `#` no se envía nunca en la petición, así que el navegador solo pide `/` y de ahí en adelante
        * enruta Angular. Ninguna ruta de la app puede chocar con `/api/**` ni con un fichero estático.
        *
-       * Por eso **`firebase.json` ya no tiene fallback de SPA**, y no debe volver a tenerlo: `/` es
+       * Por eso **`deploy/firebase.json` ya no tiene fallback de SPA**, y no debe volver a tenerlo: `/` es
        * la única ruta de servidor que la app necesita. El que había (`**\/!(*.*)`, «cualquier ruta
        * sin punto») además tenía su propia trampa — una ruta futura con un punto dentro,
        * `/receta/pan-de-3.5-kg`, no habría casado, y al recargar daría 404 en producción mientras en

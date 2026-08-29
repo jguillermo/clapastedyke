@@ -40,10 +40,13 @@ the file beside it goes stale.
 ```bash
 npm run check       # autofix (lint + format) and then verify EVERYTHING, in CI order
 npm run fix         # autofix only: eslint --fix + prettier --write
-npm run verify      # validate only, in CI order: lint · format · types · unit · stories · E2E
+npm run verify      # validate only, in CI order: deploy · lint · format · types · unit · stories · E2E
 
-ng serve            # dev server at http://localhost:4200 (route: /#/home — hash routing)
-ng build            # production build → dist/
+npm run wire -- local          # write the generated files (config.json, function .env, proxy) — do this first
+ng serve                       # dev server at http://localhost:4200 (route: /#/home — hash routing)
+npm run build -- <env>         # production build of that environment → deploy/dist/  (env defaults to `local`)
+npm run build -- <env> --only hosting     # · only the app (what the E2E suite needs)
+npm run build -- <env> --only functions   # · only the Cloud Function
 ng build --watch --configuration development   # also: npm run watch
 ng test             # unit tests — Vitest via @angular/build:unit-test (globals, jsdom)
 npm run test:unit   # the same, single run (no watch) — what CI runs
@@ -52,7 +55,11 @@ npm run test:e2e:ui # the same, in Playwright's UI mode
 npm run sb          # Storybook (component states/variants live in *.stories.ts `play`)
 npm run sb:test     # the stories' `play` as tests (vitest browser + chromium)
 npm run emulators   # Firebase emulators (functions + firestore) — needed by `ng serve` for /api/**
+npm run check:deploy # deploy/environments.json is coherent + the generated files are up to date
 npm run api:install # npm ci inside api/auth  ·  api:typecheck · api:test · api:deploy
+
+./deploy/env.sh <env> [field]                 # read (and validate) an environment's projectId/region
+./deploy/deploy.sh <env> [--only hosting]     # firebase deploy of deploy/dist — the ONLY place Firebase is invoked
 npm run lint        # ESLint (angular-eslint) — `npm run lint:fix` to autofix
 npm run format      # Prettier --write .   (npm run format:check to verify only)
 npm run typecheck   # tsc over app + stories, unit specs, and the E2E suite
@@ -61,18 +68,68 @@ npm run typecheck   # tsc over app + stories, unit specs, and the E2E suite
 - **Three tsconfigs, three type-checks** — `tsconfig.stories.json` (app + stories, `typecheck:src`), `tsconfig.spec.json` (unit specs, with vitest globals), `e2e/tsconfig.json` (the E2E suite, standalone). **Angular templates are checked only by `ng build`**, so the build job is not optional. Do **not** point `tsc` at `.storybook/tsconfig.json`: that is Storybook's *build* config — `preview.ts` imports `documentation.json` (compodoc-generated, gitignored) and `src/styles.css` (bundler-only), and its `files` entry makes TS infer `rootDir` as `.storybook/` (`TS6059`).
 - **Lint = ESLint flat config** (`eslint.config.mjs`, `angular-eslint` + `typescript-eslint`): Angular rules (signals over decorators, native control flow, OnPush), template **a11y**, and the **layer boundaries** as `no-restricted-imports` (`components/` with no app imports, `core/` isolated, features without `infrastructure/`, the E2E suite without `src/`). Not type-aware on purpose — `ng build` and the `tsc -p …` steps already type-check. What is not AST-analysable (real mobile-first at 375px, arbitrary Tailwind values inside a class string, specs living in `core/<ctx>/testing/`, one `Playground` with `play` per component) is still code review.
 - Formatting is Prettier (`.prettierrc`: 100 cols, single quotes) via `npm run format` / `npm run format:check`.
-- **CI gate** — `.github/workflows/ci.yml` runs on every PR to `main`: a drift guard that regenerates `public/config.json` and `api/<fn>/.env.<projectId>` from `deploy/firebase/environments.json` and fails if they differ, format + lint + types, unit tests, the API's own typecheck + tests, production build (with budgets), the stories' `play`, and the E2E suite (desktop + mobile). The single job to require in branch protection is **`CI OK (required)`**; it fails if any other job fails, is cancelled or skipped.
+- **CI gate** — `.github/workflows/ci.yml` runs on every PR to `main`: `deploy/check.sh` (the invariants of `deploy/environments.json` that copying cannot guarantee), format + lint + types, unit tests, the API's own typecheck + tests, production build (with budgets), the stories' `play`, and the E2E suite (desktop + mobile). The single job to require in branch protection is **`CI OK (required)`**; it fails if any other job fails, is cancelled or skipped.
 - **Checks are run ON DEMAND, never automatically.** Do **not** run `check`, `verify`, the tests, the build or the linter after editing code — not to "confirm the change works", not before finishing a task, not at the end of a turn. Run them **only when explicitly asked to**. CI is the gate; it runs on every PR and it is what decides whether a change is green.
-- What `npm run check` does when you *are* asked for it: autofixes first (`fix`) and then runs the same checks as CI in the same order, cheapest first (`verify`), so the slow E2E run only happens once everything else is green. The production build is covered inside `test:e2e` (it builds before serving `dist/`). CI splits the same work into parallel jobs instead of one chain.
+- What `npm run check` does when you *are* asked for it: autofixes first (`fix`) and then runs the same checks as CI in the same order, cheapest first (`verify`), so the slow E2E run only happens once everything else is green. The production build is covered inside `test:e2e` (it builds `deploy/dist/hosting` before serving it). CI splits the same work into parallel jobs instead of one chain.
 - **E2E lives only in `e2e/`** — one Playwright config (`e2e/playwright.config.ts`), specs mirroring `src/app/features/`, page objects in `e2e/pages/`, fixtures in `e2e/fixtures/`. Tests run against the **compiled build** served by `e2e/support/static-server.mjs`, not `ng serve`. See `e2e-tests-conventions.md` — that shape is mandatory for every new E2E test.
 - Tests use Vitest **globals** (`describe`/`it`/`expect`) — no per-file imports. `tsconfig.spec.json` discovers all `src/**/*.spec.ts` wherever they sit.
 - TypeScript **6** + Angular **22**. Path aliases have **no `baseUrl`** and use relative targets (`./src/app/*`) — required by TS6 (see `path-aliases-conventions.md`).
+
+## Deployment: `deploy/` is the only place that knows Firebase
+
+Nothing outside `deploy/` names Firebase, a project id, or a region. The folder holds what
+*declares* the deployment (`environments.json`, `firebase.json`), the scripts, and the artifact they
+produce — so publishing never has to reach into three parts of the tree.
+
+**Source stays out of it**: the app is `src/`, the Cloud Functions are `api/` (one folder = one
+package = one independent deploy — see `manual/api.md`). `build.sh` compiles `api/<fn>` and leaves
+the result in `deploy/dist/functions/<fn>`, which is what ships.
+
+```
+deploy/
+├── environments.json     ← THE single public declaration: one block per environment, front + back
+├── firebase.json         ← deploy config (paths relative to deploy/)   · firebase.emulators.json
+├── firestore.rules       ← + firestore.indexes.json
+├── dist/                 ← GENERATED artifact: hosting/ + functions/auth/   (gitignored)
+├── _common.sh            ← shared readers/writers for the scripts below
+├── wire-environment.sh   ← copies an environment's values to the LOCAL generated files
+├── build.sh              ← npm run build -- <env>   → deploy/dist
+├── deploy.sh             ← firebase deploy of deploy/dist
+├── emulators.sh · env.sh · check.sh
+├── create-google-client-id.sh · setup-firebase-project.sh   ← one-time setup of a new environment
+└── .env-secret           ← local notebook of secrets (gitignored, never distributed by a script)
+```
+
+**`deploy/environments.json` is the only file anyone edits.** Each environment declares `projectId`,
+`region`, and three blocks — `front`, `back`, `secretos` — where every block states its own
+`destino` (where its values are copied to) next to its `valores` (what is copied). `secretos` holds
+**no values**, only the key names and where to put them by hand.
+
+Four rules that make this hold:
+
+- **The scripts copy; they never derive.** `front.valores` *is* the published `config.json`;
+  `back.valores` *are* the `KEY=value` lines of the function's `.env`. A wrong value is fixed in
+  `environments.json`, never in the generated file.
+- **Nothing generated is versioned** — `public/config.json`, `api/*/.env.*`,
+  `deploy/proxy.config.json`, `deploy/dist/`. Run `npm run wire -- local` after a fresh clone; it is
+  also the first step of the CI's static job.
+- **The environment is chosen at BUILD time**, not at deploy time, so the artifact that was tested
+  is the one that ships. `deploy.sh` refuses to publish a `deploy/dist` whose `config.json` does not
+  match the environment being deployed.
+- **`deploy/check.sh` covers what copying cannot** — the Client ID written twice on purpose (front
+  and back), and the region that lives literally in `deploy/firebase.json` and in the function's
+  `setGlobalOptions` (`api/auth/index.ts`). Both are static files no script generates; checking them is honest, pretending
+  they are derived would not be.
+
+Secrets never enter `environments.json` and no script distributes them: `GOOGLE_OAUTH_CLIENT_SECRET`
+goes by hand to `api/auth/.secret.local` (emulator) and to the GitHub environment secret (from
+which `deploy-backend.yml` puts it in Secret Manager). Full procedure in [`deploy/README.md`](deploy/README.md).
 
 ## What this app is
 
 A 3D in-browser cooking game (`misaevol` / "clapastedyke"). The user navigates a three.js kitchen world (`/#/home`); the real data-entry forms are the screens reached from it. `/#/ui` is the living component showcase. **Routing is hash-based** (`withHashLocation()` in `app.config.ts`): everything after `#` never reaches the server, so `/` is the **only** server route the app has and no app route can collide with `/api/**` or with a static file. There is deliberately **no SPA fallback rewrite** — see the comment on `provideRouter` and `manual/firebase-deploy.md`. State is persisted locally in IndexedDB — **that is the source of truth, and no server ever holds the user's data**.
 
-The one network integration is **optional and additive**: from `/cuenta` a user can connect a Google account and mirror recipes and supplies into a spreadsheet in their own Drive. The app creates that spreadsheet and writes it **itself**, with the Sheets and Drive REST APIs and the user's own token — no Apps Script, nothing deployed into anyone's account, one consent checkbox (`drive.file`, which only reaches files the app created). The one-time setup for whoever publishes the app (Cloud project, consent screen, Client ID **and client secret**) is in [`deploy/google-client-id.md`](deploy/google-client-id.md) — the **only** place that procedure is documented; the design reasoning, the platform constraints and the alternatives that were measured and rejected are in [`manual/google-integration.md`](manual/google-integration.md). Nothing about local persistence changes when it is off — and it is off wherever `googleClientId` is empty. That value is written **once**, in `deploy/firebase/environments.json`; `public/config.json` and `api/auth/.env.<projectId>` are both **generated** from it (`npm run config`, `npm run api:env`), so the browser and the function can never disagree about which client is asking.
+The one network integration is **optional and additive**: from `/cuenta` a user can connect a Google account and mirror recipes and supplies into a spreadsheet in their own Drive. The app creates that spreadsheet and writes it **itself**, with the Sheets and Drive REST APIs and the user's own token — no Apps Script, nothing deployed into anyone's account, one consent checkbox (`drive.file`, which only reaches files the app created). The one-time setup for whoever publishes the app (Cloud project, consent screen, Client ID **and client secret**) is in [`deploy/README.md`](deploy/README.md) — the **only** place that procedure is documented; the design reasoning, the platform constraints and the alternatives that were measured and rejected are in [`manual/google-integration.md`](manual/google-integration.md). Nothing about local persistence changes when it is off — and it is off wherever `googleClientId` is empty. That value is written in `deploy/environments.json` — **twice on purpose**, in the environment's `front` block (what the browser publishes) and in its `back` block (what the function resolves), with `deploy/check.sh` failing the build if the two ever disagree. Everything else — `public/config.json`, `api/<fn>/.env.<projectId>`, `deploy/proxy.config.json`, and the `config.json` inside the artifact — is **copied** from there and is **not versioned**.
 
 **There is exactly one piece of backend, and it is about identity — never data.** A browser client cannot hold a `client_secret`, so Google gives it no refresh token: its access tokens die in an hour and the only way to get another is a popup, which the browser blocks when it isn't triggered by a click. That is why reloading the page used to sign you out. [`api/auth`](api/auth/README.md) — a Cloud Function — is the confidential OAuth client that custodies the long-lived grant and mints fresh access tokens on demand, behind an `HttpOnly` `__session` cookie. The recipe data never passes through it: the whole sync engine still runs in the browser. The folder rule (**one folder = one package = one independent deploy**, shared code in `api/_common/`, deployed manually and separately from hosting) is in [`manual/api.md`](manual/api.md), and it governs every backend function added from now on.
 

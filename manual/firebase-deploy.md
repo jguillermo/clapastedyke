@@ -29,14 +29,14 @@ lo secreto está fuera del repo. Nada de configuración vive dentro del workflow
 
 | Sitio | Qué contiene | Secreto |
 |---|---|---|
-| [`deploy/firebase/environments.json`](../deploy/firebase/environments.json) | **La lista de ambientes**: a qué proyecto de Firebase va cada uno (`projectId`) y el `config.json` con el que corre la app | No |
+| [`deploy/environments.json`](../deploy/environments.json) | **La lista de ambientes**: a qué proyecto de Firebase va cada uno (`projectId`, `region`) y los bloques `front` y `back` con los valores públicos de cada mitad | No |
 | **Environments de GitHub**, uno por ambiente | `FIREBASE_SERVICE_ACCOUNT` y `GOOGLE_OAUTH_CLIENT_SECRET` | Sí |
 | [`deploy/.env-secret`](../deploy/.env-secret) | El cuaderno local del que salen esos dos, **ignorado por git** | Sí |
 
-**El formato de `environments.json`** —sus dos niveles, qué va en `config` y qué fuera, y por qué
-`public/config.json` es un fichero **generado** que no se edita a mano— está documentado junto al
-propio fichero, en [`deploy/firebase/README.md`](../deploy/firebase/README.md). No se repite aquí
-para que no puedan contradecirse.
+**El formato de `environments.json`** —`front`/`back`/`secretos`, qué significa `destino`, por qué el
+Client ID está escrito dos veces y por qué nada de lo generado se versiona— está documentado junto al
+propio fichero, en [`deploy/README.md`](../deploy/README.md). No se repite aquí para que no puedan
+contradecirse.
 
 El nombre del ambiente es la bisagra: **la clave en `environments.json` y el nombre del *environment*
 de GitHub tienen que ser el mismo, en minúsculas.** Eso es lo que hace que `secrets.*` resuelva a
@@ -56,42 +56,39 @@ En <https://console.firebase.google.com>, con tu cuenta de Google: *Crear un pro
 p. ej. `clapastedyke-dev`. Analytics no hace falta.
 
 Dentro del proyecto: **Compilación → Hosting → Comenzar**. La consola te ofrecerá instalar la CLI y
-correr `firebase init`; **sáltate esos pasos** — el `firebase.json` ya está en el repo y
+correr `firebase init`; **sáltate esos pasos** — el `firebase.json` ya está en `deploy/` y
 `firebase init` lo sobrescribiría.
 
 Anota el **Project ID** (el identificador con guiones que sale bajo el nombre, no el nombre bonito;
 Firebase a veces le añade un sufijo aleatorio).
 
-### Paso 2 · Escribirlo en `deploy/firebase/environments.json`
+### Paso 2 · Escribirlo en `deploy/environments.json`
 
 ```jsonc
-{
-  "dev": {
-    "projectId": "migo-dev-20b41",
-    "config": { "debug": true, "googleClientId": "2229…", "syncPollSeconds": 120 }
-  },
-  "prod": {
-    "projectId": "clapastedyke-prod",
-    "config": { "debug": false, "googleClientId": "2229…", "syncPollSeconds": 120 }
-  }
+"dev": {
+  "projectId": "migo-dev-20b41",
+  "region": "us-central1",
+  "front": { "destino": { … }, "valores": { "debug": true, "googleClientId": "2229…", "syncPollSeconds": 120 } },
+  "back":  { "destino": { … }, "valores": { "GOOGLE_OAUTH_CLIENT_ID": "2229…" } },
+  "secretos": { "destino": { … }, "claves": ["GOOGLE_OAUTH_CLIENT_SECRET", "FIREBASE_SERVICE_ACCOUNT"] }
 }
 ```
 
-Aquí va también el **Client ID de OAuth** de cada ambiente (`config.googleClientId`), que **no es un
-secreto** y por eso está versionado —el porqué, en
-[`deploy/firebase/README.md`](../deploy/firebase/README.md). Cómo se genera:
-[`deploy/google-client-id.md`](../deploy/google-client-id.md).
+Aquí va también el **Client ID de OAuth** de cada ambiente, que **no es un secreto** y por eso está
+versionado. Va **dos veces**: en `front.valores.googleClientId` (lo publica el navegador) y en
+`back.valores.GOOGLE_OAUTH_CLIENT_ID` (lo resuelve la función). El porqué —y la guarda que impide
+que diverjan— está en [`deploy/README.md`](../deploy/README.md); cómo se genera, también.
 
-Después, `npm run config` para regenerar `public/config.json`, y commitea los dos. Si te dejas el
-placeholder `TU-PROJECT-ID-…`, el workflow falla en el primer job con un mensaje que te manda aquí,
-sin llegar a compilar ni a desplegar nada.
+Nada más que hacer: `public/config.json` y el `.env` de la función **no se versionan**, y salen de
+aquí con `npm run wire -- local`. Si te dejas el placeholder `TU-PROJECT-ID-…`, el workflow falla en
+el primer job con un mensaje que te manda aquí, sin llegar a compilar ni a desplegar nada.
 
 > **Este bloque no hace falta escribirlo a mano.**
 > [`deploy/setup-firebase-project.sh`](../deploy/setup-firebase-project.sh) lo crea si le das un
 > nombre de ambiente que todavía no existe: te pregunta el proyecto (y lo crea en Cloud si hace
-> falta), clona el `config` del primer ambiente para que no se te olvide ninguna clave, y deja
-> `googleClientId` vacío hasta que lo cablees. Montar un ambiente desde cero no exige tocar este
-> fichero antes.
+> falta), clona el esqueleto `front`/`back`/`secretos` del primer ambiente que ya lo tenga —para que
+> no se te olvide ninguna clave— y deja los valores vacíos hasta que los cablees. Montar un ambiente
+> desde cero no exige tocar este fichero antes.
 
 ### Paso 3 · Una cuenta de servicio por proyecto
 
@@ -136,7 +133,7 @@ Dentro de **cada** environment, `Add environment secret`. Son dos:
 | Secret | Valor | Quién lo usa |
 |---|---|---|
 | `FIREBASE_SERVICE_ACCOUNT` | El **contenido íntegro** del JSON del paso 3 — ábrelo con un editor y pega todo, desde la `{` hasta la `}`. **Uno distinto por ambiente**: cada JSON abre su proyecto | Los dos workflows |
-| `GOOGLE_OAUTH_CLIENT_SECRET` | El client secret de Google de ese ambiente ([`deploy/google-client-id.md`](../deploy/google-client-id.md)) | Solo el backend: el workflow lo pone en Secret Manager antes de desplegar |
+| `GOOGLE_OAUTH_CLIENT_SECRET` | El client secret de Google de ese ambiente ([`deploy/README.md`](../deploy/README.md)) | Solo el backend: el workflow lo pone en Secret Manager antes de desplegar |
 
 Los dos acaban en `deploy/.env-secret` —que **no** se versiona— y de ahí los suben al *environment*,
 si tienes `gh`, los scripts que los producen: el de la cuenta de servicio
@@ -175,7 +172,7 @@ el que falte da `Error 400: origin_mismatch`. Con dos ambientes son cuatro entra
 ocho.
 
 **Cómo se crea ese Client ID y dónde se registran sus orígenes está en
-[`deploy/google-client-id.md`](../deploy/google-client-id.md)** — es el único sitio con ese procedimiento.
+[`deploy/README.md`](../deploy/README.md)** — es el único sitio con ese procedimiento.
 
 ---
 
@@ -184,7 +181,7 @@ ocho.
 Dos pasos, y **el workflow no se toca**. El nombre del ambiente que escribes al lanzarlo se valida
 contra `environments.json`, así que la lista de ambientes que existen es literalmente ese fichero.
 
-1. **Un bloque en [`deploy/firebase/environments.json`](../deploy/firebase/environments.json)** — con el proyecto de
+1. **Un bloque en [`deploy/environments.json`](../deploy/environments.json)** — con el proyecto de
    Firebase ya creado y Hosting activado (pasos 1 y 2):
 
    ```jsonc
@@ -200,7 +197,7 @@ contra `environments.json`, así que la lista de ambientes que existen es litera
 Ya está: `Run workflow` escribiendo `stage` despliega.
 
 Detalle completo del diseño (por qué es una caja de texto y no un desplegable, y por qué la
-validación va en un job aparte) en [`deploy/firebase/README.md`](../deploy/firebase/README.md).
+validación va en un job aparte) en [`deploy/README.md`](../deploy/README.md).
 
 ---
 
@@ -215,11 +212,12 @@ validación va en un job aparte) en [`deploy/firebase/README.md`](../deploy/fire
 
 El workflow:
 
-1. Valida el ambiente y saca su `projectId` de `environments.json`.
-2. Compila con `npm run build` (producción, con presupuestos de tamaño).
-3. Escribe `dist/misaevol/browser/config.json` con el bloque `config` del ambiente, usando el mismo
-   script que `npm run config`.
-4. Sube `dist/misaevol/browser` al proyecto de Firebase de ese ambiente.
+1. Valida el ambiente y saca su `projectId`, con `./deploy/env.sh <ambiente>`.
+2. Compila **ese ambiente** con `npm run build -- <ambiente> --only hosting` (producción, con
+   presupuestos de tamaño). El `config.json` del artefacto sale del bloque `front` de ese ambiente:
+   no hay un paso posterior que lo pise.
+3. Sube `deploy/dist/hosting` con `./deploy/deploy.sh <ambiente> --only hosting`, que antes comprueba
+   que el artefacto es de ese ambiente.
 
 La URL publicada queda enlazada en la propia ejecución (el recuadro del environment) y en el
 resumen del job.
@@ -230,9 +228,9 @@ dev es lo que se publica en prod.
 
 ### Cambiar la configuración de un ambiente
 
-- `debug`, `googleClientId`, `syncPollSeconds` → editar su bloque `config` en
-  `deploy/firebase/environments.json`, `npm run config` si tocaste `dev`, commitear y **volver a
-  desplegar**.
+- `debug`, `googleClientId`, `syncPollSeconds` → editar el bloque `front.valores` de ese ambiente en
+  `deploy/environments.json`, commitear y **volver a desplegar**. (Si tocaste `local`, además
+  `npm run wire -- local` para que `ng serve` lo vea; ese fichero no se versiona.)
 - La cuenta de servicio → cambiar el secret de **ese** environment y **volver a desplegar**.
 
 No hay ningún fichero en un servidor que se pueda editar en caliente: Hosting sirve un artefacto
@@ -243,35 +241,33 @@ inmutable. La configuración se aplica en el momento del despliegue, no después
 Para una prueba rápida, con el `projectId` que quieras de `environments.json`:
 
 ```bash
-npx --yes firebase-tools login                                        # una sola vez
-npm run build
-node deploy/firebase/config.mjs dev --out dist/misaevol/browser/config.json
-npx --yes firebase-tools deploy --only hosting --project migo-dev-20b41
+npx --yes firebase-tools login          # una sola vez
+npm run build -- dev --only hosting
+./deploy/deploy.sh dev --only hosting
 ```
 
-Se lanza **desde la raíz del repo**, que es donde está el `firebase.json`, y la línea de
-`config.mjs` no se puede saltar: sin ella subes el `public/config.json` del repo, que es el de
-`dev`, así que desplegando a otro ambiente publicarías su configuración equivocada.
-
-Por eso mismo, para un despliegue de verdad usa el workflow: ahí ese orden no se puede olvidar.
+Son **los dos mismos comandos que corre el workflow**, ni uno más. El ambiente viaja en el `build`,
+así que no hay ningún paso que se pueda olvidar: si compilas `dev` y luego pides desplegar `prod`,
+`deploy.sh` compara el `config.json` del artefacto con el bloque del ambiente y se niega.
 
 ---
 
 ## Qué hay en `firebase.json`, y por qué
 
-Vive en [`firebase.json`](../firebase.json), **en la raíz del repo**, y es **uno solo para todos los
-ambientes**: lo que cambia entre ellos es el proyecto de destino y el `config.json`, no cómo se
-sirve el sitio.
+Vive en [`deploy/firebase.json`](../deploy/firebase.json) y es **uno solo para todos los ambientes**:
+lo que cambia entre ellos es el proyecto de destino y el `config.json`, no cómo se sirve el sitio.
 
-Es el único fichero del despliegue que no está en `deploy/firebase/`, y no es por gusto: el CLI fija
-la raíz del proyecto en el directorio del `firebase.json` y **rechaza cualquier `public` que se
-salga de ella**. Con el fichero en `deploy/firebase/`, el deploy muere con
-`../../dist/misaevol/browser is outside of project directory`. Detalle en
-[`deploy/firebase/README.md`](../deploy/firebase/README.md).
+Que pueda estar ahí es consecuencia de que el artefacto se genere en `deploy/dist`. El CLI fija la
+raíz del proyecto en el directorio de su `firebase.json` y **rechaza cualquier `public` que se salga
+de ella**: mientras la salida era `dist/misaevol/browser`, el fichero tenía que vivir en la raíz del
+repo. Ahora todas las rutas (`dist/hosting`, `dist/functions/auth`, `firestore.rules`) quedan dentro
+de `deploy/`, y por eso Firebase no aparece en ningún otro sitio del repositorio. `deploy.sh` hace
+`cd deploy` en vez de usar `--config`, para que el CLI no tenga margen de deducir otra raíz. Detalle
+en [`deploy/README.md`](../deploy/README.md).
 
 | Clave | Por qué |
 |---|---|
-| `"public": "dist/misaevol/browser"` | El builder `application` de Angular deja el cliente ahí. Apuntar a `dist/misaevol` publicaría además `3rdpartylicenses.txt` y un `prerendered-routes.json` que no pinta nada |
+| `"public": "deploy/dist/hosting"` | El builder `application` de Angular deja el cliente ahí. Apuntar a `dist/misaevol` publicaría además `3rdpartylicenses.txt` y un `prerendered-routes.json` que no pinta nada |
 | `"rewrites"`: `/api/auth/**` → función `auth` | El backend de la sesión, servido como **mismo origen** que la app. Va **antes** del fallback de SPA, que si no se tragaría `/api/auth/token` (no lleva punto). Es lo que permite que la cookie `HttpOnly; SameSite=Lax` viaje — ver [`api.md`](api.md) |
 | **No hay fallback de SPA**, y es deliberado | La app enruta **por fragmento** (`withHashLocation`), así que la única ruta de servidor que existe es `/`: recargar `/#/home` no pide nada más. Un `**/!(*.*)` → `/index.html` sería peor que inútil — serviría la app para cualquier ruta inventada, y como el router solo mira el fragmento, esa visita acabaría **en la portada sin un solo error**, dando por buena una URL que no lleva a donde dice. Sin él, una ruta que no existe da 404, que es lo que es |
 | `Cache-Control: immutable` en `js/css/woff2` | El build usa `outputHashing: "all"`, así que el nombre cambia con el contenido y cachear un año es seguro |
@@ -294,10 +290,11 @@ salga de ella**. Con el fichero en `deploy/firebase/`, el deploy muere con
 | `Failed to get Firebase project …` | El `projectId` no existe o es el nombre en vez del ID | Cópialo de la consola de Firebase |
 | El deploy a prod se queda «Waiting» | Está pidiendo aprobación (protección del environment) | Apruébalo desde la propia ejecución en Actions |
 | Desplegué a dev y se actualizó prod | El secret está como secret de repositorio, no de environment | Paso 4 |
-| El sitio se publica con el `config.json` de otro ambiente | Desplegaste a mano y te saltaste `config.mjs` | Usa el workflow, o repite la secuencia completa de «Desde local» |
-| `public/config.json` vuelve a cambiar solo | Es un fichero **generado**; lo reescribe `npm run config` | Edita `environments.json`, no el `config.json` |
+| El sitio se publica con el `config.json` de otro ambiente | No debería poder pasar: `deploy.sh` lo comprueba | Recompila con `npm run build -- <ambiente>` |
+| `public/config.json` no existe tras clonar | Es un fichero **generado** y ya no se versiona | `npm run wire -- local` |
+| Un cambio en `public/config.json` no se queda | Lo reescribe `wire-environment.sh` | Edita `deploy/environments.json`, no el `config.json` |
 | Una ruta da 404 | La URL va **sin `#`** (`/home` en vez de `/#/home`) | No es un fallo del despliegue: esa ruta no existe en el servidor. Todas las rutas de la app llevan hash |
 | `Failed to fetch dynamically imported module: …/chunk-XXXX.js` al navegar | La pestaña lleva abierta desde un despliegue anterior: pide un chunk con el hash de aquel build, que la publicación nueva borró | Recargar (`Cmd`/`Ctrl`+`Shift`+`R`). La app se recarga sola desde `platform/stale-build/`; si aun así se repite **después** de recargar, el fallo es otro (sin red, o una publicación a medias) y queda un `error` en consola |
-| `… is outside of project directory` | Alguien movió `firebase.json` fuera de la raíz | Tiene que estar en la raíz: el CLI no sirve nada que quede por encima de él |
+| `… is outside of project directory` | Se invocó el CLI desde otro sitio, o una ruta de `firebase.json` salió de `deploy/` | Despliega con `./deploy/deploy.sh`: hace `cd deploy`, y todas las rutas del fichero son relativas a esa carpeta |
 | `Error 400: origin_mismatch` al conectar Google | Falta ese origen concreto — son **dos por ambiente** | Paso 5 |
 | La consola no muestra trazas `[events]` en prod | `debug: false`, que es lo correcto | Los `warn` y `error` se ven siempre; en dev tienes `debug: true` |

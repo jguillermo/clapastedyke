@@ -18,6 +18,10 @@
           "options": {
             "browser": "src/main.ts",
             "tsConfig": "tsconfig.app.json",
+            "outputPath": {
+              "base": "deploy/dist/hosting",
+              "browser": ""
+            },
             "assets": [
               {
                 "glob": "**/*",
@@ -62,7 +66,7 @@
           },
           "defaultConfiguration": "development",
           "options": {
-            "proxyConfig": "proxy.config.json"
+            "proxyConfig": "deploy/proxy.config.json"
           }
         },
         "test": {

@@ -1,21 +1,16 @@
 {
   "functions": [
     {
-      "source": "api/auth",
-      "codebase": "auth",
-      "predeploy": [
-        "node deploy/firebase/api-env.mjs --project-id $PROJECT_ID",
-        "npm --prefix api/auth ci",
-        "npm --prefix api/auth run build"
-      ]
+      "source": "dist/functions/auth",
+      "codebase": "auth"
     }
   ],
   "firestore": {
-    "rules": "deploy/firebase/firestore.rules",
-    "indexes": "deploy/firebase/firestore.indexes.json"
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
   },
   "hosting": {
-    "public": "dist/misaevol/browser",
+    "public": "dist/hosting",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "rewrites": [
       {

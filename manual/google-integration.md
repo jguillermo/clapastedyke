@@ -1,7 +1,7 @@
 # Integración con Google — modelo mental y decisiones
 
 Este documento es el **por qué**. El paso a paso para ponerlo en marcha está en
-[`deploy/google-client-id.md`](../deploy/google-client-id.md); aquí está lo que hay que entender antes de tocarlo, las
+[`deploy/README.md`](../deploy/README.md); aquí está lo que hay que entender antes de tocarlo, las
 alternativas que se evaluaron y los datos medidos que respaldan cada decisión.
 
 Se escribió después de una investigación con pruebas reales contra la API de Google (agosto 2026).
@@ -303,7 +303,7 @@ completo está en `e2e/specs/account/sign-out.spec.ts`.
 
 **Este documento no explica cómo montarlo.** Los pasos —proyecto de Cloud, consentimiento, Client ID,
 client secret y orígenes, y dónde acaba cada valor— viven **solo** en
-[`deploy/google-client-id.md`](../deploy/google-client-id.md), junto al fichero de ambientes donde
+[`deploy/README.md`](../deploy/README.md), junto al fichero de ambientes donde
 acaba el Client ID. La **infraestructura** que necesita `api/auth` para existir (proyecto de Firebase,
 Blaze, Firestore, la cuenta de despliegue) es otra cosa y está en [`api.md`](api.md): el permiso que
 concede el usuario sobre su cuenta y el permiso para desplegar lo tuyo no se mezclan. Lo que falla al
@@ -334,7 +334,7 @@ original —«se pierde la sesión»— volvería cada semana, y sin ninguna pis
 
 Así que la pantalla de consentimiento tiene que estar **«En producción»**. Publicarla no cuesta nada:
 `drive.file` no es un permiso sensible y no hay verificación de Google que pasar (2.6). El trámite, en
-[`deploy/google-client-id.md`](../deploy/google-client-id.md) §2.
+[`deploy/README.md`](../deploy/README.md) §2.
 
 ---
 
@@ -342,7 +342,7 @@ Así que la pantalla de consentimiento tiene que estar **«En producción»**. P
 
 | Síntoma | Causa | Arreglo |
 |---|---|---|
-| `Error 400: origin_mismatch` | El origen no está registrado, o es `127.0.0.1` vs `localhost`, o el puerto cambió | [`deploy/google-client-id.md`](../deploy/google-client-id.md) §3 |
+| `Error 400: origin_mismatch` | El origen no está registrado, o es `127.0.0.1` vs `localhost`, o el puerto cambió | [`deploy/README.md`](../deploy/README.md) §3 |
 | `UNAUTHENTICATED` | El token de una hora caducó y el backend no ha podido emitir otro | Mirar la respuesta de `/api/auth/token`: `401 revoked` = se retiró el acceso (reconectar); `502` = Google no contestó (se reintenta solo) |
 | Al recargar pide reconectar | El backend no tiene sesión para este navegador: falta la cookie `__session`, o su concesión ya no vale | Si es sistemático, comprobar que `/api/auth/**` llega a la función (rewrite en `firebase.json`) y que la pantalla de consentimiento está **En producción** (5.2) |
 | `REJECTED` | El usuario no marcó la casilla de Drive, o revocó el acceso | Reconectar y marcarla |
@@ -480,7 +480,7 @@ los tecleara un usuario: un insumo llamado «12/03» se volvería fecha y uno qu
 | El esquema de la hoja y la fusión | `core/external-sync/infrastructure/sheet-schema.ts` + `sheet-merge.ts` |
 | La cola durable | `core/external-sync/infrastructure/indexeddb-sync-outbox.ts` |
 | Las cinco ramas de salida de la sincronización | `core/external-sync/application/use-cases/synchronize.use-case.ts` |
-| La configuración del despliegue | `public/config.json` |
+| La configuración del despliegue | `deploy/environments.json` (de ahí se copia a `public/config.json` y al `.env` de la función) |
 | La pantalla | `features/account/` |
 
 **Cambiar de proveedor de identidad** es escribir otro `Authenticator` y tocar una línea de

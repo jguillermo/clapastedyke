@@ -1,0 +1,93 @@
+{
+  "local": {
+    "projectId": "migo-dev-20b41",
+    "region": "us-central1",
+    "front": {
+      "destino": {
+        "desarrollo": "public/config.json — lo lee `ng serve`; lo escribe deploy/wire-environment.sh",
+        "artefacto": "deploy/dist/hosting/config.json — lo escribe deploy/build.sh"
+      },
+      "valores": {
+        "debug": true,
+        "googleClientId": "406941726541-6e6q7qlimm6lp8ptrtgt9gnui9p12eie.apps.googleusercontent.com",
+        "syncPollSeconds": 120
+      }
+    },
+    "back": {
+      "destino": {
+        "emulador": "api/auth/.env.<projectId> — lo escribe deploy/wire-environment.sh",
+        "proxy": "deploy/proxy.config.json — lo escribe deploy/wire-environment.sh; enruta /api/auth de `ng serve` al emulador",
+        "artefacto": "deploy/dist/functions/auth/.env.<projectId> — lo escribe deploy/build.sh"
+      },
+      "valores": {
+        "GOOGLE_OAUTH_CLIENT_ID": "406941726541-6e6q7qlimm6lp8ptrtgt9gnui9p12eie.apps.googleusercontent.com"
+      }
+    },
+    "secretos": {
+      "destino": {
+        "origen": "deploy/.env-secret — cuaderno local, nunca se versiona",
+        "emulador": "api/auth/.secret.local — fichero CLAVE=valor, chmod 600, gitignored",
+        "nube": "GitHub -> Settings -> Environments -> local -> Add environment secret"
+      },
+      "claves": ["GOOGLE_OAUTH_CLIENT_SECRET", "FIREBASE_SERVICE_ACCOUNT"]
+    }
+  },
+  "dev": {
+    "projectId": "migo-dev-20b41",
+    "region": "us-central1",
+    "front": {
+      "destino": {
+        "artefacto": "deploy/dist/hosting/config.json — lo escribe deploy/build.sh"
+      },
+      "valores": {
+        "debug": true,
+        "googleClientId": "406941726541-6e6q7qlimm6lp8ptrtgt9gnui9p12eie.apps.googleusercontent.com",
+        "syncPollSeconds": 120
+      }
+    },
+    "back": {
+      "destino": {
+        "artefacto": "deploy/dist/functions/auth/.env.<projectId> — lo escribe deploy/build.sh"
+      },
+      "valores": {
+        "GOOGLE_OAUTH_CLIENT_ID": "406941726541-6e6q7qlimm6lp8ptrtgt9gnui9p12eie.apps.googleusercontent.com"
+      }
+    },
+    "secretos": {
+      "destino": {
+        "origen": "deploy/.env-secret — cuaderno local, nunca se versiona",
+        "nube": "GitHub -> Settings -> Environments -> dev -> Add environment secret"
+      },
+      "claves": ["GOOGLE_OAUTH_CLIENT_SECRET", "FIREBASE_SERVICE_ACCOUNT"]
+    }
+  },
+  "prod": {
+    "projectId": "TU-PROJECT-ID-PROD",
+    "region": "us-central1",
+    "front": {
+      "destino": {
+        "artefacto": "deploy/dist/hosting/config.json — lo escribe deploy/build.sh"
+      },
+      "valores": {
+        "debug": false,
+        "googleClientId": "",
+        "syncPollSeconds": 120
+      }
+    },
+    "back": {
+      "destino": {
+        "artefacto": "deploy/dist/functions/auth/.env.<projectId> — lo escribe deploy/build.sh"
+      },
+      "valores": {
+        "GOOGLE_OAUTH_CLIENT_ID": ""
+      }
+    },
+    "secretos": {
+      "destino": {
+        "origen": "deploy/.env-secret — cuaderno local, nunca se versiona",
+        "nube": "GitHub -> Settings -> Environments -> prod -> Add environment secret"
+      },
+      "claves": ["GOOGLE_OAUTH_CLIENT_SECRET", "FIREBASE_SERVICE_ACCOUNT"]
+    }
+  }
+}

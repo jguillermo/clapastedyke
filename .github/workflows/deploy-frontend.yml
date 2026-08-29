@@ -57,7 +57,7 @@ jobs:
           # convierte en la anotación de error del job. `node` viene en la imagen del runner.
           AMBIENTE="$(printf '%s' "$AMBIENTE_INPUT" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
 
-          if ! project_id="$(node deploy/firebase/config.mjs "$AMBIENTE" --project-id 2>&1)"; then
+          if ! project_id="$(./deploy/env.sh "$AMBIENTE" 2>&1)"; then
             echo "::error::$project_id"
             exit 1
           fi
@@ -91,17 +91,14 @@ jobs:
       # ya trae `<base href="/">`. Tampoco hace falta copiar `index.html` a `404.html` ni
       # ningún rewrite de SPA: la app enruta por fragmento (`/#/home`), así que la única
       # ruta que pide al servidor es `/`.
+      #
+      # El ambiente se le pasa AL BUILD: el `config.json` del artefacto sale del bloque `front` de
+      # ese ambiente en `deploy/environments.json`, no de un paso posterior que pise el fichero.
+      # Así lo que se sube es exactamente lo que se compiló, y el mismo comando vale en local.
       - name: Build de producción
-        run: npm run build
-
-      # El MISMO build vale para todos los ambientes; lo que cambia es este fichero, que `main.ts`
-      # lee ANTES de arrancar. El bloque `config` del ambiente se copia tal cual, pisando el
-      # `public/config.json` que el build acaba de dejar en dist (que es el de desarrollo).
-      # Mismo script que `npm run config` en local, para que no puedan divergir.
-      - name: Configuración del ambiente (config.json)
         env:
           AMBIENTE: ${{ needs.validar.outputs.ambiente }}
-        run: node deploy/firebase/config.mjs "$AMBIENTE" --out dist/misaevol/browser/config.json
+        run: npm run build -- "$AMBIENTE" --only hosting
 
       # Fuera del árbol que se publica: `runner.temp` no está dentro del repo ni de `dist/`.
       - name: Credenciales de la cuenta de servicio
@@ -116,11 +113,10 @@ jobs:
           printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "${RUNNER_TEMP}/gcp-key.json"
           echo "GOOGLE_APPLICATION_CREDENTIALS=${RUNNER_TEMP}/gcp-key.json" >> "$GITHUB_ENV"
 
-      # Sin `--config`: el CLI encuentra `firebase.json` en la raíz, que es donde TIENE que estar
-      # (fija ahí la raíz del proyecto y `dist/` queda dentro). Ver deploy/firebase/README.md.
+      # Firebase se invoca SOLO desde `deploy/`: el script hace `cd deploy` y publica `deploy/dist`,
+      # que es lo que acaba de dejar el build. Antes de subir comprueba que el artefacto es de este
+      # ambiente. Ver deploy/README.md.
       - name: Deploy a Firebase Hosting
-        run: |
-          npx --yes firebase-tools@latest deploy \
-            --only hosting \
-            --project "${{ needs.validar.outputs.project-id }}" \
-            --non-interactive
+        env:
+          AMBIENTE: ${{ needs.validar.outputs.ambiente }}
+        run: ./deploy/deploy.sh "$AMBIENTE" --only hosting

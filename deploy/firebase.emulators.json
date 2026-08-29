@@ -1,0 +1,25 @@
+{
+  "//": [
+    "El firebase.json del EMULADOR. El de despliegue es firebase.json.",
+    "",
+    "Son dos porque apuntan a sitios distintos a prop\u00f3sito: el de despliegue sube el artefacto ya",
+    "compilado de `dist/functions/auth`, y el emulador ejecuta el fuente de `api/auth` con su `lib/`",
+    "reci\u00e9n compilado \u2014 sin pasar por `npm ci` ni por copiar \u00e1rboles, que es lo que hace `build.sh`",
+    "y lo que har\u00eda insoportable recargar en local.",
+    "",
+    "No lleva `hosting`: en desarrollo el frontend lo sirve `ng serve`, y llega a la funci\u00f3n por",
+    "deploy/proxy.config.json.",
+    "",
+    "Lo arranca ./deploy/emulators.sh (npm run emulators)."
+  ],
+  "functions": [
+    {
+      "source": "../api/auth",
+      "codebase": "auth"
+    }
+  ],
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  }
+}
