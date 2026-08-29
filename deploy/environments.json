@@ -9,8 +9,10 @@
       },
       "valores": {
         "debug": true,
-        "googleClientId": "406941726541-6e6q7qlimm6lp8ptrtgt9gnui9p12eie.apps.googleusercontent.com",
         "syncPollSeconds": 120
+      },
+      "delEntorno": {
+        "googleClientId": "GOOGLE_OAUTH_CLIENT_ID — GitHub: Settings -> Environments -> <ambiente> -> secret. En local, el último lote de deploy/.env-secret"
       }
     },
     "back": {
@@ -19,8 +21,8 @@
         "proxy": "deploy/proxy.config.json — lo escribe deploy/wire-environment.sh; enruta /api/auth de `ng serve` al emulador",
         "artefacto": "deploy/dist/functions/auth/.env.<projectId> — lo escribe deploy/build.sh"
       },
-      "valores": {
-        "GOOGLE_OAUTH_CLIENT_ID": "406941726541-6e6q7qlimm6lp8ptrtgt9gnui9p12eie.apps.googleusercontent.com"
+      "delEntorno": {
+        "GOOGLE_OAUTH_CLIENT_ID": "GOOGLE_OAUTH_CLIENT_ID — la MISMA variable que front.googleClientId: un solo origen, no pueden divergir"
       }
     },
     "secretos": {
@@ -29,7 +31,7 @@
         "emulador": "api/auth/.secret.local — fichero CLAVE=valor, chmod 600, gitignored",
         "nube": "GitHub -> Settings -> Environments -> local -> Add environment secret"
       },
-      "claves": ["GOOGLE_OAUTH_CLIENT_SECRET", "FIREBASE_SERVICE_ACCOUNT"]
+      "claves": ["GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET", "FIREBASE_SERVICE_ACCOUNT"]
     }
   },
   "dev": {
@@ -41,16 +43,18 @@
       },
       "valores": {
         "debug": true,
-        "googleClientId": "406941726541-6e6q7qlimm6lp8ptrtgt9gnui9p12eie.apps.googleusercontent.com",
         "syncPollSeconds": 120
+      },
+      "delEntorno": {
+        "googleClientId": "GOOGLE_OAUTH_CLIENT_ID — GitHub: Settings -> Environments -> <ambiente> -> secret. En local, el último lote de deploy/.env-secret"
       }
     },
     "back": {
       "destino": {
         "artefacto": "deploy/dist/functions/auth/.env.<projectId> — lo escribe deploy/build.sh"
       },
-      "valores": {
-        "GOOGLE_OAUTH_CLIENT_ID": "406941726541-6e6q7qlimm6lp8ptrtgt9gnui9p12eie.apps.googleusercontent.com"
+      "delEntorno": {
+        "GOOGLE_OAUTH_CLIENT_ID": "GOOGLE_OAUTH_CLIENT_ID — la MISMA variable que front.googleClientId: un solo origen, no pueden divergir"
       }
     },
     "secretos": {
@@ -58,7 +62,7 @@
         "origen": "deploy/.env-secret — cuaderno local, nunca se versiona",
         "nube": "GitHub -> Settings -> Environments -> dev -> Add environment secret"
       },
-      "claves": ["GOOGLE_OAUTH_CLIENT_SECRET", "FIREBASE_SERVICE_ACCOUNT"]
+      "claves": ["GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET", "FIREBASE_SERVICE_ACCOUNT"]
     }
   },
   "prod": {
@@ -70,16 +74,18 @@
       },
       "valores": {
         "debug": false,
-        "googleClientId": "",
         "syncPollSeconds": 120
+      },
+      "delEntorno": {
+        "googleClientId": "GOOGLE_OAUTH_CLIENT_ID — GitHub: Settings -> Environments -> <ambiente> -> secret. En local, el último lote de deploy/.env-secret"
       }
     },
     "back": {
       "destino": {
         "artefacto": "deploy/dist/functions/auth/.env.<projectId> — lo escribe deploy/build.sh"
       },
-      "valores": {
-        "GOOGLE_OAUTH_CLIENT_ID": ""
+      "delEntorno": {
+        "GOOGLE_OAUTH_CLIENT_ID": "GOOGLE_OAUTH_CLIENT_ID — la MISMA variable que front.googleClientId: un solo origen, no pueden divergir"
       }
     },
     "secretos": {
@@ -87,7 +93,7 @@
         "origen": "deploy/.env-secret — cuaderno local, nunca se versiona",
         "nube": "GitHub -> Settings -> Environments -> prod -> Add environment secret"
       },
-      "claves": ["GOOGLE_OAUTH_CLIENT_SECRET", "FIREBASE_SERVICE_ACCOUNT"]
+      "claves": ["GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET", "FIREBASE_SERVICE_ACCOUNT"]
     }
   }
 }

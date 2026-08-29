@@ -332,11 +332,13 @@ npx --yes firebase-tools functions:secrets:set GOOGLE_OAUTH_CLIENT_SECRET --proj
 habilitada falla con el mismo 403 y parece que el secreto no se puede crear. Le pasa igual al paso
 del workflow.
 
-El **Client ID** no va aquí: no es un secreto, y su `.env.<projectId>` es un fichero **generado** y no
-versionado —lo escribe `deploy/wire-environment.sh` (para el emulador) o `deploy/build.sh` (dentro del
-artefacto) desde `back.valores.GOOGLE_OAUTH_CLIENT_ID` de ese ambiente en
-`deploy/environments.json`, en cada cableado y en cada build, así que no
-puede quedarse viejo ni divergir.
+El **Client ID** no va en Secret Manager: no es un secreto, y la función lo resuelve de su
+`.env.<projectId>`, un fichero **generado y no versionado**. Lo escribe
+`deploy/wire-environment.sh` (el del emulador) o `deploy/build.sh` (el que viaja en el artefacto),
+en cada cableado y en cada build, leyendo la variable `GOOGLE_OAUTH_CLIENT_ID` que declara
+`back.delEntorno` en `deploy/environments.json` — la misma que usa el frontend, así que no puede
+quedarse vieja ni divergir. El valor sale del *environment* de GitHub en el CI, y de
+`deploy/.env-secret` en local. Ver [`deploy/README.md`](../deploy/README.md).
 
 ## Cuando el despliegue del backend falla
 
@@ -350,7 +352,7 @@ puede quedarse viejo ni divergir.
 | `El environment '<amb>' no tiene el secret GOOGLE_OAUTH_CLIENT_SECRET` | El *environment* de GitHub no lo declara | Requisito 5 |
 | `Secret GOOGLE_OAUTH_CLIENT_SECRET … does not exist` | El paso que lo pone no llegó a correr (o se desplegó a mano saltándose el workflow) | Requisito 5 |
 | La función responde 500 con «La función auth no está configurada» | Está desplegada, pero le falta el Client ID o el secreto | Requisito 5 y [`api/auth/README.md`](../api/auth/README.md) |
-| `<amb>: montado pero sin googleClientId` en `deploy/check.sh` | El bloque `front`/`back` de ese ambiente está vacío: la función se habría desplegado sin poder canjear | [`deploy/README.md`](../deploy/README.md) |
+| `El environment '<amb>' no tiene el secret GOOGLE_OAUTH_CLIENT_ID` | Falta ese secret en el *environment* de GitHub: la función se habría desplegado sin poder canjear el código | [`deploy/README.md`](../deploy/README.md) |
 | `No existe la función 'x'` en el job `Validar` | Errata en el input `funcion`: tiene que ser una carpeta de `api/` | El error lista las que hay |
 
 Los fallos de **autenticación** (el JSON del secret mal pegado, la clave revocada) son comunes a los

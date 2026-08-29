@@ -68,6 +68,8 @@ else
     bold "Compilando '${SOLO}' del ambiente '${AMBIENTE}' (proyecto ${PROJECT_ID})"
 fi
 
+avisar_variables_vacias
+
 # Se borra a propósito la mitad que se va a rehacer: un `dist/` incremental puede conservar el
 # config.json o un chunk de OTRO ambiente, y eso no se ve hasta que está publicado.
 step "Limpiando deploy/dist"

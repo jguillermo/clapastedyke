@@ -77,6 +77,11 @@ export interface AppFixtures {
    * **Solo lo tienen los tests que lo piden**: el resto de la suite carga el `config.json` de verdad,
    * que trae el `googleClientId` vacío, así que la integración está apagada y no se toca nada de red.
    *
+   * Que venga vacío no es casualidad: el Client ID sale de la variable `GOOGLE_OAUTH_CLIENT_ID`, y
+   * `npm run test:e2e` compila con ella **explícitamente vacía**. Así el artefacto que prueba la
+   * suite es el mismo en CI y en un portátil, tenga quien lo lance un cliente de Google cableado o
+   * no. Ver `deploy/README.md`.
+   *
    * Pedirlo instala las rutas **antes de cualquier navegación** (Playwright resuelve los fixtures del
    * test antes del cuerpo), y su estado es la hoja del usuario: se lee y se edita desde el test como lo
    * haría una persona. Ver `support/google-double.ts`.

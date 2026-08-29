@@ -5,12 +5,14 @@
 # `deploy/wire-environment.sh` copia valores; no los inventa ni los deriva. Eso deja dos huecos que
 # solo se pueden cerrar comprobando:
 #
-#   1. Valores escritos DOS VECES a propósito. El Client ID de Google lo necesitan el navegador
-#      (`front.valores.googleClientId`) y la función (`back.valores.GOOGLE_OAUTH_CLIENT_ID`), y cada
-#      bloque declara el suyo. Si divergen, Google rechaza el canje con `invalid_client` y el mensaje
-#      no dice por qué.
+#   1. El Client ID lo necesitan las dos mitades —el navegador como `front.googleClientId` y la
+#      función como `back.GOOGLE_OAUTH_CLIENT_ID`— y NO está en este fichero: cada bloque declara en
+#      `delEntorno` de qué variable lo saca. Tienen que declarar LA MISMA, o volvería a poder
+#      divergir, y cuando eso pasa Google rechaza el canje con `invalid_client` sin decir por qué.
 #
-#   2. Valores que viven en ficheros ESTÁTICOS, que ningún script genera: la región está en
+#   2. Que ninguna credencial se haya colado en `valores`, que sí se versiona.
+#
+#   3. Valores que viven en ficheros ESTÁTICOS, que ningún script genera: la región está en
 #      `deploy/firebase.json` (el rewrite de Hosting) y en `api/auth/index.ts`
 #      (`setGlobalOptions`). Fingir que se derivan sería mentira; comprobarlas es honesto.
 #
@@ -68,27 +70,43 @@ for (const [nombre, amb] of Object.entries(doc)) {
   }
   for (const bloque of ['front', 'back']) {
     if (amb[bloque] && !amb[bloque].destino) errores.push(`${nombre}.${bloque}: falta "destino".`);
-    if (amb[bloque] && !amb[bloque].valores) errores.push(`${nombre}.${bloque}: falta "valores".`);
   }
   if (!amb.region) errores.push(`${nombre}: falta "region".`);
 
-  // 1 · el Client ID está escrito dos veces y tiene que decir lo mismo
-  const front = amb.front?.valores?.googleClientId;
-  const back = amb.back?.valores?.GOOGLE_OAUTH_CLIENT_ID;
-  if (front !== back) {
+  // 1 · las dos mitades tienen que sacar el Client ID de LA MISMA variable
+  const variable = (bloque, clave) => {
+    const spec = amb[bloque]?.delEntorno?.[clave];
+    return spec ? String(spec).split('—')[0].trim() : undefined;
+  };
+  const front = variable('front', 'googleClientId');
+  const back = variable('back', 'GOOGLE_OAUTH_CLIENT_ID');
+
+  if (!front) errores.push(`${nombre}.front.delEntorno: falta "googleClientId".`);
+  if (!back) errores.push(`${nombre}.back.delEntorno: falta "GOOGLE_OAUTH_CLIENT_ID".`);
+  if (front && back && front !== back) {
     errores.push(
-      `${nombre}: el Client ID de Google no coincide entre front y back.\n` +
-        `    front.valores.googleClientId          = ${JSON.stringify(front)}\n` +
-        `    back.valores.GOOGLE_OAUTH_CLIENT_ID   = ${JSON.stringify(back)}\n` +
-        `    Los dos son el MISMO cliente: divergir da "invalid_client" al canjear el código.`,
+      `${nombre}: front y back sacan el Client ID de variables DISTINTAS.\n` +
+        `    front.delEntorno.googleClientId          → ${front}\n` +
+        `    back.delEntorno.GOOGLE_OAUTH_CLIENT_ID   → ${back}\n` +
+        `    Es el MISMO cliente: dos variables es dos valores, y eso da "invalid_client".`,
     );
   }
-  if (!front) {
-    errores.push(`${nombre}: montado pero sin googleClientId. Cablea el cliente (deploy/README.md).`);
+
+  // 2 · ningún valor de este fichero puede ser una credencial: los valores versionados son
+  //     configuración de la app, y lo que no debe versionarse va en `delEntorno`.
+  for (const bloque of ['front', 'back']) {
+    for (const clave of Object.keys(amb[bloque]?.valores ?? {})) {
+      if (/client_?id|secret|token|key/i.test(clave)) {
+        errores.push(
+          `${nombre}.${bloque}.valores.${clave}: eso no va en environments.json, que se versiona.\n` +
+            `    Declara de qué variable de entorno sale, en ${bloque}.delEntorno.`,
+        );
+      }
+    }
   }
 }
 
-// 2 · la región, contra los dos ficheros estáticos que la llevan literal
+// 3 · la región, contra los dos ficheros estáticos que la llevan literal
 const regiones = new Set(
   Object.values(doc).filter(montado).map((amb) => amb.region),
 );

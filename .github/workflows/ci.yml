@@ -81,6 +81,8 @@ jobs:
       # los E2E esperan encontrar. Si el cableado se rompiera, el CI lo ve aquí y no tres jobs más
       # tarde con un error incomprensible.
       - name: Cablear el ambiente local
+        env:
+          GOOGLE_OAUTH_CLIENT_ID: ''
         run: ./deploy/wire-environment.sh local
 
       - name: Prettier (formato)
@@ -177,9 +179,13 @@ jobs:
       # `--only hosting`: los E2E prueban la app, no la función, y compilar el backend costaría un
       # `npm ci` más. El backend lo cubre el job `api` con sus propios tests.
       #
-      # Ambiente `local` porque es el que usan los E2E: su `config.json` es el que el fixture espera
-      # cuando un test NO instala el doble de Google.
+      # Ambiente `local` porque es el que usan los E2E. `GOOGLE_OAUTH_CLIENT_ID` vacío **a
+      # propósito**: la suite prueba la app con la integración de Google APAGADA, y los tests que
+      # la necesitan instalan su propio doble. Se pone explícito y no se deja al azar de que este
+      # job no tenga `environment:`, para que el build sea el mismo aquí y en un portátil.
       - name: ng build (production, con budgets)
+        env:
+          GOOGLE_OAUTH_CLIENT_ID: ''
         run: npm run build -- local --only hosting
 
       # Lo consume el job de E2E: la suite prueba el BUILD COMPILADO, no `ng serve`.

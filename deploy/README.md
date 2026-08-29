@@ -40,8 +40,10 @@ Nada de lo generado se versiona, así que un clon recién hecho **no tiene** `pu
 npm run wire -- local     # o: ./deploy/wire-environment.sh local
 ```
 
-Y para el login con Google en local hace falta además el client secret, que **ningún script reparte**
-(ver [Los secretos](#los-secretos)).
+El Client ID lo coge del último lote de [`deploy/.env-secret`](.env-secret) si lo tienes; si no, el
+`config.json` sale con `googleClientId` vacío y la app funciona **local-only**, sin ofrecer conectar
+con Google. Para que ese login funcione en local hace falta además el **client secret**, que
+**ningún script reparte** (ver [Los secretos](#los-secretos)).
 
 ---
 
@@ -59,7 +61,8 @@ Es el único fichero de esta carpeta que se edita a mano. Solo lleva **valores p
       "desarrollo": "public/config.json — lo lee `ng serve`",
       "artefacto":  "deploy/dist/hosting/config.json — lo escribe deploy/build.sh"
     },
-    "valores": { "debug": true, "googleClientId": "…", "syncPollSeconds": 120 }
+    "valores":    { "debug": true, "syncPollSeconds": 120 },
+    "delEntorno": { "googleClientId": "GOOGLE_OAUTH_CLIENT_ID — …" }
   },
 
   "back": {                                   // lo que resuelve la Cloud Function
@@ -67,35 +70,63 @@ Es el único fichero de esta carpeta que se edita a mano. Solo lleva **valores p
       "emulador":  "api/auth/.env.<projectId> — lo escribe deploy/wire-environment.sh",
       "artefacto": "deploy/dist/functions/auth/.env.<projectId> — lo escribe deploy/build.sh"
     },
-    "valores": { "GOOGLE_OAUTH_CLIENT_ID": "…" }
+    "delEntorno": { "GOOGLE_OAUTH_CLIENT_ID": "GOOGLE_OAUTH_CLIENT_ID — …" }
   },
 
   "secretos": {                               // SIN VALORES: solo las claves y a dónde van
     "destino": {
-      "origen":   "deploy/.env-secret — cuaderno local, nunca se versiona",
-      "emulador": "api/auth/.secret.local — fichero CLAVE=valor, chmod 600, gitignored",
-      "nube":     "GitHub -> Settings -> Environments -> dev -> Add environment secret"
+      "origen": "deploy/.env-secret — cuaderno local, nunca se versiona",
+      "nube":   "GitHub -> Settings -> Environments -> dev -> Add environment secret"
     },
-    "claves": ["GOOGLE_OAUTH_CLIENT_SECRET", "FIREBASE_SERVICE_ACCOUNT"]
+    "claves": ["GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET", "FIREBASE_SERVICE_ACCOUNT"]
   }
 }
 ```
 
 Cómo se lee:
 
-- **`valores` se copia tal cual.** `front.valores` **es** el `config.json` publicado, y
-  `back.valores` **son** las líneas `CLAVE=valor` del `.env` de la función. Ningún script transforma
-  nada: si un valor está mal, se arregla **aquí**, nunca en el fichero generado.
+- **`valores` se copia tal cual.** Son configuración de la app, y están **en el fichero**, versionados.
+  Ningún script los transforma: si un valor está mal, se arregla **aquí**, nunca en el generado.
+- **`delEntorno` NO está en el fichero.** Declara de qué **variable de entorno** sale cada clave, y
+  nada más. Es donde va lo que no queremos escrito en el repositorio.
 - **`destino` dice a dónde va cada bloque**, y es lo que leen los scripts para saber dónde escribir.
-  El texto es «ruta — por qué existe»; la ruta es lo que hay antes del guion. `<projectId>` se
-  sustituye al escribir.
-  Los roles `desarrollo`, `emulador` y `proxy` los escribe `wire-environment.sh`; el rol `artefacto`
-  lo escribe `build.sh` dentro de `deploy/dist`.
+  El texto es «valor — por qué»; el valor es lo que hay antes del guion (y `<projectId>` se
+  sustituye al escribir). Los roles `desarrollo`, `emulador` y `proxy` los escribe
+  `wire-environment.sh`; el rol `artefacto` lo escribe `build.sh` dentro de `deploy/dist`.
 - **`projectId` y `region` van fuera** de `front`/`back` porque son dato de despliegue, no
   configuración de la app: nombran el `.env.<projectId>`, arman el proxy y le pasan `--project` al
   CLI.
 - **`secretos` no lleva valores**, solo las claves y su destino. Está ahí porque el sitio para
   responder «¿y este secreto dónde va?» tiene que ser el mismo que el del resto de la configuración.
+
+### Dónde vive el Client ID de Google
+
+**En ningún fichero del repositorio.** Sale de la variable `GOOGLE_OAUTH_CLIENT_ID`, y las dos
+mitades la declaran en su `delEntorno` — la **misma** variable, así que hay un solo origen y no
+pueden divergir. `deploy/check.sh` falla si alguna vez apuntan a variables distintas, o si a alguien
+se le cuela un Client ID dentro de `valores`, que sí se versiona.
+
+De dónde sale esa variable, por orden de precedencia:
+
+| Dónde | Quién la pone |
+|---|---|
+| **El CI** | el secret `GOOGLE_OAUTH_CLIENT_ID` del *environment* de GitHub del ambiente |
+| **Un portátil** | el último lote de `deploy/.env-secret`, que es donde lo deja `create-google-client-id.sh` |
+| **Explícita** | `GOOGLE_OAUTH_CLIENT_ID=… ./deploy/build.sh …` — manda sobre las dos anteriores |
+
+Una variable **ya definida no se pisa, ni siquiera si está vacía**. Esa distinción es lo que hace
+que `npm run test:e2e` (que compila con `GOOGLE_OAUTH_CLIENT_ID=` a propósito) pruebe exactamente la
+misma app en el CI y en tu máquina, tengas o no un cliente cableado.
+
+> **No es un secreto** —el Client ID viaja en cada petición del navegador y lo que lo protege es la
+> lista de orígenes autorizados—, pero está guardado como *secret* de GitHub para que el cliente de
+> Google viva **en un solo sitio**, junto a su client secret, y no repartido entre un fichero
+> versionado y un secret. Si prefieres verlo en claro en la UI de GitHub, `vars.` funciona igual:
+> solo hay que cambiar `secrets.` por `vars.` en los dos workflows.
+
+Si falta, el despliegue **se para** con un mensaje que dice qué environment lo necesita: publicar sin
+Client ID deja una app en la que el botón de conectar con Google no existe, y eso no debe pasar sin
+que nadie se entere.
 
 ### Añadir una clave
 
@@ -105,20 +136,17 @@ Cómo se lee:
 | un parámetro de la función | `back.valores` de **cada** ambiente | leerlo con `defineString` en `api/<fn>/config.ts` |
 | un ambiente entero | lo crea `setup-firebase-project.sh` con su esqueleto | rellenar el Client ID y crear el *environment* homónimo en GitHub |
 
-### Un valor escrito dos veces, a propósito
+### Lo que `check.sh` vigila
 
-El Client ID de Google lo necesitan las dos mitades, y **cada bloque declara el suyo**:
-`front.valores.googleClientId` y `back.valores.GOOGLE_OAUTH_CLIENT_ID`. Es el precio de que los
-scripts copien en vez de derivar, y se paga con una guarda:
+Copiar no lo garantiza todo. `./deploy/check.sh` comprueba tres cosas que ningún script puede
+mantener solo:
 
-```bash
-./deploy/check.sh
-```
-
-Falla si los dos no dicen lo mismo. No es teórico: cuando divergen, Google rechaza el canje con
-`invalid_client` y el mensaje no dice por qué. `check.sh` comprueba además que la **región** de los
-ambientes coincide con el literal que llevan `deploy/firebase.json` (el rewrite de Hosting) y
-`api/auth/index.ts` (`setGlobalOptions`) — dos ficheros estáticos que ningún script genera.
+1. **Front y back sacan el Client ID de la MISMA variable.** Si apuntaran a dos, volverían a poder
+   divergir, y cuando eso pasa Google rechaza el canje con `invalid_client` sin decir por qué.
+2. **Ninguna credencial se ha colado en `valores`**, que sí se versiona. Cualquier clave que huela a
+   `clientId`, `secret`, `token` o `key` ahí dentro es un error: su sitio es `delEntorno`.
+3. **La región cuadra** con el literal que llevan `deploy/firebase.json` (el rewrite de Hosting) y
+   `api/auth/index.ts` (`setGlobalOptions`) — dos ficheros estáticos que ningún script genera.
 
 ---
 
@@ -136,16 +164,20 @@ medias:
 
 ```bash
 ./deploy/env.sh dev            # → migo-dev-20b41   (falla si el ambiente no existe o no está montado)
-./deploy/check.sh              # → los dos Client ID coinciden y la región cuadra
+./deploy/check.sh              # → el fichero es coherente y no lleva credenciales
 ```
 
 Y en GitHub, `Settings → Environments`: tiene que existir un environment **llamado igual que el
-ambiente**, en minúsculas, con sus dos secrets:
+ambiente**, en minúsculas, con sus **tres** secrets:
 
-| Secret | Para qué |
-|---|---|
-| `FIREBASE_SERVICE_ACCOUNT` | el JSON de la cuenta de servicio con la que se despliega |
-| `GOOGLE_OAUTH_CLIENT_SECRET` | solo el backend: lo copia a Secret Manager antes de subir |
+| Secret | Lo usa | Si falta |
+|---|---|---|
+| `FIREBASE_SERVICE_ACCOUNT` | los dos workflows, para autenticarse | el job se para antes de desplegar |
+| `GOOGLE_OAUTH_CLIENT_ID` | los dos, en el paso de **build** | el job se para: publicar sin él deja la app sin conectar con Google |
+| `GOOGLE_OAUTH_CLIENT_SECRET` | solo el backend: lo copia a Secret Manager | el job se para: `/exchange` contestaría 500 |
+
+Los tres se comprueban vacíos antes de hacer nada, así que una errata no se convierte en un
+despliegue a medias.
 
 Ese nombre es la bisagra de todo: es lo que hace que `secrets.*` resuelva a las credenciales del
 proyecto correcto sin un solo `if` en el workflow. Montar el ambiente desde cero:
@@ -271,13 +303,19 @@ la página** — tiene que seguir conectada sin pulsar nada.
 
 ## Los secretos
 
-**Ningún script los reparte.** `environments.json` solo dice dónde van, y `wire-environment.sh` lo
-recuerda al terminar. Son dos, y cada uno tiene dos destinos:
+**Ningún script los reparte a la nube.** `environments.json` solo dice dónde van, y
+`wire-environment.sh` lo recuerda al terminar. Son tres:
 
-| Secreto | En local | En la nube |
+| Clave | En local | En la nube |
 |---|---|---|
-| `GOOGLE_OAUTH_CLIENT_SECRET` | `api/auth/.secret.local`, una línea `CLAVE=valor`, `chmod 600` | *environment secret* de GitHub → lo pone en Secret Manager `deploy-backend.yml` |
+| `GOOGLE_OAUTH_CLIENT_ID` | lo lee del cuaderno `deploy/.env-secret` **el propio script**, y lo escribe en los generados | *environment secret* de GitHub → lo lee el paso de build de los dos workflows |
+| `GOOGLE_OAUTH_CLIENT_SECRET` | a mano, en `api/auth/.secret.local` (`CLAVE=valor`, `chmod 600`) | *environment secret* de GitHub → lo pone en Secret Manager `deploy-backend.yml` |
 | `FIREBASE_SERVICE_ACCOUNT` | no hace falta (el emulador no autentica) | *environment secret* de GitHub → lo escribe `setup-firebase-project.sh` si tienes `gh` |
+
+El Client ID está en esta tabla aunque **no sea un secreto**: no es que haya que ocultarlo, es que
+así el cliente de Google vive en un único sitio por ambiente en vez de repartido entre un fichero
+versionado y un secret. Ver
+[«Dónde vive el Client ID de Google»](#dónde-vive-el-client-id-de-google).
 
 El *environment* de GitHub se llama **igual que el ambiente**: eso es lo que hace que `secrets.*`
 resuelva a las credenciales de ese proyecto.
@@ -298,15 +336,18 @@ Tres scripts, en este orden, y cada uno sabe de una cosa sola:
 | 2 | [`setup-firebase-project.sh`](setup-firebase-project.sh) | Firebase: Blaze, APIs, Firestore, la cuenta de despliegue | el bloque del ambiente en `environments.json`, con su esqueleto |
 | 3 | *a mano* + [`wire-environment.sh`](wire-environment.sh) | el ambiente: qué valor va a qué fichero | los generados locales |
 
-El paso 3 es: copiar el Client ID del lote a **los dos sitios** del bloque (`front` y `back`),
-llevar el client secret a sus dos destinos, y cablear:
+El paso 3 **ya no toca `environments.json`**: el Client ID no vive ahí. Es llevar los tres valores
+del cuaderno a su sitio y cablear:
 
 ```bash
-./deploy/check.sh                          # ¿coinciden los dos Client ID?
+./deploy/check.sh                          # el fichero es coherente
 ./deploy/wire-environment.sh <ambiente>    # (si ese ambiente tiene destinos locales)
 ```
 
-Y en GitHub: crear el *environment* con el nombre del ambiente y sus dos secrets.
+Y en GitHub, en el *environment* con el nombre del ambiente, sus **tres** secrets:
+`FIREBASE_SERVICE_ACCOUNT`, `GOOGLE_OAUTH_CLIENT_ID` y `GOOGLE_OAUTH_CLIENT_SECRET`. Los dos
+primeros los deja `setup-firebase-project.sh` y el propio `create-google-client-id.sh` si tienes
+`gh`; el tercero se sube a mano.
 
 El procedimiento del cliente de Google, paso a paso, es el resto de este documento.
 
@@ -445,8 +486,8 @@ Aquí acaba el procedimiento de OAuth: los dos valores quedan anotados y **nadie
 todavía**.
 
 ```sh
-# ─── 2026-08-28 18:04 · proyecto migo-dev-20b41 · cliente Clapastedyke web (dev) · create-google-client-id.sh
-GOOGLE_OAUTH_CLIENT_ID=406941726541-….apps.googleusercontent.com
+# ─── 2026-08-28 18:04 · proyecto mi-proyecto-dev · cliente Clapastedyke web (dev) · create-google-client-id.sh
+GOOGLE_OAUTH_CLIENT_ID=123456789012-….apps.googleusercontent.com
 GOOGLE_OAUTH_CLIENT_SECRET=GOCSPX-…
 ```
 
@@ -455,9 +496,14 @@ consola, y separarlos obligaría a acordarse de cuál iba dónde. Repartirlos es
 [«Montar un ambiente nuevo»](#montar-un-ambiente-nuevo), arriba.
 
 El **Client ID no es un secreto** —viaja en cada petición del navegador, y lo que lo protege es la
-lista de orígenes autorizados—, por eso vive en `environments.json`, que sí se versiona. El frontend
-lo necesita aunque el login sea por backend: `initCodeClient` ocurre en el navegador. Con
-`googleClientId: ""` la app simplemente no ofrece conectar con Google, y todo lo demás sigue igual.
+lista de orígenes autorizados—, pero **no está en ningún fichero versionado**: como el secret, vive
+en el *environment* de GitHub, y en local en este cuaderno. Así el cliente de Google está en un solo
+sitio por ambiente. Ver
+[«Dónde vive el Client ID de Google»](#dónde-vive-el-client-id-de-google).
+
+El frontend lo necesita aunque el login sea por backend: `initCodeClient` ocurre en el navegador. Con
+`googleClientId: ""` la app simplemente no ofrece conectar con Google, y todo lo demás —el recetario
+entero, que vive en IndexedDB— sigue igual.
 
 ---
 

@@ -101,9 +101,11 @@ deploy/
 ```
 
 **`deploy/environments.json` is the only file anyone edits.** Each environment declares `projectId`,
-`region`, and three blocks — `front`, `back`, `secretos` — where every block states its own
-`destino` (where its values are copied to) next to its `valores` (what is copied). `secretos` holds
-**no values**, only the key names and where to put them by hand.
+`region`, and three blocks — `front`, `back`, `secretos`. Every block states its own `destino` (where
+things get copied to), its `valores` (app configuration, versioned, copied verbatim) and its
+`delEntorno` (which **environment variable** each remaining key comes from — that is where anything
+that must not be versioned lives). `secretos` holds **no values**, only the key names and where to
+put them by hand.
 
 Four rules that make this hold:
 
@@ -116,20 +118,22 @@ Four rules that make this hold:
 - **The environment is chosen at BUILD time**, not at deploy time, so the artifact that was tested
   is the one that ships. `deploy.sh` refuses to publish a `deploy/dist` whose `config.json` does not
   match the environment being deployed.
-- **`deploy/check.sh` covers what copying cannot** — the Client ID written twice on purpose (front
-  and back), and the region that lives literally in `deploy/firebase.json` and in the function's
-  `setGlobalOptions` (`api/auth/index.ts`). Both are static files no script generates; checking them is honest, pretending
-  they are derived would not be.
+- **`deploy/check.sh` covers what copying cannot** — that front and back read the Client ID from the
+  *same* variable, that no credential leaked into `valores` (which is versioned), and the region that
+  lives literally in `deploy/firebase.json` and in the function's `setGlobalOptions`
+  (`api/auth/index.ts`). Those last two are static files no script generates; checking them is
+  honest, pretending they are derived would not be.
 
-Secrets never enter `environments.json` and no script distributes them: `GOOGLE_OAUTH_CLIENT_SECRET`
-goes by hand to `api/auth/.secret.local` (emulator) and to the GitHub environment secret (from
-which `deploy-backend.yml` puts it in Secret Manager). Full procedure in [`deploy/README.md`](deploy/README.md).
+No credential ever enters `environments.json`. Each environment's GitHub environment holds three
+secrets — `FIREBASE_SERVICE_ACCOUNT`, `GOOGLE_OAUTH_CLIENT_ID` and `GOOGLE_OAUTH_CLIENT_SECRET` — and
+the deploy jobs refuse to run if any is missing. Locally, `GOOGLE_OAUTH_CLIENT_SECRET` goes by hand
+to `api/auth/.secret.local`. Full procedure in [`deploy/README.md`](deploy/README.md).
 
 ## What this app is
 
 A 3D in-browser cooking game (`misaevol` / "clapastedyke"). The user navigates a three.js kitchen world (`/#/home`); the real data-entry forms are the screens reached from it. `/#/ui` is the living component showcase. **Routing is hash-based** (`withHashLocation()` in `app.config.ts`): everything after `#` never reaches the server, so `/` is the **only** server route the app has and no app route can collide with `/api/**` or with a static file. There is deliberately **no SPA fallback rewrite** — see the comment on `provideRouter` and `manual/firebase-deploy.md`. State is persisted locally in IndexedDB — **that is the source of truth, and no server ever holds the user's data**.
 
-The one network integration is **optional and additive**: from `/cuenta` a user can connect a Google account and mirror recipes and supplies into a spreadsheet in their own Drive. The app creates that spreadsheet and writes it **itself**, with the Sheets and Drive REST APIs and the user's own token — no Apps Script, nothing deployed into anyone's account, one consent checkbox (`drive.file`, which only reaches files the app created). The one-time setup for whoever publishes the app (Cloud project, consent screen, Client ID **and client secret**) is in [`deploy/README.md`](deploy/README.md) — the **only** place that procedure is documented; the design reasoning, the platform constraints and the alternatives that were measured and rejected are in [`manual/google-integration.md`](manual/google-integration.md). Nothing about local persistence changes when it is off — and it is off wherever `googleClientId` is empty. That value is written in `deploy/environments.json` — **twice on purpose**, in the environment's `front` block (what the browser publishes) and in its `back` block (what the function resolves), with `deploy/check.sh` failing the build if the two ever disagree. Everything else — `public/config.json`, `api/<fn>/.env.<projectId>`, `deploy/proxy.config.json`, and the `config.json` inside the artifact — is **copied** from there and is **not versioned**.
+The one network integration is **optional and additive**: from `/cuenta` a user can connect a Google account and mirror recipes and supplies into a spreadsheet in their own Drive. The app creates that spreadsheet and writes it **itself**, with the Sheets and Drive REST APIs and the user's own token — no Apps Script, nothing deployed into anyone's account, one consent checkbox (`drive.file`, which only reaches files the app created). The one-time setup for whoever publishes the app (Cloud project, consent screen, Client ID **and client secret**) is in [`deploy/README.md`](deploy/README.md) — the **only** place that procedure is documented; the design reasoning, the platform constraints and the alternatives that were measured and rejected are in [`manual/google-integration.md`](manual/google-integration.md). Nothing about local persistence changes when it is off — and it is off wherever `googleClientId` is empty. That value is **not in any versioned file**: both halves declare, in their `delEntorno` block of `deploy/environments.json`, that it comes from the `GOOGLE_OAUTH_CLIENT_ID` environment variable — the **same** one, so there is a single origin and they cannot disagree. In CI it is the GitHub environment secret; on a laptop, the last lot of `deploy/.env-secret`. Everything else — `public/config.json`, `api/<fn>/.env.<projectId>`, `deploy/proxy.config.json`, and the `config.json` inside the artifact — is **copied** from there and is **not versioned**.
 
 **There is exactly one piece of backend, and it is about identity — never data.** A browser client cannot hold a `client_secret`, so Google gives it no refresh token: its access tokens die in an hour and the only way to get another is a popup, which the browser blocks when it isn't triggered by a click. That is why reloading the page used to sign you out. [`api/auth`](api/auth/README.md) — a Cloud Function — is the confidential OAuth client that custodies the long-lived grant and mints fresh access tokens on demand, behind an `HttpOnly` `__session` cookie. The recipe data never passes through it: the whole sync engine still runs in the browser. The folder rule (**one folder = one package = one independent deploy**, shared code in `api/_common/`, deployed manually and separately from hosting) is in [`manual/api.md`](manual/api.md), and it governs every backend function added from now on.
 

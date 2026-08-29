@@ -11,7 +11,7 @@
 #
 # Qué escribe — los destinos con rol `desarrollo`, `emulador` y `proxy`:
 #
-#   public/config.json                ← el bloque `front.valores`, serializado tal cual
+#   public/config.json                ← el bloque `front`, serializado tal cual
 #   api/<fn>/.env.<projectId>  ← el bloque `back.valores`, una línea CLAVE=valor por entrada
 #   deploy/proxy.config.json          ← el proxy de `ng serve` hacia el emulador de funciones
 #
@@ -86,6 +86,8 @@ if [[ "${MODO}" == "comprobar" ]]; then
 else
     bold "Cableando el ambiente '${AMBIENTE}' (proyecto ${PROJECT_ID})"
 fi
+
+avisar_variables_vacias
 
 step "Frontend — el config.json que lee el navegador"
 

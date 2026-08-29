@@ -95,10 +95,22 @@ jobs:
       # El ambiente se le pasa AL BUILD: el `config.json` del artefacto sale del bloque `front` de
       # ese ambiente en `deploy/environments.json`, no de un paso posterior que pise el fichero.
       # Así lo que se sube es exactamente lo que se compiló, y el mismo comando vale en local.
+      # El Client ID NO está en el repositorio: vive aquí, en el *environment* de GitHub, y de aquí
+      # lo toma el build para escribirlo en el `config.json` del artefacto y en el `.env` de la
+      # función. Un solo origen para las dos mitades, así que no pueden divergir.
+      #
+      # No es un secreto (viaja en cada petición del navegador); está como secret para que el
+      # cliente de Google viva en UN solo sitio, junto a su client secret, y no repartido.
       - name: Build de producción
         env:
           AMBIENTE: ${{ needs.validar.outputs.ambiente }}
-        run: npm run build -- "$AMBIENTE" --only hosting
+          GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
+        run: |
+          if [ -z "$GOOGLE_OAUTH_CLIENT_ID" ]; then
+            echo "::error::El environment '$AMBIENTE' no tiene el secret GOOGLE_OAUTH_CLIENT_ID. Se obtiene con deploy/create-google-client-id.sh (ver deploy/README.md). Sin él la app se publica sin la opción de conectar con Google."
+            exit 1
+          fi
+          npm run build -- "$AMBIENTE" --only hosting
 
       # Fuera del árbol que se publica: `runner.temp` no está dentro del repo ni de `dist/`.
       - name: Credenciales de la cuenta de servicio

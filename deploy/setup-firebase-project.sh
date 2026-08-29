@@ -265,14 +265,23 @@ entrada.projectId = projectId;
 entrada.region = entrada.region ?? plantilla?.region ?? "us-central1";
 
 if (!entrada.front && plantilla) {
-  entrada.front = { destino: soloArtefacto(plantilla.front.destino), valores: vaciar(plantilla.front.valores) };
-  entrada.back = { destino: soloArtefacto(plantilla.back.destino), valores: vaciar(plantilla.back.valores) };
+  // `valores` se clona VACIADO (son ajustes de la app, y cada ambiente decide los suyos);
+  // `delEntorno` se clona TAL CUAL, porque es la declaración de qué variable alimenta qué clave y
+  // tiene que ser la misma en todos los ambientes — si no, el Client ID podría volver a divergir.
+  const bloque = (origen) => {
+    const nuevo = { destino: soloArtefacto(origen.destino) };
+    if (origen.valores) nuevo.valores = vaciar(origen.valores);
+    if (origen.delEntorno) nuevo.delEntorno = { ...origen.delEntorno };
+    return nuevo;
+  };
+  entrada.front = bloque(plantilla.front);
+  entrada.back = bloque(plantilla.back);
   entrada.secretos = {
     destino: {
       origen: "deploy/.env-secret — cuaderno local, nunca se versiona",
       nube: `GitHub -> Settings -> Environments -> ${ambiente} -> Add environment secret`,
     },
-    claves: plantilla.secretos?.claves ?? ["GOOGLE_OAUTH_CLIENT_SECRET", "FIREBASE_SERVICE_ACCOUNT"],
+    claves: plantilla.secretos?.claves ?? ["GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET", "FIREBASE_SERVICE_ACCOUNT"],
   };
 }
 

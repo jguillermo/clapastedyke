@@ -455,11 +455,12 @@ if ! grep -q '^# DÓNDE VA CADA DATO' "${ENV_SECRET}" 2>/dev/null; then
         printf '# DÓNDE VA CADA DATO\n'
         printf '#\n'
         printf '#   GOOGLE_OAUTH_CLIENT_ID      NO es secreto: viaja en cada petición del navegador.\n'
-        printf '#                               Va a deploy/environments.json, DOS veces en el mismo\n'
-        printf '#                               ambiente: front.valores.googleClientId (lo publica el\n'
-        printf '#                               navegador) y back.valores.GOOGLE_OAUTH_CLIENT_ID (lo\n'
-        printf '#                               resuelve la funcion). De ahi lo copian\n'
-        printf '#                               wire-environment.sh y build.sh a sus destinos.\n'
+        printf '#                               NO va a ningun fichero versionado. Va a DOS sitios:\n'
+        printf '#                               · GitHub: Settings -> Environments -> <ambiente> ->\n'
+        printf '#                                 secret GOOGLE_OAUTH_CLIENT_ID. De ahi lo lee el paso\n'
+        printf '#                                 de build de los DOS workflows de despliegue.\n'
+        printf '#                               · aqui mismo, para el desarrollo local: los scripts de\n'
+        printf '#                                 deploy/ leen el ultimo lote de este cuaderno.\n'
         printf '#\n'
         printf '#   GOOGLE_OAUTH_CLIENT_SECRET  Secreto. Va a DOS sitios:\n'
         printf '#                               · GitHub: Settings -> Environments -> <ambiente> ->\n'
@@ -502,23 +503,21 @@ cat <<EOF
   El Client ID y el client secret están en deploy/.env-secret, en el último lote, con una
   leyenda arriba del fichero que dice a dónde va cada uno.
 
-  LO QUE SIGUE — repartirlos. Son dos cosas distintas:
+  LO QUE SIGUE — repartirlos. Ninguno de los dos va a un fichero versionado.
 
-  1. El Client ID (público). Se escribe en deploy/environments.json, en el ambiente que toque y
-     en LOS DOS sitios — front.valores.googleClientId y back.valores.GOOGLE_OAUTH_CLIENT_ID —,
-     y luego se cablea:
+  1. En LOCAL ya está hecho: los scripts de deploy/ leen este cuaderno. Solo falta el secret del
+     emulador, que sí es a mano:
 
-       ./deploy/wire-environment.sh <ambiente>
+       api/auth/.secret.local     GOOGLE_OAUTH_CLIENT_SECRET=<valor>
 
-     `./deploy/check.sh` falla si te dejas uno de los dos o no coinciden.
+     y luego cablear:  ./deploy/wire-environment.sh <ambiente>
 
-  2. El client secret. NINGÚN script lo reparte: es a mano, y son dos destinos.
+  2. En GITHUB, en Settings -> Environments -> <ambiente> -> Add environment secret, los dos:
 
-       api/auth/.secret.local          GOOGLE_OAUTH_CLIENT_SECRET=<valor>   (emulador)
-       GitHub -> Settings -> Environments -> <ambiente> -> Add environment secret
-                                              GOOGLE_OAUTH_CLIENT_SECRET           (despliegue)
+       GOOGLE_OAUTH_CLIENT_ID       lo lee el paso de build de los dos workflows
+       GOOGLE_OAUTH_CLIENT_SECRET   lo pone en Secret Manager deploy-backend.yml
 
-     De ese environment secret lo toma deploy-backend.yml y lo pone en Secret Manager.
+     Sin cualquiera de los dos, el despliegue se para antes de subir nada.
 
   Para revisar o deshacer a mano:
     Proyectos (y borrarlos)   ${PROJECTS_URL}

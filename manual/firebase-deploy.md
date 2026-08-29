@@ -34,7 +34,7 @@ lo secreto está fuera del repo. Nada de configuración vive dentro del workflow
 | [`deploy/.env-secret`](../deploy/.env-secret) | El cuaderno local del que salen esos dos, **ignorado por git** | Sí |
 
 **El formato de `environments.json`** —`front`/`back`/`secretos`, qué significa `destino`, por qué el
-Client ID está escrito dos veces y por qué nada de lo generado se versiona— está documentado junto al
+Client ID no está en el fichero y por qué nada de lo generado se versiona— está documentado junto al
 propio fichero, en [`deploy/README.md`](../deploy/README.md). No se repite aquí para que no puedan
 contradecirse.
 
@@ -68,16 +68,26 @@ Firebase a veces le añade un sufijo aleatorio).
 "dev": {
   "projectId": "migo-dev-20b41",
   "region": "us-central1",
-  "front": { "destino": { … }, "valores": { "debug": true, "googleClientId": "2229…", "syncPollSeconds": 120 } },
-  "back":  { "destino": { … }, "valores": { "GOOGLE_OAUTH_CLIENT_ID": "2229…" } },
-  "secretos": { "destino": { … }, "claves": ["GOOGLE_OAUTH_CLIENT_SECRET", "FIREBASE_SERVICE_ACCOUNT"] }
+  "front": {
+    "destino":    { … },
+    "valores":    { "debug": true, "syncPollSeconds": 120 },
+    "delEntorno": { "googleClientId": "GOOGLE_OAUTH_CLIENT_ID — …" }
+  },
+  "back": {
+    "destino":    { … },
+    "delEntorno": { "GOOGLE_OAUTH_CLIENT_ID": "GOOGLE_OAUTH_CLIENT_ID — …" }
+  },
+  "secretos": {
+    "destino": { … },
+    "claves": ["GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET", "FIREBASE_SERVICE_ACCOUNT"]
+  }
 }
 ```
 
-Aquí va también el **Client ID de OAuth** de cada ambiente, que **no es un secreto** y por eso está
-versionado. Va **dos veces**: en `front.valores.googleClientId` (lo publica el navegador) y en
-`back.valores.GOOGLE_OAUTH_CLIENT_ID` (lo resuelve la función). El porqué —y la guarda que impide
-que diverjan— está en [`deploy/README.md`](../deploy/README.md); cómo se genera, también.
+**El Client ID de OAuth no va aquí.** Los dos bloques declaran en su `delEntorno` que sale de la
+variable `GOOGLE_OAUTH_CLIENT_ID` —la misma para los dos, así que hay un solo origen—, y el valor lo
+pone el *environment* de GitHub en el CI, o `deploy/.env-secret` en local. El porqué está en
+[`deploy/README.md`](../deploy/README.md); cómo se genera, también.
 
 Nada más que hacer: `public/config.json` y el `.env` de la función **no se versionan**, y salen de
 aquí con `npm run wire -- local`. Si te dejas el placeholder `TU-PROJECT-ID-…`, el workflow falla en
@@ -187,12 +197,18 @@ contra `environments.json`, así que la lista de ambientes que existen es litera
    ```jsonc
    "stage": {
      "projectId": "clapastedyke-stage",
-     "config": { "debug": true, "googleClientId": "…", "syncPollSeconds": 120 }
+     "region": "us-central1",
+     "front": { "destino": { … }, "valores": { "debug": true, "syncPollSeconds": 120 },
+                "delEntorno": { "googleClientId": "GOOGLE_OAUTH_CLIENT_ID — …" } },
+     "back":  { "destino": { … },
+                "delEntorno": { "GOOGLE_OAUTH_CLIENT_ID": "GOOGLE_OAUTH_CLIENT_ID — …" } },
+     "secretos": { "destino": { … }, "claves": [ … ] }
    }
    ```
 
-2. **Un environment `stage` en GitHub** con su secret `FIREBASE_SERVICE_ACCOUNT` (pasos 3 y 4), y
-   los dos orígenes del proyecto nuevo en el Client ID (paso 5).
+2. **Un environment `stage` en GitHub** con sus **tres** secrets —`FIREBASE_SERVICE_ACCOUNT`,
+   `GOOGLE_OAUTH_CLIENT_ID` y `GOOGLE_OAUTH_CLIENT_SECRET`— (pasos 3 y 4), y los dos orígenes del
+   proyecto nuevo dados de alta en el cliente de Google (paso 5).
 
 Ya está: `Run workflow` escribiendo `stage` despliega.
 
@@ -228,9 +244,11 @@ dev es lo que se publica en prod.
 
 ### Cambiar la configuración de un ambiente
 
-- `debug`, `googleClientId`, `syncPollSeconds` → editar el bloque `front.valores` de ese ambiente en
+- `debug`, `syncPollSeconds` → editar el bloque `front.valores` de ese ambiente en
   `deploy/environments.json`, commitear y **volver a desplegar**. (Si tocaste `local`, además
   `npm run wire -- local` para que `ng serve` lo vea; ese fichero no se versiona.)
+- El **Client ID de Google** → cambiar el secret `GOOGLE_OAUTH_CLIENT_ID` de **ese** environment y
+  **volver a desplegar**. No hay nada que commitear: no está en el repositorio.
 - La cuenta de servicio → cambiar el secret de **ese** environment y **volver a desplegar**.
 
 No hay ningún fichero en un servidor que se pueda editar en caliente: Hosting sirve un artefacto

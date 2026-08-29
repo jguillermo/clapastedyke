@@ -58,19 +58,20 @@ compilado sirve para todos.
 | `GOOGLE_OAUTH_CLIENT_ID` | `.env.<projectId>`, **generado** y no versionado | No — viaja en cada petición del navegador |
 | `GOOGLE_OAUTH_CLIENT_SECRET` | Secret Manager (`.secret.local` en el emulador) | **Sí** |
 
-**El `.env.<projectId>` no se edita a mano, y no se versiona.** Sale del bloque `back.valores` que
-declara el ambiente en [`deploy/environments.json`](../../deploy/environments.json), copiado tal cual:
-[`wire-environment.sh`](../../deploy/wire-environment.sh) escribe el de esta carpeta (para el emulador) y
-[`build.sh`](../../deploy/build.sh) el que viaja dentro de `deploy/dist/functions/auth/`.
+**El `.env.<projectId>` no se edita a mano, y no se versiona.** Lo escriben
+[`wire-environment.sh`](../../deploy/wire-environment.sh) (el de esta carpeta, para el emulador) y
+[`build.sh`](../../deploy/build.sh) (el que viaja dentro de `deploy/dist/functions/auth/`).
 
 ```bash
 npm run wire -- local                    # el de aquí — lo pide `npm run emulators`
 npm run build -- dev --only functions    # el del artefacto
 ```
 
-Ese mismo Client ID está escrito **otra vez** en el bloque `front` del ambiente, que es el que publica
-el navegador. Es a propósito —los scripts copian, no derivan— y lo vigila
-[`deploy/check.sh`](../../deploy/check.sh): cuando los dos divergen, Google rechaza el canje con
+**El Client ID tampoco está en `environments.json`.** Ese fichero solo declara, en
+`back.delEntorno`, que sale de la variable `GOOGLE_OAUTH_CLIENT_ID`; el valor lo pone el
+*environment* de GitHub en el CI, y `deploy/.env-secret` en un portátil. El frontend declara **la
+misma** variable, así que hay un solo origen y no pueden divergir —lo vigila
+[`deploy/check.sh`](../../deploy/check.sh)—; cuando divergían, Google rechazaba el canje con
 `invalid_client` sin decir por qué.
 
 El **secreto** sí se reparte a mano, y son dos destinos: `api/auth/.secret.local` (emulador,

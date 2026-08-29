@@ -98,11 +98,14 @@ and `deploy/dist/` — the compiled artifact that is actually published.
 
 Environments are **data, not code**:
 [`deploy/environments.json`](deploy/environments.json) is the one and only place where they are
-declared. Each block holds `projectId`, `region`, and the public values split into `front` (what the
+declared. Each block holds `projectId`, `region`, and the configuration split into `front` (what the
 browser publishes) and `back` (what the Cloud Function resolves), each stating its own `destino` —
-where those values get copied to. A third block, `secretos`, holds **no values**: only the key names
-and where to put them by hand. Today there are three environments — `local`, `dev`, `prod` — and
-adding one is a block in that file plus a matching GitHub Environment holding its secrets.
+where things get copied to — plus `delEntorno`, which names the **environment variable** a key comes
+from instead of holding its value. That is how the Google Client ID stays out of the repository
+entirely: it lives in the GitHub environment secret, and locally in the gitignored
+`deploy/.env-secret`. A third block, `secretos`, holds **no values**: only the key names and where to
+put them by hand. Today there are three environments — `local`, `dev`, `prod` — and adding one is a
+block in that file plus a matching GitHub Environment holding its three secrets.
 
 **Nothing generated is versioned**: `public/config.json`, `api/*/.env.*`,
 `deploy/proxy.config.json` and `deploy/dist/`. After cloning, run `npm run wire -- local` to write
