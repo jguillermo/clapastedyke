@@ -64,6 +64,11 @@ node_modules/
 
 # dotenv environment variables file
 .env
+# ... salvo el de la funcion: lleva MARCADORES, no valores, y el pipeline los sustituye.
+# Los `.env.<projectId>` y `.env.local` si se ignoran: Firebase los cargaria POR ENCIMA del
+# `.env` versionado, asi que uno olvidado en el disco cambiaria el despliegue sin verse en el diff.
+!functions/.env
+functions/.env.*
 
 # dataconnect generated files
 .dataconnect

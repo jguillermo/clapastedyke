@@ -109,42 +109,41 @@ jobs:
         run: npm run test:unit
 
   # ───────────────────────────────────────────────────────────────────────────
-  # 2b. La API (`api/`) — cada carpeta es un paquete independiente con sus
-  #     dependencias, así que la matriz sale de las propias carpetas: añadir una
-  #     función NO obliga a tocar este workflow.
+  # 2b. La función (`firebase/functions`) — un paquete npm independiente, con sus
+  #     propias dependencias, su propio ESLint (estilo Google) y su propio `tsc`.
+  #     Es lo que Firebase Hosting sirve en `/api/auth/**` y lo que mantiene la
+  #     sesión viva.
   #
   #     El CI la VALIDA en cada PR aunque no la despliegue: publicarla es manual
   #     y va por `deploy-backend.yml`.
   # ───────────────────────────────────────────────────────────────────────────
-  api:
-    name: API · ${{ matrix.funcion }}
+  functions:
+    name: Función (firebase/functions)
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    strategy:
-      fail-fast: false
-      matrix:
-        # Una entrada por carpeta de `api/` (las que empiezan por `_` son fuente
-        # compartida, no funciones: se compilan dentro de cada una).
-        funcion: [auth]
     steps:
       - uses: actions/checkout@v4
 
       # Sin `./.github/actions/setup`: esa acción instala las dependencias de la
-      # app, que la API no comparte. Aquí solo hace falta Node y su propio `npm ci`.
+      # app Angular, que la función no comparte. Aquí solo hace falta Node y su
+      # propio `npm ci`, con la versión que declara su `engines.node`.
       - uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version: '24'
           cache: npm
-          cache-dependency-path: api/${{ matrix.funcion }}/package-lock.json
+          cache-dependency-path: firebase/functions/package-lock.json
 
       - name: Instalar
-        run: npm --prefix api/${{ matrix.funcion }} ci
+        run: npm --prefix firebase/functions ci
 
-      - name: TypeScript
-        run: npm --prefix api/${{ matrix.funcion }} run typecheck
+      - name: ESLint
+        run: npm --prefix firebase/functions run lint
 
-      - name: Tests
-        run: npm --prefix api/${{ matrix.funcion }} test
+      # `tsc` con el tsconfig de la función: es el mismo build que corre el
+      # `predeploy` de firebase.json, así que un fallo aquí es un deploy que
+      # habría fallado.
+      - name: TypeScript (build)
+        run: npm --prefix firebase/functions run build
 
   # ───────────────────────────────────────────────────────────────────────────
   # 3. Build de producción — incluye el type-check de plantillas de Angular y
@@ -166,7 +165,7 @@ jobs:
       # MARCADORES, así que la integración de Google queda apagada y la suite prueba siempre lo
       # mismo, aquí y en un portátil. Los tests que necesitan Google instalan su propio doble.
       #
-      # El backend no se compila: los E2E prueban la app. Lo cubre el job `api` con sus tests.
+      # El backend no se compila aquí: los E2E prueban la app. Lo cubre el job `functions`.
       - name: ng build (production, con budgets)
         run: npm run build
 
@@ -177,7 +176,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: dist
-          path: deploy/dist/hosting/
+          path: firebase/public/
           retention-days: 1
           compression-level: 0
           if-no-files-found: error
@@ -228,7 +227,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: dist
-          path: deploy/dist/hosting/
+          path: firebase/public/
 
       # Sin `npm run test:e2e` a propósito: ese script vuelve a hacer `ng build`, y aquí el
       # build ya viene del job anterior. El type-check de la suite lo cubre el job `static`.
@@ -252,7 +251,7 @@ jobs:
   ci-ok:
     name: CI OK (required)
     if: always()
-    needs: [setup, static, unit, api, build, storybook, e2e]
+    needs: [setup, static, unit, functions, build, storybook, e2e]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -261,7 +260,7 @@ jobs:
           echo "setup:     ${{ needs.setup.result }}"
           echo "static:    ${{ needs.static.result }}"
           echo "unit:      ${{ needs.unit.result }}"
-          echo "api:       ${{ needs.api.result }}"
+          echo "functions: ${{ needs.functions.result }}"
           echo "build:     ${{ needs.build.result }}"
           echo "storybook: ${{ needs.storybook.result }}"
           echo "e2e:       ${{ needs.e2e.result }}"

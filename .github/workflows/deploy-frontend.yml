@@ -4,17 +4,23 @@ name: Desplegar el FRONTEND (Firebase Hosting)
 # No hay disparador automático a propósito — la puerta de calidad es el CI del pull request
 # (`CI OK (required)`), y publicar es una decisión, no un efecto secundario de mergear.
 #
-# SOLO EL FRONTEND. El backend (`api/`) tiene su propio workflow, `deploy-backend.yml`, y esa
-# separación es deliberada: publicar la app y publicar la API son dos decisiones distintas, así que un
-# cambio de maquetación no puede tirar el servicio de sesión ni al revés.
+# SOLO EL FRONTEND. La función (`firebase/functions`) tiene su propio workflow,
+# `deploy-backend.yml`, y esa separación es deliberada: publicar la app y publicar la función de
+# sesión son dos decisiones distintas, así que un cambio de maquetación no puede tirar el auth ni
+# al revés.
 #
 # > Cuando un cambio necesita las dos cosas, el ORDEN importa: primero el backend y después el
-# > frontend. La app llama a `/api/auth/token` desde su arranque, así que publicar el front contra una
-# > API vieja deja a todo el mundo desconectado hasta que la API suba.
+# > frontend. La app llama a `/api/auth/token` desde su arranque, así que publicar el front contra
+# > una función vieja deja a todo el mundo desconectado hasta que la función suba.
+#
+# DÓNDE COMPILA: `ng build` escribe en **`firebase/public`**, que es justo la carpeta que
+# `firebase/firebase.json` publica como Hosting (`"hosting": { "public": "public" }`). Compilar ES
+# preparar el deploy: no hay copia intermedia ni carpeta `dist/` que sincronizar. Por eso
+# `firebase/public/` está en `.gitignore` — es artefacto, no fuente.
 #
 # TODA LA EJECUCIÓN VIVE AQUÍ. El repositorio no tiene scripts de despliegue: lo que hace falta para
 # publicar son los pasos de este fichero. Y un ambiente no se declara en el repositorio, se declara
-# en su *environment* de GitHub — DOS SECRETS, y nada más. Ver `deploy/README.md`.
+# en su *environment* de GitHub — DOS SECRETS, y nada más.
 #
 # No hay variables de environment: el proyecto de Firebase NO se configura aparte, se lee del
 # `project_id` de la propia cuenta de servicio. Un solo sitio que mantener, y es imposible desplegar
@@ -83,7 +89,7 @@ jobs:
           [ -n "$GOOGLE_OAUTH_CLIENT" ]      || faltan="$faltan secret:GOOGLE_OAUTH_CLIENT"
           [ -n "$FIREBASE_SERVICE_ACCOUNT" ] || faltan="$faltan secret:FIREBASE_SERVICE_ACCOUNT"
           if [ -n "$faltan" ]; then
-            echo "::error::Al environment '$AMBIENTE' le falta:$faltan. Settings → Environments → $AMBIENTE (ver deploy/README.md)."
+            echo "::error::Al environment '$AMBIENTE' le falta:$faltan. Settings → Environments → $AMBIENTE."
             exit 1
           fi
 
@@ -99,24 +105,28 @@ jobs:
           echo "Ambiente **$AMBIENTE** → proyecto \`$PROJECT_ID\`" >> "$GITHUB_STEP_SUMMARY"
 
       # Sin `--base-href`: Firebase sirve desde la raíz del dominio y `src/index.html` ya trae
-      # `<base href="/">`. Tampoco hace falta copiar `index.html` a `404.html` ni ningún rewrite de
-      # SPA: la app enruta por fragmento (`/#/home`), así que la única ruta que pide al servidor es
-      # `/`.
+      # `<base href="/">`. Tampoco hay rewrite de SPA en `firebase.json`: la app enruta por
+      # fragmento (`/#/home`), así que la única ruta que pide al servidor es `/`.
       #
-      # El build es el MISMO para todos los ambientes. Lo que cambia viaja como marcadores dentro de
-      # `config.json`, y se sustituye en el paso siguiente.
-      - name: Build de producción
+      # `outputPath` es `firebase/public` (angular.json), o sea la carpeta que publica Hosting.
+      # El build es el MISMO para todos los ambientes: lo que cambia viaja como marcadores dentro
+      # de `config.json`, y se sustituye en el paso siguiente.
+      - name: Build de producción → firebase/public
         run: npm run build
 
       # Aquí es donde un ambiente se vuelve ese ambiente. Los marcadores viven versionados en
-      # `public/config.json`; esto los sustituye SOLO en el artefacto, así que el repositorio nunca
-      # contiene un Client ID.
+      # `public/config.json`; esto los sustituye SOLO en el artefacto compilado, así que el
+      # repositorio nunca contiene un Client ID.
       - name: Sustituir los marcadores del artefacto
         env:
           GOOGLE_OAUTH_CLIENT: ${{ secrets.GOOGLE_OAUTH_CLIENT }}
           DEBUG: ${{ inputs.debug }}
         run: |
-          CONFIG=deploy/dist/hosting/config.json
+          CONFIG=firebase/public/config.json
+          [ -f "$CONFIG" ] || {
+            echo "::error::No existe $CONFIG. ¿Ha cambiado el outputPath de angular.json?"
+            exit 1
+          }
           CLIENT_ID="$(printf '%s' "$GOOGLE_OAUTH_CLIENT" | jq -er '.web.client_id')" || {
             echo "::error::El secret GOOGLE_OAUTH_CLIENT no es el JSON del cliente de Google (falta .web.client_id)."
             exit 1
@@ -135,7 +145,7 @@ jobs:
           fi
           echo "config.json del artefacto:"; cat "$CONFIG"
 
-      # Fuera del árbol que se publica: `runner.temp` no está dentro del repo ni de `deploy/dist`.
+      # Fuera del árbol que se publica: `runner.temp` no está dentro del repo ni de `firebase/public`.
       - name: Credenciales de la cuenta de servicio
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
@@ -143,13 +153,15 @@ jobs:
           printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "${RUNNER_TEMP}/gcp-key.json"
           echo "GOOGLE_APPLICATION_CREDENTIALS=${RUNNER_TEMP}/gcp-key.json" >> "$GITHUB_ENV"
 
-      # `cd deploy` y no `--config`: el CLI fija la raíz del proyecto en el directorio de su
-      # `firebase.json`, y todas las rutas de ese fichero (`dist/hosting`, `dist/functions/auth`,
-      # `firestore.rules`) son relativas a `deploy/`. Desde la raíz del repositorio, el deploy muere
-      # con «… is outside of project directory».
+      # `cd firebase` y no `--config`: el CLI fija la raíz del proyecto en el directorio de su
+      # `firebase.json`, y todas las rutas de ese fichero (`public`, `functions`, `firestore.rules`)
+      # son relativas a `firebase/`. Desde la raíz del repositorio, el deploy muere con
+      # «… is outside of project directory».
+      #
+      # `--only hosting`: no toca ni la función ni las reglas de Firestore, que son del backend.
       - name: Deploy a Firebase Hosting
         run: |
-          cd deploy
+          cd firebase
           npx --yes firebase-tools@latest deploy \
             --only hosting \
             --project "$PROJECT_ID" \

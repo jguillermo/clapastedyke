@@ -313,7 +313,7 @@ export class GoogleDouble {
    * demostrar es que *recargar no echa a nadie* y que *cerrar sesión sí*, y eso es exactamente lo que
    * modela este booleano: sobrevive a un `reload()` porque el estado es del servidor, no de la página.
    * La mecánica de la cookie `HttpOnly` es plomería entre el navegador y Cloud Functions —no la
-   * escribe esta app— y se comprueba en los tests de `api/` y a mano.
+   * escribe esta app— y se comprueba en los tests de la función y a mano.
    */
   private session = false;
 
@@ -403,7 +403,7 @@ export class GoogleDouble {
       }),
     );
 
-    // 3 · El backend de la sesión (`api/auth`). Es quien identifica la cuenta y emite los tokens;
+    // 3 · El backend de la sesión (`firebase/functions`). Es quien identifica la cuenta y emite los tokens;
     //     la app ya no le pregunta el perfil a Google.
     await page.route('**/api/auth/exchange', (route) =>
       this.answerAuth(route, () => {
@@ -442,7 +442,7 @@ export class GoogleDouble {
 
   /**
    * Las respuestas del backend de la sesión, que **no** hablan el idioma de Google: llevan su propio
-   * estado y su propia forma de error (`{ error, message }`), igual que `api/auth`.
+   * estado y su propia forma de error (`{ error, message }`), igual que el backend.
    *
    * Respeta la misma puerta de retención que el resto: si un spec retiene «la red», la reanudación de
    * la sesión también se queda esperando, que es lo que pasaría de verdad.
@@ -890,7 +890,7 @@ const GIS_STUB = `
 })();
 `;
 
-/** Lo que responde el doble de `api/auth`: un estado y un cuerpo (o ninguno). */
+/** Lo que responde el doble del backend: un estado y un cuerpo (o ninguno). */
 interface AuthReply {
   status: number;
   body: unknown | null;
@@ -903,7 +903,7 @@ const UNAUTHORIZED: AuthReply = {
 
 const NO_CONTENT: AuthReply = { status: 204, body: null };
 
-/** La misma forma que devuelven `/auth/exchange` y `/auth/token` en `api/auth/payload.ts`. */
+/** La misma forma que devuelven `/api/auth/exchange` y `/api/auth/token`. */
 function sessionPayload(): AuthReply {
   return {
     status: 200,

@@ -11,15 +11,15 @@ coverage/
 documentation.json
 package-lock.json
 
-# Ficheros GENERADOS por deploy/wire-environment.sh y deploy/build.sh: los escribe un script desde
-# deploy/environments.json, así que su formato no es cosa de Prettier.
+# Ficheros con MARCADORES que sustituye el pipeline de despliegue: su contenido no es cosa de
+# Prettier, y reformatearlos rompería el `sed` que los sustituye.
 public/config.json
-deploy/proxy.config.json
-api/*/.env.*
+firebase/functions/.env
 
-# La salida de `tsc` de cada función de `api/` (lo que se despliega). `lib-test/` es la de sus tests.
-api/*/lib/
-api/*/lib-test/
+# El artefacto de Hosting (lo escribe `ng build`) y la función, que tiene su propio ESLint
+# (estilo Google: comillas dobles) y se pelearía con el Prettier del repo.
+firebase/public/
+firebase/functions/
 
 # Google Apps Script: `.gs` no es una extensión que Prettier entienda y el fichero se copia y pega
 # tal cual en el editor de Apps Script (ver appscript.md).

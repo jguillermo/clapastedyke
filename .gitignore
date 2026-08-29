@@ -39,7 +39,7 @@ testem.log
 /typings
 __screenshots__/
 
-# Firebase — la CLI deja su caché y sus logs junto al firebase.json (deploy/)
+# Firebase — la CLI deja su caché y sus logs junto al firebase.json (firebase/)
 .firebase/
 firebase-debug.log
 firebase-*-debug.log
@@ -60,9 +60,13 @@ storybook-static
 /documentation.json
 /dist-dev/
 
-# El artefacto compilado. Lo produce `ng build` y lo publica el pipeline; nada de él se versiona.
-/deploy/dist/
+# El artefacto compilado. `ng build` escribe DENTRO de `firebase/public`, que es lo que Firebase
+# Hosting publica: compilar ES preparar el deploy. Nada de lo que hay ahí se versiona.
+/firebase/public/
 
-# Los `.env.<projectId>` de las funciones: Firebase los cargaría por encima del `.env` versionado,
-# así que uno olvidado en el disco cambiaría el despliegue sin que se vea en el diff.
-/api/*/.env.*
+# Los `.env.<projectId>` y `.env.local` de la función: Firebase los cargaría por encima del `.env`
+# versionado, así que uno olvidado en el disco cambiaría el despliegue sin que se vea en el diff.
+/firebase/functions/.env.*
+
+# La salida de `tsc` de la función (lo que empaqueta Firebase).
+/firebase/functions/lib/

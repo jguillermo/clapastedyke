@@ -6,7 +6,7 @@ import { Credential } from '../domain/value-objects/credential';
 import { DRIVE_FILE_PERMISSION, GoogleCodeClient } from './google-code-client';
 
 /**
- * Autenticación contra **el backend de la propia app** (`api/auth`), que es quien custodia el
+ * Autenticación contra **el backend de la propia app** (`firebase/functions`), que es quien custodia el
  * permiso duradero.
  *
  * ## Qué arregla
@@ -39,7 +39,7 @@ const SIGN_OUT_URL = '/api/auth/sign-out';
 /** Ninguna llamada puede quedarse colgada: una promesa que no resuelve congela `ResumeSession`. */
 const TIMEOUT_MS = 15_000;
 
-/** El lenguaje publicado de `api/auth`. Se declara aquí porque el front no importa de `api/`. */
+/** El lenguaje publicado del backend. Se declara aquí porque el front no importa de `firebase/`. */
 interface SessionPayload {
   account: { id: string; email: string; name: string; pictureUrl: string | null };
   accessToken: string;

@@ -3,7 +3,7 @@
 Cómo la app y la hoja del usuario se mantienen iguales, **por qué está hecho así**, qué límites tiene
 aceptados y cómo se diagnostica cuando algo no cuadra.
 
-El «cómo se configura» está en [`deploy/README.md`](../deploy/README.md); el «por qué Google Sheets y no otra
+El «cómo se configura» está en [`firebase/README.md`](../firebase/README.md); el «por qué Google Sheets y no otra
 cosa» y las alternativas medidas y descartadas, en
 [google-integration.md](google-integration.md).
 
@@ -349,7 +349,7 @@ el comportamiento anterior (más cuota, posible pisarse), no uno peor.
 ## La sesión caduca, y se renueva sola
 
 El token de Google dura ~1 h, y en un navegador no hay forma de renovarlo sin abrir una ventana. Por
-eso el permiso duradero lo custodia el backend ([`api/auth`](../api/auth/README.md)): cuando el token
+eso el permiso duradero lo custodia el backend ([`firebase/functions`](functions.md)): cuando el token
 muere —o cuando se recarga la página— se pide otro con un POST de mismo origen, sin ventana y sin
 gesto del usuario. Renovar **no toca el `epoch`**: es la misma sesión.
 
