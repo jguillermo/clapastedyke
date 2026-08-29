@@ -65,7 +65,7 @@ GOOGLE_OAUTH_CLIENT_ID=GOOGLE_OAUTH_CLIENT_ID
 ```
 
 Quien lo sustituye es [`deploy-backend.yml`](../../.github/workflows/deploy-backend.yml), sobre la
-copia que viaja en `deploy/dist/functions/auth/`, con el `web.client_id` del secret `GOOGLE_OAUTH`
+copia que viaja en `deploy/dist/functions/auth/`, con el `web.client_id` del secret `GOOGLE_OAUTH_CLIENT`
 del *environment*. **En el repositorio no hay ningún Client ID**, y en un portátil tampoco: el
 marcador se queda como está y el emulador arranca con él.
 

@@ -8,8 +8,8 @@
  * **El Client ID no es un secreto** (viaja en cada petición del navegador), así que va en un `.env`
  * **versionado** — pero no con su valor: con el MARCADOR `GOOGLE_OAUTH_CLIENT_ID`. Quien lo
  * sustituye es el workflow de despliegue, sobre la copia que viaja en
- * `deploy/dist/functions/auth/`, sacándolo del `web.client_id` del secret `GOOGLE_OAUTH`. En el
- * repositorio nunca hay un Client ID.
+ * `deploy/dist/functions/auth/`, sacándolo del `web.client_id` del secret `GOOGLE_OAUTH_CLIENT`.
+ * En el repositorio nunca hay un Client ID.
  *
  * El fichero es `.env` **sin sufijo de proyecto** a propósito: Firebase lo carga para cualquier
  * `--project`, así que un mismo artefacto sirve para todos los ambientes.

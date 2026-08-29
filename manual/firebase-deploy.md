@@ -29,7 +29,7 @@ lo secreto está fuera del repo. Nada de configuración vive dentro del workflow
 
 | Sitio | Qué contiene | Secreto |
 |---|---|---|
-| **Environments de GitHub**, uno por ambiente | Los secrets `GOOGLE_OAUTH` (el JSON del cliente de Google, entero) y `FIREBASE_SERVICE_ACCOUNT`; las variables `PROJECT_ID` y `DEBUG` | Sí, los dos secrets |
+| **Environments de GitHub**, uno por ambiente | Los secrets `GOOGLE_OAUTH_CLIENT` (el JSON del cliente de Google, entero) y `FIREBASE_SERVICE_ACCOUNT`; las variables `PROJECT_ID` y `DEBUG` | Sí, los dos secrets |
 | `public/config.json` y `api/auth/.env` | **Marcadores**, versionados: `GOOGLE_OAUTH_CLIENT_ID`, `"DEBUG"`. El pipeline los sustituye en el artefacto | No |
 | [`deploy/environments.example.json`](../deploy/environments.example.json) | Un **ejemplo** de qué configura un ambiente. **Nadie lo lee** | No |
 
@@ -69,7 +69,7 @@ Firebase a veces le añade un sufijo aleatorio).
 |---|---|---|
 | variable | `PROJECT_ID` | el Project ID del paso 1 |
 | variable | `DEBUG` | `true` en dev, `false` en prod |
-| secret | `GOOGLE_OAUTH` | el JSON del cliente de Google, entero (paso 5) |
+| secret | `GOOGLE_OAUTH_CLIENT` | el JSON del cliente de Google, entero (paso 5) |
 | secret | `FIREBASE_SERVICE_ACCOUNT` | la clave de la cuenta de servicio (pasos 3 y 4) |
 
 **No hay nada que commitear**: un ambiente nuevo no toca ni un fichero del repositorio. Si falta
@@ -115,7 +115,7 @@ Dentro de **cada** environment, `Add environment secret`. Son dos:
 | Secret | Valor | Quién lo usa |
 |---|---|---|
 | `FIREBASE_SERVICE_ACCOUNT` | El **contenido íntegro** del JSON del paso 3 — ábrelo con un editor y pega todo, desde la `{` hasta la `}`. **Uno distinto por ambiente**: cada JSON abre su proyecto | Los dos workflows |
-| `GOOGLE_OAUTH` | El **fichero de cliente de Google entero**, tal cual lo descarga la consola ([`deploy/README.md`](../deploy/README.md)) | Los dos: el build le saca el `client_id`; el backend, además, el `client_secret` para Secret Manager |
+| `GOOGLE_OAUTH_CLIENT` | El **fichero de cliente de Google entero**, tal cual lo descarga la consola ([`deploy/README.md`](../deploy/README.md)) | Los dos: el build le saca el `client_id`; el backend, además, el `client_secret` para Secret Manager |
 
 Los dos se pegan a mano: el JSON de la cuenta de servicio del paso 3, y el JSON del cliente que te
 enseña [`create-google-client-id.sh`](../deploy/create-google-client-id.sh). Que estén aquí y no en
@@ -166,7 +166,7 @@ contra el *environment* de GitHub, así que la lista de ambientes que existen es
    [`api.md`](api.md) (pasos 1 y 2).
 
 2. **Un environment `stage` en GitHub** con sus dos secrets —`FIREBASE_SERVICE_ACCOUNT` y
-   `GOOGLE_OAUTH`— y sus dos variables —`PROJECT_ID` y `DEBUG`— (pasos 3 y 4), y los dos orígenes del
+   `GOOGLE_OAUTH_CLIENT`— y sus dos variables —`PROJECT_ID` y `DEBUG`— (pasos 3 y 4), y los dos orígenes del
    proyecto nuevo dados de alta en el cliente de Google (paso 5).
 
 **No se toca ni un fichero del repositorio.**
@@ -206,7 +206,7 @@ dev es lo que se publica en prod.
 ### Cambiar la configuración de un ambiente
 
 - `debug` → cambiar la variable `DEBUG` de **ese** environment y **volver a desplegar**.
-- El **cliente de Google** → cambiar el secret `GOOGLE_OAUTH` de **ese** environment (el JSON
+- El **cliente de Google** → cambiar el secret `GOOGLE_OAUTH_CLIENT` de **ese** environment (el JSON
   entero) y **volver a desplegar**.
 - `syncPollSeconds` → es el mismo en todos los ambientes: se edita `public/config.json` y se
   commitea.

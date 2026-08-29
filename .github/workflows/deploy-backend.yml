@@ -53,12 +53,12 @@ jobs:
           AMBIENTE: ${{ inputs.ambiente }}
           FUNCION: ${{ inputs.funcion }}
           PROJECT_ID: ${{ vars.PROJECT_ID }}
-          GOOGLE_OAUTH: ${{ secrets.GOOGLE_OAUTH }}
+          GOOGLE_OAUTH_CLIENT: ${{ secrets.GOOGLE_OAUTH_CLIENT }}
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
         run: |
           faltan=""
           [ -n "$PROJECT_ID" ]               || faltan="$faltan variable:PROJECT_ID"
-          [ -n "$GOOGLE_OAUTH" ]             || faltan="$faltan secret:GOOGLE_OAUTH"
+          [ -n "$GOOGLE_OAUTH_CLIENT" ]      || faltan="$faltan secret:GOOGLE_OAUTH_CLIENT"
           [ -n "$FIREBASE_SERVICE_ACCOUNT" ] || faltan="$faltan secret:FIREBASE_SERVICE_ACCOUNT"
           if [ -n "$faltan" ]; then
             echo "::error::Al environment '$AMBIENTE' le falta:$faltan. Settings → Environments → $AMBIENTE (ver deploy/README.md)."
@@ -112,11 +112,11 @@ jobs:
       - name: Sustituir los marcadores del artefacto
         env:
           FUNCION: ${{ inputs.funcion }}
-          GOOGLE_OAUTH: ${{ secrets.GOOGLE_OAUTH }}
+          GOOGLE_OAUTH_CLIENT: ${{ secrets.GOOGLE_OAUTH_CLIENT }}
         run: |
           ENV_FILE="deploy/dist/functions/$FUNCION/.env"
-          CLIENT_ID="$(printf '%s' "$GOOGLE_OAUTH" | jq -er '.web.client_id')" || {
-            echo "::error::El secret GOOGLE_OAUTH no es el JSON del cliente de Google (falta .web.client_id)."
+          CLIENT_ID="$(printf '%s' "$GOOGLE_OAUTH_CLIENT" | jq -er '.web.client_id')" || {
+            echo "::error::El secret GOOGLE_OAUTH_CLIENT no es el JSON del cliente de Google (falta .web.client_id)."
             exit 1
           }
 
@@ -146,10 +146,10 @@ jobs:
       - name: Client secret de OAuth en Secret Manager
         env:
           PROJECT_ID: ${{ vars.PROJECT_ID }}
-          GOOGLE_OAUTH: ${{ secrets.GOOGLE_OAUTH }}
+          GOOGLE_OAUTH_CLIENT: ${{ secrets.GOOGLE_OAUTH_CLIENT }}
         run: |
-          CLIENT_SECRET="$(printf '%s' "$GOOGLE_OAUTH" | jq -er '.web.client_secret')" || {
-            echo "::error::El secret GOOGLE_OAUTH no trae .web.client_secret."
+          CLIENT_SECRET="$(printf '%s' "$GOOGLE_OAUTH_CLIENT" | jq -er '.web.client_secret')" || {
+            echo "::error::El secret GOOGLE_OAUTH_CLIENT no trae .web.client_secret."
             exit 1
           }
           echo "::add-mask::$CLIENT_SECRET"
