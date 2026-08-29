@@ -87,7 +87,7 @@ De los siete campos del JSON, el despliegue usa **dos**:
 | Campo | ¿Se usa? | Para qué |
 |---|---|---|
 | `client_id` | **Sí** | sustituye el marcador en el `config.json` y en el `.env` de la función |
-| `client_secret` | **Sí** | lo copia `deploy-backend.yml` a Secret Manager |
+| `client_secret` | **Sí** | sustituye el marcador del `.env` de la función, en la copia que viaja |
 | `token_uri` | No | está literal en `api/auth/google-oauth.ts`, y es el mismo para todo el mundo |
 | `auth_uri` | No | la app usa la ventana de GIS (`initCodeClient`), no el flujo de redirección |
 | `auth_provider_x509_cert_url` | No | el `id_token` **no se verifica**: llega del propio canje contra Google por TLS (OIDC §3.1.3.7) |
@@ -107,8 +107,8 @@ que si algo de esto falta el despliegue **falla**, y el error del CLI casi nunca
 | **Plan Blaze** | functions | `Your project must be on the Blaze plan` |
 | **Hosting activado** en la consola (*Compilación → Hosting → Comenzar*) | hosting | el deploy no encuentra sitio al que publicar |
 | **Base de datos de Firestore creada** — habilitar la API **no** la crea | `firestore:rules` | `NOT_FOUND … database (default)` |
-| **Seis APIs**: `secretmanager`, `cloudfunctions`, `run`, `cloudbuild`, `artifactregistry`, `firestore` | functions | `403 … has not been used in project` |
-| **Cuenta de servicio con diez roles** | los dos | `403 … Permission denied` |
+| **Cinco APIs**: `cloudfunctions`, `run`, `cloudbuild`, `artifactregistry`, `firestore` | functions | `403 … has not been used in project` |
+| **Cuenta de servicio con ocho roles** | los dos | `403 … Permission denied` |
 
 Los cinco, con los comandos exactos, están en [`manual/api.md`](../manual/api.md) → «Requisitos del
 proyecto de Firebase». **El frontend necesita mucho menos que el backend**: si `deploy-frontend` va
@@ -119,7 +119,7 @@ en verde y `deploy-backend` en rojo, el problema está en esa lista, no en el c�
 gcloud projects describe <projectId> --format='value(lifecycleState)'   # ACTIVE
 gcloud billing projects describe <projectId> --format='value(billingEnabled)'
 gcloud firestore databases list --project <projectId>
-gcloud services list --enabled --project <projectId> | grep -E 'secretmanager|cloudfunctions|run\.|cloudbuild|artifactregistry|firestore'
+gcloud services list --enabled --project <projectId> | grep -E 'cloudfunctions|run\.|cloudbuild|artifactregistry|firestore'
 ```
 
 ---
@@ -145,8 +145,9 @@ gh run watch
 ```
 
 Hace: comprobar el environment · tests de la función · `tsc` y empaquetar en
-`deploy/dist/functions/auth/` · sustituir el marcador del `.env` · `client_secret` → Secret Manager ·
-`firebase deploy --only functions:auth,firestore:rules`.
+`deploy/dist/functions/auth/` · sustituir los dos marcadores del `.env` ·
+`firebase deploy --only functions:auth,firestore:rules`. **Nada más que Firebase**: publicar la
+función no habla con ninguna otra API de Google.
 
 ### Paso 2 · Desplegar el FRONTEND
 
@@ -175,8 +176,8 @@ En el sitio publicado (`https://<PROJECT_ID>.web.app`):
    alguno, pero esto lo confirma en el sitio servido.)
 2. **La función contesta.** `curl -si https://<projectId>.web.app/api/auth/token` debe dar **401**
    (sin cookie no hay sesión), no 404 ni 500. Un **404** significa que el rewrite no llegó o la
-   función no está desplegada; un **500** con «La función auth no está configurada» significa que
-   falta `GOOGLE_OAUTH_CLIENT_SECRET` en Secret Manager.
+   función no está desplegada; un **500** con «La función auth no está configurada» significa que un
+   marcador del `.env` llegó sin sustituir.
 3. **La sesión sobrevive a una recarga.** `/cuenta` → Conectar con Google → **recargar** → sigue
    conectada. Es lo único que ejercita las tres piezas a la vez: el Client ID del front, el del back
    y el secreto.
@@ -231,7 +232,8 @@ el **fuente** de `api/auth` con su `lib/` recién compilado, sin `npm ci` ni cop
 Es el único caso que pide tocar algo a mano, y **no se commitea**:
 
 ```bash
-# api/auth/.secret.local     (gitignored; la función lo lee en el emulador)
+# api/auth/.env.local        (gitignored; lo carga el emulador por encima del .env versionado)
+GOOGLE_OAUTH_CLIENT_ID=<el client_id>
 GOOGLE_OAUTH_CLIENT_SECRET=<el client_secret>
 
 # public/config.json         (versionado: acuérdate de revertirlo)
@@ -247,8 +249,8 @@ Tres cosas, y ninguna la hace un script del proyecto:
 1. **El cliente de Google** — [`create-google-client-id.sh`](create-google-client-id.sh) crea el
    proyecto de Cloud, habilita Sheets y Drive, te lleva a la consola y te enseña el JSON del cliente.
    No escribe nada.
-2. **El proyecto de Firebase** — a mano: plan Blaze, base de Firestore creada, seis APIs, cuenta de
-   servicio con diez roles. El paso a paso está en [`manual/api.md`](../manual/api.md) →
+2. **El proyecto de Firebase** — a mano: plan Blaze, base de Firestore creada, cinco APIs, cuenta de
+   servicio con ocho roles. El paso a paso está en [`manual/api.md`](../manual/api.md) →
    «Requisitos del proyecto de Firebase».
 3. **El environment de GitHub** con el nombre del ambiente, sus dos secrets y sus dos variables (la
    tabla de arriba).
@@ -317,8 +319,8 @@ Los rótulos y las URLs van **en inglés** porque Google Cloud Console está en 
 > habilitadas.
 
 **Estas dos, y ninguna más.** Son las que hacen que existan los scopes de Sheets y Drive. Las de la
-infraestructura —`secretmanager`, `cloudfunctions`, `run`, `cloudbuild`, `artifactregistry`,
-`firestore`— no tienen nada que ver con el consentimiento del usuario: van en el proyecto de
+infraestructura —`cloudfunctions`, `run`, `cloudbuild`, `artifactregistry`, `firestore`— no tienen
+nada que ver con el consentimiento del usuario: van en el proyecto de
 **Firebase**, se habilitan a mano al montar el ambiente, y su porqué está en
 [`manual/api.md`](../manual/api.md) → requisito 3.
 

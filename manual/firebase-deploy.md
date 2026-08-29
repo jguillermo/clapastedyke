@@ -80,7 +80,7 @@ cualquiera de las cuatro cosas, el primer paso del workflow se para y dice exact
 GitHub Actions no puede abrir un navegador para iniciar sesión, así que despliega con una **cuenta
 de servicio**: un usuario de máquina con su propia clave.
 
-> **Los diez roles de una vez.** La lista está en [`api.md`](api.md) → requisito 4, con el bucle
+> **Los ocho roles de una vez.** La lista está en [`api.md`](api.md) → requisito 4, con el bucle
 > `for ROLE in …` listo para pegar. Concédelos todos: cada uno que falte es otro despliegue fallido
 > de veinte minutos, y el 403 que sale no dice cuál es.
 
@@ -115,7 +115,7 @@ Dentro de **cada** environment, `Add environment secret`. Son dos:
 | Secret | Valor | Quién lo usa |
 |---|---|---|
 | `FIREBASE_SERVICE_ACCOUNT` | El **contenido íntegro** del JSON del paso 3 — ábrelo con un editor y pega todo, desde la `{` hasta la `}`. **Uno distinto por ambiente**: cada JSON abre su proyecto | Los dos workflows |
-| `GOOGLE_OAUTH_CLIENT` | El **fichero de cliente de Google entero**, tal cual lo descarga la consola ([`deploy/README.md`](../deploy/README.md)) | Los dos: el build le saca el `client_id`; el backend, además, el `client_secret` para Secret Manager |
+| `GOOGLE_OAUTH_CLIENT` | El **fichero de cliente de Google entero**, tal cual lo descarga la consola ([`deploy/README.md`](../deploy/README.md)) | Los dos: el build le saca el `client_id`; el backend, además, el `client_secret` para el `.env` de la función |
 
 Los dos se pegan a mano: el JSON de la cuenta de servicio del paso 3, y el JSON del cliente que te
 enseña [`create-google-client-id.sh`](../deploy/create-google-client-id.sh). Que estén aquí y no en
@@ -267,8 +267,7 @@ en [`deploy/README.md`](../deploy/README.md).
 | `Failed to authenticate, have you run firebase login?` | `FIREBASE_SERVICE_ACCOUNT` mal pegado: la ruta en vez del contenido, falta una llave, o se «limpiaron» los `\n` del `private_key`. El mensaje es genérico y tapa la causa — con `--debug` sale la de verdad (`invalid_grant`, `error:1E08010C`…) | Volver a pegar el JSON entero, tal cual |
 | `invalid_grant: Invalid grant: account not found` | La cuenta de servicio se borró, o la clave se revocó | Generar una clave nueva (paso 3) |
 | `HTTP Error: 403` desplegando el **frontend** | La cuenta de servicio no tiene permiso en ese proyecto | Rol **Firebase Hosting Admin** en IAM (paso 3) |
-| `HTTP Error: 403` desplegando el **backend** (`Permission denied to get service …`) | Los roles de hosting no cubren funciones, Cloud Run, Artifact Registry, Secret Manager ni las reglas de Firestore | [`api.md`](api.md) → «Requisitos del proyecto de Firebase», requisito 4 |
-| `HTTP Error: 403` desplegando el **backend** (`Secret Manager API has not been used in project …`) | No son permisos: esa API no está habilitada en el proyecto, y el CLI no la enciende él | [`api.md`](api.md) → «Requisitos del proyecto de Firebase», requisito 3 |
+| `HTTP Error: 403` desplegando el **backend** (`Permission denied to get service …`) | Los roles de hosting no cubren funciones, Cloud Run, Artifact Registry ni las reglas de Firestore | [`api.md`](api.md) → «Requisitos del proyecto de Firebase», requisito 4 |
 | `Failed to get Firebase project …` | El `projectId` no existe o es el nombre en vez del ID | Cópialo de la consola de Firebase |
 | El deploy a prod se queda «Waiting» | Está pidiendo aprobación (protección del environment) | Apruébalo desde la propia ejecución en Actions |
 | Desplegué a dev y se actualizó prod | El secret está como secret de repositorio, no de environment | Paso 4 |

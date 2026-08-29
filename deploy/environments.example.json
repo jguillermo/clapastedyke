@@ -32,12 +32,9 @@
         "syncPollSeconds": "no es marcador: es el mismo valor en todos los ambientes"
       },
       "api/auth/.env": {
-        "GOOGLE_OAUTH_CLIENT_ID": "GOOGLE_OAUTH_CLIENT_ID  ->  web.client_id del secret GOOGLE_OAUTH_CLIENT"
+        "GOOGLE_OAUTH_CLIENT_ID": "GOOGLE_OAUTH_CLIENT_ID  ->  web.client_id del secret GOOGLE_OAUTH_CLIENT",
+        "GOOGLE_OAUTH_CLIENT_SECRET": "GOOGLE_OAUTH_CLIENT_SECRET  ->  web.client_secret del MISMO secret (no va a Secret Manager: ver api/auth/config.ts)"
       }
-    },
-
-    "secretManager": {
-      "GOOGLE_OAUTH_CLIENT_SECRET": "web.client_secret del secret GOOGLE_OAUTH_CLIENT; lo escribe deploy-backend.yml antes de desplegar"
     },
 
     "literales": {

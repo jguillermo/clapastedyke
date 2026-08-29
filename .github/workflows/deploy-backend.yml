@@ -47,7 +47,7 @@ jobs:
         with:
           node-version: '22'
 
-      # Todo lo que puede faltar, comprobado ANTES de compilar o de tocar Secret Manager.
+      # Todo lo que puede faltar, comprobado ANTES de compilar ni empaquetar nada.
       - name: Comprobar el environment y la función
         env:
           AMBIENTE: ${{ inputs.ambiente }}
@@ -107,8 +107,17 @@ jobs:
 
           echo "package.json del artefacto:"; cat "$DEST/package.json"
 
-      # El mismo mecanismo que en el frontend: el marcador vive versionado en `api/<fn>/.env` y se
-      # sustituye SOLO en la copia que viaja.
+      # El mismo mecanismo que en el frontend: los marcadores viven versionados en `api/<fn>/.env` y
+      # se sustituyen SOLO en la copia que viaja.
+      #
+      # Las DOS mitades del cliente van aquí, incluido el `client_secret`. Antes el secreto se subía
+      # a Secret Manager con `functions:secrets:set` y la función lo declaraba con `defineSecret`:
+      # eso metía en el camino de publicar otras dos APIs de Google (Secret Manager y Service Usage),
+      # con sus permisos, y un 403 en cualquiera de ellas tiraba un despliegue que no las necesitaba
+      # para nada. Ahora publicar la función es un deploy de Firebase y nada más.
+      #
+      # `::add-mask::` es obligatorio: GitHub enmascara el secret ENTERO en los logs, pero no un
+      # campo extraído de él, y este acaba escrito en un fichero que el paso imprime.
       - name: Sustituir los marcadores del artefacto
         env:
           FUNCION: ${{ inputs.funcion }}
@@ -119,11 +128,17 @@ jobs:
             echo "::error::El secret GOOGLE_OAUTH_CLIENT no es el JSON del cliente de Google (falta .web.client_id)."
             exit 1
           }
+          CLIENT_SECRET="$(printf '%s' "$GOOGLE_OAUTH_CLIENT" | jq -er '.web.client_secret')" || {
+            echo "::error::El secret GOOGLE_OAUTH_CLIENT no trae .web.client_secret."
+            exit 1
+          }
+          echo "::add-mask::$CLIENT_SECRET"
 
           sed -i "s|GOOGLE_OAUTH_CLIENT_ID=GOOGLE_OAUTH_CLIENT_ID|GOOGLE_OAUTH_CLIENT_ID=${CLIENT_ID}|g" "$ENV_FILE"
+          sed -i "s|GOOGLE_OAUTH_CLIENT_SECRET=GOOGLE_OAUTH_CLIENT_SECRET|GOOGLE_OAUTH_CLIENT_SECRET=${CLIENT_SECRET}|g" "$ENV_FILE"
 
-          if grep -q '^GOOGLE_OAUTH_CLIENT_ID=GOOGLE_OAUTH_CLIENT_ID$' "$ENV_FILE"; then
-            echo "::error::Ha quedado el marcador sin sustituir en $ENV_FILE."
+          if grep -qE '^GOOGLE_OAUTH_CLIENT_(ID|SECRET)=GOOGLE_OAUTH_CLIENT_(ID|SECRET)$' "$ENV_FILE"; then
+            echo "::error::Ha quedado un marcador sin sustituir en $ENV_FILE."
             exit 1
           fi
 
@@ -133,31 +148,6 @@ jobs:
         run: |
           printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "${RUNNER_TEMP}/gcp-key.json"
           echo "GOOGLE_APPLICATION_CREDENTIALS=${RUNNER_TEMP}/gcp-key.json" >> "$GITHUB_ENV"
-
-      # El client secret NO viaja en el artefacto: la función lo resuelve en ejecución desde Secret
-      # Manager (`defineSecret`). Este paso lo pone ahí, sacándolo del mismo JSON del cliente.
-      #
-      # Va por **stdin** (`--data-file -`) a propósito: como argumento quedaría en la línea de
-      # comandos, visible para cualquier proceso de la máquina. Y `::add-mask::` es obligatorio:
-      # GitHub enmascara el secret ENTERO en los logs, pero no un campo extraído de él.
-      #
-      # Cada ejecución crea una VERSIÓN nueva del secreto y el `defineSecret` apunta a la última;
-      # las viejas se limpian de vez en cuando con `functions:secrets:prune`.
-      - name: Client secret de OAuth en Secret Manager
-        env:
-          PROJECT_ID: ${{ vars.PROJECT_ID }}
-          GOOGLE_OAUTH_CLIENT: ${{ secrets.GOOGLE_OAUTH_CLIENT }}
-        run: |
-          CLIENT_SECRET="$(printf '%s' "$GOOGLE_OAUTH_CLIENT" | jq -er '.web.client_secret')" || {
-            echo "::error::El secret GOOGLE_OAUTH_CLIENT no trae .web.client_secret."
-            exit 1
-          }
-          echo "::add-mask::$CLIENT_SECRET"
-
-          printf '%s' "$CLIENT_SECRET" | npx --yes firebase-tools@latest \
-            functions:secrets:set GOOGLE_OAUTH_CLIENT_SECRET \
-            --project "$PROJECT_ID" \
-            --data-file -
 
       # `--only functions:<codebase>` empaqueta y sube SOLO esa carpeta: las demás funciones ni se
       # recompilan ni se tocan. Es lo que hace que cada una sea un despliegue independiente.

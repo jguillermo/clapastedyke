@@ -56,28 +56,40 @@ el mismo artefacto sirve para todos los ambientes.
 | Valor | Dónde | Secreto |
 |---|---|---|
 | `GOOGLE_OAUTH_CLIENT_ID` | `.env`, **versionado con un marcador** | No — viaja en cada petición del navegador |
-| `GOOGLE_OAUTH_CLIENT_SECRET` | Secret Manager (`.secret.local` en el emulador) | **Sí** |
+| `GOOGLE_OAUTH_CLIENT_SECRET` | `.env`, **versionado con un marcador** | **Sí** — pero viaja en el artefacto, no en Secret Manager |
 
-**El `.env` está versionado, pero con un MARCADOR dentro, no con un valor:**
+**El `.env` está versionado, pero con MARCADORES dentro, no con valores:**
 
 ```sh
 GOOGLE_OAUTH_CLIENT_ID=GOOGLE_OAUTH_CLIENT_ID
+GOOGLE_OAUTH_CLIENT_SECRET=GOOGLE_OAUTH_CLIENT_SECRET
 ```
 
-Quien lo sustituye es [`deploy-backend.yml`](../../.github/workflows/deploy-backend.yml), sobre la
-copia que viaja en `deploy/dist/functions/auth/`, con el `web.client_id` del secret `GOOGLE_OAUTH_CLIENT`
-del *environment*. **En el repositorio no hay ningún Client ID**, y en un portátil tampoco: el
-marcador se queda como está y el emulador arranca con él.
+Quien los sustituye es [`deploy-backend.yml`](../../.github/workflows/deploy-backend.yml), sobre la
+copia que viaja en `deploy/dist/functions/auth/`, con el `web.client_id` y el `web.client_secret` del
+secret `GOOGLE_OAUTH_CLIENT` del *environment*. **En el repositorio no hay ningún valor de verdad**,
+y en un portátil tampoco: los marcadores se quedan como están y el emulador arranca con ellos.
 
-Ese secret trae también el `client_secret`, que el mismo workflow copia a Secret Manager. Un solo
-sitio para las dos cosas, así que no se pueden emparejar el id de un cliente con el secreto de otro
-—que es lo que Google rechaza con `invalid_client` sin decir por qué—.
+Que las dos mitades salgan del **mismo** secret es lo que impide emparejar el id de un cliente con el
+secreto de otro — que es lo que Google rechaza con `invalid_client` sin decir por qué.
 
-Para el **emulador**, el secreto sí se pone a mano, porque la función lo resuelve de un fichero y no
-del JSON:
+> ### Por qué el secreto NO va en Secret Manager
+>
+> `defineSecret` habría metido en el camino de publicar otras dos APIs de Google —Secret Manager y
+> Service Usage—, con sus permisos y sus 403, para transportar un valor que el propio despliegue ya
+> tiene en la mano. Así, publicar esta función es un deploy de Firebase y nada más.
+>
+> El coste, dicho claro: una variable de entorno la ve cualquiera con permiso de lectura sobre la
+> función en la consola de Cloud; Secret Manager la habría guardado cifrada y con bitácora de
+> accesos. Rotarla es regenerar el client secret en Google, actualizar el secret
+> `GOOGLE_OAUTH_CLIENT` del *environment* y volver a desplegar.
+
+Para el **emulador**, si quieres probar el flujo de verdad, pon los dos valores en un fichero
+aparte — nunca tocando el `.env` versionado:
 
 ```sh
-# api/auth/.secret.local   (gitignored)
+# api/auth/.env.local   (gitignored)
+GOOGLE_OAUTH_CLIENT_ID=<el client_id>
 GOOGLE_OAUTH_CLIENT_SECRET=<el client_secret>
 ```
 

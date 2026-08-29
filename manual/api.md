@@ -85,9 +85,10 @@ estructuralmente, y de paso los ayudantes se pueden probar sin levantar nada.
    deliberada: el de despliegue apunta a `dist/functions/<nombre>` (el artefacto, dentro de
    `deploy/`) y el del emulador a `../api/<nombre>` (el fuente, en la raíz).
 4. `.github/workflows/ci.yml`: añadir el nombre a la matriz del job `api`.
-5. Si necesita un parámetro público, un `.env` **versionado con su marcador**
-   (`MI_PARAMETRO=MI_PARAMETRO`), y un paso de sustitución en `deploy-backend.yml` como el que ya
-   hay para el Client ID. Si es un secreto, va a Secret Manager con `defineSecret`.
+5. Si necesita un parámetro, un `.env` **versionado con su marcador** (`MI_PARAMETRO=MI_PARAMETRO`)
+   y su sustitución en `deploy-backend.yml`, como los del cliente de OAuth. **También si es un
+   secreto**: no se usa `defineSecret`, porque metería Secret Manager y Service Usage en el camino
+   de publicar (ver `api/auth/config.ts`).
 
 ## El router: la misma ruta llega de dos formas
 
@@ -107,9 +108,9 @@ El proxy no es comodidad: la cookie de sesión es `HttpOnly` y `SameSite=Lax`, a
 el backend se ve como mismo origen que la app**. Llamando al emulador por su URL directa
 (`127.0.0.1:5001`) la sesión no se reanudaría nunca en local.
 
-Los secretos del emulador van en `api/<función>/.secret.local`, que está en el `.gitignore` y
-**no lo escribe ningún script**: se copia a mano del JSON del cliente. Sin él, el emulador arranca
-igual y `/exchange` contesta 500.
+Los valores de verdad para el emulador van en `api/<función>/.env.local`, que está en el
+`.gitignore` y **no lo escribe ningún script**: se copian a mano del JSON del cliente. Sin ellos, el
+emulador arranca igual y `/exchange` contesta 500 — el `.env` versionado solo lleva marcadores.
 
 El emulador usa `deploy/firebase.emulators.json`, no el de despliegue: ejecuta el **fuente** con su
 `lib/` recién compilado, sin `npm ci` ni copiar árboles.
@@ -177,7 +178,6 @@ Sobre un ambiente nuevo (aquí `<projectId>`), de arriba abajo:
 3. **Habilitar las APIs que el CLI no enciende solo** (requisito 3):
    ```bash
    gcloud services enable \
-     secretmanager.googleapis.com \
      cloudfunctions.googleapis.com \
      run.googleapis.com \
      cloudbuild.googleapis.com \
@@ -188,8 +188,9 @@ Sobre un ambiente nuevo (aquí `<projectId>`), de arriba abajo:
 4. **Conceder los roles a la cuenta de servicio del despliegue** — el `client_email` del JSON que hay
    en el secret `FIREBASE_SERVICE_ACCOUNT` del *environment* de GitHub (requisito 4, el bucle
    `for ROLE in …` de más abajo).
-5. **El cliente de OAuth en el *environment* de GitHub** (requisito 5): el secret `GOOGLE_OAUTH_CLIENT`,
-   con el JSON entero. De él saca el workflow el `client_secret` que pone en Secret Manager.
+5. **El cliente de OAuth en el *environment* de GitHub** (requisito 5): el secret
+   `GOOGLE_OAUTH_CLIENT`, con el JSON entero. De él saca el workflow las dos mitades que escribe en
+   el `.env` del artefacto.
 6. **Esperar 2–3 minutos** a que propaguen las APIs y los roles.
 7. **Relanzar el workflow `deploy-backend`.**
 
@@ -216,21 +217,12 @@ despliegue de todas formas).
 ### CRITICAL: 3 · Las APIs habilitadas — el CLI NO enciende todas
 
 `firebase deploy` enciende sobre la marcha las que sabe que va a necesitar (`cloudfunctions`,
-`cloudbuild`, `artifactregistry`, `firebaseextensions`… se ven en el log con «Enabling now…»).
-**Secret Manager no está en esa lista.** Para resolver `GOOGLE_OAUTH_CLIENT_SECRET` el CLI llama
-directo a `secretmanager.googleapis.com` sin habilitarla antes, así que en un proyecto recién creado
-el despliegue muere con un 403 que **no** es de permisos:
-
-```
-Error: Request to https://secretmanager.googleapis.com/v1/projects/<projectId>/secrets/GOOGLE_OAUTH_CLIENT_SECRET
-had HTTP Error: 403, Secret Manager API has not been used in project <projectId> before or it is disabled.
-```
-
-Se encienden todas de golpe, una sola vez:
+`cloudbuild`, `artifactregistry`, `firebaseextensions`… se ven en el log con «Enabling now…»), pero
+para eso necesita **poder consultarlas** (requisito 4). Encenderlas antes, a mano, quita de en medio
+los reintentos y los tiempos de propagación en mitad del primer despliegue:
 
 ```bash
 gcloud services enable \
-  secretmanager.googleapis.com \
   cloudfunctions.googleapis.com \
   run.googleapis.com \
   cloudbuild.googleapis.com \
@@ -239,8 +231,11 @@ gcloud services enable \
   --project <projectId>
 ```
 
-Las otras cinco no hacen falta estrictamente —el CLI las habilitaría él— pero encenderlas aquí quita
-de en medio los reintentos y los tiempos de propagación en mitad del primer despliegue.
+> **Secret Manager ya no está en la lista, y es deliberado.** El client secret viaja como variable de
+> entorno en el `.env` del artefacto, no con `defineSecret`. Mientras lo hacía, publicar la función
+> dependía además de `secretmanager.googleapis.com` y de `serviceusage.googleapis.com`, y un 403 en
+> cualquiera de las dos tiraba un despliegue que no las necesitaba para nada. El porqué y su coste
+> están en [`api/auth/config.ts`](../api/auth/config.ts).
 
 **Habilitar tarda un par de minutos en propagarse.** Si relanzas el workflow al instante, puede
 repetir el mismo 403.
@@ -272,7 +267,6 @@ Los roles, en el proyecto del ambiente:
 | `roles/cloudbuild.builds.editor` | La compilación de la imagen |
 | `roles/artifactregistry.admin` | Dónde se guarda esa imagen |
 | `roles/iam.serviceAccountUser` | *Actuar como* la cuenta de ejecución de la función |
-| `roles/secretmanager.admin` | `GOOGLE_OAUTH_CLIENT_SECRET`: resolverlo y dar acceso a la función |
 | `roles/firebaserules.admin` | `firestore:rules` |
 | `roles/firebase.developAdmin` | Leer el proyecto de Firebase como tal |
 
@@ -289,7 +283,6 @@ for ROLE in \
   roles/cloudbuild.builds.editor \
   roles/artifactregistry.admin \
   roles/iam.serviceAccountUser \
-  roles/secretmanager.admin \
   roles/firebaserules.admin \
   roles/firebase.developAdmin
 do
@@ -302,44 +295,33 @@ También se pueden añadir a mano en [IAM](https://console.cloud.google.com/iam-
 cambios tardan un minuto largo en propagarse**: si relanzas el workflow inmediatamente, puede volver
 a dar el mismo 403.
 
-### 5 · El secreto de OAuth, puesto
+### 5 · El cliente de OAuth, puesto en el *environment*
 
-`api/auth` no arranca sin él ([`api/auth/README.md`](../api/auth/README.md)), pero **no lo subes tú a
-Secret Manager**: lo que subes al *environment* de GitHub es el secret `GOOGLE_OAUTH_CLIENT` —el fichero de
-cliente que descarga Google, entero—, y `deploy-backend.yml` le saca el `client_secret` (con
-`jq`, enmascarándolo con `::add-mask::`) y lo escribe en Secret Manager antes de desplegar. Es lo que hace que montar un ambiente sea **elegirlo en
+`api/auth` no arranca sin él ([`api/auth/README.md`](../api/auth/README.md)), pero **no subes nada a
+Google**: lo que subes al *environment* de GitHub es el secret `GOOGLE_OAUTH_CLIENT` —el fichero de
+cliente que descarga Google, entero—, y `deploy-backend.yml` le saca con `jq` el `client_id` y el
+`client_secret` (este último enmascarado con `::add-mask::`) y los escribe en el `.env` de la copia
+que viaja en `deploy/dist/functions/auth/`. Es lo que hace que montar un ambiente sea **elegirlo en
 Actions**: no queda ningún valor pendiente de que alguien se acuerde de subirlo desde su portátil.
 
-De dónde sale ese valor: [`deploy/README.md`](../deploy/README.md). El script de
-allí te lo enseña en pantalla; al *environment* de GitHub se pega a mano.
+De dónde sale ese valor: [`deploy/README.md`](../deploy/README.md). El script de allí te lo enseña en
+pantalla; al *environment* de GitHub se pega a mano.
 
-Si alguna vez hace falta ponerlo a mano:
-
-```bash
-npx --yes firebase-tools functions:secrets:set GOOGLE_OAUTH_CLIENT_SECRET --project <projectId>
-```
-
-**Va después del requisito 3**: este comando también habla con Secret Manager, así que sin la API
-habilitada falla con el mismo 403 y parece que el secreto no se puede crear. Le pasa igual al paso
-del workflow.
-
-El **Client ID** no va en Secret Manager: no es un secreto, y la función lo resuelve de su
-`.env`, un fichero **versionado con un marcador** que el workflow sustituye en el artefacto con el
-`web.client_id` del secret `GOOGLE_OAUTH_CLIENT`. El frontend sale del **mismo** secret, así que no pueden
-divergir. Ver [`deploy/README.md`](../deploy/README.md).
+**Las dos mitades salen del mismo secret**, y eso no es comodidad: es lo que impide emparejar el
+`client_id` de un cliente con el `client_secret` de otro, que es lo que Google rechaza con un
+`invalid_client` sin explicar nada. El frontend lee ese **mismo** secret, así que tampoco pueden
+divergir app y API.
 
 ## Cuando el despliegue del backend falla
 
 | Síntoma | Causa | Arreglo |
 |---|---|---|
-| `403 … Secret Manager API has not been used in project … before or it is disabled` | La API de Secret Manager no está encendida: el CLI la llama directa, sin habilitarla | Requisito 3 |
-| `403 … Permission denied to get service [firestore.googleapis.com]` (o `cloudfunctions`, `run`, `artifactregistry`…) al empezar el deploy | La cuenta de servicio no tiene `serviceusage.serviceUsageAdmin`: el CLI ni siquiera puede mirar si las APIs están encendidas | Requisito 4 — concede **todos** los roles, no solo ese |
+| `403 … Permission denied to get service [cloudfunctions.googleapis.com]` (o `run`, `artifactregistry`, `firestore`…) al empezar el deploy | La cuenta de servicio no tiene `serviceusage.serviceUsageAdmin`: el CLI ni siquiera puede mirar si las APIs están encendidas | Requisito 4 — concede **todos** los roles, no solo ese |
 | `403` más adelante, ya subiendo o compilando | Falta uno de los otros roles | Requisito 4 |
 | `NOT_FOUND … database (default)` al desplegar las reglas | La API de Firestore está habilitada pero **la base no existe** | Requisito 2 |
 | `Billing account … required` / `Your project must be on the Blaze plan` | Proyecto en Spark | Requisito 1 |
 | `El environment '<amb>' no tiene el secret GOOGLE_OAUTH_CLIENT` | El *environment* de GitHub no declara el cliente | Requisito 5 |
-| `Secret GOOGLE_OAUTH_CLIENT_SECRET … does not exist` | El paso que lo pone no llegó a correr (o se desplegó a mano saltándose el workflow) | Requisito 5 |
-| La función responde 500 con «La función auth no está configurada» | Está desplegada, pero le falta el Client ID o el secreto | Requisito 5 y [`api/auth/README.md`](../api/auth/README.md) |
+| La función responde 500 con «La función auth no está configurada» | Está desplegada, pero un marcador del `.env` llegó sin sustituir | Requisito 5 y [`api/auth/README.md`](../api/auth/README.md) |
 | `El cliente de GOOGLE_OAUTH_CLIENT no tiene "client_secret"` | El secret está, pero no es el JSON completo del cliente | [`deploy/README.md`](../deploy/README.md) |
 | `No existe la función 'x'` en el job `Validar` | Errata en el input `funcion`: tiene que ser una carpeta de `api/` | El error lista las que hay |
 

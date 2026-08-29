@@ -18,7 +18,6 @@ import { onRequest, type Request } from 'firebase-functions/v2/https';
 import type { Response } from 'express';
 import { logger } from 'firebase-functions';
 import { normalizePath, sendError } from '../_common/http';
-import { GOOGLE_OAUTH_CLIENT_SECRET } from './config';
 import { handleExchange } from './exchange';
 import { handleToken } from './token';
 import { handleSignOut } from './sign-out';
@@ -36,8 +35,9 @@ const ROUTES: Record<string, Route> = {
 
 export const auth = onRequest(
   {
-    // Declarar el secreto es lo que hace que `GOOGLE_OAUTH_CLIENT_SECRET.value()` tenga valor.
-    secrets: [GOOGLE_OAUTH_CLIENT_SECRET],
+    // Sin `secrets`: las dos mitades del cliente de OAuth son variables del `.env` que viaja con el
+    // artefacto, así que publicar esta función es un deploy de Firebase y nada más. El porqué (y su
+    // coste) está en `config.ts`.
     region: 'us-central1',
     // La app la llama en cada arranque; que un usuario espere un arranque en frío es aceptable,
     // pero no diez segundos.

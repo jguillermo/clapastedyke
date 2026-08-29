@@ -2,6 +2,7 @@ node_modules/
 lib/
 lib-test/
 
-# El client secret para el emulador. NUNCA se versiona: en la nube vive en Secret Manager.
-.secret.local
+# Los valores de verdad del cliente de OAuth para el emulador. NUNCA se versionan: el `.env`
+# versionado solo lleva marcadores, y en la nube los sustituye el workflow de despliegue.
 .env.local
+.secret.local
