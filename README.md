@@ -108,7 +108,7 @@ connecting fails with a local, diagnosable message instead of Google's `invalid_
 a fresh clone runs with **nothing executed** — `npm ci && npm start` and you are working.
 
 An environment is declared in its **GitHub environment**, not in this repo: two secrets
-(`GOOGLE_OAUTH`, the client JSON kept whole, and `FIREBASE_SERVICE_ACCOUNT`) and two variables
+(`GOOGLE_OAUTH_CLIENT`, the client JSON kept whole, and `FIREBASE_SERVICE_ACCOUNT`) and two variables
 (`PROJECT_ID`, `DEBUG`). Adding `stage` touches no file.
 [`deploy/environments.example.json`](deploy/environments.example.json) shows that same picture as a
 file you can read at a glance; nothing consumes it.

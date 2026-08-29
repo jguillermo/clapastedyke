@@ -16,7 +16,7 @@
 
     "github": {
       "secrets": {
-        "GOOGLE_OAUTH": "el fichero de cliente que descarga Google, ENTERO: {\"web\":{…}}",
+        "GOOGLE_OAUTH_CLIENT": "el fichero de cliente que descarga Google, ENTERO: {\"web\":{…}}",
         "FIREBASE_SERVICE_ACCOUNT": "la clave JSON de la cuenta de servicio de despliegue"
       },
       "variables": {
@@ -28,16 +28,16 @@
     "marcadores": {
       "public/config.json": {
         "debug": "\"DEBUG\"  ->  la variable DEBUG del environment",
-        "googleClientId": "GOOGLE_OAUTH_CLIENT_ID  ->  web.client_id del secret GOOGLE_OAUTH",
+        "googleClientId": "GOOGLE_OAUTH_CLIENT_ID  ->  web.client_id del secret GOOGLE_OAUTH_CLIENT",
         "syncPollSeconds": "no es marcador: es el mismo valor en todos los ambientes"
       },
       "api/auth/.env": {
-        "GOOGLE_OAUTH_CLIENT_ID": "GOOGLE_OAUTH_CLIENT_ID  ->  web.client_id del secret GOOGLE_OAUTH"
+        "GOOGLE_OAUTH_CLIENT_ID": "GOOGLE_OAUTH_CLIENT_ID  ->  web.client_id del secret GOOGLE_OAUTH_CLIENT"
       }
     },
 
     "secretManager": {
-      "GOOGLE_OAUTH_CLIENT_SECRET": "web.client_secret del secret GOOGLE_OAUTH; lo escribe deploy-backend.yml antes de desplegar"
+      "GOOGLE_OAUTH_CLIENT_SECRET": "web.client_secret del secret GOOGLE_OAUTH_CLIENT; lo escribe deploy-backend.yml antes de desplegar"
     },
 
     "literales": {

@@ -18,7 +18,7 @@
 #   · el fichero del cliente de Google, en pantalla, listo para pegar
 #
 # Y ahí para. **No escribe nada, en ningún sitio**: el Client ID y el client secret no se guardan en
-# el repositorio ni en un fichero suelto, se pegan una vez en el secret `GOOGLE_OAUTH` del
+# el repositorio ni en un fichero suelto, se pegan una vez en el secret `GOOGLE_OAUTH_CLIENT` del
 # *environment* de GitHub del ambiente. Ese es su único domicilio.
 #
 # El ÚNICO paso manual es la consola: Google no tiene API ni comando para crear un OAuth client
@@ -392,16 +392,16 @@ echo
 info "Descarga el JSON del cliente (botón «Download JSON» al guardarlo) y pega su contenido."
 info "Es una sola línea; no se verá al pegarlo, porque lleva el client secret dentro."
 while true; do
-    read -r -s -p "  Pega aquí el JSON del cliente (o 'salir' para abortar): " GOOGLE_OAUTH
+    read -r -s -p "  Pega aquí el JSON del cliente (o 'salir' para abortar): " GOOGLE_OAUTH_CLIENT
     echo
-    GOOGLE_OAUTH="$(printf '%s' "${GOOGLE_OAUTH}" | tr -d '\n')"
+    GOOGLE_OAUTH_CLIENT="$(printf '%s' "${GOOGLE_OAUTH_CLIENT}" | tr -d '\n')"
 
-    if [[ "${GOOGLE_OAUTH}" == "salir" ]]; then
+    if [[ "${GOOGLE_OAUTH_CLIENT}" == "salir" ]]; then
         die "Cancelado: no se ha guardado nada.
   El cliente ya existe en la consola; su secret se regenera desde ahí cuando lo necesites."
     fi
 
-    if [[ -z "${GOOGLE_OAUTH}" ]]; then
+    if [[ -z "${GOOGLE_OAUTH_CLIENT}" ]]; then
         warn "Vacío. Pega el contenido del fichero, o escribe 'salir'."
         continue
     fi
@@ -418,7 +418,7 @@ while true; do
         console.error(error.message);
         process.exit(1);
       }
-    ' "${GOOGLE_OAUTH}" 2>/dev/null)"; then
+    ' "${GOOGLE_OAUTH_CLIENT}" 2>/dev/null)"; then
         warn "Eso no es el JSON de un cliente web de Google: tiene que traer web.client_id y web.client_secret."
         continue
     fi
@@ -430,7 +430,7 @@ info "Cliente ${CLIENT_ID}"
 # ─────────────────────────────────────────────────────────────────────────────
 # 7 · Enseñarlo, y parar
 #
-# **No se escribe en ningún sitio.** El cliente tiene un único domicilio, el secret `GOOGLE_OAUTH`
+# **No se escribe en ningún sitio.** El cliente tiene un único domicilio, el secret `GOOGLE_OAUTH_CLIENT`
 # del *environment* de GitHub, y de ahí lo saca el pipeline al publicar. Guardar una copia en un
 # fichero del repositorio —aunque estuviera en el .gitignore— solo añadiría un sitio del que puede
 # escaparse y otro que puede quedarse viejo cuando el cliente se rote.
@@ -442,7 +442,7 @@ step "7 · El cliente, para pegar"
 
 warn "Lo que viene lleva el client secret en claro. Cópialo a GitHub y limpia la terminal."
 echo
-printf '%s\n' "${GOOGLE_OAUTH}"
+printf '%s\n' "${GOOGLE_OAUTH_CLIENT}"
 echo
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -459,7 +459,7 @@ cat <<EOF
 
     GitHub -> Settings -> Environments -> <ambiente> -> Add environment secret
 
-       Nombre:  GOOGLE_OAUTH
+       Nombre:  GOOGLE_OAUTH_CLIENT
        Valor:   el JSON de arriba, ENTERO, tal cual
 
   De ahí sacan los dos workflows lo que necesitan: el `client_id`, que sustituye el marcador del

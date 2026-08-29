@@ -68,7 +68,7 @@ ambiente: eso es lo que hace que `secrets.*` y `vars.*` resuelvan a los de ese p
 
 | | Nombre | Qué es |
 |---|---|---|
-| secret | `GOOGLE_OAUTH` | el fichero de cliente que descarga Google, **entero** |
+| secret | `GOOGLE_OAUTH_CLIENT` | el fichero de cliente que descarga Google, **entero** |
 | secret | `FIREBASE_SERVICE_ACCOUNT` | la clave JSON de la cuenta de servicio de despliegue |
 | var | `PROJECT_ID` | el proyecto de Firebase de ese ambiente |
 | var | `DEBUG` | `true` / `false` |
@@ -381,7 +381,7 @@ razón por la que la sesión sobrevive a una recarga.
 
 ---
 
-## 4 · El fichero del cliente → el secret `GOOGLE_OAUTH`
+## 4 · El fichero del cliente → el secret `GOOGLE_OAUTH_CLIENT`
 
 Aquí acaba el procedimiento de OAuth. En la consola, al guardar, usa **Download JSON**; ese fichero
 es lo que se pega, **entero y tal cual**, en el environment:
@@ -389,7 +389,7 @@ es lo que se pega, **entero y tal cual**, en el environment:
 ```
 GitHub → Settings → Environments → <ambiente> → Add environment secret
 
-  Nombre:  GOOGLE_OAUTH
+  Nombre:  GOOGLE_OAUTH_CLIENT
   Valor:   {"web":{"client_id":"123456789012-….apps.googleusercontent.com","client_secret":"GOCSPX-…",…}}
 ```
 

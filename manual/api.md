@@ -188,7 +188,7 @@ Sobre un ambiente nuevo (aquí `<projectId>`), de arriba abajo:
 4. **Conceder los roles a la cuenta de servicio del despliegue** — el `client_email` del JSON que hay
    en el secret `FIREBASE_SERVICE_ACCOUNT` del *environment* de GitHub (requisito 4, el bucle
    `for ROLE in …` de más abajo).
-5. **El cliente de OAuth en el *environment* de GitHub** (requisito 5): el secret `GOOGLE_OAUTH`,
+5. **El cliente de OAuth en el *environment* de GitHub** (requisito 5): el secret `GOOGLE_OAUTH_CLIENT`,
    con el JSON entero. De él saca el workflow el `client_secret` que pone en Secret Manager.
 6. **Esperar 2–3 minutos** a que propaguen las APIs y los roles.
 7. **Relanzar el workflow `deploy-backend`.**
@@ -305,7 +305,7 @@ a dar el mismo 403.
 ### 5 · El secreto de OAuth, puesto
 
 `api/auth` no arranca sin él ([`api/auth/README.md`](../api/auth/README.md)), pero **no lo subes tú a
-Secret Manager**: lo que subes al *environment* de GitHub es el secret `GOOGLE_OAUTH` —el fichero de
+Secret Manager**: lo que subes al *environment* de GitHub es el secret `GOOGLE_OAUTH_CLIENT` —el fichero de
 cliente que descarga Google, entero—, y `deploy-backend.yml` le saca el `client_secret` (con
 `jq`, enmascarándolo con `::add-mask::`) y lo escribe en Secret Manager antes de desplegar. Es lo que hace que montar un ambiente sea **elegirlo en
 Actions**: no queda ningún valor pendiente de que alguien se acuerde de subirlo desde su portátil.
@@ -325,7 +325,7 @@ del workflow.
 
 El **Client ID** no va en Secret Manager: no es un secreto, y la función lo resuelve de su
 `.env`, un fichero **versionado con un marcador** que el workflow sustituye en el artefacto con el
-`web.client_id` del secret `GOOGLE_OAUTH`. El frontend sale del **mismo** secret, así que no pueden
+`web.client_id` del secret `GOOGLE_OAUTH_CLIENT`. El frontend sale del **mismo** secret, así que no pueden
 divergir. Ver [`deploy/README.md`](../deploy/README.md).
 
 ## Cuando el despliegue del backend falla
@@ -337,10 +337,10 @@ divergir. Ver [`deploy/README.md`](../deploy/README.md).
 | `403` más adelante, ya subiendo o compilando | Falta uno de los otros roles | Requisito 4 |
 | `NOT_FOUND … database (default)` al desplegar las reglas | La API de Firestore está habilitada pero **la base no existe** | Requisito 2 |
 | `Billing account … required` / `Your project must be on the Blaze plan` | Proyecto en Spark | Requisito 1 |
-| `El environment '<amb>' no tiene el secret GOOGLE_OAUTH` | El *environment* de GitHub no declara el cliente | Requisito 5 |
+| `El environment '<amb>' no tiene el secret GOOGLE_OAUTH_CLIENT` | El *environment* de GitHub no declara el cliente | Requisito 5 |
 | `Secret GOOGLE_OAUTH_CLIENT_SECRET … does not exist` | El paso que lo pone no llegó a correr (o se desplegó a mano saltándose el workflow) | Requisito 5 |
 | La función responde 500 con «La función auth no está configurada» | Está desplegada, pero le falta el Client ID o el secreto | Requisito 5 y [`api/auth/README.md`](../api/auth/README.md) |
-| `El cliente de GOOGLE_OAUTH no tiene "client_secret"` | El secret está, pero no es el JSON completo del cliente | [`deploy/README.md`](../deploy/README.md) |
+| `El cliente de GOOGLE_OAUTH_CLIENT no tiene "client_secret"` | El secret está, pero no es el JSON completo del cliente | [`deploy/README.md`](../deploy/README.md) |
 | `No existe la función 'x'` en el job `Validar` | Errata en el input `funcion`: tiene que ser una carpeta de `api/` | El error lista las que hay |
 
 Los fallos de **autenticación** (el JSON del secret mal pegado, la clave revocada) son comunes a los
