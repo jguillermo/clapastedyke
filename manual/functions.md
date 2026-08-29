@@ -207,7 +207,8 @@ Sobre un ambiente nuevo (aquí `<projectId>`), de arriba abajo:
 2. **Base de datos de Firestore creada** (requisito 2):
    ```bash
    gcloud firestore databases list --project <projectId>
-   gcloud firestore databases create --location=eur3 --project <projectId>   # si no hay ninguna
+   # La región TIENE que ser la de `firestore.location` en firebase/firebase.json (hoy us-west1)
+   gcloud firestore databases create --location=us-west1 --project <projectId>   # si no hay ninguna
    ```
 3. **Habilitar las APIs que el CLI no enciende solo** (requisito 3):
    ```bash
@@ -240,13 +241,28 @@ un proyecto sin base de datos falla. Se comprueba y se crea una sola vez:
 
 ```bash
 gcloud firestore databases list --project <projectId>
-gcloud firestore databases create --location=eur3 --project <projectId>   # si no hay ninguna
+gcloud firestore databases create --location=us-west1 --project <projectId>   # si no hay ninguna
 ```
 
 O desde la consola de Firebase: **Compilación → Firestore Database → Crear base de datos**, en modo
 producción (las reglas de
 [`firebase/firestore.rules`](../firebase/firestore.rules) las sobrescriben en el primer
 despliegue de todas formas).
+
+> ### CRITICAL: la región tiene que coincidir, y no se puede cambiar después
+>
+> `firebase/firebase.json` declara `"firestore": { "location": "us-west1" }`. **Crea la base en esa
+> misma región.** La ubicación de una base de Firestore es **permanente**: para cambiarla hay que
+> borrar la base entera y volver a crearla, con lo que haya dentro. Si prefieres otra región,
+> cámbiala en `firebase.json` **antes** de crear nada.
+
+> ### Por qué el despliegue intenta CREARLA (y falla con 403)
+>
+> Esa clave `location` es justo lo que hace que `firebase deploy` intente aprovisionar la base si no
+> existe: en el log sale `firestore: Creating the new Firestore database (default)...` seguido de
+> `HTTP Error: 403, The caller does not have permission`. La cuenta de servicio de despliegue no
+> puede —ni debe— crear bases de datos: **el pipeline publica, no aprovisiona**. Créala tú una vez y
+> el deploy pasa a limitarse a subir las reglas y los índices.
 
 > ⚠️ **`firebase/firestore.rules` sigue siendo el fichero abierto que dejó `firebase init`**
 > (`allow read, write: if request.time < timestamp.date(2026, 9, 28)`). Es una regla de arranque con
