@@ -56,7 +56,7 @@ npm run test:e2e:ui       # the same, in Playwright's UI mode
 npm run test:e2e:report   # open the last HTML report
 ```
 
-The suite runs against the **compiled build** (`dist/misaevol/browser`), served by
+The suite runs against the **compiled build** (`deploy/dist/hosting`), served by
 `e2e/support/static-server.mjs` — no dev server needed. Conventions for writing them are in
 [`.claude/rules/e2e-tests-conventions.md`](.claude/rules/e2e-tests-conventions.md).
 
@@ -68,34 +68,58 @@ user's own token and the `drive.file` scope — which reaches only the files the
 is deployed into anyone's account, and users grant a single consent checkbox.
 
 Publishing the app needs a one-time pass through Google Cloud (project, consent screen, OAuth Client
-ID). Every step is in [`deploy/google-client-id.md`](deploy/google-client-id.md) — start there. Once
-configured, users connect from the `/cuenta` screen; without it the app keeps working exactly as
-before, fully local.
+ID **and client secret**). Every step is in
+[`deploy/README.md`](deploy/README.md) — start there, and run
+`./deploy/create-google-client-id.sh` if you want it done for you. Once configured, users connect
+from the `/cuenta` screen; without it the app keeps working exactly as before, fully local.
 
-The reasoning behind that design — why a Google login is unavoidable, why the token travels in the
-POST body, why reloading the page forces a reconnect, and which alternatives were measured and
-rejected — is in [`manual/google-integration.md`](manual/google-integration.md). All technical
-documentation lives in [`manual/`](manual/).
+The session itself is the one piece of backend: [`api/auth`](api/auth/README.md), a Cloud Function
+that holds the long-lived grant behind an `HttpOnly` cookie so **reloading the page no longer signs
+you out**. It never sees a recipe — the sync engine still runs entirely in the browser. Setting up
+its environment (Firebase project, Blaze, Firestore, deploy service account) is a separate concern
+a manual one-time setup documented in [`manual/api.md`](manual/api.md).
+
+The reasoning behind that design — why a Google login is unavoidable, why a browser client can never
+hold a refresh token, and which alternatives were measured and rejected — is in
+[`manual/google-integration.md`](manual/google-integration.md). All technical documentation lives in
+[`manual/`](manual/).
 
 ## Deployment
 
 The app is published to **Firebase Hosting** by a **manual** workflow — merging to `main` does not
-deploy anything. Run it from `Actions → Desplegar en Firebase Hosting → Run workflow`, picking a
-branch and an environment.
+deploy anything. Run it from `Actions → Desplegar el FRONTEND → Run workflow`, picking a branch and
+an environment. The Cloud Function has its own workflow; when a change needs both, **deploy the
+backend first**.
 
-Environments are **data, not code**:
-[`deploy/firebase/environments.json`](deploy/firebase/environments.json) is the one and only place
-where they are declared — which Firebase project each one deploys to, and the `config.json` it runs
-with. Today there are two, `dev` and `prod`, backed by two separate Firebase projects; adding
-`stage` or `lab` is one block in that file plus a matching GitHub Environment holding its service
-account. The workflow itself never names an environment.
+**`deploy/` is the only place that knows Firebase — and it holds no deployment logic.** Compiling,
+substituting and publishing live entirely in the two workflows; the folder keeps configuration, the
+compiled artifact, and one script that registers a Google client and writes nothing.
 
-**`public/config.json` is generated**, not hand-written — `npm run config` rebuilds it from the
-`dev` block, and a deploy does the same with the target environment's block. Edit
-`environments.json`, never `config.json`.
+**A value that must not be versioned is never written anywhere.** The file that needs it carries a
+**placeholder** named after the variable — `public/config.json` has
+`"googleClientId": "GOOGLE_OAUTH_CLIENT_ID"` and `"debug": "DEBUG"`, `api/auth/.env` has
+`GOOGLE_OAUTH_CLIENT_ID=GOOGLE_OAUTH_CLIENT_ID` — and both files are versioned, placeholder and all.
+The deploy workflow substitutes them **in the artifact**, right before publishing, and fails the job
+if one survives.
 
-The one-time setup (one Firebase project and service account per environment, the environment
-secret, OAuth origins) and the troubleshooting table are in
+A surviving placeholder does not break anything: the app only accepts a `googleClientId` ending in
+`.apps.googleusercontent.com`, so anything else leaves the integration off with a `warn`, and
+connecting fails with a local, diagnosable message instead of Google's `invalid_client`. That is why
+a fresh clone runs with **nothing executed** — `npm ci && npm start` and you are working.
+
+An environment is declared in its **GitHub environment**, not in this repo: two secrets
+(`GOOGLE_OAUTH`, the client JSON kept whole, and `FIREBASE_SERVICE_ACCOUNT`) and two variables
+(`PROJECT_ID`, `DEBUG`). Adding `stage` touches no file.
+[`deploy/environments.example.json`](deploy/environments.example.json) shows that same picture as a
+file you can read at a glance; nothing consumes it.
+
+Publishing is `Actions → Desplegar el BACKEND / FRONTEND → Run workflow`, in that order — the app
+calls `/api/auth/token` on boot, so a front published against an old API signs everyone out.
+
+The folder's own guide — the placeholders, what each environment configures, publishing step by
+step, and three things that look like mistakes but are not — is
+[`deploy/README.md`](deploy/README.md). The one-time setup (one Firebase project and service account
+per environment, the environment secret, OAuth origins) and the troubleshooting table are in
 [`manual/firebase-deploy.md`](manual/firebase-deploy.md). Start there before the first deploy.
 
 ## Additional Resources

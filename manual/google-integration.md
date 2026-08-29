@@ -1,7 +1,7 @@
 # Integración con Google — modelo mental y decisiones
 
 Este documento es el **por qué**. El paso a paso para ponerlo en marcha está en
-[`deploy/google-client-id.md`](../deploy/google-client-id.md); aquí está lo que hay que entender antes de tocarlo, las
+[`deploy/README.md`](../deploy/README.md); aquí está lo que hay que entender antes de tocarlo, las
 alternativas que se evaluaron y los datos medidos que respaldan cada decisión.
 
 Se escribió después de una investigación con pruebas reales contra la API de Google (agosto 2026).
@@ -266,14 +266,48 @@ Merece la pena saber que la excepción era Apps Script: **un Web App no contesta
 que cualquier cabecera propia mataba la llamada antes de salir y obligaba a mandar el token dentro
 del cuerpo con `text/plain`. Todo aquel rodeo desapareció al quitar el script de en medio.
 
+### 4.3 Cerrar sesión vacía el aparato entero
+
+Cerrar sesión no es «salir de la cuenta»: deja el navegador **como recién instalado**. `SignOut`
+(`core/auth/application/use-cases/sign-out.use-case.ts`) borra las **dos** bases de datos locales —la
+de la app y la del bus de eventos—, así que no queda ni una receta, ni un insumo, ni la cola
+pendiente, ni la base de comparación con la hoja, ni el enlace a la hoja, ni la pista de sesión. El
+contrato es `LocalData` (`core/_common/local-data/`), en el shared kernel: lo que se borra es de todos
+los contextos y ninguno puede conocer a otro.
+
+Media limpieza sería peor que ninguna: quien usara después ese aparato vería recetas ajenas y, al
+conectar **su** cuenta, se le subirían a **su** hoja.
+
+Tres cosas que dependen del orden y de nada más:
+
+1. **Primero se pierde la conexión, después se borra.** `session.close()` va antes de tocar nada
+   local —y antes incluso de retirar la autorización, que es red y tarda—. Con sesión viva, un ciclo
+   de sincronización podría leer la base ya vacía y no concluiría «no hay nada que subir» sino que el
+   usuario **ha borrado su recetario entero**: escribiría esas bajas en la hoja. Cerrar quita la
+   credencial (el ciclo se niega a arrancar) y cambia el `epoch` (lo que esté en vuelo tira su
+   resultado).
+2. **Se borra antes de publicar el evento.** Publicar deja el evento en la cola, que también es
+   IndexedDB: al revés, el borrado se lo llevaría por delante y nadie lo recibiría.
+3. **La app rearranca** (`platform/restart/app-restart.ts`). Los app-initializers solo corren al
+   arrancar, así que solo una carga en frío vuelve a sembrar el recetario de ejemplo; y sin ella, la
+   pantalla seguiría enseñando lo que tenía leído de una base que ya no existe.
+
+Nada de esto pierde datos para su dueño: **lo que estuviera sincronizado sigue en su hoja de Drive** y
+baja de vuelta al conectar otra vez. Lo que sí se pierde es lo que quedara en la cola, así que la
+pantalla de cuenta pregunta antes y **dice cuántos cambios son** — es la única que lo sabe. El journey
+completo está en `e2e/specs/account/sign-out.spec.ts`.
+
 ---
 
 ## 5 · Puesta en marcha
 
-**Este documento no explica cómo montarlo.** Los pasos —proyecto de Cloud, consentimiento, Client ID
-y orígenes, y dónde se pega el valor— viven **solo** en
-[`deploy/google-client-id.md`](../deploy/google-client-id.md), junto al fichero de ambientes donde
-acaba el Client ID. Lo que falla al usarlo está en [6 · Diagnóstico](#6--diagnóstico).
+**Este documento no explica cómo montarlo.** Los pasos —proyecto de Cloud, consentimiento, Client ID,
+client secret y orígenes, y dónde acaba cada valor— viven **solo** en
+[`deploy/README.md`](../deploy/README.md), junto al fichero de ambientes donde
+acaba el Client ID. La **infraestructura** que necesita `api/auth` para existir (proyecto de Firebase,
+Blaze, Firestore, la cuenta de despliegue) es otra cosa y está en [`api.md`](api.md): el permiso que
+concede el usuario sobre su cuenta y el permiso para desplegar lo tuyo no se mezclan. Lo que falla al
+usarlo está en [6 · Diagnóstico](#6--diagnóstico).
 
 Lo único que pertenece aquí es la consecuencia de diseño:
 
@@ -300,7 +334,7 @@ original —«se pierde la sesión»— volvería cada semana, y sin ninguna pis
 
 Así que la pantalla de consentimiento tiene que estar **«En producción»**. Publicarla no cuesta nada:
 `drive.file` no es un permiso sensible y no hay verificación de Google que pasar (2.6). El trámite, en
-[`deploy/google-client-id.md`](../deploy/google-client-id.md) §2.
+[`deploy/README.md`](../deploy/README.md) §2.
 
 ---
 
@@ -308,12 +342,11 @@ Así que la pantalla de consentimiento tiene que estar **«En producción»**. P
 
 | Síntoma | Causa | Arreglo |
 |---|---|---|
-| `Error 400: origin_mismatch` | El origen no está registrado, o es `127.0.0.1` vs `localhost`, o el puerto cambió | [`deploy/google-client-id.md`](../deploy/google-client-id.md) §3 |
+| `Error 400: origin_mismatch` | El origen no está registrado, o es `127.0.0.1` vs `localhost`, o el puerto cambió | [`deploy/README.md`](../deploy/README.md) §3 |
 | `UNAUTHENTICATED` | El token de una hora caducó y el backend no ha podido emitir otro | Mirar la respuesta de `/api/auth/token`: `401 revoked` = se retiró el acceso (reconectar); `502` = Google no contestó (se reintenta solo) |
 | Al recargar pide reconectar | El backend no tiene sesión para este navegador: falta la cookie `__session`, o su concesión ya no vale | Si es sistemático, comprobar que `/api/auth/**` llega a la función (rewrite en `firebase.json`) y que la pantalla de consentimiento está **En producción** (5.2) |
 | `REJECTED` | El usuario no marcó la casilla de Drive, o revocó el acceso | Reconectar y marcarla |
 | `TARGET_GONE` | La hoja se borró o está en la papelera | Se recrea sola al reconectar; también **Crear una hoja nueva** |
-| Al recargar pide reconectar | **Es el comportamiento correcto** | Ver 2.4 |
 | `INTERNAL` con «*… API has not been used in project …*» | Falta habilitar Sheets o Drive API | *APIs & Services → Library* |
 | La ventana de Google no llega a abrirse | Bloqueador de ventanas emergentes | Permitir las emergentes de este sitio y reintentar |
 | «*El dato de prueba no ha vuelto igual*» | La hoja existe pero la escritura no cuaja | **Crear una hoja nueva** desde `/cuenta` |
@@ -447,7 +480,7 @@ los tecleara un usuario: un insumo llamado «12/03» se volvería fecha y uno qu
 | El esquema de la hoja y la fusión | `core/external-sync/infrastructure/sheet-schema.ts` + `sheet-merge.ts` |
 | La cola durable | `core/external-sync/infrastructure/indexeddb-sync-outbox.ts` |
 | Las cinco ramas de salida de la sincronización | `core/external-sync/application/use-cases/synchronize.use-case.ts` |
-| La configuración del despliegue | `public/config.json` |
+| La configuración del despliegue | `public/config.json` y `api/auth/.env`, con marcadores que sustituye el pipeline |
 | La pantalla | `features/account/` |
 
 **Cambiar de proveedor de identidad** es escribir otro `Authenticator` y tocar una línea de

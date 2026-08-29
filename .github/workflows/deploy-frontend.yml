@@ -12,15 +12,14 @@ name: Desplegar el FRONTEND (Firebase Hosting)
 # > frontend. La app llama a `/api/auth/token` desde su arranque, así que publicar el front contra una
 # > API vieja deja a todo el mundo desconectado hasta que la API suba.
 #
-# LOS AMBIENTES NO SE DECLARAN AQUÍ: se leen de `deploy/firebase/environments.json`, que es el único sitio
-# donde viven. Añadir uno nuevo (stage, lab, qa…) no toca este fichero.
-# Casi todo lo del despliegue vive en `deploy/firebase/` — ver `deploy/firebase/README.md`.
-# La excepción es `firebase.json`, que el CLI obliga a tener en la raíz.
+# TODA LA EJECUCIÓN VIVE AQUÍ. El repositorio no tiene scripts de despliegue: lo que hace falta para
+# publicar son los pasos de este fichero. Y un ambiente no se declara en el repositorio, se declara
+# en su *environment* de GitHub — dos secrets y dos variables. Ver `deploy/README.md`.
 on:
   workflow_dispatch:
     inputs:
       ambiente:
-        description: 'Ambiente: una clave de deploy/firebase/environments.json (dev, prod, …)'
+        description: 'Ambiente: el nombre de un environment de GitHub (dev, prod, …)'
         type: string
         required: true
         default: dev
@@ -34,50 +33,19 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Job aparte y SIN `environment:` a propósito. GitHub crea al vuelo cualquier environment que
-  # un job referencie, así que validar aquí evita que un nombre mal escrito deje sembrado un
-  # environment fantasma (sin secrets ni protecciones) antes de fallar.
-  validar:
-    name: Validar ambiente
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    outputs:
-      ambiente: ${{ steps.resolver.outputs.ambiente }}
-      project-id: ${{ steps.resolver.outputs.project-id }}
-      url: ${{ steps.resolver.outputs.url }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Resolver ambiente
-        id: resolver
-        env:
-          AMBIENTE_INPUT: ${{ inputs.ambiente }}
-        run: |
-          # El script valida el ambiente y saca su projectId; si algo falla, su mensaje se
-          # convierte en la anotación de error del job. `node` viene en la imagen del runner.
-          AMBIENTE="$(printf '%s' "$AMBIENTE_INPUT" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
-
-          if ! project_id="$(node deploy/firebase/config.mjs "$AMBIENTE" --project-id 2>&1)"; then
-            echo "::error::$project_id"
-            exit 1
-          fi
-
-          echo "ambiente=$AMBIENTE" >> "$GITHUB_OUTPUT"
-          echo "project-id=$project_id" >> "$GITHUB_OUTPUT"
-          echo "url=https://$project_id.web.app" >> "$GITHUB_OUTPUT"
-          echo "Ambiente **$AMBIENTE** → proyecto \`$project_id\`" >> "$GITHUB_STEP_SUMMARY"
-
   desplegar:
-    name: Build y deploy · ${{ needs.validar.outputs.ambiente }}
-    needs: validar
+    name: Build y deploy · ${{ inputs.ambiente }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    # El *environment* de GitHub del mismo nombre que el ambiente es lo que hace que `secrets.*`
-    # resuelva a las credenciales de ESE proyecto de Firebase. Es también donde se configuran las
+    # El *environment* de GitHub del mismo nombre que el ambiente es lo que hace que `secrets.*` y
+    # `vars.*` resuelvan a los de ESE proyecto de Firebase. Es también donde se configuran las
     # aprobaciones y las ramas permitidas.
+    #
+    # Un nombre mal escrito crea aquí un environment vacío: el primer paso lo caza y dice que le
+    # falta `PROJECT_ID`, en vez de fallar más tarde con un error del CLI.
     environment:
-      name: ${{ needs.validar.outputs.ambiente }}
-      url: ${{ needs.validar.outputs.url }}
+      name: ${{ inputs.ambiente }}
+      url: https://${{ vars.PROJECT_ID }}.web.app
     steps:
       - uses: actions/checkout@v4
 
@@ -87,39 +55,80 @@ jobs:
         with:
           node-version: '22'
 
-      # Sin `--base-href`: Firebase sirve desde la raíz del dominio y `src/index.html`
-      # ya trae `<base href="/">`. El fallback de SPA lo pone el `rewrites` de firebase.json,
-      # así que tampoco hace falta copiar `index.html` a `404.html`.
+      # Se comprueba TODO antes de compilar nada. Publicar a medias es peor que no publicar, y un
+      # secret que falta es el fallo más frecuente al estrenar un ambiente.
+      - name: Comprobar el environment
+        env:
+          AMBIENTE: ${{ inputs.ambiente }}
+          PROJECT_ID: ${{ vars.PROJECT_ID }}
+          GOOGLE_OAUTH: ${{ secrets.GOOGLE_OAUTH }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          faltan=""
+          [ -n "$PROJECT_ID" ]               || faltan="$faltan variable:PROJECT_ID"
+          [ -n "$GOOGLE_OAUTH" ]             || faltan="$faltan secret:GOOGLE_OAUTH"
+          [ -n "$FIREBASE_SERVICE_ACCOUNT" ] || faltan="$faltan secret:FIREBASE_SERVICE_ACCOUNT"
+          if [ -n "$faltan" ]; then
+            echo "::error::Al environment '$AMBIENTE' le falta:$faltan. Settings → Environments → $AMBIENTE (ver deploy/README.md)."
+            exit 1
+          fi
+          echo "Ambiente **$AMBIENTE** → proyecto \`$PROJECT_ID\`" >> "$GITHUB_STEP_SUMMARY"
+
+      # Sin `--base-href`: Firebase sirve desde la raíz del dominio y `src/index.html` ya trae
+      # `<base href="/">`. Tampoco hace falta copiar `index.html` a `404.html` ni ningún rewrite de
+      # SPA: la app enruta por fragmento (`/#/home`), así que la única ruta que pide al servidor es
+      # `/`.
+      #
+      # El build es el MISMO para todos los ambientes. Lo que cambia viaja como marcadores dentro de
+      # `config.json`, y se sustituye en el paso siguiente.
       - name: Build de producción
         run: npm run build
 
-      # El MISMO build vale para todos los ambientes; lo que cambia es este fichero, que `main.ts`
-      # lee ANTES de arrancar. El bloque `config` del ambiente se copia tal cual, pisando el
-      # `public/config.json` que el build acaba de dejar en dist (que es el de desarrollo).
-      # Mismo script que `npm run config` en local, para que no puedan divergir.
-      - name: Configuración del ambiente (config.json)
+      # Aquí es donde un ambiente se vuelve ese ambiente. Los marcadores viven versionados en
+      # `public/config.json`; esto los sustituye SOLO en el artefacto, así que el repositorio nunca
+      # contiene un Client ID.
+      - name: Sustituir los marcadores del artefacto
         env:
-          AMBIENTE: ${{ needs.validar.outputs.ambiente }}
-        run: node deploy/firebase/config.mjs "$AMBIENTE" --out dist/misaevol/browser/config.json
-
-      # Fuera del árbol que se publica: `runner.temp` no está dentro del repo ni de `dist/`.
-      - name: Credenciales de la cuenta de servicio
-        env:
-          AMBIENTE: ${{ needs.validar.outputs.ambiente }}
-          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          GOOGLE_OAUTH: ${{ secrets.GOOGLE_OAUTH }}
+          DEBUG: ${{ vars.DEBUG }}
         run: |
-          if [ -z "$FIREBASE_SERVICE_ACCOUNT" ]; then
-            echo "::error::El environment '$AMBIENTE' no tiene el secret FIREBASE_SERVICE_ACCOUNT (manual/firebase-deploy.md, paso 4)."
+          CONFIG=deploy/dist/hosting/config.json
+          CLIENT_ID="$(printf '%s' "$GOOGLE_OAUTH" | jq -er '.web.client_id')" || {
+            echo "::error::El secret GOOGLE_OAUTH no es el JSON del cliente de Google (falta .web.client_id)."
+            exit 1
+          }
+
+          sed -i "s|GOOGLE_OAUTH_CLIENT_ID|${CLIENT_ID}|g" "$CONFIG"
+          # Con las comillas dentro del patrón: `debug` tiene que quedar como booleano JSON, no como
+          # la cadena "true" — la app compara con `=== true`.
+          sed -i "s|\"DEBUG\"|${DEBUG:-false}|g" "$CONFIG"
+
+          # Un marcador que sobrevive es un despliegue mudo: la app se publicaría sin poder conectar
+          # con Google y nadie se enteraría hasta que alguien lo intentara.
+          if grep -q 'GOOGLE_OAUTH_CLIENT_ID\|"DEBUG"' "$CONFIG"; then
+            echo "::error::Ha quedado un marcador sin sustituir en $CONFIG."
             exit 1
           fi
+          echo "config.json del artefacto:"; cat "$CONFIG"
+
+      # Fuera del árbol que se publica: `runner.temp` no está dentro del repo ni de `deploy/dist`.
+      - name: Credenciales de la cuenta de servicio
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
           printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "${RUNNER_TEMP}/gcp-key.json"
           echo "GOOGLE_APPLICATION_CREDENTIALS=${RUNNER_TEMP}/gcp-key.json" >> "$GITHUB_ENV"
 
-      # Sin `--config`: el CLI encuentra `firebase.json` en la raíz, que es donde TIENE que estar
-      # (fija ahí la raíz del proyecto y `dist/` queda dentro). Ver deploy/firebase/README.md.
+      # `cd deploy` y no `--config`: el CLI fija la raíz del proyecto en el directorio de su
+      # `firebase.json`, y todas las rutas de ese fichero (`dist/hosting`, `dist/functions/auth`,
+      # `firestore.rules`) son relativas a `deploy/`. Desde la raíz del repositorio, el deploy muere
+      # con «… is outside of project directory».
       - name: Deploy a Firebase Hosting
+        env:
+          PROJECT_ID: ${{ vars.PROJECT_ID }}
         run: |
+          cd deploy
           npx --yes firebase-tools@latest deploy \
             --only hosting \
-            --project "${{ needs.validar.outputs.project-id }}" \
+            --project "$PROJECT_ID" \
             --non-interactive

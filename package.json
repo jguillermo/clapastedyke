@@ -24,12 +24,10 @@
     "test:e2e:debug": "playwright test --config e2e/playwright.config.ts --debug",
     "test:e2e:report": "playwright show-report playwright-report",
     "e2e:serve": "node e2e/support/static-server.mjs",
-    "config": "node deploy/firebase/config.mjs",
-    "emulators": "npx --yes firebase-tools@latest emulators:start --only functions,firestore --project migo-dev-20b41",
+    "emulators": "npm --prefix api/auth run build && cd deploy && npx --yes firebase-tools@latest emulators:start --only functions,firestore --config firebase.emulators.json --project migo-dev-20b41",
     "api:install": "npm --prefix api/auth ci",
     "api:typecheck": "npm --prefix api/auth run typecheck",
     "api:test": "npm --prefix api/auth test",
-    "api:deploy": "npx --yes firebase-tools@latest deploy --only functions:auth,firestore:rules",
     "sb": "ng run misaevol:storybook",
     "sb:test": "vitest run --project=storybook",
     "sb:build": "ng run misaevol:build-storybook"

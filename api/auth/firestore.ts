@@ -7,7 +7,7 @@
  * custodiar aquí.
  *
  * Las reglas de seguridad **deniegan todo**: a estas colecciones solo llega el Admin SDK, que se las
- * salta por diseño. Ver `deploy/firebase/firestore.rules`.
+ * salta por diseño. Ver `deploy/firestore.rules`.
  *
  * > **Por qué está aquí y no en `api/_common/`.** Importa `firebase-admin`, y `_common/` vive fuera
  * > del directorio de cualquier función: desde allí TypeScript no encuentra

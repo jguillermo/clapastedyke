@@ -1,0 +1,50 @@
+{
+  "__": [
+    "EJEMPLO. Nada lee este fichero: está aquí para que se vea de un vistazo qué configura cada",
+    "ambiente y dónde vive cada valor. Editarlo no cambia nada.",
+    "",
+    "Lo que de verdad configura un ambiente son sus dos secrets y sus dos variables en GitHub",
+    "(Settings -> Environments -> <ambiente>), más los ficheros con MARCADORES que el pipeline",
+    "sustituye al publicar. Ver deploy/README.md.",
+    "",
+    "Un valor que no debe versionarse NUNCA aparece aquí: aparece su marcador en el fichero que lo",
+    "necesita, y el nombre del secret del que sale."
+  ],
+
+  "dev": {
+    "__": "Un ambiente = un proyecto de Firebase = un environment de GitHub con el mismo nombre.",
+
+    "github": {
+      "secrets": {
+        "GOOGLE_OAUTH": "el fichero de cliente que descarga Google, ENTERO: {\"web\":{…}}",
+        "FIREBASE_SERVICE_ACCOUNT": "la clave JSON de la cuenta de servicio de despliegue"
+      },
+      "variables": {
+        "PROJECT_ID": "migo-dev-20b41",
+        "DEBUG": "true"
+      }
+    },
+
+    "marcadores": {
+      "public/config.json": {
+        "debug": "\"DEBUG\"  ->  la variable DEBUG del environment",
+        "googleClientId": "GOOGLE_OAUTH_CLIENT_ID  ->  web.client_id del secret GOOGLE_OAUTH",
+        "syncPollSeconds": "no es marcador: es el mismo valor en todos los ambientes"
+      },
+      "api/auth/.env": {
+        "GOOGLE_OAUTH_CLIENT_ID": "GOOGLE_OAUTH_CLIENT_ID  ->  web.client_id del secret GOOGLE_OAUTH"
+      }
+    },
+
+    "secretManager": {
+      "GOOGLE_OAUTH_CLIENT_SECRET": "web.client_secret del secret GOOGLE_OAUTH; lo escribe deploy-backend.yml antes de desplegar"
+    },
+
+    "literales": {
+      "__": "Valores que no cambian por ambiente y viven escritos en su fichero.",
+      "region": "us-central1 — en deploy/firebase.json (rewrite) y en api/auth/index.ts (setGlobalOptions)",
+      "hosting": "deploy/dist/hosting — en deploy/firebase.json",
+      "functions": "deploy/dist/functions/auth — en deploy/firebase.json"
+    }
+  }
+}

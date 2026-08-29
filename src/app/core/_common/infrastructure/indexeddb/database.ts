@@ -138,6 +138,26 @@ export function openDatabase(): Promise<IDBDatabase> {
   return connection;
 }
 
+/**
+ * Vacía **todos** los stores, en una sola transacción. La base sigue existiendo con su esquema y su
+ * versión: lo que desaparece es el contenido.
+ *
+ * Se vacía y **no se borra la base** a propósito. `deleteDatabase()` se queda bloqueado mientras
+ * haya una conexión abierta —y la hay, la de esta misma pestaña—, así que dejaría el cierre de
+ * sesión esperando a algo que no va a pasar; además invalidaría la conexión cacheada y todo lo que
+ * escribiera después reventaría. Vaciar es instantáneo, atómico y deja la app operativa.
+ *
+ * Aquí NO se registra: se traduce y se relanza, y quien decide el resultado visible lo registra una
+ * sola vez con la cadena entera. Ver logging-conventions.md → «un dueño por fallo».
+ */
+export async function clearAllStores(): Promise<void> {
+  const db = await openDatabase();
+  const tx = db.transaction([...STORES], 'readwrite');
+  // Todas las peticiones sobre la MISMA transacción y esperadas juntas: un `await` por store la
+  // dejaría morir entre uno y otro (IndexedDB la cierra cuando se queda sin peticiones vivas).
+  await Promise.all(STORES.map((name) => ask(tx.objectStore(name).clear())));
+}
+
 /** Tests only: forget the cached connection. */
 export function resetConnectionForTests(): void {
   connection = null;

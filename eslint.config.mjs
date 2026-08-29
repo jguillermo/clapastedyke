@@ -88,6 +88,9 @@ export default tseslint.config(
     // Artefactos, informes y los scripts JS sueltos (el estático de los E2E no se lintea).
     ignores: [
       'dist/**',
+      'deploy/dist/**',
+      'api/*/lib/**',
+      'api/*/lib-test/**',
       'dist-dev/**',
       'out-tsc/**',
       '.angular/**',

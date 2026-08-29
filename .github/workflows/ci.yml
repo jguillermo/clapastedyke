@@ -67,6 +67,10 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
+      # Ya no hay guardián de configuración: no hay nada generado que pueda derivar. Los ficheros
+      # que el despliegue necesita están VERSIONADOS con un marcador dentro, y sustituirlo es cosa
+      # del pipeline de despliegue, no de este job.
+
       - name: Prettier (formato)
         run: npm run format:check
 
@@ -158,6 +162,11 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
+      # Compila la app tal cual está en el repositorio: el `config.json` que viaja dentro lleva sus
+      # MARCADORES, así que la integración de Google queda apagada y la suite prueba siempre lo
+      # mismo, aquí y en un portátil. Los tests que necesitan Google instalan su propio doble.
+      #
+      # El backend no se compila: los E2E prueban la app. Lo cubre el job `api` con sus tests.
       - name: ng build (production, con budgets)
         run: npm run build
 
@@ -168,7 +177,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: dist
-          path: dist/
+          path: deploy/dist/hosting/
           retention-days: 1
           compression-level: 0
           if-no-files-found: error
@@ -219,7 +228,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: dist
-          path: dist/
+          path: deploy/dist/hosting/
 
       # Sin `npm run test:e2e` a propósito: ese script vuelve a hacer `ng build`, y aquí el
       # build ya viene del job anterior. El type-check de la suite lo cubre el job `static`.

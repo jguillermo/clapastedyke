@@ -39,7 +39,7 @@ testem.log
 /typings
 __screenshots__/
 
-# Firebase — la CLI deja su caché y sus logs junto al firebase.json (deploy/firebase/)
+# Firebase — la CLI deja su caché y sus logs junto al firebase.json (deploy/)
 .firebase/
 firebase-debug.log
 firebase-*-debug.log
@@ -59,3 +59,10 @@ Thumbs.db
 storybook-static
 /documentation.json
 /dist-dev/
+
+# El artefacto compilado. Lo produce `ng build` y lo publica el pipeline; nada de él se versiona.
+/deploy/dist/
+
+# Los `.env.<projectId>` de las funciones: Firebase los cargaría por encima del `.env` versionado,
+# así que uno olvidado en el disco cambiaría el despliegue sin que se vea en el diff.
+/api/*/.env.*

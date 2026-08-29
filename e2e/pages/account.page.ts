@@ -18,7 +18,25 @@ export class AccountPage {
   readonly root = this.page.locator('app-account');
 
   readonly connect = this.root.getByRole('button', { name: 'Conectar con Google', exact: true });
+  /** Pregunta; no cierra nada por sí solo. Quien cierra es {@link confirmDisconnect}. */
   readonly disconnect = this.root.getByRole('button', { name: 'Cerrar sesión', exact: true });
+  /**
+   * Confirma el cierre de sesión. Su rótulo es distinto del que pregunta a propósito (ver la vista),
+   * así que `exact: true` los mantiene separados aunque uno contenga al otro por subcadena.
+   */
+  readonly confirmDisconnect = this.root.getByRole('button', {
+    name: 'Sí, cerrar sesión',
+    exact: true,
+  });
+  readonly cancelDisconnect = this.root.getByRole('button', { name: 'Cancelar', exact: true });
+
+  /**
+   * El aviso de lo que se pierde al cerrar sesión (`migo-alert variant="warning"` → `role="alert"`).
+   * Aparece solo mientras se está preguntando.
+   */
+  readonly signOutWarning = this.root
+    .getByRole('alert')
+    .filter({ hasText: 'Se borrará todo lo de este dispositivo' });
   readonly retry = this.root.getByRole('button', { name: 'Reintentar', exact: true });
   readonly recreate = this.root.getByRole('button', { name: 'Crear una hoja nueva', exact: true });
   readonly check = this.root.getByRole('button', { name: 'Comprobar la hoja', exact: true });
@@ -71,8 +89,12 @@ export class AccountPage {
   readonly pending = this.field('Cambios pendientes');
   readonly lastSynced = this.field('Última sincronización');
 
+  /**
+   * `/#/cuenta`, con hash: la app enruta por fragmento (`withHashLocation`), así que el servidor solo
+   * ve `/`. Sin el `#` esto pediría al servidor una ruta que no existe y acabaría en la portada.
+   */
   async goto(): Promise<void> {
-    await this.page.goto('/cuenta');
+    await this.page.goto('/#/cuenta');
     await expect(this.root).toBeVisible();
   }
 
@@ -87,5 +109,25 @@ export class AccountPage {
     await this.connect.click();
     await expect(this.ready).toBeVisible({ timeout: 30_000 });
     await expect(this.steps).toHaveCount(4);
+  }
+
+  /**
+   * Cierra la sesión de verdad: pregunta, confirma y espera al **rearranque**.
+   *
+   * Cerrar sesión borra todo el almacenamiento local, así que la app recarga el documento para
+   * volver a sembrar y no quedarse hablando de datos que ya no existen. Por eso no basta con esperar
+   * al botón de conectar: hay que esperar a que la vista se haya vuelto a montar tras la recarga, o
+   * las aserciones siguientes se harían contra el DOM que está a punto de desaparecer.
+   */
+  async disconnectAndWait(): Promise<void> {
+    await this.disconnect.click();
+    await expect(this.signOutWarning).toBeVisible();
+
+    // El `load` se espera desde ANTES del clic: la recarga la lanza la app cuando el cierre termina,
+    // y esperarla después sería una carrera que a veces se resolvería contra el DOM anterior.
+    await Promise.all([this.page.waitForEvent('load'), this.confirmDisconnect.click()]);
+
+    await expect(this.root).toBeVisible();
+    await expect(this.connect).toBeEnabled();
   }
 }

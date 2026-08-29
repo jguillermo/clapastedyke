@@ -1,3 +1,4 @@
+import { Location } from '@angular/common';
 import { inject } from '@angular/core';
 import { NavigationError } from '@angular/router';
 import { Logger } from '@core/_common/logger/logger';
@@ -27,6 +28,11 @@ import { Logger } from '@core/_common/logger/logger';
  */
 export function reloadOnStaleBuild(event: NavigationError): void {
   const log = inject(Logger).scoped('stale-build');
+  // `event.url` es la ruta INTERNA del router (`/cuenta`), no una URL de navegador. Con el enrutado
+  // por fragmento, recargar con ella tal cual pediría al servidor la ruta `/cuenta` y la barra
+  // acabaría sin hash. `prepareExternalUrl` la traduce con la estrategia que esté puesta —hoy
+  // `/#/cuenta`— así que esto sigue siendo correcto si algún día se cambia.
+  const location = inject(Location);
 
   if (!isChunkLoadFailure(event.error)) {
     return; // No es lo nuestro: que lo registre quien corresponda.
@@ -45,7 +51,7 @@ export function reloadOnStaleBuild(event: NavigationError): void {
   log.warn('el despliegue cambió bajo los pies: recargando el build nuevo', event.error, {
     url: event.url,
   });
-  window.location.assign(event.url);
+  window.location.assign(location.prepareExternalUrl(event.url));
 }
 
 /**

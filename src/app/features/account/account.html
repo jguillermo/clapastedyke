@@ -114,6 +114,30 @@
         @if (actionError(); as error) {
           <migo-alert variant="error">{{ error }}</migo-alert>
         }
+
+        <!-- Cerrar sesión no es «salir»: es vaciar el aparato. Se dice ANTES, con todas las letras,
+             y con lo único que no se puede recuperar destacado aparte. -->
+        @if (confirmingSignOut()) {
+          <migo-alert variant="warning" heading="Se borrará todo lo de este dispositivo">
+            <div class="flex flex-col gap-2">
+              <p>
+                Al cerrar sesión se borran de este navegador las recetas, los insumos y el enlace
+                con tu hoja, y la app vuelve a empezar con el recetario de ejemplo. Habrá que volver
+                a conectar la cuenta para usarla otra vez.
+              </p>
+              <p>
+                <strong>Tu hoja en Drive no se toca:</strong> todo lo que esté sincronizado sigue
+                ahí y vuelve a bajar en cuanto conectes de nuevo.
+              </p>
+              @if (status().pendingLabel; as pending) {
+                <p>
+                  <strong>Ojo: {{ pending }}.</strong> Si cierras sesión ahora, eso no se recupera:
+                  cancela y pulsa «Sincronizar todo» antes de salir para conservarlo.
+                </p>
+              }
+            </div>
+          </migo-alert>
+        }
       </div>
     </migo-card-body>
 
@@ -121,15 +145,33 @@
       <!-- Reintentar NO vive aquí: cuando algo falla, el botón está dentro del aviso, junto a las
            instrucciones que hay que haber seguido antes de volver a pulsarlo. -->
       @if (session().connected) {
-        <button
-          migo-button
-          type="button"
-          variant="secondary"
-          [loading]="busy()"
-          (click)="disconnect()"
-        >
-          Cerrar sesión
-        </button>
+        @if (confirmingSignOut()) {
+          <button migo-button type="button" variant="ghost" (click)="keepSession()">
+            Cancelar
+          </button>
+          <!-- «Sí, cerrar sesión» y no «Cerrar sesión»: el rótulo del que confirma no puede ser
+               idéntico al del que pregunta, o quien pulsa dos veces por inercia se borra el aparato
+               sin haber leído. -->
+          <button
+            migo-button
+            type="button"
+            variant="danger"
+            [loading]="busy()"
+            (click)="disconnect()"
+          >
+            Sí, cerrar sesión
+          </button>
+        } @else {
+          <button
+            migo-button
+            type="button"
+            variant="secondary"
+            [loading]="busy()"
+            (click)="askToDisconnect()"
+          >
+            Cerrar sesión
+          </button>
+        }
       } @else {
         <button migo-button type="button" variant="primary" [loading]="busy()" (click)="connect()">
           Conectar con Google

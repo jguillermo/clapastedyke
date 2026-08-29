@@ -16,6 +16,10 @@ import { App } from './app/app';
  * en local-only, dejando un `warn`.
  *
  * No se inyecta el `Logger` aquí: si el arranque falla, el inyector no llegó a existir.
+ *
+ * > **La única ruta de servidor de la app es `/`.** Todo lo demás vive detrás de `#`
+ * > (`withHashLocation()` en `app.config.ts`), así que aquí no hay nada que normalizar: una URL con
+ * > ruta en el `pathname` no es una ruta de esta app y el servidor la trata como lo que es, un 404.
  */
 readConfigDocument()
   .then((document) => bootstrapApplication(App, appConfig(document)))

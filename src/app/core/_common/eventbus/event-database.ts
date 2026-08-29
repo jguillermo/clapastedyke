@@ -53,6 +53,17 @@ export class EventDatabase {
     return (await this.store(mode)).index(BY_SEQ);
   }
 
+  /**
+   * Tira la cola entera: lo pendiente de entregar deja de existir.
+   *
+   * Solo tiene un uso legítimo —cerrar sesión, que borra todo lo de este navegador— y por eso no se
+   * ofrece nada más fino. Un evento a medio repartir de la sesión anterior es justo lo que no puede
+   * sobrevivir: hablaría de datos que ya no están.
+   */
+  async clear(): Promise<void> {
+    await ask((await this.store('readwrite')).clear());
+  }
+
   private open(): Promise<IDBDatabase> {
     this.connection ??= new Promise((resolve, reject) => {
       const request = indexedDB.open(DB_NAME, DB_VERSION);

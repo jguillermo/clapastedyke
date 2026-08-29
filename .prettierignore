@@ -11,6 +11,12 @@ coverage/
 documentation.json
 package-lock.json
 
+# Ficheros GENERADOS por deploy/wire-environment.sh y deploy/build.sh: los escribe un script desde
+# deploy/environments.json, así que su formato no es cosa de Prettier.
+public/config.json
+deploy/proxy.config.json
+api/*/.env.*
+
 # La salida de `tsc` de cada función de `api/` (lo que se despliega). `lib-test/` es la de sus tests.
 api/*/lib/
 api/*/lib-test/

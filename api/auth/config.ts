@@ -5,10 +5,14 @@
  * `firebase functions:secrets:set GOOGLE_OAUTH_CLIENT_SECRET --project <projectId>`.
  * En el emulador se lee de `api/auth/.secret.local`, que está en el `.gitignore`.
  *
- * **El Client ID no es un secreto** (viaja en cada petición del navegador), así que va en un
- * `.env.<projectId>` versionado. Tiene que ser **el mismo** que el `googleClientId` del ambiente en
- * `deploy/firebase/environments.json`: si no coinciden, Google rechaza el canje con
- * `invalid_client` y no hay forma de deducirlo del mensaje.
+ * **El Client ID no es un secreto** (viaja en cada petición del navegador), así que va en un `.env`
+ * **versionado** — pero no con su valor: con el MARCADOR `GOOGLE_OAUTH_CLIENT_ID`. Quien lo
+ * sustituye es el workflow de despliegue, sobre la copia que viaja en
+ * `deploy/dist/functions/auth/`, sacándolo del `web.client_id` del secret `GOOGLE_OAUTH`. En el
+ * repositorio nunca hay un Client ID.
+ *
+ * El fichero es `.env` **sin sufijo de proyecto** a propósito: Firebase lo carga para cualquier
+ * `--project`, así que un mismo artefacto sirve para todos los ambientes.
  */
 import { defineSecret, defineString } from 'firebase-functions/params';
 
@@ -30,7 +34,7 @@ export function oauthClient(): OAuthClient {
 
   if (!clientId || !clientSecret) {
     throw new Error(
-      'La función auth no está configurada: faltan GOOGLE_OAUTH_CLIENT_ID (.env.<projectId>) ' +
+      'La función auth no está configurada: faltan GOOGLE_OAUTH_CLIENT_ID (.env) ' +
         'o GOOGLE_OAUTH_CLIENT_SECRET (Secret Manager). Ver api/auth/README.md.',
     );
   }

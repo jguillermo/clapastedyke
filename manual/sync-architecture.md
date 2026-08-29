@@ -3,7 +3,7 @@
 Cómo la app y la hoja del usuario se mantienen iguales, **por qué está hecho así**, qué límites tiene
 aceptados y cómo se diagnostica cuando algo no cuadra.
 
-El «cómo se configura» está en [`deploy/google-client-id.md`](../deploy/google-client-id.md); el «por qué Google Sheets y no otra
+El «cómo se configura» está en [`deploy/README.md`](../deploy/README.md); el «por qué Google Sheets y no otra
 cosa» y las alternativas medidas y descartadas, en
 [google-integration.md](google-integration.md).
 
@@ -420,6 +420,7 @@ no crece sola, y el desplazamiento de filas al borrar una.
 | Spec | Qué cubre |
 |---|---|
 | `e2e/specs/account/account.spec.ts` | Conectar crea la hoja y sube el recetario · la comprobación no encuentra nada que mover · el ciclo es **idempotente** · cerrar sesión · hoja en la papelera ⇒ se crea otra |
+| `e2e/specs/account/sign-out.spec.ts` | Cerrar sesión **vacía el aparato**: se avisa de los cambios sin subir, cancelar no toca nada, confirmar borra y vuelve a sembrar, y **reconectar recupera de la hoja** lo que estaba sincronizado |
 | `e2e/specs/account/sheet-authority.spec.ts` | Editar una celda a mano, marcar `borrado`, borrar una fila, teclear una fila sin id y cambiarle el id a otra |
 | `e2e/specs/account/guard-rails.spec.ts` | Las barreras: borrado masivo, pestaña que falta, columna que desaparece — y que arreglar la hoja devuelve la convergencia |
 | `e2e/specs/account/field-merge.spec.ts` | **La capacidad nueva**: renombrar aquí y repreciar en la hoja a la vez, y que sobrevivan los dos |

@@ -14,6 +14,16 @@ export interface SyncStatusView {
   lastError: string | null;
   pending: number;
   /**
+   * Los cambios que quedan por subir, en palabras y con la concordancia ya resuelta
+   * («1 cambio sin sincronizar» / «4 cambios sin sincronizar»). `''` cuando no queda ninguno, para
+   * que quien avise de ellos no tenga que decidir si hay algo que decir.
+   *
+   * Va aquí y no en la plantilla por la misma razón que `lastSyncedLabel`: la vista pinta, no
+   * redacta. Y el aviso de cerrar sesión —donde esta frase importa— no puede permitirse un
+   * «1 cambios».
+   */
+  pendingLabel: string;
+  /**
    * **¿Está todo sincronizado?**, en un solo valor.
    *
    * Vive aquí y no en cada vista porque antes se deducía por separado en dos sitios —el aviso flotante
@@ -55,6 +65,7 @@ export class WatchSyncStatus extends UseCase<void, SyncStatusView> {
       lastSyncedLabel: formatMoment(snapshot.lastSyncedAt),
       lastError: snapshot.lastError,
       pending: this.outbox.pending(),
+      pendingLabel: describePending(this.outbox.pending()),
       upToDate: snapshot.phase === 'idle' && this.outbox.pending() === 0,
     };
   });
@@ -74,6 +85,14 @@ export class WatchSyncStatus extends UseCase<void, SyncStatusView> {
   async execute(): Promise<SyncStatusView> {
     return this.state();
   }
+}
+
+/** `''` cuando no queda nada: quien avisa no tiene que decidir si hay algo que decir. */
+function describePending(pending: number): string {
+  if (pending === 0) {
+    return '';
+  }
+  return pending === 1 ? '1 cambio sin sincronizar' : `${pending} cambios sin sincronizar`;
 }
 
 /** El DTO sale listo para pintar: la vista no formatea fechas. */
