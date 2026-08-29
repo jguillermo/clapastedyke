@@ -82,7 +82,7 @@ export interface AppFixtures {
    * Que venga así no es casualidad ni depende de la máquina: ese fichero está **versionado con el
    * marcador dentro**, y quien lo sustituye es el pipeline, sobre el artefacto que publica. El build
    * que prueba la suite es idéntico en el CI y en un portátil, tenga quien lo lance un cliente de
-   * Google a mano o no. Ver `.github/workflows/deploy-frontend.yml`.
+   * Google a mano o no. Ver `.github/workflows/deploy.yml`.
    *
    * Pedirlo instala las rutas **antes de cualquier navegación** (Playwright resuelve los fixtures del
    * test antes del cuerpo), y su estado es la hoja del usuario: se lee y se edita desde el test como lo

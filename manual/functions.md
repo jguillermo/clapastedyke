@@ -28,7 +28,7 @@ firebase/
 | Sus dependencias | su propio `package.json` y su propio `package-lock.json` |
 | Su compilación | su propio `tsconfig.json` (`tsc` → `lib/`) |
 | Su lint | su propio `.eslintrc.js`, ejecutado por su `npm run lint` |
-| Su despliegue | `Actions → Desplegar el BACKEND` |
+| Su despliegue | `Actions → Desplegar (Firebase)` — que publica **todo**, siempre |
 | Su ruta | `/api/auth/**`, por un rewrite de Hosting |
 
 > **`module`/`moduleResolution` son `NodeNext`, no `commonjs`/`node`.** TypeScript 6 deprecó la
@@ -77,7 +77,7 @@ de Angular): monta su propio Node y hace su propio `npm ci`.
 2. **Un rewrite** `/api/<nombre>/**` en `firebase/firebase.json`, apuntando a ese `functionId`. Los
    rewrites se evalúan **en orden**, así que si alguna vez se añade uno más amplio, este va antes.
 3. Si necesita un parámetro, una línea más en el `.env` **versionado con su marcador**
-   (`MI_PARAMETRO=MI_PARAMETRO`) y su sustitución en `deploy-backend.yml`, como los del cliente de
+   (`MI_PARAMETRO=MI_PARAMETRO`) y su sustitución en `deploy.yml`, como los del cliente de
    OAuth. **También si es un secreto**: no se usa `defineSecret`, porque metería Secret Manager y
    Service Usage en el camino de publicar (ver más abajo, requisito 3).
 
@@ -121,27 +121,35 @@ npm run fn:build        # su tsc
 
 ## Despliegue: manual, y separado del de la app
 
-Publicar la app y publicar el backend son **dos decisiones distintas**, y por eso son dos workflows:
+Hay **un solo workflow**, [`deploy.yml`](../.github/workflows/deploy.yml), y **un solo comando**:
+`firebase deploy` sin `--only` despliega los tres targets del `firebase.json` —`firestore`,
+`functions` y `hosting`— de una vez. **No se elige qué se publica: siempre va todo.**
 
-| Qué | Workflow | Inputs |
+| Input | Valores | Qué hace |
 |---|---|---|
-| El frontend | [`deploy-frontend.yml`](../.github/workflows/deploy-frontend.yml) | ambiente + debug |
-| El backend | [`deploy-backend.yml`](../.github/workflows/deploy-backend.yml) | ambiente |
+| `ambiente` | `dev` · `prod` … | el *environment* de GitHub del que salen los secrets |
+| `debug` | casilla | el `"debug"` de `config.json` |
+
+Las reglas de Firestore viajan en el mismo deploy, y ahí es donde deben estar: protegen exactamente
+lo que guarda el backend. Viven en
+[`firebase/firestore.rules`](../firebase/firestore.rules), con el resto del despliegue.
+
+> **Antes eran dos workflows** (`deploy-frontend.yml` y `deploy-backend.yml`) porque el backend vivía
+> en `api/`, con una carpeta y un *codebase* por función: publicar una no debía tocar las demás, y
+> había que acordarse de lanzar el backend **antes** que el frontend (la app pide `/api/auth/token`
+> en cuanto arranca). Con un paquete único eso dejó de aplicar, y desplegar siempre todo hace que ese
+> orden deje de estar en manos de quien publica.
+
+**El paquete se instala en el runner, pero no se compila ahí.** El `npm ci` de `functions/` hace
+falta porque los `predeploy` de `firebase.json` son `npm --prefix … run lint/build` y corren **dentro
+del propio `firebase deploy`**. Compilarla antes a mano sería repetir ese trabajo.
 
 **No hay comando local equivalente, y es deliberado**: el repositorio no tiene scripts de despliegue,
 así que publicar es lanzar el workflow. El CLI de Firebase se invoca solo desde ahí, siempre con
 `cd firebase`: en esa carpeta está `firebase.json`, y sus `source` y `public` son relativos a ella.
 
-Los dos son `workflow_dispatch`: no hay despliegue automático a propósito (ver
+Es `workflow_dispatch`: no hay despliegue automático a propósito (ver
 [`firebase-deploy.md`](firebase-deploy.md)).
-
-> **Cuando un cambio necesita las dos cosas, primero el backend y después el hosting.** La app llama
-> a `/api/auth/token` desde su arranque: publicar el front contra una API vieja deja a todo el mundo
-> desconectado hasta que la API suba.
-
-`deploy-backend.yml` despliega también `firestore:rules`, porque esas reglas protegen exactamente lo
-que guarda el backend — no tendría sentido que viajaran con el frontend. Viven en
-[`firebase/firestore.rules`](../firebase/firestore.rules), con el resto del despliegue.
 
 > ### Una salvaguarda que conviene conocer
 >
@@ -157,8 +165,8 @@ alguna, el despliegue muere con un 403 o con un error de configuración, no con 
 «te falta esto».
 
 > **Que el frontend despliegue bien no dice nada del backend.** Publicar el frontend solo necesita
-> Hosting; el backend necesita las cinco. Si `deploy-frontend` está en verde y `deploy-backend` en
-> rojo, el problema está en esta lista, no en el código ni en el workflow.
+> Hosting; el backend necesita las cinco. Si el deploy sube la app y falla al llegar a la función,
+> el problema está en esta lista, no en el código ni en el workflow.
 
 ### No hay atajo: los cinco son a mano
 
@@ -203,7 +211,7 @@ Sobre un ambiente nuevo (aquí `<projectId>`), de arriba abajo:
    `GOOGLE_OAUTH_CLIENT`, con el JSON entero. De él saca el workflow las dos mitades que escribe en
    el `.env` de la función.
 6. **Esperar 2–3 minutos** a que propaguen las APIs y los roles.
-7. **Relanzar el workflow `deploy-backend`.**
+7. **Relanzar el workflow de despliegue.**
 
 ### 1 · Plan Blaze
 
@@ -314,7 +322,7 @@ a dar el mismo 403.
 
 La función `auth` no arranca sin él, pero **no subes nada a Google**: lo que subes al *environment*
 de GitHub es el secret `GOOGLE_OAUTH_CLIENT` —el fichero de cliente que descarga Google, entero—, y
-`deploy-backend.yml` le saca con `jq` el `client_id` y el `client_secret` (este último enmascarado
+`deploy.yml` le saca con `jq` el `client_id` y el `client_secret` (este último enmascarado
 con `::add-mask::`) y los escribe en `firebase/functions/.env`. Es lo que hace que montar un ambiente
 sea **elegirlo en Actions**: no queda ningún valor pendiente de que alguien se acuerde de subirlo
 desde su portátil.
@@ -336,10 +344,10 @@ divergir app y backend.
 | `NOT_FOUND … database (default)` al desplegar las reglas | La API de Firestore está habilitada pero **la base no existe** | Requisito 2 |
 | `Billing account … required` / `Your project must be on the Blaze plan` | Proyecto en Spark | Requisito 1 |
 | `Al environment '<amb>' le falta: secret:GOOGLE_OAUTH_CLIENT` | El *environment* de GitHub no declara el cliente | Requisito 5 |
-| `firebase/functions no exporta ninguna función` | `src/index.ts` no exporta nada (o el build no llegó a `lib/index.js`) | Escribe la función; la salvaguarda te está evitando borrar las que ya estén publicadas |
+| El deploy se planta pidiendo `--force` para borrar funciones | `src/index.ts` no exporta lo que sí está publicado en el proyecto | `--non-interactive` te está evitando borrarlas sin querer. Revisa qué exporta antes de forzar nada |
 | La función responde 500 con «La función auth no está configurada» | Está desplegada, pero un marcador del `.env` llegó sin sustituir | Requisito 5 |
 | `El secret GOOGLE_OAUTH_CLIENT no trae .web.client_secret` | El secret está, pero no es el JSON completo del cliente | [`firebase/README.md`](../firebase/README.md) → «El fichero del cliente» |
 | `/api/auth/…` da **404** en el sitio publicado | El rewrite no llegó, o la función no está desplegada | Despliega el backend; comprueba el `rewrites` de `firebase/firebase.json` |
 
 Los fallos de **autenticación** (el JSON del secret mal pegado, la clave revocada) son comunes a los
-dos workflows y están en la tabla de [`firebase-deploy.md`](firebase-deploy.md).
+dos mitades del despliegue y están en la tabla de [`firebase-deploy.md`](firebase-deploy.md).

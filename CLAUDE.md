@@ -59,7 +59,8 @@ npm run typecheck   # tsc over app + stories, unit specs, and the E2E suite
 ```
 
 **Publishing is not a command.** There is no deploy script in the repo: it is
-`Actions → Desplegar el BACKEND / FRONTEND → Run workflow`, in that order. See
+`Actions → Desplegar (Firebase) → Run workflow` — one workflow, one command: `firebase deploy` with
+no `--only` always ships firestore + functions + hosting together. See
 [`firebase/README.md`](firebase/README.md).
 
 - **Three tsconfigs, three type-checks** — `tsconfig.stories.json` (app + stories, `typecheck:src`), `tsconfig.spec.json` (unit specs, with vitest globals), `e2e/tsconfig.json` (the E2E suite, standalone). **Angular templates are checked only by `ng build`**, so the build job is not optional. Do **not** point `tsc` at `.storybook/tsconfig.json`: that is Storybook's *build* config — `preview.ts` imports `documentation.json` (compodoc-generated, gitignored) and `src/styles.css` (bundler-only), and its `files` entry makes TS infer `rootDir` as `.storybook/` (`TS6059`).
@@ -133,8 +134,8 @@ which is ephemeral and never printed.
 ⚠️ **`firebase/functions/src/index.ts` is still the empty `firebase init` scaffold.** The auth
 function was deleted along with `api/` in commit `63eef49` and lives only in git history. The app
 still calls `/api/auth/**`, so until it is written, sessions do not survive a reload in a deployed
-environment. `deploy-backend.yml` refuses to publish an empty codebase (Firebase would read that as
-"delete every function in this codebase").
+environment. If a deploy would DELETE an already-published function, `--non-interactive` stops the
+CLI and asks for `--force` instead of doing it silently.
 
 Full procedure — publishing step by step, what to check afterwards, and how to reproduce the
 substitution locally — in [`firebase/README.md`](firebase/README.md).

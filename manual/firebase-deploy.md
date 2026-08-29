@@ -1,15 +1,14 @@
 # Despliegue en Firebase Hosting
 
 La app se publica en **Firebase Hosting** con un workflow **manual**
-([`.github/workflows/deploy-frontend.yml`](../.github/workflows/deploy-frontend.yml)). No hay
+([`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml)). No hay
 despliegue automático: mergear a `main` no publica nada. Publicar es una decisión que se toma
 eligiendo un ambiente y pulsando un botón.
 
-> **Este documento es solo el frontend.** El backend (`firebase/functions`) se publica con **otro** workflow,
-> [`deploy-backend.yml`](../.github/workflows/deploy-backend.yml), y su procedimiento está en
-> [`functions.md`](functions.md). Son dos ficheros y dos decisiones a propósito: un cambio de maquetación no
-> puede tirar el servicio de sesión ni al revés. Cuando hay que publicar los dos, **primero el
-> backend**.
+> **Este documento es el frontend.** El backend (`firebase/functions`) sale por el **mismo** workflow
+> —`firebase deploy` publica los tres targets de una vez— y su procedimiento está en
+> [`functions.md`](functions.md). **No se elige qué se publica: siempre va todo**, que es lo que
+> impide que la app y la función que le sirve `/api/auth/**` queden desparejadas.
 
 Un **ambiente** es un **proyecto de Firebase independiente** bajo la misma cuenta de Google: no
 comparten hosting, ni cuota, ni credenciales. Hoy hay dos, `dev` y `prod`, pero **el número no está
@@ -123,8 +122,8 @@ Dentro de **cada** environment, `Add environment secret`. Son dos:
 
 | Secret | Valor | Quién lo usa |
 |---|---|---|
-| `FIREBASE_SERVICE_ACCOUNT` | El **contenido íntegro** del JSON del paso 3 — ábrelo con un editor y pega todo, desde la `{` hasta la `}`. **Uno distinto por ambiente**: cada JSON abre su proyecto | Los dos workflows |
-| `GOOGLE_OAUTH_CLIENT` | El **fichero de cliente de Google entero**, tal cual lo descarga la consola ([`firebase/README.md`](../firebase/README.md)) | Los dos: el build le saca el `client_id`; el backend, además, el `client_secret` para el `.env` de la función |
+| `FIREBASE_SERVICE_ACCOUNT` | El **contenido íntegro** del JSON del paso 3 — ábrelo con un editor y pega todo, desde la `{` hasta la `}`. **Uno distinto por ambiente**: cada JSON abre su proyecto | El workflow de despliegue |
+| `GOOGLE_OAUTH_CLIENT` | El **fichero de cliente de Google entero**, tal cual lo descarga la consola ([`firebase/README.md`](../firebase/README.md)) | Las dos mitades: el build le saca el `client_id`; el backend, además, el `client_secret` para el `.env` de la función |
 
 Los dos se pegan a mano: el JSON de la cuenta de servicio del paso 3, y el JSON del cliente que te
 enseña [`create-google-client-id.sh`](../create-google-client-id.sh). Que estén aquí y no en
@@ -189,10 +188,13 @@ validación va en un job aparte) en [`firebase/README.md`](../firebase/README.md
 
 ## Desplegar
 
-`Actions → Desplegar en Firebase Hosting → Run workflow`. Se eligen dos cosas:
+`Actions → Desplegar (Firebase) → Run workflow`. Se eligen tres cosas:
 
 - **Branch** — de qué rama se compila.
-- **Ambiente** — se escribe: `dev`, `prod`, o el que hayas añadido. Da igual mayúsculas o espacios
+- **Ambiente** — se escribe: `dev`, `prod`, o el que hayas añadido.
+- **Debug** — si se ve el detalle del flujo en la consola del navegador.
+
+Sobre el ambiente: Da igual mayúsculas o espacios
   de más (`PROD` vale); si el nombre no existe, el primer paso del job —«Comprobar el
   environment»— falla **antes de compilar** diciendo qué secret falta.
 
@@ -205,7 +207,9 @@ El workflow:
    **marcadores** dentro: es el mismo para todos los ambientes.
 3. **Sustituye los marcadores** en `firebase/public/config.json` con el `client_id` del secret y
    el input `debug`, y falla si alguno sobrevive.
-4. Sube `firebase/public` con `firebase deploy --only hosting`, desde `firebase/`.
+4. Instala las dependencias de la función y sustituye los marcadores de su `.env`.
+5. Publica con **`firebase deploy`**, desde `firebase/`. Sin `--only`: sube los tres targets del
+   `firebase.json` —firestore, functions y hosting— en una sola ejecución.
 
 La URL publicada queda enlazada en la propia ejecución (el recuadro del environment) y en el
 resumen del job.

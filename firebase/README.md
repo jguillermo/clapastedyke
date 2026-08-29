@@ -3,7 +3,8 @@
 **Fuera de esta carpeta nadie nombra Firebase.** Ni un `projectId`, ni una región, ni el CLI.
 
 Y **aquí dentro no hay lógica de despliegue**: hay *configuración* y el *fuente del backend*. La
-ejecución —compilar, sustituir, publicar— vive entera en los dos workflows de `.github/workflows/`.
+ejecución —compilar, sustituir, publicar— vive entera en
+[`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml).
 
 ```
 firebase/
@@ -53,8 +54,8 @@ lo que se publica es una copia con el valor real:
 
 | Fichero | Marcador | Lo sustituye |
 |---|---|---|
-| `public/config.json` | `"googleClientId": "GOOGLE_OAUTH_CLIENT_ID"` · `"debug": "DEBUG"` | `deploy-frontend.yml`, sobre `firebase/public/config.json` ya compilado |
-| `firebase/functions/.env` | `GOOGLE_OAUTH_CLIENT_ID=…` · `GOOGLE_OAUTH_CLIENT_SECRET=…` | `deploy-backend.yml`, sobre la copia del runner |
+| `public/config.json` | `"googleClientId": "GOOGLE_OAUTH_CLIENT_ID"` · `"debug": "DEBUG"` | `deploy.yml`, sobre `firebase/public/config.json` ya compilado |
+| `firebase/functions/.env` | `GOOGLE_OAUTH_CLIENT_ID=…` · `GOOGLE_OAUTH_CLIENT_SECRET=…` | `deploy.yml`, sobre la copia del runner |
 
 > **El `.env` se sustituye en el árbol de trabajo del runner, no en una copia aparte.** Firebase
 > empaqueta `functions/` desde el fuente, así que no hay artefacto intermedio donde hacerlo. El
@@ -137,8 +138,7 @@ del CLI casi nunca dice cuál es. Es de **una sola vez por ambiente**:
 
 Los cinco, con los comandos exactos, están en [`manual/functions.md`](../manual/functions.md) →
 «Requisitos del proyecto de Firebase». **El frontend necesita mucho menos que el backend**: si
-`deploy-frontend` va en verde y `deploy-backend` en rojo, el problema está en esa lista, no en el
-código.
+el deploy falla en la parte de la función, el problema está en esa lista, no en el código.
 
 ```bash
 # comprobación rápida antes de lanzar nada
@@ -153,52 +153,51 @@ gcloud services list --enabled --project <projectId> | grep -E 'cloudfunctions|r
 ## Publicar, paso a paso
 
 **El despliegue se hace SIEMPRE desde GitHub Actions, a mano.** Nada se publica al mezclar a `main`:
-los dos workflows son `workflow_dispatch` puro. Los dos workflows que `firebase init` generaba
+el workflow es `workflow_dispatch` puro. Los dos que `firebase init` generaba
 —`firebase-hosting-merge.yml` y `firebase-hosting-pull-request.yml`— se borraron por eso mismo: si
 `firebase init` vuelve a crearlos, se borran otra vez.
 
-### Paso 1 · Desplegar el BACKEND
+### Paso 1 · Lanzar el workflow
 
-`Actions → Desplegar el BACKEND (Cloud Functions) → Run workflow`:
+`Actions → Desplegar (Firebase) → Run workflow`:
 
 | Campo | Valor |
 |---|---|
 | **Use workflow from** | la rama que quieres publicar |
 | **ambiente** | `dev` · `prod` … el nombre de un environment de GitHub |
+| **debug** | ¿se ve el detalle del flujo en la consola? |
 
 ```bash
-gh workflow run deploy-backend.yml --ref <rama> -f ambiente=dev
+gh workflow run deploy.yml --ref <rama> -f ambiente=dev
 gh run watch
 ```
 
-Hace: comprobar el environment · `npm ci` + lint + `tsc` en `functions/` · comprobar que hay función
-que desplegar · sustituir los dos marcadores del `.env` ·
-`firebase deploy --only functions,firestore:rules`. **Nada más que Firebase**: publicar la función no
-habla con ninguna otra API de Google.
+**No se elige qué se publica: siempre se despliega todo.** Hace: comprobar el environment ·
+`npm run build` (que escribe en `firebase/public`) · `npm ci` en `functions/` · sustituir los
+marcadores de `config.json` y de `.env` · **`firebase deploy`**. **Nada más que Firebase**: publicar
+no habla con ninguna otra API de Google.
 
-> **Un codebase que no exporta nada NO es un deploy vacío inofensivo.** Firebase lo lee como «borra
-> todas las funciones de este codebase». Por eso el workflow comprueba antes que `functions/lib/index.js`
-> exporta algo y para con un mensaje claro si no.
-
-### Paso 2 · Desplegar el FRONTEND
-
-`Actions → Desplegar el FRONTEND (Firebase Hosting) → Run workflow`, con la misma rama y ambiente.
-
-```bash
-gh workflow run deploy-frontend.yml --ref <rama> -f ambiente=dev
-gh run watch
-```
-
-Hace: comprobar el environment · `npm run build` (que escribe en `firebase/public`) · sustituir los
-marcadores de `firebase/public/config.json` · `firebase deploy --only hosting`.
-
-> ### El orden importa: BACKEND primero, FRONTEND después
+> ### Por qué UN workflow y UN comando
 >
-> La app pide `/api/auth/token` **en cuanto arranca**, para reanudar la sesión. Si publicas el front
-> contra una API vieja, todo el mundo aparece desconectado hasta que suba la API. Al revés no pasa
-> nada. Si el cambio toca solo una mitad, despliega solo esa.
+> Hay un solo `firebase.json`, y `firebase deploy` **sin `--only`** despliega sus tres targets
+> —`firestore`, `functions` y `hosting`— de una vez. Antes eran dos workflows porque el backend
+> vivía en `api/`, con una carpeta y un *codebase* por función, y publicar una no debía tocar las
+> demás. Con `firebase/functions` como paquete único eso dejó de aplicar.
+>
+> Que se despliegue **todo, siempre** es lo que impide que la app y la función que le sirve
+> `/api/auth/**` queden desparejadas. La app pide `/api/auth/token` **en cuanto arranca**: con dos
+> lanzamientos manuales, hacerlos al revés dejaba a todo el mundo desconectado hasta el segundo.
+>
+> Los cuatro pasos anteriores están porque `firebase deploy` **no** compila Angular, **no** instala
+> las dependencias de la función (sus `predeploy` —lint + `tsc`— corren en el runner, dentro del
+> propio deploy), **no** sustituye marcadores y **no** se autentica solo. Nada de eso es una
+> decisión: es lo que el comando no hace.
 
-### Paso 3 · Comprobar que funcionó
+> **Si el despliegue implicara borrar una función ya publicada**, `--non-interactive` planta el CLI
+> y pide `--force` en vez de hacerlo callando. Es la red que evita que un `src/index.ts` vacío se
+> lleve por delante lo que ya estaba.
+
+### Paso 2 · Comprobar que funcionó
 
 En el sitio publicado (`https://<PROJECT_ID>.web.app`):
 
@@ -288,7 +287,7 @@ Tres cosas, y ninguna la hace un script del proyecto:
    [`manual/functions.md`](../manual/functions.md) → «Requisitos del proyecto de Firebase».
 3. **El environment de GitHub** con el nombre del ambiente y sus dos secrets (la tabla de arriba).
 
-Después, `Actions → Desplegar el BACKEND` y luego el FRONTEND.
+Después, `Actions → Desplegar (Firebase) → Run workflow`.
 
 ---
 
@@ -308,7 +307,7 @@ un chunk borrado —y el navegador intentaría ejecutarlo como JavaScript— y a
 en `/`; de ahí la entrada aparte.
 
 **3 · El ambiente se teclea en Actions.** Un `type: choice` obligaría a duplicar la lista de
-ambientes en los dos workflows. GitHub crea al vuelo cualquier environment que un job referencie, así
+ambientes dentro del propio workflow. GitHub crea al vuelo cualquier environment que un job referencie, así
 que una errata deja un environment vacío — y el primer paso del workflow lo caza diciendo qué
 secret le falta, antes de compilar nada.
 

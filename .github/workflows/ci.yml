@@ -115,7 +115,7 @@ jobs:
   #     sesión viva.
   #
   #     El CI la VALIDA en cada PR aunque no la despliegue: publicarla es manual
-  #     y va por `deploy-backend.yml`.
+  #     y va por `deploy.yml`.
   # ───────────────────────────────────────────────────────────────────────────
   functions:
     name: Función (firebase/functions)

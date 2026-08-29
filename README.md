@@ -87,9 +87,15 @@ hold a refresh token, and which alternatives were measured and rejected — is i
 ## Deployment
 
 The app is published to **Firebase Hosting** by a **manual** workflow — merging to `main` does not
-deploy anything. Run it from `Actions → Desplegar el FRONTEND → Run workflow`, picking a branch and
-an environment. The Cloud Function has its own workflow; when a change needs both, **deploy the
-backend first**.
+deploy anything. Run it from `Actions → Desplegar (Firebase) → Run workflow`, picking a branch and an
+environment.
+
+**One workflow, one command, and it always ships everything.** `firebase deploy` — no `--only` —
+publishes all three targets in `firebase/firebase.json`: firestore, functions and hosting. There is
+no scope to pick, which is what keeps the app and the function serving its `/api/auth/**` from
+drifting apart. What that command does *not* do is compile Angular, install the function's
+dependencies (its `predeploy` hooks run on the runner, inside the deploy) or substitute the
+placeholders; those are the four steps around it.
 
 **`firebase/` is the only place that knows Firebase — and it holds no deployment logic.** Compiling,
 substituting and publishing live entirely in the two workflows; the folder keeps the deploy config,
@@ -120,8 +126,9 @@ The two workflows `firebase init` generates — `firebase-hosting-merge.yml` and
 `firebase-hosting-pull-request.yml` — were **deleted**: they deploy on merge, skip the placeholder
 substitution and hardcode the project id. If it regenerates them, delete them again.
 
-Publishing is `Actions → Desplegar el BACKEND / FRONTEND → Run workflow`, in that order — the app
-calls `/api/auth/token` on boot, so a front published against an old API signs everyone out.
+Publishing is `Actions → Desplegar (Firebase) → Run workflow` — which also removes the old ordering
+trap: the app calls `/api/auth/token` on boot, so a front published against an old function used to
+sign everyone out when the two manual launches happened in the wrong order.
 
 The folder's own guide — the placeholders, what each environment configures, publishing step by
 step, and three things that look like mistakes but are not — is
