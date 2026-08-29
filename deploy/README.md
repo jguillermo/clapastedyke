@@ -96,6 +96,34 @@ De los siete campos del JSON, el despliegue usa **dos**:
 
 ---
 
+## Qué tiene que existir ya en Firebase
+
+**El pipeline publica; no aprovisiona.** Antes había un script que montaba el proyecto —ya no—, así
+que si algo de esto falta el despliegue **falla**, y el error del CLI casi nunca dice cuál es. Es de
+**una sola vez por ambiente**:
+
+| Qué | Lo necesita | Si falta |
+|---|---|---|
+| **Plan Blaze** | functions | `Your project must be on the Blaze plan` |
+| **Hosting activado** en la consola (*Compilación → Hosting → Comenzar*) | hosting | el deploy no encuentra sitio al que publicar |
+| **Base de datos de Firestore creada** — habilitar la API **no** la crea | `firestore:rules` | `NOT_FOUND … database (default)` |
+| **Seis APIs**: `secretmanager`, `cloudfunctions`, `run`, `cloudbuild`, `artifactregistry`, `firestore` | functions | `403 … has not been used in project` |
+| **Cuenta de servicio con diez roles** | los dos | `403 … Permission denied` |
+
+Los cinco, con los comandos exactos, están en [`manual/api.md`](../manual/api.md) → «Requisitos del
+proyecto de Firebase». **El frontend necesita mucho menos que el backend**: si `deploy-frontend` va
+en verde y `deploy-backend` en rojo, el problema está en esa lista, no en el código.
+
+```bash
+# comprobación rápida antes de lanzar nada
+gcloud projects describe <projectId> --format='value(lifecycleState)'   # ACTIVE
+gcloud billing projects describe <projectId> --format='value(billingEnabled)'
+gcloud firestore databases list --project <projectId>
+gcloud services list --enabled --project <projectId> | grep -E 'secretmanager|cloudfunctions|run\.|cloudbuild|artifactregistry|firestore'
+```
+
+---
+
 ## Publicar, paso a paso
 
 **El despliegue se hace SIEMPRE desde GitHub Actions, a mano.** Nada se publica al mezclar a `main`:

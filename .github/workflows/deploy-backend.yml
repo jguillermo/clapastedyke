@@ -94,7 +94,18 @@ jobs:
           DEST="deploy/dist/functions/$FUNCION"
           rm -rf "$DEST" && mkdir -p "$DEST"
           cp -R "api/$FUNCION/lib" "$DEST/lib"
-          cp "api/$FUNCION/package.json" "api/$FUNCION/package-lock.json" "api/$FUNCION/.env" "$DEST/"
+          cp "api/$FUNCION/package-lock.json" "api/$FUNCION/.env" "$DEST/"
+
+          # El package.json viaja SIN `scripts`. Lo que se sube ya está compilado, y el buildpack de
+          # Cloud Build ejecuta `npm run build` cuando lo encuentra: aquí ese script es
+          # `tsc -p tsconfig.json`, y el tsconfig NO se copia (ni debe: no hay nada que compilar
+          # arriba). Dejarlo sería un fallo de despliegue esperando a ocurrir.
+          #
+          # Se quitan solo los scripts, no las devDependencies: el package-lock sí las lista, y
+          # `npm ci` aborta si los dos ficheros no coinciden.
+          jq 'del(.scripts)' "api/$FUNCION/package.json" > "$DEST/package.json"
+
+          echo "package.json del artefacto:"; cat "$DEST/package.json"
 
       # El mismo mecanismo que en el frontend: el marcador vive versionado en `api/<fn>/.env` y se
       # sustituye SOLO en la copia que viaja.
