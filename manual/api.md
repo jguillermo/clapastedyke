@@ -161,7 +161,7 @@ Montar un ambiente entero son tres cosas independientes:
 ```
 1. ./deploy/create-google-client-id.sh   el cliente de Google → te enseña su JSON
 2. lo que sigue en esta página           la infraestructura del proyecto de Firebase
-3. Settings → Environments → <amb>       los dos secrets y las dos variables
+3. Settings → Environments → <amb>       los dos secrets (no hay variables)
 ```
 
 ### El paso a paso, en orden

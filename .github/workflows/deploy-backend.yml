@@ -11,7 +11,12 @@ name: Desplegar el BACKEND (Cloud Functions)
 # > frontend, porque la app llama a `/api/auth/token` desde su arranque.
 #
 # TODA LA EJECUCIÓN VIVE AQUÍ. El repositorio no tiene scripts de despliegue. Las funciones son las
-# carpetas de `api/`; los ambientes son los *environments* de GitHub. Ver `deploy/README.md`.
+# carpetas de `api/`; los ambientes son los *environments* de GitHub — DOS SECRETS, y nada más. Ver
+# `deploy/README.md`.
+#
+# No hay variables de environment: el proyecto de Firebase NO se configura aparte, se lee del
+# `project_id` de la propia cuenta de servicio. Un solo sitio que mantener, y es imposible desplegar
+# en un proyecto distinto del de las credenciales con las que se despliega.
 on:
   workflow_dispatch:
     inputs:
@@ -52,18 +57,24 @@ jobs:
         env:
           AMBIENTE: ${{ inputs.ambiente }}
           FUNCION: ${{ inputs.funcion }}
-          PROJECT_ID: ${{ vars.PROJECT_ID }}
           GOOGLE_OAUTH_CLIENT: ${{ secrets.GOOGLE_OAUTH_CLIENT }}
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
         run: |
           faltan=""
-          [ -n "$PROJECT_ID" ]               || faltan="$faltan variable:PROJECT_ID"
           [ -n "$GOOGLE_OAUTH_CLIENT" ]      || faltan="$faltan secret:GOOGLE_OAUTH_CLIENT"
           [ -n "$FIREBASE_SERVICE_ACCOUNT" ] || faltan="$faltan secret:FIREBASE_SERVICE_ACCOUNT"
           if [ -n "$faltan" ]; then
             echo "::error::Al environment '$AMBIENTE' le falta:$faltan. Settings → Environments → $AMBIENTE (ver deploy/README.md)."
             exit 1
           fi
+
+          # El proyecto de Firebase NO se configura: es el de la cuenta de servicio con la que se
+          # despliega. Se publica en `GITHUB_ENV` para el resto de pasos. No es un secreto.
+          PROJECT_ID="$(printf '%s' "$FIREBASE_SERVICE_ACCOUNT" | jq -er '.project_id')" || {
+            echo "::error::El secret FIREBASE_SERVICE_ACCOUNT no es la clave JSON de una cuenta de servicio (falta .project_id)."
+            exit 1
+          }
+          echo "PROJECT_ID=$PROJECT_ID" >> "$GITHUB_ENV"
 
           # Una función es una carpeta de `api/` con su propio paquete. Comprobarlo aquí convierte
           # una errata en un mensaje claro en vez de en un error del CLI de Firebase.
@@ -158,7 +169,6 @@ jobs:
       - name: Deploy de la función
         env:
           FUNCION: ${{ inputs.funcion }}
-          PROJECT_ID: ${{ vars.PROJECT_ID }}
         run: |
           cd deploy
           npx --yes firebase-tools@latest deploy \
