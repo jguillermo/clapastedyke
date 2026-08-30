@@ -1,93 +1,131 @@
-# Despliegue de Hosting a producción. MANUAL, nunca automático.
+# Despliegue de Hosting. MANUAL, nunca automático.
 #
 # Se lanza desde Actions → «Desplegar Hosting (Firebase)» → Run workflow. No hay
 # disparador por `push` a propósito: publicar es una decisión, no un efecto
-# secundario de mergear. Antes esto corría solo en cada push a `main`, así que
-# cualquier merge —incluido uno a medias— salía a `live` sin que nadie lo pidiera.
+# secundario de mergear.
 #
-# ⚠️ Este workflow publica SOLO Hosting: la action `action-hosting-deploy` no
-# toca `functions` ni `firestore`. La función `health` (y las que vengan) se
-# siguen desplegando con `cd firebase && firebase deploy`, que es el único
-# comando que publica los tres targets de `firebase/firebase.json` a la vez.
+# ── LO ÚNICO QUE SE ELIGE EN EL FORMULARIO ES EL ENTORNO ──────────────────────
 #
-# ⚠️ Tampoco sustituye los marcadores: lo que se publica lleva
-# `"googleClientId": "GOOGLE_OAUTH_CLIENT_ID"` y `"debug": "DEBUG"` literales, así
-# que la integración con Google queda apagada en el despliegue resultante.
-# ── El secret FIREBASE_SERVICE_ACCOUNT_MIGO_DEV_C5E23 ───────────────────
-# Es el JSON ENTERO que descarga Firebase Console → Configuración del
-# proyecto → Cuentas de servicio → «Generar nueva clave privada». Se pega
-# tal cual en el secret, sin reformatear: los `\n` de `private_key` son
-# parte del valor, no saltos de línea que se puedan expandir.
+# `entorno` (dev | prod) es el input del workflow, y es lo que decide TODO lo que
+# cambia entre despliegues:
 #
-# Campos que trae ese JSON. Esto es SOLO el contrato del fichero —el
-# nombre de cada clave y para qué sirve—, para saber qué se está
-# guardando y qué hay que rotar cuando toque. Aquí NO se versiona ni un
-# valor, y no debe versionarse nunca:
+#   · a qué proyecto de Firebase se publica → sale del `project_id` del propio
+#     secret `FIREBASE_SERVICE_ACCOUNT` del entorno, NO de este fichero ni de
+#     `.firebaserc`. No se puede desplegar a un proyecto distinto del de las
+#     credenciales que se usan.
+#   · el Client ID de Google que se escribe en `config.json` → sale del secret
+#     `GOOGLE_OAUTH_CLIENT` del entorno.
+#   · si el despliegue sale con `debug` encendido → input `debug`.
 #
-#   type                         siempre "service_account": el tipo de credencial
-#   project_id                   proyecto de Firebase dueño de la cuenta. Es la
-#                                única fuente de verdad de a DÓNDE se despliega:
-#                                no se puede publicar en un proyecto distinto
-#                                del de estas credenciales
-#   private_key_id               id de ESTA clave concreta. Es lo que se revoca
-#                                al rotar, sin tocar las demás claves de la
-#                                misma cuenta de servicio
-#   private_key      🔒 SECRETO  clave privada RSA en formato PEM. El único campo
-#                                que de verdad hay que proteger: con él se firma
-#                                el JWT que Google canjea por un access token.
-#                                Si se filtra, se rota (generar nueva y BORRAR
-#                                la antigua por su private_key_id)
-#   client_email                 identidad de la cuenta de servicio
-#                                (…@….iam.gserviceaccount.com). Es a QUIEN se le
-#                                conceden los roles IAM que permiten desplegar
-#   client_id                    id numérico de la cuenta de servicio en Google
-#   auth_uri                     endpoint OAuth2 de autorización (constante)
-#   token_uri                    endpoint donde se canjea el JWT firmado por un
-#                                access token (constante)
-#   auth_provider_x509_cert_url  certificados públicos de Google (constante)
-#   client_x509_cert_url         certificado público de ESTA cuenta de servicio
-#   universe_domain              dominio de la nube ("googleapis.com"); solo
-#                                cambia en despliegues soberanos / Google
-#                                Distributed Cloud
+# Un entorno nuevo (`stage`, lo que sea) NO toca este fichero: se crea el
+# GitHub environment, se le ponen sus dos secrets y se añade su nombre a las
+# `options` del input `entorno`.
 #
-# ⚠️  El JSON va COMPLETO en GitHub → Settings → Secrets and variables →
-# Actions. Nunca en el repositorio, ni siquiera a trozos: `private_key` y
-# `private_key_id` juntos bastan para autenticarse como esta cuenta.
+# ── LA RAMA NO SE ELIGE: SIEMPRE ES `main` ────────────────────────────────────
+#
+# GitHub siempre pinta el desplegable de rama en `workflow_dispatch` y no hay
+# forma de quitarlo. Así que aquí no se confía en él: el checkout es
+# `ref: main`, fijo. Se elija lo que se elija en ese desplegable, lo que se
+# compila y se publica es `main`.
+#
+# ⚠️ Este workflow publica SOLO Hosting: `action-hosting-deploy` no toca
+# `functions` ni `firestore`. La función `health` (y las que vengan) se siguen
+# desplegando con `cd firebase && firebase deploy`, que es el único comando que
+# publica los tres targets de `firebase/firebase.json` a la vez.
+#
+# ── LOS DOS SECRETS DEL ENTORNO ───────────────────────────────────────────────
+#
+# Se declaran en GitHub → Settings → Environments → <entorno> → Secrets. NO a
+# nivel de repositorio: si estuvieran ahí, dev y prod compartirían valor y
+# elegir entorno no significaría nada.
+#
+# `FIREBASE_SERVICE_ACCOUNT`
+#   El JSON ENTERO que descarga Firebase Console → Configuración del proyecto →
+#   Cuentas de servicio → «Generar nueva clave privada». Se pega tal cual, sin
+#   reformatear: los `\n` de `private_key` son parte del valor, no saltos de
+#   línea que se puedan expandir. Campos que trae (esto es SOLO el contrato del
+#   fichero; aquí no se versiona ni un valor, y no debe versionarse nunca):
+#
+#     type                         siempre "service_account": el tipo de credencial
+#     project_id                   proyecto de Firebase dueño de la cuenta. Es la
+#                                  única fuente de verdad de a DÓNDE se despliega
+#     private_key_id               id de ESTA clave concreta. Es lo que se revoca
+#                                  al rotar, sin tocar las demás claves de la
+#                                  misma cuenta de servicio
+#     private_key      🔒 SECRETO  clave privada RSA en PEM. El único campo que de
+#                                  verdad hay que proteger: con él se firma el JWT
+#                                  que Google canjea por un access token. Si se
+#                                  filtra, se rota (generar nueva y BORRAR la
+#                                  antigua por su private_key_id)
+#     client_email                 identidad de la cuenta de servicio
+#                                  (…@….iam.gserviceaccount.com). Es a QUIEN se le
+#                                  conceden los roles IAM que permiten desplegar
+#     client_id                    id numérico de la cuenta de servicio en Google
+#     auth_uri                     endpoint OAuth2 de autorización (constante)
+#     token_uri                    endpoint donde se canjea el JWT firmado por un
+#                                  access token (constante)
+#     auth_provider_x509_cert_url  certificados públicos de Google (constante)
+#     client_x509_cert_url         certificado público de ESTA cuenta de servicio
+#     universe_domain              dominio de la nube ("googleapis.com")
+#
+# `GOOGLE_OAUTH_CLIENT`
+#   El JSON del cliente OAuth, ENTERO y tal como lo descarga Google Cloud
+#   Console (`{"web":{"client_id":…,"client_secret":…}}`). Se guarda entero, en
+#   UN solo secret, para que el `client_id` de un cliente no pueda emparejarse
+#   con el `client_secret` de otro: ese desajuste es lo que Google contesta con
+#   un `invalid_client` sin explicación. De aquí solo se usa el `client_id`, que
+#   es público y va al `config.json` publicado.
+#
+#   Si el entorno todavía no lo tiene, el despliegue NO falla: se publica con
+#   `googleClientId: ""` y un aviso. La app arranca igual, en local-only, con la
+#   integración con Google apagada — todo el recetario vive en IndexedDB.
 
 name: Desplegar Hosting (Firebase)
 
 on:
   workflow_dispatch:
+    inputs:
+      entorno:
+        description: 'Entorno de despliegue (de él salen el proyecto y los secrets)'
+        type: choice
+        required: true
+        default: dev
+        options:
+          - dev
+          - prod
+      debug:
+        description: '¿Publicar con el detalle del flujo en consola? (config.json → "debug")'
+        type: boolean
+        required: false
+        default: false
 
 # Solo lectura del repositorio: este workflow no escribe nada en él.
 permissions:
   contents: read
 
-# Dos despliegues a `live` no deben pisarse. No se cancela el que ya corre: a
-# medio publicar es peor que tarde.
+# Dos despliegues al MISMO entorno no deben pisarse; dev y prod sí pueden ir a
+# la vez. No se cancela el que ya corre: a medio publicar es peor que tarde.
 concurrency:
-  group: firebase-hosting-live
+  group: firebase-hosting-${{ inputs.entorno }}
   cancel-in-progress: false
 
 jobs:
   build_and_deploy:
-    name: Deploy · live
+    name: Deploy · ${{ inputs.entorno }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # Esto es lo que hace que `secrets.*` resuelva a los del entorno elegido.
+    # También es el gancho de las reglas de protección (revisores requeridos,
+    # espera) que se configuren en GitHub para `prod`.
+    environment: ${{ inputs.entorno }}
     steps:
-      # `workflow_dispatch` deja elegir la rama en el formulario, y no hay forma
-      # de limitar ese desplegable. Así que la restricción se comprueba aquí, y
-      # se hace ANTES del checkout: si alguien elige otra rama, el job para en
-      # segundos y sin haber tocado nada.
-      - name: Solo se publica desde main
-        if: github.ref != 'refs/heads/main'
-        env:
-          RAMA: ${{ github.ref_name }}
-        run: |
-          echo "::error::Este despliegue solo se lanza desde 'main' (has elegido '$RAMA')."
-          exit 1
-
       - uses: actions/checkout@v4
+        with:
+          # `main`, fijo. NO `github.ref`: no hay otra rama desde la que
+          # desplegar, así que el desplegable de rama del formulario —que GitHub
+          # pinta siempre y no se puede quitar— es ruido: se elija lo que se
+          # elija ahí, lo que se compila y se publica es `main`.
+          ref: main
 
       # ── PASO 1 · COMPILAR, DESDE LA RAÍZ ────────────────────────────────────
       # Aquí NO se entra en `firebase/`: el `package.json` de Angular está en la
@@ -100,9 +138,74 @@ jobs:
       - name: Build de la app → firebase/public
         run: npm ci && npm run build
 
+      # ── PASO 2 · SUSTITUIR LOS MARCADORES, EN EL ARTEFACTO ──────────────────
+      # El repositorio versiona `public/config.json` CON marcadores
+      # (`"debug": "DEBUG"`, `"googleClientId": "GOOGLE_OAUTH_CLIENT_ID"`) y sin
+      # ningún valor. Los valores solo existen aquí, en el árbol de trabajo del
+      # runner, que es efímero: se sustituyen sobre la COPIA ya compilada
+      # (`firebase/public/config.json`), nunca sobre el fichero del repo.
+      #
+      # `jq` y no `sed` porque `debug` es un BOOLEANO en el JSON final
+      # (`"debug": true`) y el marcador es una cadena: hay que reemplazar el
+      # valor con su tipo, no un trozo de texto.
+      - name: Sustituir marcadores de config.json
+        id: config
+        env:
+          GOOGLE_OAUTH_CLIENT: ${{ secrets.GOOGLE_OAUTH_CLIENT }}
+          DEBUG: ${{ inputs.debug }}
+        run: |
+          set -euo pipefail
+          CONFIG=firebase/public/config.json
+          test -f "$CONFIG" || { echo "::error::No existe $CONFIG — ¿falló el build?"; exit 1; }
+
+          # El secret trae el JSON entero del cliente; de él solo sale el
+          # client_id (público). El client_secret NO se toca aquí: es del
+          # backend, y este workflow solo publica Hosting.
+          CLIENT_ID=""
+          if [ -n "${GOOGLE_OAUTH_CLIENT:-}" ]; then
+            CLIENT_ID=$(jq -r '.web.client_id // .installed.client_id // empty' <<< "$GOOGLE_OAUTH_CLIENT")
+          fi
+          if [ -z "$CLIENT_ID" ]; then
+            echo "::warning::El entorno '${{ inputs.entorno }}' no tiene GOOGLE_OAUTH_CLIENT (o no trae client_id): se publica con la integración de Google APAGADA."
+          fi
+
+          jq --argjson debug "$DEBUG" --arg clientId "$CLIENT_ID" \
+             '.debug = $debug | .googleClientId = $clientId' \
+             "$CONFIG" > "$CONFIG.tmp" && mv "$CONFIG.tmp" "$CONFIG"
+
+          # Guarda: si sobrevive un marcador, el despliegue no sale.
+          if grep -qE 'GOOGLE_OAUTH_CLIENT_ID|"DEBUG"' "$CONFIG"; then
+            echo "::error::Ha sobrevivido un marcador en $CONFIG."
+            exit 1
+          fi
+          echo "config.json publicado: debug=$DEBUG, googleClientId=$([ -n "$CLIENT_ID" ] && echo presente || echo vacío)"
+
+      # ── PASO 3 · A QUÉ PROYECTO SE PUBLICA ──────────────────────────────────
+      # No se escribe en ningún sitio: se lee del propio secret del entorno. Así
+      # el proyecto y las credenciales no pueden desalinearse, y `.firebaserc`
+      # (que apunta a dev) queda como lo que es — config de emulador y de
+      # comandos a mano, no de despliegue.
+      - name: Resolver el proyecto desde la cuenta de servicio
+        id: proyecto
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          set -euo pipefail
+          if [ -z "${FIREBASE_SERVICE_ACCOUNT:-}" ]; then
+            echo "::error::El entorno '${{ inputs.entorno }}' no tiene el secret FIREBASE_SERVICE_ACCOUNT."
+            exit 1
+          fi
+          PROJECT_ID=$(jq -r '.project_id // empty' <<< "$FIREBASE_SERVICE_ACCOUNT")
+          if [ -z "$PROJECT_ID" ]; then
+            echo "::error::FIREBASE_SERVICE_ACCOUNT no trae 'project_id' — ¿es el JSON completo de la cuenta de servicio?"
+            exit 1
+          fi
+          echo "project_id=$PROJECT_ID" >> "$GITHUB_OUTPUT"
+          echo "::notice::Entorno '${{ inputs.entorno }}' → proyecto '$PROJECT_ID'."
+
+      # ── PASO 4 · DESPLEGAR, DESDE DENTRO DE `firebase/` ─────────────────────
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
-          # ── PASO 2 · DESPLEGAR, DESDE DENTRO DE `firebase/` ───────────────
           # OBLIGATORIO. `entryPoint` es, literalmente, «the location of your
           # firebase.json file, relative to the root of your directory» (su
           # default es `.`). Aquí el CLI se ejecuta DENTRO de `firebase/`, que es
@@ -117,8 +220,8 @@ jobs:
           #   firebase.json hosting.public    (desde firebase/)   → firebase/public
           entryPoint: firebase
           repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_MIGO_DEV_C5E23 }}
-          # `live` es el canal de producción (migo-dev-c5e23.web.app). Sin este
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          # `live` es el canal de producción del proyecto que toque. Sin este
           # campo la action crearía un canal de preview efímero.
           channelId: live
-          projectId: migo-dev-c5e23
+          projectId: ${{ steps.proyecto.outputs.project_id }}
