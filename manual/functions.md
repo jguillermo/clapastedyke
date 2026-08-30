@@ -19,7 +19,7 @@ firebase/
     ├── .env               VERSIONADO, con MARCADORES — nunca con valores
     ├── package.json       dependencias, `lint`, `build`; `main: "lib/index.js"`
     ├── tsconfig.json      rootDir `src`, outDir `lib`
-    ├── .eslintrc.js       estilo Google (comillas dobles) — NO es el ESLint de la app
+    ├── eslint.config.mjs  su ESLint, en flat — NO es el de la app, y TIENE que existir (ver abajo)
     └── src/index.ts       el punto de entrada: `export const auth = onRequest(…)`
 ```
 
@@ -27,7 +27,7 @@ firebase/
 |---|---|
 | Sus dependencias | su propio `package.json` y su propio `package-lock.json` |
 | Su compilación | su propio `tsconfig.json` (`tsc` → `lib/`) |
-| Su lint | su propio `.eslintrc.js`, ejecutado por su `npm run lint` |
+| Su lint | su propio `eslint.config.mjs`, ejecutado por su `npm run lint` |
 | Su despliegue | `Actions → Desplegar (Firebase)` — que publica **todo**, siempre |
 | Su ruta | `/api/auth/**`, por un rewrite de Hosting |
 
@@ -64,12 +64,27 @@ Prettier. Está atado en tres sitios, y los tres son a propósito:
 
 | Fichero | Qué hace |
 |---|---|
-| `eslint.config.mjs` | ignora `firebase/functions/**` — la config de Angular no aplica a un backend de Node |
+| `eslint.config.mjs` (raíz) | ignora `firebase/functions/**` — la config de Angular no aplica a un backend de Node |
 | `.prettierignore` | ignora `firebase/functions/` — su ESLint usa comillas dobles y se pelearía con el Prettier del repo |
 | `.gitignore` | ignora `firebase/functions/lib/` (la salida de `tsc`) y `firebase/functions/.env.*` |
 
 Por eso el job `functions` del CI **no** usa `./.github/actions/setup` (que instala las dependencias
 de Angular): monta su propio Node y hace su propio `npm ci`.
+
+> ### CRITICAL: la función necesita su propio flat config, y no es opcional
+>
+> `firebase init` deja un `.eslintrc.js` con `root: true` y el script `eslint --ext .js,.ts .`. Eso
+> vale en un repositorio suelto y **aquí no**: esta carpeta cuelga de un repo que ya tiene su flat
+> config en la raíz, y ESLint **sube directorios** buscando uno. Encuentra el de la raíz, se pone en
+> modo flat, y en modo flat `--ext` no existe → `Invalid option '--ext'`. El `root: true` no protege:
+> es un mecanismo de eslintrc y el descubrimiento de flat config lo ignora.
+>
+> No es un fallo cosmético de lint: ese script es el primer `predeploy` de `firebase.json`, así que
+> **tumba el despliegue entero** antes de subir nada.
+>
+> Se arregla dándole a la función su propio `eslint.config.mjs` (la búsqueda para ahí) y usando
+> `eslint .` sin `--ext`. **Si algún día `firebase init` vuelve a dejar un `.eslintrc.js`, hay que
+> volver a hacer esto.**
 
 ## Añadir una función
 
@@ -192,7 +207,8 @@ Sobre un ambiente nuevo (aquí `<projectId>`), de arriba abajo:
 2. **Base de datos de Firestore creada** (requisito 2):
    ```bash
    gcloud firestore databases list --project <projectId>
-   gcloud firestore databases create --location=eur3 --project <projectId>   # si no hay ninguna
+   # La región TIENE que ser la de `firestore.location` en firebase/firebase.json (hoy us-west1)
+   gcloud firestore databases create --location=us-west1 --project <projectId>   # si no hay ninguna
    ```
 3. **Habilitar las APIs que el CLI no enciende solo** (requisito 3):
    ```bash
@@ -225,13 +241,28 @@ un proyecto sin base de datos falla. Se comprueba y se crea una sola vez:
 
 ```bash
 gcloud firestore databases list --project <projectId>
-gcloud firestore databases create --location=eur3 --project <projectId>   # si no hay ninguna
+gcloud firestore databases create --location=us-west1 --project <projectId>   # si no hay ninguna
 ```
 
 O desde la consola de Firebase: **Compilación → Firestore Database → Crear base de datos**, en modo
 producción (las reglas de
 [`firebase/firestore.rules`](../firebase/firestore.rules) las sobrescriben en el primer
 despliegue de todas formas).
+
+> ### CRITICAL: la región tiene que coincidir, y no se puede cambiar después
+>
+> `firebase/firebase.json` declara `"firestore": { "location": "us-west1" }`. **Crea la base en esa
+> misma región.** La ubicación de una base de Firestore es **permanente**: para cambiarla hay que
+> borrar la base entera y volver a crearla, con lo que haya dentro. Si prefieres otra región,
+> cámbiala en `firebase.json` **antes** de crear nada.
+
+> ### Por qué el despliegue intenta CREARLA (y falla con 403)
+>
+> Esa clave `location` es justo lo que hace que `firebase deploy` intente aprovisionar la base si no
+> existe: en el log sale `firestore: Creating the new Firestore database (default)...` seguido de
+> `HTTP Error: 403, The caller does not have permission`. La cuenta de servicio de despliegue no
+> puede —ni debe— crear bases de datos: **el pipeline publica, no aprovisiona**. Créala tú una vez y
+> el deploy pasa a limitarse a subir las reglas y los índices.
 
 > ⚠️ **`firebase/firestore.rules` sigue siendo el fichero abierto que dejó `firebase init`**
 > (`allow read, write: if request.time < timestamp.date(2026, 9, 28)`). Es una regla de arranque con

@@ -1,0 +1,124 @@
+# Despliegue de Hosting a producción. MANUAL, nunca automático.
+#
+# Se lanza desde Actions → «Desplegar Hosting (Firebase)» → Run workflow. No hay
+# disparador por `push` a propósito: publicar es una decisión, no un efecto
+# secundario de mergear. Antes esto corría solo en cada push a `main`, así que
+# cualquier merge —incluido uno a medias— salía a `live` sin que nadie lo pidiera.
+#
+# ⚠️ Este workflow publica SOLO Hosting: la action `action-hosting-deploy` no
+# toca `functions` ni `firestore`. La función `health` (y las que vengan) se
+# siguen desplegando con `cd firebase && firebase deploy`, que es el único
+# comando que publica los tres targets de `firebase/firebase.json` a la vez.
+#
+# ⚠️ Tampoco sustituye los marcadores: lo que se publica lleva
+# `"googleClientId": "GOOGLE_OAUTH_CLIENT_ID"` y `"debug": "DEBUG"` literales, así
+# que la integración con Google queda apagada en el despliegue resultante.
+# ── El secret FIREBASE_SERVICE_ACCOUNT_MIGO_DEV_C5E23 ───────────────────
+# Es el JSON ENTERO que descarga Firebase Console → Configuración del
+# proyecto → Cuentas de servicio → «Generar nueva clave privada». Se pega
+# tal cual en el secret, sin reformatear: los `\n` de `private_key` son
+# parte del valor, no saltos de línea que se puedan expandir.
+#
+# Campos que trae ese JSON. Esto es SOLO el contrato del fichero —el
+# nombre de cada clave y para qué sirve—, para saber qué se está
+# guardando y qué hay que rotar cuando toque. Aquí NO se versiona ni un
+# valor, y no debe versionarse nunca:
+#
+#   type                         siempre "service_account": el tipo de credencial
+#   project_id                   proyecto de Firebase dueño de la cuenta. Es la
+#                                única fuente de verdad de a DÓNDE se despliega:
+#                                no se puede publicar en un proyecto distinto
+#                                del de estas credenciales
+#   private_key_id               id de ESTA clave concreta. Es lo que se revoca
+#                                al rotar, sin tocar las demás claves de la
+#                                misma cuenta de servicio
+#   private_key      🔒 SECRETO  clave privada RSA en formato PEM. El único campo
+#                                que de verdad hay que proteger: con él se firma
+#                                el JWT que Google canjea por un access token.
+#                                Si se filtra, se rota (generar nueva y BORRAR
+#                                la antigua por su private_key_id)
+#   client_email                 identidad de la cuenta de servicio
+#                                (…@….iam.gserviceaccount.com). Es a QUIEN se le
+#                                conceden los roles IAM que permiten desplegar
+#   client_id                    id numérico de la cuenta de servicio en Google
+#   auth_uri                     endpoint OAuth2 de autorización (constante)
+#   token_uri                    endpoint donde se canjea el JWT firmado por un
+#                                access token (constante)
+#   auth_provider_x509_cert_url  certificados públicos de Google (constante)
+#   client_x509_cert_url         certificado público de ESTA cuenta de servicio
+#   universe_domain              dominio de la nube ("googleapis.com"); solo
+#                                cambia en despliegues soberanos / Google
+#                                Distributed Cloud
+#
+# ⚠️  El JSON va COMPLETO en GitHub → Settings → Secrets and variables →
+# Actions. Nunca en el repositorio, ni siquiera a trozos: `private_key` y
+# `private_key_id` juntos bastan para autenticarse como esta cuenta.
+
+name: Desplegar Hosting (Firebase)
+
+on:
+  workflow_dispatch:
+
+# Solo lectura del repositorio: este workflow no escribe nada en él.
+permissions:
+  contents: read
+
+# Dos despliegues a `live` no deben pisarse. No se cancela el que ya corre: a
+# medio publicar es peor que tarde.
+concurrency:
+  group: firebase-hosting-live
+  cancel-in-progress: false
+
+jobs:
+  build_and_deploy:
+    name: Deploy · live
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      # `workflow_dispatch` deja elegir la rama en el formulario, y no hay forma
+      # de limitar ese desplegable. Así que la restricción se comprueba aquí, y
+      # se hace ANTES del checkout: si alguien elige otra rama, el job para en
+      # segundos y sin haber tocado nada.
+      - name: Solo se publica desde main
+        if: github.ref != 'refs/heads/main'
+        env:
+          RAMA: ${{ github.ref_name }}
+        run: |
+          echo "::error::Este despliegue solo se lanza desde 'main' (has elegido '$RAMA')."
+          exit 1
+
+      - uses: actions/checkout@v4
+
+      # ── PASO 1 · COMPILAR, DESDE LA RAÍZ ────────────────────────────────────
+      # Aquí NO se entra en `firebase/`: el `package.json` de Angular está en la
+      # raíz del repositorio, que es el working-directory por defecto.
+      #
+      # `outputPath` de angular.json ES `firebase/public`, o sea `hosting.public`:
+      # no hay copia intermedia, compilar es preparar el deploy. Sin este paso se
+      # publicaría lo que hubiera en esa carpeta (la primera vez, el index.html de
+      # bienvenida de `firebase init`).
+      - name: Build de la app → firebase/public
+        run: npm ci && npm run build
+
+      - uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          # ── PASO 2 · DESPLEGAR, DESDE DENTRO DE `firebase/` ───────────────
+          # OBLIGATORIO. `entryPoint` es, literalmente, «the location of your
+          # firebase.json file, relative to the root of your directory» (su
+          # default es `.`). Aquí el CLI se ejecuta DENTRO de `firebase/`, que es
+          # donde vive `firebase.json` y de donde cuelgan TODAS sus rutas
+          # (`public`, `functions`, `firestore.rules`). Sin esta línea la action
+          # lo busca en la raíz, no lo encuentra, y el job muere.
+          #
+          # Las dos mitades encajan porque cada ruta se resuelve en su propio
+          # sistema y ambas caen en la misma carpeta:
+          #
+          #   angular.json  outputPath        (desde la raíz)     → firebase/public
+          #   firebase.json hosting.public    (desde firebase/)   → firebase/public
+          entryPoint: firebase
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_MIGO_DEV_C5E23 }}
+          # `live` es el canal de producción (migo-dev-c5e23.web.app). Sin este
+          # campo la action crearía un canal de preview efímero.
+          channelId: live
+          projectId: migo-dev-c5e23

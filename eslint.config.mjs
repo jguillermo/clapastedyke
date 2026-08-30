@@ -90,8 +90,8 @@ export default tseslint.config(
       'dist/**',
       // El artefacto de Hosting: lo escribe `ng build` dentro de la carpeta que publica Firebase.
       'firebase/public/**',
-      // La función tiene su PROPIO ESLint (`firebase/functions/.eslintrc.js`, estilo Google) y su
-      // propio `npm run lint`. Lintearla con la config de Angular del repo no tiene sentido.
+      // La función tiene su PROPIO ESLint (`firebase/functions/eslint.config.mjs`) y su propio
+      // `npm run lint`. Lintearla con la config de Angular del repo no tiene sentido.
       'firebase/functions/**',
       'dist-dev/**',
       'out-tsc/**',

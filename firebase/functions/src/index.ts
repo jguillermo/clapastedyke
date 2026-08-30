@@ -1,32 +1,41 @@
 /**
- * Import function triggers from their respective submodules:
+ * Punto de entrada del backend.
  *
- * import {onCall} from "firebase-functions/v2/https";
- * import {onDocumentWritten} from "firebase-functions/v2/firestore";
+ * UNA función = UN `export` de este fichero. No se crea una carpeta por función:
+ * añadir una función es añadir aquí otro `export` (y, si tiene que ser
+ * alcanzable por la app, su `rewrite` en `firebase.json`).
  *
- * See a full list of supported triggers at https://firebase.google.com/docs/functions
+ * Hoy solo está `health`, una función de sanidad: su único propósito es que
+ * `firebase deploy` tenga algo real que publicar y se pueda validar el circuito
+ * completo — lint → tsc → empaquetado → despliegue.
+ *
+ * ⚠️ La función `auth` que la app llama en `/api/auth/**` NO está escrita. El
+ * commit `63eef49` borró la carpeta `api/` donde vivía (`api/auth/` +
+ * `api/_common/`); se recupera desde `63eef49^`. Mientras no exista, la sesión
+ * de Google no sobrevive a una recarga de página.
  */
 
 import {setGlobalOptions} from "firebase-functions";
-// import {onRequest} from "firebase-functions/https";
-// import * as logger from "firebase-functions/logger";
+import {onRequest} from "firebase-functions/https";
+import * as logger from "firebase-functions/logger";
 
-// Start writing functions
-// https://firebase.google.com/docs/functions/typescript
-
-// For cost control, you can set the maximum number of containers that can be
-// running at the same time. This helps mitigate the impact of unexpected
-// traffic spikes by instead downgrading performance. This limit is a
-// per-function limit. You can override the limit for each function using the
-// `maxInstances` option in the function's options, e.g.
-// `onRequest({ maxInstances: 5 }, (req, res) => { ... })`.
-// NOTE: setGlobalOptions does not apply to functions using the v1 API. V1
-// functions should each use functions.runWith({ maxInstances: 10 }) instead.
-// In the v1 API, each function can only serve one request per container, so
-// this will be the maximum concurrent request count.
+// Control de coste: tope de contenedores simultáneos, por función.
 setGlobalOptions({maxInstances: 10});
 
-// export const helloWorld = onRequest((request, response) => {
-//   logger.info("Hello logs!", {structuredData: true});
-//   response.send("Hello from Firebase!");
-// });
+/**
+ * Sanidad del despliegue.
+ *
+ * Devuelve la hora del arranque del contenedor además de la del momento de la
+ * petición: si ambas son viejas, lo que está publicado es una revisión
+ * anterior, y eso distingue «no se desplegó» de «se desplegó y no cambió nada».
+ */
+const startedAt = new Date().toISOString();
+
+export const health = onRequest((request, response) => {
+  logger.info("health", {structuredData: true});
+  response.json({
+    status: "ok",
+    startedAt,
+    now: new Date().toISOString(),
+  });
+});
