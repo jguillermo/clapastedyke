@@ -136,7 +136,7 @@ jobs:
       # publicaría lo que hubiera en esa carpeta (la primera vez, el index.html de
       # bienvenida de `firebase init`).
       - name: Build de la app → firebase/public
-        run: npm ci && npm run build
+        run: npm ci #&& npm run build
 
       # ── PASO 2 · SUSTITUIR LOS MARCADORES, EN EL ARTEFACTO ──────────────────
       # El repositorio versiona `public/config.json` CON marcadores
