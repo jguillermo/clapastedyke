@@ -1,13 +1,15 @@
 import { inject, Injectable } from '@angular/core';
 import { Logger } from '@core/_common/logger/logger';
 import { Account } from '../domain/entities/account';
+import { AuthSettingsRepository } from '../domain/repositories/auth-settings.repository';
+import { SessionTokenRepository } from '../domain/repositories/session-token.repository';
 import { Authentication, Authenticator } from '../domain/services/authenticator';
 import { Credential } from '../domain/value-objects/credential';
 import { DRIVE_FILE_PERMISSION, GoogleCodeClient } from './google-code-client';
 
 /**
- * Autenticación contra **el backend de la propia app** (`firebase/functions`), que es quien custodia el
- * permiso duradero.
+ * Autenticación contra **el backend de la propia app** (`firebase/functions`), que es quien custodia
+ * el permiso duradero.
  *
  * ## Qué arregla
  *
@@ -15,77 +17,112 @@ import { DRIVE_FILE_PERMISSION, GoogleCodeClient } from './google-code-client';
  * ventana emergente. Como reanudar ocurre al **arrancar la página**, sin gesto del usuario, el
  * navegador bloqueaba esa ventana y la sesión se perdía en cada recarga.
  *
- * Ahora reanudar es **un POST de mismo origen**: sin ventana, sin gesto, y sin depender de que la
- * persona tenga su sesión de Google abierta. La única operación que sigue abriendo una ventana es
- * conectar por primera vez, que sí sale de un clic.
+ * Ahora reanudar es **un POST**: sin ventana, sin gesto, y sin depender de que la persona tenga su
+ * sesión de Google abierta. La única operación que sigue abriendo una ventana es conectar por
+ * primera vez, que sí sale de un clic.
  *
  * ## Qué NO cambia
  *
- * La credencial sigue viviendo **solo en memoria** y durando una hora. Lo que ahora es duradero es
- * la capacidad de pedir otra, y eso vive en una cookie `HttpOnly` que este código no puede leer —
- * ni él ni un XSS.
+ * La credencial de Google sigue viviendo **solo en memoria** y durando una hora. Lo duradero es la
+ * capacidad de pedir otra, y esa vive en el servidor: aquí no hay ningún refresh token, ni lo habrá.
  *
- * ## Por qué rutas relativas
+ * ## Por qué URL absoluta, y no `/api/auth/…`
  *
- * `/api/auth/…` lo reescribe Firebase Hosting a la función, así que para el navegador es **mismo
- * origen**: no hay CORS, no hay URL que configurar por ambiente y la cookie viaja sola. En
- * desarrollo lo replica el proxy de `ng serve`.
+ * La función **no** se sirve desde el mismo origen que la app: se llama directamente, con CORS. Su
+ * dirección lleva dentro el proyecto y la región, así que cambia por ambiente y sale de
+ * `public/config.json` (`authApiUrl`), no del bundle.
+ *
+ * ## Las dos vías por las que viaja la sesión
+ *
+ * El backend emite una cookie `HttpOnly` (`credentials: 'include'` la manda) **y** devuelve el mismo
+ * identificador en el cuerpo. La cookie es la vía preferida —ni la app ni un XSS pueden leerla—,
+ * pero al ser de otro dominio es una cookie de terceros, y Safari e iOS la bloquean. Por eso se
+ * guarda el `session_token` y se manda en `Authorization` como respaldo. Sin él, en móvil la sesión
+ * no sobreviviría a una recarga, que es justo lo que este backend viene a arreglar.
  */
-
-const EXCHANGE_URL = '/api/auth/exchange';
-const TOKEN_URL = '/api/auth/token';
-const SIGN_OUT_URL = '/api/auth/sign-out';
 
 /** Ninguna llamada puede quedarse colgada: una promesa que no resuelve congela `ResumeSession`. */
 const TIMEOUT_MS = 15_000;
 
 /** El lenguaje publicado del backend. Se declara aquí porque el front no importa de `firebase/`. */
 interface SessionPayload {
-  account: { id: string; email: string; name: string; pictureUrl: string | null };
-  accessToken: string;
-  expiresIn: number;
+  access_token: string;
+  expires_in: number;
   scope: string;
+  token_type: 'Bearer';
+  session_token: string;
+  account: { sub: string; email: string; name: string; picture: string | null };
 }
 
 @Injectable()
 export class BackendAuthenticator extends Authenticator {
   private readonly codes = inject(GoogleCodeClient);
+  private readonly settings = inject(AuthSettingsRepository);
+  private readonly sessionTokens = inject(SessionTokenRepository);
   private readonly log = inject(Logger).scoped('auth/backend');
 
   /**
    * Conectar: una ventana de Google (dentro del clic) para obtener el código, y el backend lo
    * canjea. Es el único momento de toda la vida de la sesión en que se le pide algo al usuario.
+   *
+   * **El login no lo hace este método ni el backend**: lo hace Google en su propia ventana. Aquí solo
+   * se recoge el código que Google emite después, y se manda a canjear.
    */
   async authenticate(clientId: string): Promise<Authentication> {
+    const base = await this.settings.authApiUrl();
+    if (!base) {
+      throw new Error(
+        'Falta la dirección del servicio de sesión en la configuración del despliegue ' +
+          '(clave `authApiUrl` de config.json; ver manual/google-integration.md).',
+      );
+    }
+
+    // AQUÍ está el login: una ventana de Google, en su dominio, donde la persona se identifica. La
+    // app no ve la contraseña y no podría verla. Lo que vuelve es un código de un solo uso.
     const code = await this.codes.requestCode(clientId);
 
+    // Y esto es lo único que el navegador no puede hacer solo: canjear ese código exige el
+    // `client_secret`. De ahí que exista el backend, y de ahí el nombre de la ruta.
     this.log.debug('canjeando el código en el backend');
-    const response = await this.post(EXCHANGE_URL, { code });
+    const response = await this.post(`${base}/exchange`, { code });
 
     if (!response.ok) {
       throw new Error(await failureMessage(response));
     }
 
-    const authentication = toAuthentication(await response.json());
+    const payload = await readPayload(response);
+    // Se guarda ANTES de devolver: si la cookie no cuaja (Safari), esto es lo único que permitirá
+    // reanudar, y perderlo aquí no daría ningún síntoma hasta la siguiente recarga.
+    await this.sessionTokens.save(payload.session_token);
+
+    const authentication = toAuthentication(payload);
     this.log.debug('sesión abierta', { accountId: authentication.account.id.value });
     return authentication;
   }
 
   /**
-   * Reanudar es **solo esto**: pedirle un token al backend, que lo emite con el permiso duradero
-   * que guarda. Ni carga el script de Google, ni abre nada, ni necesita el `clientId` ni la pista —
-   * la identidad la pone la cookie. Los dos parámetros se conservan porque son del puerto, no de
-   * este adaptador.
+   * Reanudar es **solo esto**: pedirle un token al backend, que lo emite con el permiso duradero que
+   * guarda. Ni carga el script de Google, ni abre nada, ni necesita el `clientId` ni la pista — la
+   * identidad la ponen la cookie o el identificador guardado. Los dos parámetros se conservan porque
+   * son del puerto, no de este adaptador.
    *
    * `401` es el caso normal de quien no ha conectado nunca o cuya sesión ya no vale: **no es un
    * fallo** y no se registra como tal.
    */
   async resume(_clientId: string, _hint: string): Promise<Authentication | null> {
+    const base = await this.settings.authApiUrl();
+    if (!base) {
+      // Sin dirección no hay a quién preguntar. El puerto exige `null`, no una excepción: reanudar
+      // corre en el arranque y no puede tumbar la app.
+      this.log.debug('sin dirección del servicio de sesión, no se puede reanudar');
+      return null;
+    }
+
     this.log.debug('pidiendo un token al backend');
 
     let response: Response;
     try {
-      response = await this.post(TOKEN_URL);
+      response = await this.post(`${base}/refresh`);
     } catch (error) {
       // A diferencia del flujo anterior, el error SÍ se liga: sin esto no había forma de saber por
       // qué no se reanudaba una sesión.
@@ -94,15 +131,25 @@ export class BackendAuthenticator extends Authenticator {
     }
 
     if (response.status === 401) {
+      // El backend ya ha decidido que esta sesión no vale; conservar el identificador solo serviría
+      // para volver a preguntar lo mismo en cada arranque.
+      await this.sessionTokens.clear();
       this.log.debug('el backend no tiene sesión para este navegador');
       return null;
     }
     if (!response.ok) {
+      // Un fallo pasajero (Google no contestó): la sesión del backend sigue viva, así que el
+      // identificador NO se borra y el intento siguiente puede ir bien.
       this.log.warn('el backend no ha podido renovar el acceso', await failureMessage(response));
       return null;
     }
 
-    const authentication = toAuthentication(await response.json());
+    const payload = await readPayload(response);
+    // El backend repite el identificador al renovar; guardarlo cubre al navegador que lo hubiera
+    // perdido pero conservara la cookie.
+    await this.sessionTokens.save(payload.session_token);
+
+    const authentication = toAuthentication(payload);
     if (!authentication.credential.allows(DRIVE_FILE_PERMISSION)) {
       this.log.warn('el token renovado no trae el permiso de Drive, se descarta');
       return null;
@@ -111,47 +158,72 @@ export class BackendAuthenticator extends Authenticator {
   }
 
   /**
-   * Cerrar sesión. El backend revoca el permiso en Google y borra lo que guardaba; la credencial en
-   * memoria la tira quien llama. No lanza aunque el backend falle: la sesión local se cierra igual.
+   * Cerrar sesión. El backend cierra la sesión de este navegador y limpia su cookie; la credencial
+   * en memoria la tira quien llama. No lanza aunque el backend falle: la sesión local se cierra
+   * igual.
+   *
+   * El identificador local se borra **pase lo que pase**. Dejarlo vivo tras cerrar sesión haría que
+   * el siguiente arranque intentara reanudar una sesión que el usuario acaba de cerrar.
    */
   async revoke(_credential: Credential): Promise<void> {
+    const base = await this.settings.authApiUrl();
     try {
-      await this.post(SIGN_OUT_URL);
-      this.log.debug('permiso retirado en el backend');
+      if (base) {
+        await this.post(`${base}/logout`);
+        this.log.debug('sesión cerrada en el backend');
+      }
     } catch (error) {
       this.log.warn('no se ha podido avisar al backend del cierre de sesión', error);
+    } finally {
+      await this.sessionTokens.clear();
     }
   }
 
   /**
-   * `credentials: 'include'` es lo que hace que viaje la cookie de sesión. Es mismo origen, así que
-   * bastaría con el valor por defecto, pero declararlo evita que un cambio futuro de origen rompa
-   * la reanudación en silencio.
+   * `credentials: 'include'` es lo que hace que viaje la cookie de sesión incluso siendo de otro
+   * origen. Y `Authorization` es el respaldo para cuando el navegador la bloquea: mandar los dos no
+   * cuesta nada, y el backend se queda con el que llegue.
    */
-  private post(url: string, body?: unknown): Promise<Response> {
+  private async post(url: string, body?: unknown): Promise<Response> {
+    const sessionToken = await this.sessionTokens.read();
+    const headers: Record<string, string> = {};
+
+    if (body !== undefined) {
+      headers['Content-Type'] = 'application/json';
+    }
+    if (sessionToken) {
+      headers['Authorization'] = `Bearer ${sessionToken}`;
+    }
+
     return fetch(url, {
       method: 'POST',
       credentials: 'include',
-      headers: body === undefined ? {} : { 'Content-Type': 'application/json' },
+      headers,
       body: body === undefined ? undefined : JSON.stringify(body),
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
   }
 }
 
-function toAuthentication(raw: unknown): Authentication {
-  const payload = raw as SessionPayload;
+/** El cuerpo de una respuesta correcta, comprobando que trae lo mínimo para armar una sesión. */
+async function readPayload(response: Response): Promise<SessionPayload> {
+  const payload = (await response.json()) as SessionPayload;
   const account = payload?.account;
 
-  if (!account?.id || !account.email || !payload.accessToken) {
+  if (!account?.sub || !account.email || !payload.access_token || !payload.session_token) {
     throw new Error('El servicio de sesión ha devuelto una respuesta incompleta.');
   }
+  return payload;
+}
+
+function toAuthentication(payload: SessionPayload): Authentication {
+  const { account } = payload;
 
   return {
-    account: Account.of(account.id, account.email, account.name, account.pictureUrl),
+    account: Account.of(account.sub, account.email, account.name, account.picture),
     credential: Credential.of(
-      payload.accessToken,
-      payload.expiresIn,
+      payload.access_token,
+      payload.expires_in,
       (payload.scope ?? '').split(' ').filter((entry) => entry.length > 0),
       Date.now(),
     ),

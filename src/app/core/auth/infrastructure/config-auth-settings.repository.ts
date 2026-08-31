@@ -31,4 +31,13 @@ export class ConfigAuthSettingsRepository extends AuthSettingsRepository {
     });
     return clientId;
   }
+
+  async authApiUrl(): Promise<string | null> {
+    const authApiUrl = this.config.integration.authApiUrl;
+    // Un booleano, nunca la URL: es configuración de despliegue y no va a un registro.
+    this.log.debug('dirección del servicio de sesión leída del despliegue', {
+      configurada: authApiUrl !== null,
+    });
+    return authApiUrl;
+  }
 }

@@ -64,9 +64,14 @@ storybook-static
 # Hosting publica: compilar ES preparar el deploy. Nada de lo que hay ahí se versiona.
 /firebase/public2/
 
-# Los `.env.<projectId>` y `.env.local` de la función: Firebase los cargaría por encima del `.env`
-# versionado, así que uno olvidado en el disco cambiaría el despliegue sin que se vea en el diff.
+# La configuración de la función. El `.env` lleva VALORES DE VERDAD (el client_id y el client_secret
+# de Google), así que no se versiona — lo ignora `firebase/.gitignore`. Y los `.env.<projectId>` /
+# `.env.local` tampoco: Firebase los cargaría POR ENCIMA del `.env`, así que uno olvidado en el disco
+# cambiaría el despliegue sin que se vea en ningún diff.
 /firebase/functions/.env.*
+# La plantilla SÍ se versiona: documenta las dos claves sin llevar ningún valor.
+!/firebase/functions/.env.example
 
-# La salida de `tsc` de la función (lo que empaqueta Firebase).
+# La salida de `tsc` de la función (lo que empaqueta Firebase) y la de sus tests.
 /firebase/functions/lib/
+/firebase/functions/lib-test/

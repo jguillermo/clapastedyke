@@ -15,4 +15,12 @@ export abstract class AuthSettingsRepository {
    * ninguno y todavía no se puede autenticar a nadie.
    */
   abstract clientId(): Promise<string | null>;
+
+  /**
+   * La dirección base del servicio de sesión, o `null` si el despliegue no trae ninguna.
+   *
+   * Es del despliegue por la misma razón que `clientId`: la URL de la función lleva dentro el
+   * proyecto y la región, así que cambia de un ambiente a otro y no puede vivir en el código.
+   */
+  abstract authApiUrl(): Promise<string | null>;
 }

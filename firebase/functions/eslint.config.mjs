@@ -8,14 +8,22 @@ import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-  { ignores: ['lib/**', 'generated/**'] },
+  // `lib/` y `lib-test/` son salida de `tsc`: JavaScript compilado que no se lintea.
+  { ignores: ['lib/**', 'lib-test/**', 'generated/**'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
     files: ['**/*.ts'],
     languageOptions: {
       parserOptions: {
-        project: ['tsconfig.json', 'tsconfig.dev.json'],
+        // Los DOS proyectos: `tsconfig.json` excluye los `*.test.ts` (no viajan al despliegue), así
+        // que sin `tsconfig.test.json` los tests no pertenecerían a ninguno y el parser fallaría.
+        //
+        // Aquí estaba `tsconfig.dev.json`, que `firebase init` deja para lintar el `.eslintrc.js`
+        // que él mismo genera. Ese fichero se sustituyó por este flat config, así que aquel tsconfig
+        // se quedó apuntando a un fichero inexistente y tumbaba el lint con `TS18003` — y el lint es
+        // el primer `predeploy`, así que tumbaba el despliegue entero. Se eliminó.
+        project: ['tsconfig.json', 'tsconfig.test.json'],
         tsconfigRootDir: import.meta.dirname,
       },
     },

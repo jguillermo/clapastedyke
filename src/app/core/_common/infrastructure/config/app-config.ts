@@ -12,6 +12,11 @@ export interface ConfigDocument {
   debug?: boolean;
   /** Client ID de OAuth de la app ante Google. */
   googleClientId?: string;
+  /**
+   * URL base del servicio de sesión (la función `auth` de `firebase/functions`), sin barra final.
+   * Cambia por proyecto y por región, así que no puede estar en el bundle.
+   */
+  authApiUrl?: string;
   /** Cada cuántos segundos se comprueba si hay cambios remotos. Ausente o inválido = 120 (2 min). */
   syncPollSeconds?: number;
 }
@@ -19,13 +24,26 @@ export interface ConfigDocument {
 /**
  * Configuración de la integración con Google, resuelta al arrancar.
  *
- * **Un solo valor**, y es del despliegue entero: el identificador de la app ante Google. Todo lo
- * demás —dónde está la hoja, a qué dirección se le habla, con qué secreto— es de cada usuario, se
- * crea al conectar y vive en su IndexedDB, no aquí.
+ * **Dos valores, y los dos son del despliegue entero**: con qué identidad se presenta la app ante
+ * Google, y dónde vive el servicio que custodia el permiso duradero. Todo lo demás —dónde está la
+ * hoja de cada persona, con qué token se escribe— es de cada usuario, se crea al conectar y vive en
+ * su IndexedDB, no aquí.
+ *
+ * Cualquiera de los dos en `null` **apaga la integración**, y eso es un estado normal: la app sigue
+ * siendo utilizable entera porque el recetario vive en IndexedDB.
  */
 export interface IntegrationConfig {
   /** Client ID de OAuth de la app. Uno para todo el despliegue: no se configura por usuario. */
   googleClientId: string | null;
+  /**
+   * URL base del servicio de sesión, sin barra final. La app le cuelga `/exchange`, `/refresh` y
+   * `/logout`.
+   *
+   * Es una URL **absoluta** porque la función no se sirve desde el mismo origen que la app: se llama
+   * directamente, con CORS. Por eso no puede ser una ruta relativa fija en el código — la URL de una
+   * Cloud Function lleva dentro el proyecto y la región.
+   */
+  authApiUrl: string | null;
 }
 
 /**

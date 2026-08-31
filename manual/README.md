@@ -24,13 +24,7 @@ condena a desactualizarse, porque nadie la ve al tocar el fichero de al lado.
 | [`src/app/components/README.md`](../src/app/components/README.md) | Catálogo vivo de la librería de componentes: qué existe, cómo se usa cada pieza y qué falta por construir. Se actualiza en el mismo commit que añade un componente. |
 | [`src/app/core/_common/eventbus/README.md`](../src/app/core/_common/eventbus/README.md) | Especificación del bus de eventos: cola persistente, entrega *at-least-once*, y por qué los manejadores tienen que tolerar ejecutarse dos veces. |
 | [`src/app/core/_common/logger/README.md`](../src/app/core/_common/logger/README.md) | El puerto de registro y su configuración. |
-
-> **Falta un documento, y falta a propósito.** La función `auth` tenía el suyo (`api/auth/README.md`)
-> con sus tres rutas, qué guarda en Firestore y los cinco detalles de OAuth que cuesta deducir del
-> código. Se borró con `api/` en el commit `63eef49` y **`firebase/functions/src/index.ts` es hoy el
-> scaffold vacío de `firebase init`**. Cuando se escriba la función, su README va **a su lado**
-> (`firebase/functions/README.md`) y se enlaza desde esta tabla. El contenido viejo está en el
-> historial: `git show 63eef49^:api/auth/README.md`.
+| [`firebase/functions/README.md`](../firebase/functions/README.md) | El contrato de la función `auth`: sus tres rutas, los códigos de error, cómo viaja la sesión (cookie + `session_token`), qué guarda en Firestore y los detalles de OAuth que cuesta deducir del código. |
 
 Las **convenciones de código** son otra categoría y viven en
 [`.claude/rules/`](../.claude/rules/), una por área (componentes, core/DDD, features, plataforma,

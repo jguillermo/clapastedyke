@@ -87,8 +87,10 @@ firebase/
 ├── firestore.rules               ← + firestore.indexes.json
 ├── proxy.config.json             ← `ng serve` → emulator, versioned
 ├── functions/                    ← THE BACKEND: its own npm package (deps, tsc, ESLint)
-│   ├── .env                      ← VERSIONED, with placeholders — never with values
-│   └── src/index.ts              ← exports `auth` → /api/auth/**
+│   ├── .env                      ← NOT versioned: real values, copied by hand
+│   ├── .env.example              ← versioned: documents the two keys, no values
+│   ├── README.md                 ← the function's contract
+│   └── src/index.ts              ← exports `auth`; the routes live in src/auth/
 └── public/                       ← the artifact `ng build` produces (gitignored)
 ```
 
@@ -103,10 +105,12 @@ hardcode the project id. They were deleted; delete them again if they come back.
 
 Three rules that make this hold:
 
-- **A value that must not be versioned is never written anywhere.** The file that needs it carries a
-  **placeholder** named after the variable — `public/config.json` has
-  `"googleClientId": "GOOGLE_OAUTH_CLIENT_ID"` and `"debug": "DEBUG"`; `firebase/functions/.env` has
-  `GOOGLE_OAUTH_CLIENT_ID=GOOGLE_OAUTH_CLIENT_ID`. Both files are **versioned**, placeholder and all.
+- **A value that must not be versioned is never written anywhere.** `public/config.json` is
+  **versioned with placeholders** named after their variable — `"googleClientId":
+  "GOOGLE_OAUTH_CLIENT_ID"`, `"debug": "DEBUG"`, `"authApiUrl": "AUTH_API_URL"` — and the pipeline
+  substitutes them. **`firebase/functions/.env` is different: it is NOT versioned at all.** It holds
+  real values, is ignored by `firebase/.gitignore`, and is copied by hand from `.env.example`. So only
+  someone whose machine has that file can deploy the function.
 - **The pipeline substitutes them on the runner**, right before publishing (`jq` over the secret,
   `sed` over the file, then a grep that fails the job if a placeholder survived). The repository
   never contains a Client ID.
@@ -131,11 +135,11 @@ override it, which is why that pattern stays in `.gitignore`. The backend deploy
 Firebase packages `functions/` itself — so the substitution happens in the runner's working tree,
 which is ephemeral and never printed.
 
-⚠️ **`firebase/functions/src/index.ts` is still the empty `firebase init` scaffold.** The auth
-function was deleted along with `api/` in commit `63eef49` and lives only in git history. The app
-still calls `/api/auth/**`, so until it is written, sessions do not survive a reload in a deployed
-environment. If a deploy would DELETE an already-published function, `--non-interactive` stops the
-CLI and asks for `--force` instead of doing it silently.
+⚠️ **There is no workflow that deploys the function.** `.github/workflows/` only has
+`deploy-hosting.yml`, which publishes Hosting and nothing else. Publishing the function is
+`cd firebase && firebase deploy --project <projectId>`, by hand, from a machine that has the `.env`.
+If a deploy would DELETE an already-published function, `--non-interactive` stops the CLI and asks for
+`--force` instead of doing it silently.
 
 Full procedure — publishing step by step, what to check afterwards, and how to reproduce the
 substitution locally — in [`firebase/README.md`](firebase/README.md).
@@ -144,9 +148,11 @@ substitution locally — in [`firebase/README.md`](firebase/README.md).
 
 A 3D in-browser cooking game (`misaevol` / "clapastedyke"). The user navigates a three.js kitchen world (`/#/home`); the real data-entry forms are the screens reached from it. `/#/ui` is the living component showcase. **Routing is hash-based** (`withHashLocation()` in `app.config.ts`): everything after `#` never reaches the server, so `/` is the **only** server route the app has and no app route can collide with `/api/**` or with a static file. There is deliberately **no SPA fallback rewrite** — see the comment on `provideRouter` and `manual/firebase-deploy.md`. State is persisted locally in IndexedDB — **that is the source of truth, and no server ever holds the user's data**.
 
-The one network integration is **optional and additive**: from `/cuenta` a user can connect a Google account and mirror recipes and supplies into a spreadsheet in their own Drive. The app creates that spreadsheet and writes it **itself**, with the Sheets and Drive REST APIs and the user's own token — no Apps Script, nothing deployed into anyone's account, one consent checkbox (`drive.file`, which only reaches files the app created). The one-time setup for whoever publishes the app (Cloud project, consent screen, Client ID **and client secret**) is in [`firebase/README.md`](firebase/README.md) — the **only** place that procedure is documented; the design reasoning, the platform constraints and the alternatives that were measured and rejected are in [`manual/google-integration.md`](manual/google-integration.md). Nothing about local persistence changes when it is off — and it is off wherever `googleClientId` is empty. That value is **not in any file of this repository**: `public/config.json` carries the placeholder `GOOGLE_OAUTH_CLIENT_ID` and `firebase/functions/.env` carries that one plus `GOOGLE_OAUTH_CLIENT_SECRET`, and the deploy workflows substitute them on the runner from the `GOOGLE_OAUTH_CLIENT` environment secret — the whole client JSON that Google hands you on download, kept as **one** secret so the `client_id` of one client can never be paired with the `client_secret` of another (that mismatch is what Google answers with an unexplained `invalid_client`). Locally the placeholder simply stays, and the app runs with the integration off.
+The one network integration is **optional and additive**: from `/cuenta` a user can connect a Google account and mirror recipes and supplies into a spreadsheet in their own Drive. The app creates that spreadsheet and writes it **itself**, with the Sheets and Drive REST APIs and the user's own token — no Apps Script, nothing deployed into anyone's account, one consent checkbox (`drive.file`, which only reaches files the app created). The one-time setup for whoever publishes the app (Cloud project, consent screen, Client ID **and client secret**) is in [`firebase/README.md`](firebase/README.md) — the **only** place that procedure is documented; the design reasoning, the platform constraints and the alternatives that were measured and rejected are in [`manual/google-integration.md`](manual/google-integration.md). Nothing about local persistence changes when it is off — and it is off wherever `googleClientId` or `authApiUrl` is missing. Neither value is in any file of this repository: `public/config.json` carries the placeholders `GOOGLE_OAUTH_CLIENT_ID` and `AUTH_API_URL`, substituted on the runner. The `client_secret` never touches the repo either — it lives only in `firebase/functions/.env`, which is **not versioned**. Both halves of the client must come from the **same** downloaded JSON: pairing the `client_id` of one client with the `client_secret` of another is what Google answers with an unexplained `invalid_client`. Locally the placeholders simply stay, and the app runs with the integration off.
 
-**There is exactly one piece of backend, and it is about identity — never data.** A browser client cannot hold a `client_secret`, so Google gives it no refresh token: its access tokens die in an hour and the only way to get another is a popup, which the browser blocks when it isn't triggered by a click. That is why reloading the page used to sign you out. [`firebase/functions`](firebase/functions/) — a Cloud Function named `auth` — is the confidential OAuth client that custodies the long-lived grant and mints fresh access tokens on demand, behind an `HttpOnly` `__session` cookie. The recipe data never passes through it: the whole sync engine still runs in the browser. The folder rule (**one npm package, fully separate from the Angular app — its own deps, its own `tsc`, its own ESLint — deployed manually and separately from hosting; a new function is another `export` from `src/index.ts` plus its rewrite, not another folder**) is in [`manual/functions.md`](manual/functions.md), and it governs every backend function added from now on. ⚠️ Today that file is the empty `firebase init` scaffold: the function still has to be written.
+**There is exactly one piece of backend, and it is about identity — never data.** A browser client cannot hold a `client_secret`, so Google gives it no refresh token: its access tokens die in an hour and the only way to get another is a popup, which the browser blocks when it isn't triggered by a click. That is why reloading the page used to sign you out. [`firebase/functions`](firebase/functions/) — a Cloud Function named `auth`, with three routes (`POST /exchange`, `/refresh`, `/logout`) — is the confidential OAuth client that custodies the long-lived grant and mints fresh access tokens on demand. The recipe data never passes through it: the whole sync engine still runs in the browser. Its contract is in [`firebase/functions/README.md`](firebase/functions/README.md); the folder rule (**one npm package, fully separate from the Angular app — its own deps, its own `tsc`, its own ESLint — deployed by hand; a new function is another `export` from `src/index.ts`, not another folder**) is in [`manual/functions.md`](manual/functions.md).
+
+⚠️ **The app reaches it by its direct URL, with CORS — Hosting is not involved.** There is no rewrite: the function's address lives in `authApiUrl` (`public/config.json`), because a Cloud Function URL carries the project and region inside it. Two consequences that are decisions, not oversights, and both documented in that README: **CORS reflects any `Origin`** with `Allow-Credentials: true`, and the session travels **both** in an `HttpOnly` `__session` cookie **and** in a `session_token` the app stores in IndexedDB — the cookie is third-party, so Safari and iOS block it, and without that fallback the session would not survive a reload on mobile.
 
 ## Architecture: four layers under `src/app/`
 
@@ -263,7 +269,8 @@ umbral de nivel, ni interruptor en `window`, ni estado en `localStorage`.
 // public/config.json — el MISMO build lo lee en todos los entornos
 {
   "debug": true,          // ¿se ve el detalle del flujo? Ausente = false
-  "googleClientId": ""
+  "googleClientId": "",   // identidad de la app ante Google
+  "authApiUrl": ""        // URL de la función `auth`; sin ella no hay sesión que reanudar
 }
 ```
 

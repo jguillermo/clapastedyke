@@ -5,7 +5,7 @@
  */
 
 export const DB_NAME = 'clapastedyke';
-export const DB_VERSION = 13;
+export const DB_VERSION = 14;
 
 const STORES = [
   'ingredients',
@@ -43,6 +43,15 @@ const STORES = [
   // guarda la credencial —eso sigue viviendo solo en memoria—, solo el id y el correo con los que
   // pedirle al proveedor un token nuevo en silencio. Ver `auth/domain/repositories/session-hint`.
   'auth_session_hint',
+  // El identificador de sesión que emite el backend de autenticación. Es el RESPALDO de la cookie
+  // `__session`: la función vive en otro dominio que la app, así que esa cookie es de terceros y
+  // Safari e iOS la bloquean aunque esté bien formada. Sin este respaldo, en esos navegadores la
+  // sesión no sobreviviría a una recarga — que es justo el fallo que el backend viene a arreglar.
+  //
+  // NO es una credencial de Google: no abre nada por sí mismo, solo le dice al backend qué sesión
+  // renovar. Vive aquí y no en `localStorage` porque `SignOut` borra esta base entera
+  // (`LocalData.wipe()`), y así no puede quedar un identificador muerto tras cerrar sesión.
+  'auth_session_token',
   // Cola durable de cambios pendientes de sincronizar. No guarda un agregado sino TRABAJO POR HACER,
   // y por eso vive aquí: un refresco a media sincronización no puede llevarse por delante los
   // cambios que esperaban turno. Ver `external-sync/infrastructure/indexeddb-sync-outbox.ts`.

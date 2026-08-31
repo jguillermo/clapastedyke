@@ -52,7 +52,7 @@ export async function readConfigDocument(): Promise<ConfigDocument | null> {
   }
 }
 
-const EMPTY: IntegrationConfig = { googleClientId: null };
+const EMPTY: IntegrationConfig = { googleClientId: null, authApiUrl: null };
 
 /**
  * Todo Client ID de Google acaba así. Es la forma de distinguir un valor de verdad del **marcador**
@@ -86,7 +86,10 @@ export class PublicFileAppConfig extends AppConfig {
     if (!this.document) {
       return EMPTY;
     }
-    return { googleClientId: clientIdOrNull(this.document.googleClientId) };
+    return {
+      googleClientId: clientIdOrNull(this.document.googleClientId),
+      authApiUrl: authApiUrlOrNull(this.document.authApiUrl),
+    };
   }
 
   get sync(): SyncConfig {
@@ -116,6 +119,39 @@ function clientIdOrNull(value: string | undefined): string | null {
     return null;
   }
   return trimmed;
+}
+
+/**
+ * La URL base del servicio de sesión, o `null` si lo que hay no lo es.
+ *
+ * Se aplica el mismo criterio que a `clientIdOrNull` y por el mismo motivo: distinguir un valor de
+ * verdad del **marcador** `AUTH_API_URL` que lleva el `config.json` versionado. Un marcador que
+ * llegara al navegador sin sustituir haría que la app pidiera tokens a una dirección inventada, y el
+ * fallo aparecería como un error de red sin relación visible con la causa.
+ *
+ * Se exige protocolo `https:` —o `http:` sobre `localhost`/`127.0.0.1`, que es el emulador—, porque
+ * la sesión viaja con una cookie `Secure` y un `http://` en producción no podría guardarla nunca. Y
+ * se quita la barra final para que `${base}/exchange` no acabe en `//exchange`.
+ */
+function authApiUrlOrNull(value: string | undefined): string | null {
+  const trimmed = (value ?? '').trim();
+  if (trimmed.length === 0) {
+    return null;
+  }
+
+  let url: URL;
+  try {
+    url = new URL(trimmed);
+  } catch {
+    // Incluye el marcador sin sustituir: `AUTH_API_URL` no es una URL absoluta.
+    return null;
+  }
+
+  const isLocal = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
+  if (url.protocol !== 'https:' && !(url.protocol === 'http:' && isLocal)) {
+    return null;
+  }
+  return trimmed.replace(/\/+$/, '');
 }
 
 /** La misma tolerancia que `clientIdOrNull`: el fichero lo escribe una persona a mano. */

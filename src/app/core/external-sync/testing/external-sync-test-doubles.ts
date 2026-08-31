@@ -387,7 +387,7 @@ export class FakeAppConfig extends AppConfig {
   readonly debug = false;
 
   get integration(): IntegrationConfig {
-    return { googleClientId: null };
+    return { googleClientId: null, authApiUrl: null };
   }
 
   get sync(): SyncConfig {

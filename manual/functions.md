@@ -5,7 +5,8 @@ Firebase y fuera de `src/`. Es **un paquete npm independiente** de la app Angula
 dependencias, su propio `tsconfig.json`, su propio ESLint y su propio `npm ci`.
 
 Hoy expone una sola función —`auth`, el cliente confidencial de OAuth que mantiene viva la sesión—,
-servida en `/api/auth/**`.
+a la que la app llama por **su URL directa, con CORS**. Su contrato (las tres rutas, los códigos de
+error, qué guarda en Firestore) está en [`../firebase/functions/README.md`](../firebase/functions/README.md).
 
 El «por qué existe un backend en un proyecto que nació sin él» está en
 [`google-integration.md`](google-integration.md). Esto es el «cómo está organizado y cómo se opera».
@@ -14,13 +15,18 @@ El «por qué existe un backend en un proyecto que nació sin él» está en
 
 ```
 firebase/
-├── firebase.json          declara `functions.source = "functions"` y el rewrite /api/auth/**
+├── firebase.json          declara `functions.source = "functions"`
 └── functions/             = codebase `default` = el paquete = el despliegue
-    ├── .env               VERSIONADO, con MARCADORES — nunca con valores
-    ├── package.json       dependencias, `lint`, `build`; `main: "lib/index.js"`
-    ├── tsconfig.json      rootDir `src`, outDir `lib`
+    ├── .env               NO versionado, con los VALORES de verdad
+    ├── .env.example       versionado: documenta las dos claves, sin ningún valor
+    ├── package.json       dependencias, `lint`, `build`, `test`; `main: "lib/index.js"`
+    ├── tsconfig.json      rootDir `src`, outDir `lib`; excluye los `*.test.ts`
+    ├── tsconfig.test.json los tests, aparte, a `lib-test/` (no viajan al despliegue)
     ├── eslint.config.mjs  su ESLint, en flat — NO es el de la app, y TIENE que existir (ver abajo)
-    └── src/index.ts       el punto de entrada: `export const auth = onRequest(…)`
+    ├── README.md          el contrato de la función y cómo operarla
+    └── src/
+        ├── index.ts       el punto de entrada: `export const auth = onRequest(…)`
+        └── auth/          un fichero por responsabilidad (router, cors, cookies, oauth, sesiones…)
 ```
 
 | | |
@@ -28,8 +34,8 @@ firebase/
 | Sus dependencias | su propio `package.json` y su propio `package-lock.json` |
 | Su compilación | su propio `tsconfig.json` (`tsc` → `lib/`) |
 | Su lint | su propio `eslint.config.mjs`, ejecutado por su `npm run lint` |
-| Su despliegue | `Actions → Desplegar (Firebase)` — que publica **todo**, siempre |
-| Su ruta | `/api/auth/**`, por un rewrite de Hosting |
+| Su despliegue | `cd firebase && firebase deploy` desde una máquina que tenga el `.env` |
+| Su ruta | Su **URL directa** (`https://<region>-<projectId>.cloudfunctions.net/auth`), con CORS |
 
 > **`module`/`moduleResolution` son `NodeNext`, no `commonjs`/`node`.** TypeScript 6 deprecó la
 > resolución `node10` (`TS5107`). Como el `package.json` no declara `"type": "module"`, `NodeNext`
@@ -43,8 +49,8 @@ firebase/
 `src/index.ts`**, no crear otra carpeta:
 
 ```typescript
-export const auth = onRequest(…);      // /api/auth/**
-export const informes = onRequest(…);  // /api/informes/**, con su rewrite
+export const auth = onRequest(…);      // el servicio de sesión
+export const informes = onRequest(…);  // otra función, otro export
 ```
 
 Las funciones de un mismo codebase se despliegan juntas y comparten `package.json`. Si alguna vez una
@@ -89,37 +95,60 @@ de Angular): monta su propio Node y hace su propio `npm ci`.
 ## Añadir una función
 
 1. `export const <nombre> = onRequest(…)` en `firebase/functions/src/index.ts`.
-2. **Un rewrite** `/api/<nombre>/**` en `firebase/firebase.json`, apuntando a ese `functionId`. Los
-   rewrites se evalúan **en orden**, así que si alguna vez se añade uno más amplio, este va antes.
-3. Si necesita un parámetro, una línea más en el `.env` **versionado con su marcador**
-   (`MI_PARAMETRO=MI_PARAMETRO`) y su sustitución en `deploy.yml`, como los del cliente de
-   OAuth. **También si es un secreto**: no se usa `defineSecret`, porque metería Secret Manager y
-   Service Usage en el camino de publicar (ver más abajo, requisito 3).
+2. Si la llama el navegador, su **URL directa** y su **CORS**: la función tiene que reflejar el origen
+   y contestar el preflight, como hace `auth` (ver `src/auth/router.ts`). Y la app necesita saber esa
+   URL, que lleva dentro el proyecto y la región — o sea, una clave más en `public/config.json`, como
+   `authApiUrl`. **Hosting no se toca**: no hay rewrites que añadir.
+3. Si necesita un parámetro, una línea más en `.env` (el valor) **y en `.env.example`** (la clave
+   documentada, sin valor), y se lee con `process.env` dentro del manejador. **También si es un
+   secreto**: no se usa `defineSecret`, porque metería Secret Manager y Service Usage en el camino de
+   publicar (ver más abajo, requisito 3).
 
-**Nada más.** Ni el CI ni los workflows llevan una lista de funciones que haya que actualizar: el CI
-lintea y compila el paquete entero, y el deploy publica el codebase entero.
+**Nada más.** Ningún workflow lleva una lista de funciones que haya que actualizar: el deploy publica
+el codebase entero.
 
-## El router: la misma ruta llega de dos formas
+> ⚠️ **`.env` no se versiona**, así que quien añada un parámetro tiene que avisar a quien despliegue:
+> su fichero es el único sitio donde ese valor va a existir. `.env.example` es lo que hace visible el
+> cambio en el diff.
 
-Detrás del rewrite de Hosting la función recibe la ruta **completa** (`/api/auth/exchange`). A través
-del proxy de `ng serve`, que ya apunta a la función, recibe la **corta** (`/exchange`). Las dos tienen
-que acabar en el mismo manejador, así que **el enrutado interno de la función tiene que normalizar el
-prefijo**. Ninguna ruta debería volver a preocuparse por ello.
+## Un fichero por responsabilidad, no uno por ruta
+
+`auth` son cinco ficheros bajo `src/auth/`, y ese reparto es la referencia para la siguiente función:
+
+| Fichero | Qué contiene |
+|---|---|
+| `router.ts` | Enrutado, CORS y preflight; el último recinto de los fallos |
+| `routes.ts` | Las tres operaciones (`login`, `refresh`, `logout`), juntas |
+| `google.ts` | El diálogo con el proveedor externo |
+| `sessions.ts` | Lo que se persiste y cómo se identifica quien pregunta |
+| `http.ts` | Tipos de petición/respuesta, configuración del `.env` y forma del payload |
+
+**Una ruta no es un fichero.** Las tres de `auth` ocupan 132 líneas entre las tres; separarlas
+obligaba a un bloque de imports por cada una y no hacía más fácil leer ninguna.
 
 ## Desarrollo local
 
 ```bash
 npm run emulators       # compila la función y arranca functions + firestore
-npm start               # ng serve, con el proxy de firebase/proxy.config.json
+npm start               # ng serve, en otra terminal
 ```
 
-El proxy no es comodidad: la cookie de sesión es `HttpOnly` y `SameSite=Lax`, así que **solo viaja si
-el backend se ve como mismo origen que la app**. Llamando al emulador por su URL directa
-(`127.0.0.1:5001`) la sesión no se reanudaría nunca en local.
+**No hay proxy, y ya no hace falta.** La app llama al emulador por su URL directa, que se le dice en
+la clave `authApiUrl` de tu `public/config.json` local:
 
-Los valores de verdad para el emulador van en `firebase/functions/.env.local`, que está en el
-`.gitignore` y **no lo escribe ningún script**: se copian a mano del JSON del cliente. Sin ellos, el
-emulador arranca igual y `/exchange` contesta 500 — el `.env` versionado solo lleva marcadores.
+```jsonc
+{ "authApiUrl": "http://127.0.0.1:5001/<projectId>/us-central1/auth" }
+```
+
+`http://` solo se acepta sobre `localhost` o `127.0.0.1`; en cualquier otro sitio la app exige
+`https:`. Es lo que evita publicar por error una configuración con la que la cookie `Secure` nunca
+podría guardarse. (Antes había un `firebase/proxy.config.json` referenciado desde `angular.json`,
+porque la cookie `SameSite=Lax` de entonces exigía mismo origen; hoy la cookie es `SameSite=None` y
+tiene además el respaldo del `session_token`, así que esa línea se quitó de `angular.json`.)
+
+Los valores de verdad van en `firebase/functions/.env`, que está en el `.gitignore` y **no lo escribe
+ningún script**: se copian a mano del JSON del cliente (`cp .env.example .env`). Sin ellos, el
+emulador arranca igual y las rutas contestan 500 con «La función auth no está configurada».
 
 **Hay un solo `firebase.json`**, con la sección `emulators` dentro. El emulador ejecuta el mismo
 `functions/` que se despliega, con su `lib/` recién compilado. (Antes había un
@@ -134,16 +163,24 @@ npm run fn:lint         # su ESLint
 npm run fn:build        # su tsc
 ```
 
-## Despliegue: manual, y separado del de la app
+## Despliegue: a mano, desde una máquina que tenga el `.env`
 
-Hay **un solo workflow**, [`deploy.yml`](../.github/workflows/deploy.yml), y **un solo comando**:
+> ### ⚠️ Hoy NO hay workflow que despliegue la función
+>
+> `.github/workflows/` solo tiene `deploy-hosting.yml`, que usa `action-hosting-deploy` y **publica
+> únicamente Hosting**: no toca `functions` ni `firestore`. El `deploy.yml` que este capítulo describía
+> se borró en el commit `bb69986`.
+>
+> Y no puede volver tal cual: **el `.env` ya no se versiona con marcadores**, así que un runner de
+> GitHub no tiene de dónde sacar el `client_secret`. Publicar la función es, hoy, un comando a mano.
+
+```bash
+cd firebase && npx firebase-tools@latest deploy --project <projectId>
+```
+
 `firebase deploy` sin `--only` despliega los tres targets del `firebase.json` —`firestore`,
-`functions` y `hosting`— de una vez. **No se elige qué se publica: siempre va todo.**
-
-| Input | Valores | Qué hace |
-|---|---|---|
-| `ambiente` | `dev` · `prod` … | el *environment* de GitHub del que salen los secrets |
-| `debug` | casilla | el `"debug"` de `config.json` |
+`functions` y `hosting`— de una vez. Siempre con `cd firebase`: allí está el `firebase.json` y de él
+cuelgan todas sus rutas.
 
 Las reglas de Firestore viajan en el mismo deploy, y ahí es donde deben estar: protegen exactamente
 lo que guarda el backend. Viven en
@@ -151,9 +188,10 @@ lo que guarda el backend. Viven en
 
 > **Antes eran dos workflows** (`deploy-frontend.yml` y `deploy-backend.yml`) porque el backend vivía
 > en `api/`, con una carpeta y un *codebase* por función: publicar una no debía tocar las demás, y
-> había que acordarse de lanzar el backend **antes** que el frontend (la app pide `/api/auth/token`
-> en cuanto arranca). Con un paquete único eso dejó de aplicar, y desplegar siempre todo hace que ese
-> orden deje de estar en manos de quien publica.
+> había que acordarse de lanzar el backend **antes** que el frontend (la app le pedía un token en
+> cuanto arrancaba). Con un paquete único eso dejó de aplicar. Ese orden sigue importando, eso sí:
+> publicar el frontend con una `authApiUrl` que apunta a una función que todavía no existe deja a
+> todo el mundo sin poder conectar.
 
 **El paquete se instala en el runner, pero no se compila ahí.** El `npm ci` de `functions/` hace
 falta porque los `predeploy` de `firebase.json` son `npm --prefix … run lint/build` y corren **dentro
@@ -207,8 +245,8 @@ Sobre un ambiente nuevo (aquí `<projectId>`), de arriba abajo:
 2. **Base de datos de Firestore creada** (requisito 2):
    ```bash
    gcloud firestore databases list --project <projectId>
-   # La región TIENE que ser la de `firestore.location` en firebase/firebase.json (hoy us-west1)
-   gcloud firestore databases create --location=us-west1 --project <projectId>   # si no hay ninguna
+   # La región TIENE que ser la de `firestore.location` en firebase/firebase.json (hoy nam5)
+   gcloud firestore databases create --location=nam5 --project <projectId>   # si no hay ninguna
    ```
 3. **Habilitar las APIs que el CLI no enciende solo** (requisito 3):
    ```bash
@@ -241,7 +279,7 @@ un proyecto sin base de datos falla. Se comprueba y se crea una sola vez:
 
 ```bash
 gcloud firestore databases list --project <projectId>
-gcloud firestore databases create --location=us-west1 --project <projectId>   # si no hay ninguna
+gcloud firestore databases create --location=nam5 --project <projectId>   # si no hay ninguna
 ```
 
 O desde la consola de Firebase: **Compilación → Firestore Database → Crear base de datos**, en modo
@@ -251,7 +289,7 @@ despliegue de todas formas).
 
 > ### CRITICAL: la región tiene que coincidir, y no se puede cambiar después
 >
-> `firebase/firebase.json` declara `"firestore": { "location": "us-west1" }`. **Crea la base en esa
+> `firebase/firebase.json` declara `"firestore": { "location": "nam5" }`. **Crea la base en esa
 > misma región.** La ubicación de una base de Firestore es **permanente**: para cambiarla hay que
 > borrar la base entera y volver a crearla, con lo que haya dentro. Si prefieres otra región,
 > cámbiala en `firebase.json` **antes** de crear nada.
@@ -349,22 +387,23 @@ También se pueden añadir a mano en [IAM](https://console.cloud.google.com/iam-
 cambios tardan un minuto largo en propagarse**: si relanzas el workflow inmediatamente, puede volver
 a dar el mismo 403.
 
-### 5 · El cliente de OAuth, puesto en el *environment*
+### 5 · El cliente de OAuth, en el `.env` de quien despliega
 
-La función `auth` no arranca sin él, pero **no subes nada a Google**: lo que subes al *environment*
-de GitHub es el secret `GOOGLE_OAUTH_CLIENT` —el fichero de cliente que descarga Google, entero—, y
-`deploy.yml` le saca con `jq` el `client_id` y el `client_secret` (este último enmascarado
-con `::add-mask::`) y los escribe en `firebase/functions/.env`. Es lo que hace que montar un ambiente
-sea **elegirlo en Actions**: no queda ningún valor pendiente de que alguien se acuerde de subirlo
-desde su portátil.
+La función `auth` no arranca sin él. Se copia a mano del JSON del cliente que descarga Google Cloud
+Console, a `firebase/functions/.env`, que **no se versiona**:
 
-De dónde sale ese valor: [`firebase/README.md`](../firebase/README.md). El script de la raíz te lo
-enseña en pantalla; al *environment* de GitHub se pega a mano.
+```bash
+cp firebase/functions/.env.example firebase/functions/.env
+# y dentro: web.client_id → GOOGLE_OAUTH_CLIENT_ID, web.client_secret → GOOGLE_OAUTH_CLIENT_SECRET
+```
 
-**Las dos mitades salen del mismo secret**, y eso no es comodidad: es lo que impide emparejar el
-`client_id` de un cliente con el `client_secret` de otro, que es lo que Google rechaza con un
-`invalid_client` sin explicar nada. El frontend lee ese **mismo** secret, así que tampoco pueden
-divergir app y backend.
+**Las dos mitades salen del mismo cliente**, y eso no es comodidad: es lo que impide emparejar el
+`client_id` de uno con el `client_secret` de otro, que es lo que Google rechaza con un
+`invalid_client` sin explicar nada.
+
+> ⚠️ **Consecuencia:** solo puede desplegar la función quien tenga ese fichero. No hay ningún
+> pipeline que lo rellene, y el repositorio no contiene ni un valor. El detalle está en
+> [`../firebase/functions/README.md`](../firebase/functions/README.md) → «Configuración».
 
 ## Cuando el despliegue del backend falla
 
@@ -376,9 +415,10 @@ divergir app y backend.
 | `Billing account … required` / `Your project must be on the Blaze plan` | Proyecto en Spark | Requisito 1 |
 | `Al environment '<amb>' le falta: secret:GOOGLE_OAUTH_CLIENT` | El *environment* de GitHub no declara el cliente | Requisito 5 |
 | El deploy se planta pidiendo `--force` para borrar funciones | `src/index.ts` no exporta lo que sí está publicado en el proyecto | `--non-interactive` te está evitando borrarlas sin querer. Revisa qué exporta antes de forzar nada |
-| La función responde 500 con «La función auth no está configurada» | Está desplegada, pero un marcador del `.env` llegó sin sustituir | Requisito 5 |
+| La función responde 500 con «La función auth no está configurada» | Está desplegada, pero el `.env` no viajó (o llegó vacío) | Requisito 5 |
 | `El secret GOOGLE_OAUTH_CLIENT no trae .web.client_secret` | El secret está, pero no es el JSON completo del cliente | [`firebase/README.md`](../firebase/README.md) → «El fichero del cliente» |
-| `/api/auth/…` da **404** en el sitio publicado | El rewrite no llegó, o la función no está desplegada | Despliega el backend; comprueba el `rewrites` de `firebase/firebase.json` |
+| La app dice que no puede conectar y en la consola hay un error de red sin código | La petición murió en el CORS, o `authApiUrl` apunta a otro sitio | Mira la respuesta del `OPTIONS` en la pestaña de red; comprueba `authApiUrl` en el `config.json` publicado |
+| `POST <authApiUrl>/refresh` da **404** | La función no está desplegada, o la URL no es la suya | `firebase deploy`; la URL correcta sale en la salida del deploy |
 
 Los fallos de **autenticación** (el JSON del secret mal pegado, la clave revocada) son comunes a los
 dos mitades del despliegue y están en la tabla de [`firebase-deploy.md`](firebase-deploy.md).

@@ -1,41 +1,40 @@
 /**
  * Punto de entrada del backend.
  *
- * UNA función = UN `export` de este fichero. No se crea una carpeta por función:
- * añadir una función es añadir aquí otro `export` (y, si tiene que ser
- * alcanzable por la app, su `rewrite` en `firebase.json`).
+ * UNA función = UN `export` de este fichero. No se crea una carpeta por función: añadir una función
+ * es añadir aquí otro `export`.
  *
- * Hoy solo está `health`, una función de sanidad: su único propósito es que
- * `firebase deploy` tenga algo real que publicar y se pueda validar el circuito
- * completo — lint → tsc → empaquetado → despliegue.
+ * Hoy solo está `auth`, el **cliente confidencial de OAuth** de la app: custodia el refresh token de
+ * cada persona y emite tokens de acceso frescos. No hace nada más — ni toca la hoja de cálculo, ni
+ * sabe qué es una receta. **Es un backend de identidad, nunca de datos**: la sincronización del
+ * recetario sigue entera en el navegador, hablando directamente con Sheets y Drive.
  *
- * ⚠️ La función `auth` que la app llama en `/api/auth/**` NO está escrita. El
- * commit `63eef49` borró la carpeta `api/` donde vivía (`api/auth/` +
- * `api/_common/`); se recupera desde `63eef49^`. Mientras no exista, la sesión
- * de Google no sobrevive a una recarga de página.
+ * El contrato de sus tres rutas está en `src/auth/router.ts` y explicado en `README.md`.
  */
 
 import {setGlobalOptions} from "firebase-functions";
 import {onRequest} from "firebase-functions/https";
-import * as logger from "firebase-functions/logger";
+import {route} from "./auth/router";
 
 // Control de coste: tope de contenedores simultáneos, por función.
 setGlobalOptions({maxInstances: 10});
 
 /**
- * Sanidad del despliegue.
+ * El servicio de sesión.
  *
- * Devuelve la hora del arranque del contenedor además de la del momento de la
- * petición: si ambas son viejas, lo que está publicado es una revisión
- * anterior, y eso distingue «no se desplegó» de «se desplegó y no cambió nada».
+ * Sin `cors` de `onRequest`: esta función refleja el origen y responde el preflight ella misma (ver
+ * `auth/cors.ts`), porque necesita `Access-Control-Allow-Credentials`, que la opción del framework
+ * no cubre con la política que se quiere aquí.
  */
-const startedAt = new Date().toISOString();
-
-export const health = onRequest((request, response) => {
-  logger.info("health", {structuredData: true});
-  response.json({
-    status: "ok",
-    startedAt,
-    now: new Date().toISOString(),
-  });
-});
+export const auth = onRequest(
+  {
+    region: "us-central1",
+    // La app la llama en cada arranque; que alguien espere un arranque en frío es aceptable, pero no
+    // diez segundos colgado de una llamada a Google que no responde.
+    timeoutSeconds: 30,
+    memory: "256MiB",
+  },
+  async (req, res) => {
+    await route(req, res);
+  },
+);

@@ -68,13 +68,22 @@ export class FakeAuthenticator extends Authenticator {
   }
 }
 
-/** Ajustes falsos: por defecto hay identificador de cliente, que es el caso normal. */
+/**
+ * Ajustes falsos: por defecto el despliegue está completo (identificador de cliente y dirección del
+ * servicio de sesión), que es el caso normal. Poner cualquiera de los dos a `null` ejercita la rama
+ * de «este despliegue no puede autenticar a nadie».
+ */
 @Injectable()
 export class FakeAuthSettingsRepository extends AuthSettingsRepository {
   configured: string | null = '123-abc.apps.googleusercontent.com';
+  apiUrl: string | null = 'https://auth.example.test';
 
   async clientId(): Promise<string | null> {
     return this.configured;
+  }
+
+  async authApiUrl(): Promise<string | null> {
+    return this.apiUrl;
   }
 }
 

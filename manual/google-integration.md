@@ -84,10 +84,11 @@ sin depender de que la persona tenga su sesión de Google abierta.
 > de Firestore que deniegan todo, y un token que nunca se devuelve al navegador— pero el modelo de
 > amenaza **cambió**, y conviene saberlo antes que descubrirlo.
 
-### 2.4 En el navegador no se persiste ninguna credencial
+### 2.4 En el navegador no se persiste ninguna credencial *de Google*
 
 `Credential` sigue viviendo **solo en memoria** (`core/auth/domain/value-objects/credential.ts`) y
-durando una hora. No está en `localStorage`, ni en IndexedDB, ni en una cookie legible.
+durando una hora. No está en `localStorage`, ni en IndexedDB, ni en una cookie legible. El refresh
+token no llega nunca al navegador.
 
 | Dónde guardar el token de acceso | Sobrevive a… | Coste |
 |---|---|---|
@@ -99,6 +100,23 @@ Ninguna de las dos últimas pasa de **1 hora** —ahí caduca el token—, así 
 problema. Lo que lo resuelve es no guardar el token sino **poder pedir otro**, y esa capacidad vive en
 una cookie **`HttpOnly`** que emite la función `auth`: el JavaScript de la app no puede leerla, y un XSS
 tampoco.
+
+> **La cookie sola no basta, y hay que saber por qué.** La función se llama por su **URL directa**, no
+> por un rewrite de mismo origen, así que su cookie es **de terceros** — y Safari e iOS las bloquean
+> aunque estén perfectamente formadas. En esos navegadores la cookie no llegaría nunca y la sesión no
+> sobreviviría a una recarga, que es justo el fallo que todo esto viene a arreglar. Y la app es
+> **mobile-first**: ese medio parque es el principal.
+>
+> Por eso la respuesta lleva además un `session_token` con el mismo valor, que la app guarda en
+> IndexedDB (`auth_session_token`) y manda en `Authorization` cuando la cookie no viajó. Va en
+> IndexedDB y no en `localStorage` porque `SignOut` borra esa base entera, así que cerrar sesión se lo
+> lleva por delante sin que nadie tenga que acordarse.
+>
+> **El coste, dicho claro:** ese identificador sí es legible por el JavaScript de la página, así que
+> un XSS podría llevárselo — cosa que con la cookie `HttpOnly` sola no pasaba. No es una credencial de
+> Google (no abre nada por sí mismo; solo le dice al backend qué sesión renovar, y el backend decide
+> si sigue viva), pero permitiría suplantar la sesión hasta que se cierre. Es el precio de que la
+> sesión funcione en móvil, y se acepta a sabiendas.
 
 En IndexedDB se sigue guardando **solo con qué cuenta se estaba** (id y correo, nunca un token). Es la
 puerta de `ResumeSession`: sin pista, a un visitante que nunca conectó ni se le pregunta al backend.
@@ -203,11 +221,12 @@ El tercero era el que de verdad protegía contra corrupción silenciosa, y es el
 Navegador                        auth (Cloud Function)          Drive del usuario
 ─────────                        ───────────────────────        ─────────────────
                                  Firestore
-«Conectar» ─ code ─────────────►  canje + client_secret ──────►  Google
-                                 refresh token ▸ Firestore
-           ◄─ cookie __session ─  token de acceso (1 h)
-recarga / cada hora ───────────►  refresh ────────────────────►  Google
-           ◄──────────────────── token de acceso (1 h)
+«Conectar» ─ POST /exchange ───►  canje + client_secret ──────►  Google
+              { code }             refresh token ▸ Firestore
+           ◄─ cookie __session  ─  token de acceso (1 h)
+              + session_token
+recarga / cada hora ───────────►  POST /refresh ───────────────►  Google
+     (cookie o Bearer)             ◄──────────────────────────── token de acceso (1 h)
 
 IndexedDB (fuente de verdad)
     │
@@ -281,7 +300,7 @@ conectar **su** cuenta, se le subirían a **su** hoja.
 Tres cosas que dependen del orden y de nada más:
 
 1. **Primero se pierde la conexión, después se borra.** `session.close()` va antes de tocar nada
-   local —y antes incluso de retirar la autorización, que es red y tarda—. Con sesión viva, un ciclo
+   local —y antes incluso de avisar al backend, que es red y tarda—. Con sesión viva, un ciclo
    de sincronización podría leer la base ya vacía y no concluiría «no hay nada que subir» sino que el
    usuario **ha borrado su recetario entero**: escribiría esas bajas en la hoja. Cerrar quita la
    credencial (el ciclo se niega a arrancar) y cambia el `epoch` (lo que esté en vuelo tira su
@@ -291,6 +310,13 @@ Tres cosas que dependen del orden y de nada más:
 3. **La app rearranca** (`platform/restart/app-restart.ts`). Los app-initializers solo corren al
    arrancar, así que solo una carga en frío vuelve a sembrar el recetario de ejemplo; y sin ella, la
    pantalla seguiría enseñando lo que tenía leído de una base que ya no existe.
+
+> **Cerrar sesión NO retira el permiso en Google.** `POST /logout` cierra **esta** sesión: borra
+> `sessions/{sid}` y limpia la cookie. La concesión (`users/{sub}`, con el refresh token) se queda, así
+> que los otros dispositivos de esa persona siguen conectados y la app sigue apareciendo autorizada en
+> su cuenta de Google. Es deliberado —cerrar sesión en el móvil no debería echar a nadie del
+> ordenador—, y quien quiera lo otro lo hace desde su cuenta de Google. Ojo: **este aparato sí queda
+> vacío**, porque el borrado local es aparte y sí ocurre.
 
 Nada de esto pierde datos para su dueño: **lo que estuviera sincronizado sigue en su hoja de Drive** y
 baja de vuelta al conectar otra vez. Lo que sí se pierde es lo que quedara en la cola, así que la
@@ -343,8 +369,10 @@ Así que la pantalla de consentimiento tiene que estar **«En producción»**. P
 | Síntoma | Causa | Arreglo |
 |---|---|---|
 | `Error 400: origin_mismatch` | El origen no está registrado, o es `127.0.0.1` vs `localhost`, o el puerto cambió | [`firebase/README.md`](../firebase/README.md) §3 |
-| `UNAUTHENTICATED` | El token de una hora caducó y el backend no ha podido emitir otro | Mirar la respuesta de `/api/auth/token`: `401 revoked` = se retiró el acceso (reconectar); `502` = Google no contestó (se reintenta solo) |
-| Al recargar pide reconectar | El backend no tiene sesión para este navegador: falta la cookie `__session`, o su concesión ya no vale | Si es sistemático, comprobar que `/api/auth/**` llega a la función (rewrite en `firebase.json`) y que la pantalla de consentimiento está **En producción** (5.2) |
+| `UNAUTHENTICATED` | El token de una hora caducó y el backend no ha podido emitir otro | Mirar la respuesta de `<authApiUrl>/refresh`: `401 revoked` = se retiró el acceso (reconectar); `502` = Google no contestó (se reintenta solo) |
+| Al recargar pide reconectar | El backend no tiene sesión para este navegador: no llegó ni la cookie `__session` ni el `session_token`, o la concesión ya no vale | Comprobar que `authApiUrl` del `config.json` publicado apunta a la función y que la pantalla de consentimiento está **En producción** (5.2) |
+| Al recargar pide reconectar **solo en Safari o iOS** | La cookie de terceros está bloqueada Y el `session_token` de respaldo no se guardó | Mirar en IndexedDB el store `auth_session_token`. Si está vacío tras conectar, el fallo está en `BackendAuthenticator`, no en el navegador |
+| La consola dice «blocked by CORS» o un error de red sin código | La petición murió en el preflight, o `authApiUrl` apunta a otro sitio | Mirar la respuesta del `OPTIONS` en la pestaña de red |
 | `REJECTED` | El usuario no marcó la casilla de Drive, o revocó el acceso | Reconectar y marcarla |
 | `TARGET_GONE` | La hoja se borró o está en la papelera | Se recrea sola al reconectar; también **Crear una hoja nueva** |
 | `INTERNAL` con «*… API has not been used in project …*» | Falta habilitar Sheets o Drive API | *APIs & Services → Library* |
@@ -471,7 +499,7 @@ los tecleara un usuario: un insumo llamado «12/03» se volvería fecha y uno qu
 | Todo lo que sabe que el proveedor es Google, en el navegador | `core/auth/infrastructure/google-code-client.ts` |
 | Los scopes que se piden | mismo fichero, constante `SCOPES` |
 | El adaptador que habla con el backend | `core/auth/infrastructure/backend-authenticator.ts` |
-| El cliente confidencial (canje, refresco, revocación) | `firebase/functions/` — ver [`functions.md`](functions.md) |
+| El cliente confidencial (canje, refresco, cierre de sesión) | `firebase/functions/` — su contrato en [`../firebase/functions/README.md`](../firebase/functions/README.md) |
 | La credencial y su caducidad | `core/auth/domain/value-objects/credential.ts` |
 | Traducción de sesión → contrato compartido | `core/auth/infrastructure/session-credentials-provider.ts` |
 | El puerto agnóstico del destino | `core/external-sync/domain/services/sync.gateway.ts` |

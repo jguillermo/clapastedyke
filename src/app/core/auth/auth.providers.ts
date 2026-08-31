@@ -9,11 +9,13 @@ import { CredentialsProvider } from '@core/_common/credentials/credentials-provi
 import { ResumeSession } from './application/use-cases/resume-session.use-case';
 import { AuthSettingsRepository } from './domain/repositories/auth-settings.repository';
 import { SessionHintRepository } from './domain/repositories/session-hint.repository';
+import { SessionTokenRepository } from './domain/repositories/session-token.repository';
 import { Authenticator } from './domain/services/authenticator';
 import { Session } from './domain/services/session';
 import { BackendAuthenticator } from './infrastructure/backend-authenticator';
 import { ConfigAuthSettingsRepository } from './infrastructure/config-auth-settings.repository';
 import { IndexedDbSessionHintRepository } from './infrastructure/indexeddb-session-hint.repository';
+import { IndexedDbSessionTokenRepository } from './infrastructure/indexeddb-session-token.repository';
 import { InMemorySession } from './infrastructure/in-memory-session';
 import { SessionCredentialsProvider } from './infrastructure/session-credentials-provider';
 import { SessionHintAccountHistory } from './infrastructure/session-hint-account-history';
@@ -22,10 +24,14 @@ import { SessionHintAccountHistory } from './infrastructure/session-hint-account
  * DI del contexto `auth`. **Aquí se decide el proveedor de identidad**: cambiar de proveedor es
  * escribir otro `Authenticator` y tocar esta línea; ni el dominio ni los casos de uso se enteran.
  *
- * **En el navegador no se persiste ninguna credencial**: la de acceso vive en memoria y muere con la
- * pestaña, y lo único que se guarda aquí es una pista de con qué cuenta se estaba, que por sí sola no
- * abre nada. Lo que sí dura es una cookie `HttpOnly` que emite el backend (`firebase/functions`) y que este
- * código no puede leer — ni él ni un XSS. Ver `BackendAuthenticator`.
+ * **En el navegador no se persiste ninguna credencial de Google**: la de acceso vive en memoria y
+ * muere con la pestaña, y el permiso duradero no sale nunca del backend. Lo que sí se guarda aquí es
+ * una pista de con qué cuenta se estaba y el identificador de sesión que emite el backend — dos
+ * cosas que por sí solas no abren nada, porque quien decide si esa sesión sigue viva es el servidor.
+ *
+ * Ese identificador viaja también en una cookie `HttpOnly` que este código no puede leer (ni él ni
+ * un XSS), y esa es la vía preferida; se guarda además una copia porque la cookie es de otro dominio
+ * y Safari e iOS la bloquean. Ver `BackendAuthenticator` y `SessionTokenRepository`.
  *
  * El app-initializer intenta **reanudar** con esa pista, y lo hace sin esperar: pedirle un token al
  * backend tarda unas décimas y bloquear el arranque por eso dejaría la cocina en blanco. Mientras
@@ -38,6 +44,7 @@ export function provideAuth(): EnvironmentProviders {
     { provide: Session, useClass: InMemorySession },
     { provide: AuthSettingsRepository, useClass: ConfigAuthSettingsRepository },
     { provide: SessionHintRepository, useClass: IndexedDbSessionHintRepository },
+    { provide: SessionTokenRepository, useClass: IndexedDbSessionTokenRepository },
     // Cómo obtiene otro contexto las credenciales de la sesión. El contrato es del shared kernel,
     // así que nadie necesita conocer este contexto para actuar en nombre del usuario.
     { provide: CredentialsProvider, useClass: SessionCredentialsProvider },

@@ -49,6 +49,15 @@ const SCOPES = `openid email profile ${DRIVE_FILE}`;
 /** El `client_id` que se le sirve a la app en `config.json`; sin uno, la integración está apagada. */
 const CLIENT_ID = 'e2e-client-id.apps.googleusercontent.com';
 
+/**
+ * La dirección del servicio de sesión que se le sirve a la app en `config.json`.
+ *
+ * Es `https://` porque `PublicFileAppConfig` rechaza cualquier otra cosa fuera de localhost — la
+ * cookie de sesión es `Secure` y un `http://` en producción no podría guardarla. Nadie llega a este
+ * dominio: las tres rutas están interceptadas.
+ */
+const AUTH_API_URL = 'https://auth.e2e.example';
+
 const TOKEN = 'e2e-access-token';
 
 /** La cuenta que el doble dice que ha entrado. `sub` es lo que la app usa como id de cuenta. */
@@ -318,7 +327,7 @@ export class GoogleDouble {
   private session = false;
 
   /**
-   * Cuántas veces se le ha pedido un token al backend (`POST /api/auth/token`).
+   * Cuántas veces se le ha pedido un token al backend (`POST <authApiUrl>/refresh`).
    *
    * Existe para que un spec pueda asertar **por dónde** volvió la sesión, y no solo que la pantalla
    * dice «Conectada». Sin esto, un journey de recarga pasaría igual si la app se hubiera reconectado
@@ -390,7 +399,7 @@ export class GoogleDouble {
       route.fulfill({
         status: 200,
         contentType: 'application/json; charset=utf-8',
-        body: JSON.stringify({ debug: true, googleClientId: CLIENT_ID }),
+        body: JSON.stringify({ debug: true, googleClientId: CLIENT_ID, authApiUrl: AUTH_API_URL }),
       }),
     );
 
@@ -405,19 +414,19 @@ export class GoogleDouble {
 
     // 3 · El backend de la sesión (`firebase/functions`). Es quien identifica la cuenta y emite los tokens;
     //     la app ya no le pregunta el perfil a Google.
-    await page.route('**/api/auth/exchange', (route) =>
+    await page.route(`${AUTH_API_URL}/exchange`, (route) =>
       this.answerAuth(route, () => {
         this.session = true;
         return sessionPayload();
       }),
     );
-    await page.route('**/api/auth/token', (route) =>
+    await page.route(`${AUTH_API_URL}/refresh`, (route) =>
       this.answerAuth(route, () => {
         this.tokenRequests += 1;
         return this.session ? sessionPayload() : UNAUTHORIZED;
       }),
     );
-    await page.route('**/api/auth/sign-out', (route) =>
+    await page.route(`${AUTH_API_URL}/logout`, (route) =>
       this.answerAuth(route, () => {
         this.session = false;
         return NO_CONTENT;
@@ -867,7 +876,7 @@ interface StructuralRequest {
  *
  * Expone **solo `initCodeClient`**, que es lo único que la app usa desde que la sesión la custodia el
  * backend: entrega un código de autorización y ahí acaba su papel. Ni tokens, ni `revoke` — de eso
- * responde ahora `/api/auth/*`, que también tiene su doble aquí.
+ * responde ahora el servicio de sesión, que también tiene su doble aquí.
  *
  * Un detalle que importa: el modelo de código solo entra en juego al **conectar**, así que si algún
  * día la app volviera a necesitar a Google para reanudar, este stub no la salvaría — el spec de
@@ -903,20 +912,28 @@ const UNAUTHORIZED: AuthReply = {
 
 const NO_CONTENT: AuthReply = { status: 204, body: null };
 
-/** La misma forma que devuelven `/api/auth/exchange` y `/api/auth/token`. */
+/**
+ * La misma forma que devuelven `<authApiUrl>/exchange` y `/refresh`: nombres de OAuth.
+ *
+ * `session_token` es el respaldo de la cookie `__session` para los navegadores que bloquean las
+ * cookies de terceros. Aquí es una constante porque el doble no distingue sesiones: lo que un E2E
+ * comprueba es que la app lo guarda y lo devuelve, no cuál es su valor.
+ */
 function sessionPayload(): AuthReply {
   return {
     status: 200,
     body: {
+      access_token: TOKEN,
+      expires_in: 3600,
+      scope: SCOPES,
+      token_type: 'Bearer',
+      session_token: 'e2e-session-token',
       account: {
-        id: E2E_ACCOUNT.sub,
+        sub: E2E_ACCOUNT.sub,
         email: E2E_ACCOUNT.email,
         name: E2E_ACCOUNT.name,
-        pictureUrl: null,
+        picture: null,
       },
-      accessToken: TOKEN,
-      expiresIn: 3600,
-      scope: SCOPES,
     },
   };
 }

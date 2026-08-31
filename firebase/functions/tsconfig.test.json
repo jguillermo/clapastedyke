@@ -1,11 +1,17 @@
 {
+  // Los tests se compilan APARTE y a otra carpeta (`lib-test/`, ignorada por git) para que no viajen
+  // en el despliegue: `tsconfig.json` los excluye, y `lib/` solo lleva lo que se ejecuta en Cloud.
+  //
+  // No extiende `tsconfig.json` con `extends` porque necesita invertir su `exclude`, y en TypeScript
+  // un `exclude` heredado no se puede "vaciar" sin volver a declararlo entero. Diez líneas duplicadas
+  // cuestan menos que esa sutileza.
   "compilerOptions": {
     "module": "NodeNext",
     "esModuleInterop": true,
     "moduleResolution": "nodenext",
     "noImplicitReturns": true,
     "noUnusedLocals": true,
-    "outDir": "lib",
+    "outDir": "lib-test",
     "rootDir": "src",
     "sourceMap": true,
     "strict": true,
@@ -17,11 +23,7 @@
       "ES2022"
     ]
   },
-  "compileOnSave": true,
   "include": [
     "src"
-  ],
-  "exclude": [
-    "src/**/*.test.ts"
   ]
 }
