@@ -62,7 +62,7 @@ storybook-static
 
 # El artefacto compilado. `ng build` escribe DENTRO de `firebase/public`, que es lo que Firebase
 # Hosting publica: compilar ES preparar el deploy. Nada de lo que hay ahí se versiona.
-/firebase/public2/
+/firebase/public/
 
 # La configuración de la función. El `.env` lleva VALORES DE VERDAD (el client_id y el client_secret
 # de Google), así que no se versiona — lo ignora `firebase/.gitignore`. Y los `.env.<projectId>` /

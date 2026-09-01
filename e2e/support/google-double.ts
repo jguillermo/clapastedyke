@@ -395,7 +395,7 @@ export class GoogleDouble {
   async install(page: Page): Promise<void> {
     // 1 · La configuración del despliegue. Sin `googleClientId` la integración está apagada y el
     //     botón de conectar no puede hacer nada, así que se sirve uno.
-    await page.route('**/config.json', (route) =>
+    await page.route('**/config.json*', (route) =>
       route.fulfill({
         status: 200,
         contentType: 'application/json; charset=utf-8',
