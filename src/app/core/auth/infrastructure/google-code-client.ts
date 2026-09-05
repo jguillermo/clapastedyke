@@ -63,11 +63,31 @@ export class GoogleCodeClient {
   private loading: Promise<GoogleIdentityApi> | null = null;
 
   /**
+   * Descarga el script de Google **sin esperar a nadie**, para que `requestCode` no tenga que hacerlo
+   * dentro del clic.
+   *
+   * La primera vez, cargarlo es una petición de red, y esperarla puede romper el vínculo con el gesto
+   * del usuario: el navegador bloquearía la ventana emergente justo en el primer intento. Adelantarlo
+   * al montar la pantalla de cuenta lo evita sin que nadie más pague la descarga.
+   *
+   * Un fallo aquí no degrada nada: `requestCode` lo reintentará y ahí sí hay a quién contárselo.
+   */
+  preload(): void {
+    void this.load().catch((error: unknown) => {
+      this.log.debug('la precarga del script ha fallado, se reintentará al conectar', { error });
+    });
+  }
+
+  /**
    * Abre la ventana de Google y devuelve el código de autorización.
    *
    * **Hay que llamarlo dentro del gesto del usuario** (el clic en «Conectar»): abre una ventana
    * emergente y el navegador la bloquearía si no. Es la única operación de toda la sesión con esa
    * restricción, y por eso es la única que ocurre en respuesta a un clic.
+   *
+   * Para que ese vínculo con el clic aguante, el script tiene que estar ya cargado: esperar aquí una
+   * petición de red es lo que hacía que el navegador bloqueara la ventana **en el primer intento**.
+   * De eso responde {@link preload}.
    *
    * `select_account: true` garantiza que el usuario pueda **elegir cuenta** —y por tanto cambiar de
    * cuenta—; con el comportamiento por defecto Google reutilizaría la última en silencio.
@@ -99,10 +119,11 @@ export class GoogleCodeClient {
 
   /**
    * Carga el script de GIS la primera vez que hace falta. Se inyecta en runtime, y no con una
-   * etiqueta en `index.html`, para que quien nunca conecte su cuenta no descargue nada de Google.
+   * etiqueta en `index.html`, para que quien nunca abra la pantalla de cuenta no descargue nada de
+   * Google.
    *
-   * Con el modelo de código esto solo ocurre al pulsar «Conectar»: **reanudar una sesión ya no toca
-   * a Google desde el navegador**, así que una recarga no descarga este script.
+   * En la práctica lo dispara `preload()` al montarse esa pantalla, no el clic. **Reanudar una sesión
+   * ya no toca a Google desde el navegador**, así que una recarga sigue sin descargar este script.
    */
   private load(): Promise<GoogleIdentityApi> {
     const pending = this.loading ?? this.injectScript();

@@ -40,7 +40,12 @@ export class FakeAuthenticator extends Authenticator {
   interactiveCalls = 0;
   resumeCalls = 0;
   remoteSessionsClosed = 0;
+  prepareCalls = 0;
   failWith: Error | null = null;
+
+  prepare(): void {
+    this.prepareCalls += 1;
+  }
 
   async authenticate(): Promise<Authentication> {
     this.interactiveCalls += 1;

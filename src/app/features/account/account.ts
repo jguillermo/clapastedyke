@@ -1,4 +1,11 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  type OnInit,
+  signal,
+} from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Card } from '@components/card/card';
 import { CardBody } from '@components/card/card-body';
@@ -12,6 +19,7 @@ import { Checklist, ChecklistItem, ChecklistState } from '@components/checklist/
 import { Icon } from '@components/icon/icon';
 import { Alert } from '@components/alert/alert';
 import { Logger } from '@core/_common/logger/logger';
+import { PrepareSignIn } from '@core/auth/application/use-cases/prepare-sign-in.use-case';
 import { SignIn } from '@core/auth/application/use-cases/sign-in.use-case';
 import { SignOut } from '@core/auth/application/use-cases/sign-out.use-case';
 import { WatchSession } from '@core/auth/application/use-cases/watch-session.use-case';
@@ -153,9 +161,10 @@ interface ConnectFailure {
     Alert,
   ],
 })
-export class Account {
+export class Account implements OnInit {
   private readonly watchSession = inject(WatchSession);
   private readonly watchStatus = inject(WatchSyncStatus);
+  private readonly prepareSignIn = inject(PrepareSignIn);
   private readonly signIn = inject(SignIn);
   private readonly signOut = inject(SignOut);
   private readonly prepareTarget = inject(PrepareSyncTarget);
@@ -163,6 +172,17 @@ export class Account {
   private readonly sync = inject(SynchronizeTables);
   private readonly restart = inject(AppRestart);
   private readonly log = inject(Logger).scoped('ui/account');
+
+  /**
+   * Se adelanta lo que conectar necesita, porque quien abre esta pantalla es quien va a pulsarlo.
+   *
+   * No es una optimización: autenticar abre una ventana emergente y el navegador solo la permite si
+   * sale del clic, así que esperar ahí a que se cargue el proveedor la haría bloquearse en el primer
+   * intento. `void` es honesto — el caso de uso no puede fallar.
+   */
+  ngOnInit(): void {
+    void this.prepareSignIn.execute();
+  }
 
   /** Estado de la sesión y de la sincronización, tal como los publica cada caso de uso. */
   protected readonly session = this.watchSession.state;

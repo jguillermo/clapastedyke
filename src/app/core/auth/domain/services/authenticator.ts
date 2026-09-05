@@ -37,8 +37,24 @@ export type ResumeOutcome =
  */
 export abstract class Authenticator {
   /**
+   * Adelanta lo que `authenticate` necesite tener listo, para que ese pueda ocurrir **dentro del
+   * gesto del usuario**.
+   *
+   * Existe por una restricción del navegador, no por rendimiento: autenticar abre una ventana
+   * emergente, y el navegador solo la permite si sale de un clic. Cualquier espera previa —descargar
+   * el SDK del proveedor, típicamente— puede romper ese vínculo y hacer que la ventana se bloquee
+   * justo la primera vez, que es la única que importa.
+   *
+   * No devuelve nada y no puede fallar hacia fuera: es un adelanto, y si no sale, `authenticate` hará
+   * el trabajo por su cuenta. Llamarlo varias veces no lo repite.
+   */
+  abstract prepare(): void;
+
+  /**
    * Autentica al usuario. Debe permitirle **elegir cuenta** en cada intento; si no, cambiar de
    * cuenta sería imposible.
+   *
+   * Hay que llamarlo **dentro del gesto del usuario**. Ver {@link prepare}.
    *
    * @param clientId identificador de la aplicación ante el proveedor.
    */

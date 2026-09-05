@@ -64,6 +64,11 @@ export class BackendAuthenticator extends Authenticator {
   private readonly sessionTokens = inject(SessionTokenRepository);
   private readonly log = inject(Logger).scoped('auth/backend');
 
+  /** Lo único que `authenticate` no puede permitirse esperar dentro del clic. */
+  prepare(): void {
+    this.codes.preload();
+  }
+
   /**
    * Conectar: una ventana de Google (dentro del clic) para obtener el código, y el backend lo
    * canjea. Es el único momento de toda la vida de la sesión en que se le pide algo al usuario.
