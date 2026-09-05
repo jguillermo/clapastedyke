@@ -37,6 +37,9 @@ import { SessionHintAccountHistory } from './infrastructure/session-hint-account
  * backend tarda unas décimas y bloquear el arranque por eso dejaría la cocina en blanco. Mientras
  * tanto la app funciona igual —local-first—, y cuando la sesión vuelve, la pantalla de cuenta se
  * entera sola porque lee una signal.
+ *
+ * Nadie llega a ver «Conectar con Google» durante esas décimas: en cuanto se lee la pista, la sesión
+ * se abre **sin conexión** y solo asciende a activa cuando el backend contesta. Ver `ResumeSession`.
  */
 export function provideAuth(): EnvironmentProviders {
   return makeEnvironmentProviders([

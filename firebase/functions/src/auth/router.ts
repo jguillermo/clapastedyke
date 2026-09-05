@@ -4,7 +4,7 @@
  * Tres rutas, todas `POST`. Lo que hay alrededor —preflight, método equivocado, ruta inexistente,
  * fallo inesperado— se resuelve aquí una sola vez, para que ninguna ruta tenga que acordarse.
  *
- * ## CRITICAL: se refleja CUALQUIER origen, y eso tiene un coste conocido
+ * ## CRITICAL: solo se contesta a los orígenes de la lista
  *
  * La app **no** llega por un rewrite de mismo origen: llama a la URL directa de la función, así que
  * cada petición es de origen cruzado y el navegador exige cabeceras CORS. Sin ellas descarta la
@@ -12,15 +12,12 @@
  * diagnosticar.
  *
  * Con `Allow-Credentials: true` la especificación prohíbe el comodín `*`: hay que devolver el origen
- * concreto que pidió. Aquí se devuelve **el que venga, sea cual sea**.
- *
- * Eso significa que cualquier web que visite la persona puede hacer `POST /refresh` desde su
- * navegador, recibir un token de acceso válido y usarlo contra los ficheros que esta app creó en su
- * Drive. Es una decisión tomada a sabiendas, no un descuido: si algún día se quiere cerrar, el único
- * cambio es que `allowedOrigin` consulte una lista en vez de devolver lo que le dan.
+ * concreto que pidió. Y devolver **el que venga** —como se hacía antes— dejaba que cualquier web que
+ * visitara la persona pidiera `POST /refresh` con su cookie y recibiera un token de acceso a su
+ * Drive. Por eso el origen se comprueba contra `ALLOWED_ORIGINS`; ver {@link allowedOrigins}.
  */
 import * as logger from "firebase-functions/logger";
-import {isSecure, normalizePath, sendError} from "./http";
+import {allowedOrigins, isSecure, normalizePath, sendError} from "./http";
 import type {HttpRequest, HttpResponse} from "./http";
 import {handleExchange, handleLogout, handleRefresh, type Route} from "./routes";
 
@@ -79,15 +76,25 @@ export async function route(req: HttpRequest, res: HttpResponse): Promise<void> 
 }
 
 /**
- * El origen que se autoriza para esta petición: el que venga.
+ * El origen que se autoriza para esta petición, o `null` si no hay ninguno que autorizar.
  *
- * `null` cuando no viene `Origin` — una llamada de servidor a servidor, o un `curl`. Ahí no hay CORS
- * que aplicar: el navegador es quien impone esta política, y si no hay navegador no hay nada que
- * declarar.
+ * Devuelve `null` en dos casos que no hay que confundir. Sin cabecera `Origin` es una llamada de
+ * servidor a servidor o un `curl`: no hay CORS que aplicar, porque quien impone esta política es el
+ * navegador. Con un `Origin` que no está en la lista, es una web ajena: tampoco se le declara nada,
+ * y su navegador descartará la respuesta.
  */
 export function allowedOrigin(req: HttpRequest): string | null {
   const origin = req.headers.origin;
-  return origin && origin.length > 0 ? origin : null;
+  if (!origin) {
+    return null;
+  }
+  if (!allowedOrigins().has(origin)) {
+    // La única pista de que un despliegue tiene mal ALLOWED_ORIGINS: desde el navegador, esto se ve
+    // como un fallo de red sin explicación.
+    logger.warn("origen no autorizado", {origin});
+    return null;
+  }
+  return origin;
 }
 
 function applyCors(req: HttpRequest, res: HttpResponse): void {

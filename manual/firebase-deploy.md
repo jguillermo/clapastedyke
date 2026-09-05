@@ -162,6 +162,31 @@ ocho.
 **Cómo se crea ese Client ID y dónde se registran sus orígenes está en
 [`firebase/README.md`](../firebase/README.md)** — es el único sitio con ese procedimiento.
 
+Esos **mismos dos dominios** van además en `ALLOWED_ORIGINS`, dentro de
+[`firebase/functions/.env`](../firebase/functions/.env.example): son dos listas distintas y las dos
+tienen que estar. La de Google decide desde dónde se puede pedir el consentimiento; la de la función
+decide a quién le contesta el servicio de sesión. Si falta la segunda, conectar funciona pero
+**recargar deja la app «sin conexión» para siempre**, y la única pista es un `warn` con `origen no
+autorizado` en el registro de la función.
+
+### Paso 6 · Política TTL de las sesiones (recomendado)
+
+La función marca cada sesión con `expiresAt` y borra la que encuentra caducada al leerla, pero
+**Firestore no borra nada por su cuenta**: las sesiones de quien nunca vuelve se quedan ahí. Una
+política TTL las retira sola.
+
+```bash
+gcloud firestore fields ttls update expiresAt \
+  --collection-group=sessions --enable-ttl --project=<projectId>
+```
+
+También se puede activar desde la consola de Firestore, en **Time-to-live**, sobre el grupo de
+colecciones `sessions` y el campo `expiresAt`.
+
+No es imprescindible —una sesión caducada no autoriza nada, porque `readGrant` la rechaza y la
+borra—, así que esto es higiene de almacenamiento, no seguridad. El plazo es de **inactividad**: cada
+`/refresh` empuja `expiresAt` otros 180 días.
+
 ---
 
 ## Añadir un ambiente

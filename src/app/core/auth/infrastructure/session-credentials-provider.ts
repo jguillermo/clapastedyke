@@ -5,7 +5,14 @@ import {
 } from '@core/_common/credentials/credentials-provider';
 import { Logger } from '@core/_common/logger/logger';
 import { ResumeSession } from '../application/use-cases/resume-session.use-case';
-import { Session } from '../domain/services/session';
+import { phaseOf, Session, SessionPhase } from '../domain/services/session';
+
+/** Por qué se está pidiendo una reanudación. Cada situación se arregla de una forma distinta. */
+const WHY_RESUMING: Readonly<Record<SessionPhase, string>> = {
+  disconnected: 'sin sesión en memoria, se intenta reanudar la de este navegador',
+  offline: 'sesión conocida pero sin autorización, se intenta recuperarla',
+  active: 'credencial caducada, se intenta renovar sin molestar al usuario',
+};
 
 /**
  * Adaptador de salida de `auth` hacia el contrato `CredentialsProvider` del shared kernel.
@@ -88,14 +95,8 @@ export class SessionCredentialsProvider extends CredentialsProvider {
     }
 
     // Quien pregunta solo ve `null` y lo trata como «desconectado». Distinguir POR QUÉ es la
-    // diferencia entre «no ha entrado» y «se le caducó el token», que se arreglan distinto.
-    if (snapshot.account) {
-      this.log.debug('credencial caducada, se intenta renovar sin molestar al usuario', {
-        accountId: snapshot.account.id.value,
-      });
-    } else {
-      this.log.debug('sin sesión en memoria, se intenta reanudar la de este navegador');
-    }
+    // diferencia entre «no ha entrado», «se quedó sin cobertura» y «se le caducó el token».
+    this.log.debug(WHY_RESUMING[phaseOf(snapshot)]);
     await this.resume.execute();
 
     const renewed = this.session.snapshot();

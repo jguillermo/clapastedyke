@@ -31,7 +31,10 @@ const SESSIONS = "sessions";
 
 export const SESSION_COOKIE = "__session";
 
-/** Seis meses. Lo que dura la comodidad de no volver a conectar. */
+/**
+ * Seis meses **de inactividad**, no de vida: cada `/refresh` vuelve a empezar la cuenta (ver
+ * {@link extendSession}). A quien usa la app no se le pide reconectar nunca; a quien la abandona, sí.
+ */
 export const SESSION_MAX_AGE_SECONDS = 180 * 24 * 60 * 60;
 
 /** La concesión de una persona, tal como la necesita quien renueva un token. */
@@ -246,6 +249,21 @@ export async function readGrant(sid: string): Promise<StoredGrant | null> {
     refreshToken,
     scope: (user.get("scope") as string | undefined) ?? "",
   };
+}
+
+/**
+ * Aleja la caducidad de una sesión que se acaba de usar.
+ *
+ * Sin esto, los 180 días corren desde que se conectó y la sesión muere aunque se use a diario: a
+ * alguien que abre la app cada mañana se le pediría reconectar cada seis meses sin motivo. Con esto,
+ * el plazo mide **inactividad**, que es lo que se quería medir desde el principio.
+ *
+ * No devuelve nada ni lanza hacia fuera: quien la llama ya tiene el token del usuario en la mano, y
+ * fallar por no haber podido mover una fecha sería cambiar un éxito por un error.
+ */
+export async function extendSession(sid: string): Promise<void> {
+  const expiresAt = Date.now() + SESSION_MAX_AGE_SECONDS * 1000;
+  await db().collection(SESSIONS).doc(sid).update({expiresAt});
 }
 
 /**

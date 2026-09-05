@@ -14,6 +14,10 @@ import assert from "node:assert/strict";
 import {allowedOrigin, route} from "./router";
 import type {HttpRequest, HttpResponse} from "./http";
 
+// La lista de orígenes se lee del entorno en cada petición, igual que en producción: sin ella la
+// función no contestaría a nadie y todo lo de abajo fallaría por el mismo motivo.
+process.env["ALLOWED_ORIGINS"] = "https://ejemplo.test,http://localhost:4200";
+
 function request(method: string, path: string, origin?: string): HttpRequest {
   return {method, path, body: null, headers: origin ? {origin} : {}};
 }
@@ -47,13 +51,33 @@ function spy() {
 }
 
 describe("allowedOrigin", () => {
-  it("refleja cualquier origen — decisión explícita, con su coste documentado en router.ts", () => {
+  it("devuelve los orígenes de la lista, uno a uno", () => {
     assert.equal(allowedOrigin(request("POST", "/exchange", "https://ejemplo.test")), "https://ejemplo.test");
     assert.equal(allowedOrigin(request("POST", "/exchange", "http://localhost:4200")), "http://localhost:4200");
   });
 
+  it("null ante un origen ajeno: es lo que impide que otra web pida un token con la cookie del usuario", () => {
+    assert.equal(allowedOrigin(request("POST", "/refresh", "https://web-ajena.test")), null);
+  });
+
+  it("null ante un origen que solo se le parece: la comparación es exacta", () => {
+    assert.equal(allowedOrigin(request("POST", "/refresh", "https://ejemplo.test.evil.test")), null);
+    assert.equal(allowedOrigin(request("POST", "/refresh", "https://ejemplo.test/")), null);
+  });
+
   it("null sin Origin: no hay navegador imponiendo la política (curl, servidor a servidor)", () => {
     assert.equal(allowedOrigin(request("POST", "/exchange")), null);
+  });
+});
+
+describe("route · origen no autorizado", () => {
+  it("no declara CORS, así que su navegador descarta la respuesta", async () => {
+    const {res, state} = spy();
+
+    await route(request("POST", "/refresh", "https://web-ajena.test"), res);
+
+    assert.equal(state.headers["Access-Control-Allow-Origin"], undefined);
+    assert.equal(state.headers["Access-Control-Allow-Credentials"], undefined);
   });
 });
 

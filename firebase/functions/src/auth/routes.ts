@@ -43,6 +43,7 @@ import {
 import {
   clearedSessionCookie,
   closeSession,
+  extendSession,
   forgetGrant,
   openSession,
   readGrant,
@@ -126,8 +127,12 @@ export const handleExchange: Route = async (req, res, secure) => {
  * **Esta ruta es el arreglo.** Corre en cada recarga y cada vez que el token de una hora caduca: sin
  * ventana emergente, sin gesto del usuario y sin depender de que tenga su sesión de Google abierta.
  *
- * `401` no es un fallo del servidor ni un error que mostrar: significa «hay que conectar a mano», y
- * el navegador lo traduce a `null` en `Authenticator.resume`.
+ * Además **alarga la sesión**: usarla es lo que la mantiene viva, así que los 180 días miden
+ * inactividad y no antigüedad.
+ *
+ * `401` no es un fallo del servidor ni un error que mostrar: es lo único que autoriza al navegador a
+ * olvidar su sesión. Cualquier otro desenlace —incluido este servicio sin contestar— lo trata como
+ * «no se ha podido preguntar», y la sesión sigue en pie. Ver `ResumeOutcome` en el navegador.
  */
 export const handleRefresh: Route = async (req, res, secure) => {
   const sid = readSessionId(req);
@@ -170,10 +175,28 @@ export const handleRefresh: Route = async (req, res, secure) => {
   // descartara un token perfectamente válido por «no trae el permiso de Drive».
   const scope = tokens.scope || grant.scope;
 
+  await keepSessionAlive(sid, res, secure);
+
   // El `sid` no rota al renovar: es la misma sesión. Se repite en el payload para que un navegador
   // que hubiera perdido lo guardado pueda recuperarlo sin volver a conectar.
   sendJson(res, 200, sessionPayload(grant, tokens, scope, sid));
 };
+
+/**
+ * La sesión se acaba de usar, así que su plazo vuelve a empezar: en Firestore y en la cookie del
+ * navegador, que tienen que caducar a la vez.
+ *
+ * Un fallo aquí no puede tumbar la respuesta. El usuario ya tiene su token y la sesión sigue siendo
+ * válida; lo único que se pierde es haber movido la fecha, y el refresco siguiente lo reintenta.
+ */
+async function keepSessionAlive(sid: string, res: HttpResponse, secure: boolean): Promise<void> {
+  res.setHeader("Set-Cookie", sessionCookie(sid, secure));
+  try {
+    await extendSession(sid);
+  } catch (error) {
+    logger.warn("no se ha podido alargar la sesión", error);
+  }
+}
 
 // ─── POST /logout ────────────────────────────────────────────────────────────────────────────────
 

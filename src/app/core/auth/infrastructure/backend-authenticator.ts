@@ -3,7 +3,7 @@ import { Logger } from '@core/_common/logger/logger';
 import { Account } from '../domain/entities/account';
 import { AuthSettingsRepository } from '../domain/repositories/auth-settings.repository';
 import { SessionTokenRepository } from '../domain/repositories/session-token.repository';
-import { Authentication, Authenticator } from '../domain/services/authenticator';
+import { Authentication, Authenticator, ResumeOutcome } from '../domain/services/authenticator';
 import { Credential } from '../domain/value-objects/credential';
 import { DRIVE_FILE_PERMISSION, GoogleCodeClient } from './google-code-client';
 
@@ -43,6 +43,9 @@ import { DRIVE_FILE_PERMISSION, GoogleCodeClient } from './google-code-client';
 
 /** Ninguna llamada puede quedarse colgada: una promesa que no resuelve congela `ResumeSession`. */
 const TIMEOUT_MS = 15_000;
+
+const UNREACHABLE: ResumeOutcome = { kind: 'unreachable' };
+const INVALID: ResumeOutcome = { kind: 'invalid' };
 
 /** El lenguaje publicado del backend. Se declara aquí porque el front no importa de `firebase/`. */
 interface SessionPayload {
@@ -102,20 +105,21 @@ export class BackendAuthenticator extends Authenticator {
 
   /**
    * Reanudar es **solo esto**: pedirle un token al backend, que lo emite con el permiso duradero que
-   * guarda. Ni carga el script de Google, ni abre nada, ni necesita el `clientId` ni la pista — la
-   * identidad la ponen la cookie o el identificador guardado. Los dos parámetros se conservan porque
-   * son del puerto, no de este adaptador.
+   * guarda. Ni carga el script de Google, ni abre nada, ni necesita saber con qué cuenta se estaba —
+   * la identidad la ponen la cookie o el identificador guardado.
    *
-   * `401` es el caso normal de quien no ha conectado nunca o cuya sesión ya no vale: **no es un
-   * fallo** y no se registra como tal.
+   * ## Qué se considera «no te oigo» y qué «tu sesión no vale»
+   *
+   * Solo el `401` dice algo sobre la sesión: es el backend afirmando que no la reconoce. Todo lo
+   * demás —red caída, tiempo agotado, Google sin contestar, despliegue sin dirección configurada— es
+   * ignorancia nuestra, y tratarla como una expulsión echaría al usuario cada vez que entra en el
+   * metro.
    */
-  async resume(_clientId: string, _hint: string): Promise<Authentication | null> {
+  async resume(): Promise<ResumeOutcome> {
     const base = await this.settings.authApiUrl();
     if (!base) {
-      // Sin dirección no hay a quién preguntar. El puerto exige `null`, no una excepción: reanudar
-      // corre en el arranque y no puede tumbar la app.
-      this.log.debug('sin dirección del servicio de sesión, no se puede reanudar');
-      return null;
+      this.log.debug('sin dirección del servicio de sesión, no se puede preguntar');
+      return UNREACHABLE;
     }
 
     this.log.debug('pidiendo un token al backend');
@@ -124,24 +128,18 @@ export class BackendAuthenticator extends Authenticator {
     try {
       response = await this.post(`${base}/refresh`);
     } catch (error) {
-      // A diferencia del flujo anterior, el error SÍ se liga: sin esto no había forma de saber por
-      // qué no se reanudaba una sesión.
-      this.log.debug('el backend no ha contestado, hará falta conectar a mano', { error });
-      return null;
+      this.log.debug('el backend no ha contestado', { error });
+      return UNREACHABLE;
     }
 
     if (response.status === 401) {
-      // El backend ya ha decidido que esta sesión no vale; conservar el identificador solo serviría
-      // para volver a preguntar lo mismo en cada arranque.
-      await this.sessionTokens.clear();
-      this.log.debug('el backend no tiene sesión para este navegador');
-      return null;
+      this.log.debug('el backend no reconoce la sesión de este navegador');
+      return INVALID;
     }
     if (!response.ok) {
-      // Un fallo pasajero (Google no contestó): la sesión del backend sigue viva, así que el
-      // identificador NO se borra y el intento siguiente puede ir bien.
+      // Pasajero: la sesión del backend sigue viva y el intento siguiente puede ir bien.
       this.log.warn('el backend no ha podido renovar el acceso', await failureMessage(response));
-      return null;
+      return UNREACHABLE;
     }
 
     const payload = await readPayload(response);
@@ -151,32 +149,45 @@ export class BackendAuthenticator extends Authenticator {
 
     const authentication = toAuthentication(payload);
     if (!authentication.credential.allows(DRIVE_FILE_PERMISSION)) {
+      // Sin el permiso de Drive el token no sirve para lo único que esta app hace con Google, así
+      // que la sesión que lo respalda tampoco: hay que volver a consentir.
       this.log.warn('el token renovado no trae el permiso de Drive, se descarta');
-      return null;
+      return INVALID;
     }
-    return authentication;
+    return { kind: 'authenticated', authentication };
   }
 
   /**
-   * Cerrar sesión. El backend cierra la sesión de este navegador y limpia su cookie; la credencial
-   * en memoria la tira quien llama. No lanza aunque el backend falle: la sesión local se cierra
-   * igual.
+   * Cierra en el backend la sesión de **este** navegador: borra su `sessions/{sid}` y vacía su
+   * cookie. Ni toca las sesiones que esa persona tenga en otros dispositivos, ni retira su
+   * autorización en Google.
    *
-   * El identificador local se borra **pase lo que pase**. Dejarlo vivo tras cerrar sesión haría que
-   * el siguiente arranque intentara reanudar una sesión que el usuario acaba de cerrar.
+   * Que no se pueda contactar se **devuelve**, no se traga: quien llama tiene que poder negarse a
+   * cerrar en local una sesión que quizá siga viva al otro lado.
    */
-  async revoke(_credential: Credential): Promise<void> {
+  async closeRemoteSession(): Promise<'closed' | 'unreachable'> {
     const base = await this.settings.authApiUrl();
-    try {
-      if (base) {
-        await this.post(`${base}/logout`);
-        this.log.debug('sesión cerrada en el backend');
-      }
-    } catch (error) {
-      this.log.warn('no se ha podido avisar al backend del cierre de sesión', error);
-    } finally {
-      await this.sessionTokens.clear();
+    if (!base) {
+      this.log.debug('sin dirección del servicio de sesión, no hay a quién avisar');
+      return 'unreachable';
     }
+
+    let response: Response;
+    try {
+      response = await this.post(`${base}/logout`);
+    } catch (error) {
+      this.log.debug('el backend no ha contestado al cierre de sesión', { error });
+      return 'unreachable';
+    }
+
+    if (!response.ok) {
+      // Sin confirmación no se puede dar por cerrada: quien llama va a borrar el dispositivo entero.
+      this.log.warn('el backend no ha confirmado el cierre', await failureMessage(response));
+      return 'unreachable';
+    }
+
+    this.log.debug('sesión cerrada en el backend');
+    return 'closed';
   }
 
   /**

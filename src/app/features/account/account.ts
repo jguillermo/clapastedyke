@@ -168,6 +168,15 @@ export class Account {
   protected readonly session = this.watchSession.state;
   protected readonly status = this.watchStatus.state;
 
+  /** Hay una cuenta detrás, aunque ahora mismo no se pueda hablar con el servidor. */
+  protected readonly hasSession = computed(() => this.session().phase !== 'disconnected');
+
+  /**
+   * Se puede actuar en nombre del usuario. Es lo que separa «tienes sesión» de «puedes usarla», y
+   * gobierna las tres acciones que necesitan al servidor: sincronizar, comprobar y cerrar sesión.
+   */
+  protected readonly canOperate = computed(() => this.session().phase === 'active');
+
   protected readonly busy = signal(false);
 
   /**

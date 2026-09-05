@@ -7,7 +7,8 @@ import { Logger } from '@core/_common/logger/logger';
 import { AuthSettingsRepository } from '../domain/repositories/auth-settings.repository';
 import { SessionHint, SessionHintRepository } from '../domain/repositories/session-hint.repository';
 import { Account } from '../domain/entities/account';
-import { Authentication, Authenticator } from '../domain/services/authenticator';
+import { Authentication, Authenticator, ResumeOutcome } from '../domain/services/authenticator';
+import { SessionTokenRepository } from '../domain/repositories/session-token.repository';
 import { Session } from '../domain/services/session';
 import { Credential } from '../domain/value-objects/credential';
 import { InMemorySession } from '../infrastructure/in-memory-session';
@@ -26,11 +27,19 @@ import { InMemorySession } from '../infrastructure/in-memory-session';
 /** Proveedor de identidad falso. Distingue entrar (interactivo) de reanudar (silencioso). */
 @Injectable()
 export class FakeAuthenticator extends Authenticator {
-  /** `false` simula que no hay sesión en el proveedor o que hace falta consentir otra vez. */
-  canResume = true;
+  /**
+   * Cómo contesta al reanudar. Los tres desenlaces del puerto se ejercitan cambiando esto, y
+   * distinguirlos es justo lo que se está probando: `unreachable` deja la sesión en pie e `invalid`
+   * la tira.
+   */
+  resumesWith: ResumeOutcome['kind'] = 'authenticated';
+
+  /** `false` simula que no hay forma de avisar al servicio de sesión de que se cierra. */
+  remoteSessionReachable = true;
+
   interactiveCalls = 0;
   resumeCalls = 0;
-  revoked: Credential[] = [];
+  remoteSessionsClosed = 0;
   failWith: Error | null = null;
 
   async authenticate(): Promise<Authentication> {
@@ -41,13 +50,17 @@ export class FakeAuthenticator extends Authenticator {
     return this.authentication();
   }
 
-  async resume(): Promise<Authentication | null> {
+  async resume(): Promise<ResumeOutcome> {
     this.resumeCalls += 1;
-    return this.canResume ? this.authentication() : null;
+    if (this.resumesWith === 'authenticated') {
+      return { kind: 'authenticated', authentication: this.authentication() };
+    }
+    return this.resumesWith === 'invalid' ? { kind: 'invalid' } : { kind: 'unreachable' };
   }
 
-  async revoke(credential: Credential): Promise<void> {
-    this.revoked.push(credential);
+  async closeRemoteSession(): Promise<'closed' | 'unreachable'> {
+    this.remoteSessionsClosed += 1;
+    return this.remoteSessionReachable ? 'closed' : 'unreachable';
   }
 
   /**
@@ -114,6 +127,33 @@ export class FakeSessionHintRepository extends SessionHintRepository {
   }
 }
 
+/**
+ * El identificador de sesión de este navegador, en memoria.
+ *
+ * Se asserta que **desaparece** al cerrar sesión y al recibir un rechazo del servicio: si sobrevive,
+ * la siguiente carga intentaría reanudar una sesión que ya no existe.
+ */
+@Injectable()
+export class FakeSessionTokenRepository extends SessionTokenRepository {
+  private token: string | null = null;
+
+  async read(): Promise<string | null> {
+    return this.token;
+  }
+
+  async save(token: string): Promise<void> {
+    this.token = token;
+  }
+
+  async clear(): Promise<void> {
+    this.token = null;
+  }
+
+  stored(): string | null {
+    return this.token;
+  }
+}
+
 /** El borrado local, contado: lo que importa es si se pidió, y `failWith` cubre que no tumbe la salida. */
 @Injectable()
 export class FakeLocalData extends LocalData {
@@ -162,10 +202,12 @@ export function provideAuthTestDoubles(): Provider[] {
     FakeAuthenticator,
     FakeAuthSettingsRepository,
     FakeSessionHintRepository,
+    FakeSessionTokenRepository,
     FakeLocalData,
     { provide: Authenticator, useExisting: FakeAuthenticator },
     { provide: AuthSettingsRepository, useExisting: FakeAuthSettingsRepository },
     { provide: SessionHintRepository, useExisting: FakeSessionHintRepository },
+    { provide: SessionTokenRepository, useExisting: FakeSessionTokenRepository },
     { provide: LocalData, useExisting: FakeLocalData },
     { provide: Session, useClass: InMemorySession },
     { provide: EventBus, useClass: RecordingEventBus },

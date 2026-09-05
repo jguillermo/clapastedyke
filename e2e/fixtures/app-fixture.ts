@@ -1,6 +1,6 @@
 import { test as base, expect, type Page } from '@playwright/test';
 import { DISABLE_WEBGL_SCRIPT } from '../support/webgl';
-import { GoogleDouble } from '../support/google-double';
+import { AUTH_API_URL, GoogleDouble } from '../support/google-double';
 import { AccountPage } from '../pages/account.page';
 import { SyncBadgePage } from '../pages/sync-badge.page';
 import { HomePage } from '../pages/home.page';
@@ -128,6 +128,21 @@ function isFontResource(url: string): boolean {
   return /\.(woff2?|ttf|otf|eot)(\?|#|$)/i.test(url);
 }
 
+/**
+ * Una petición al servicio de sesión que **el propio test ha cortado** (`google.cutSessionService()`).
+ *
+ * El navegador anota en consola toda petición que muere en la red, y esa anotación no es de la app:
+ * es el navegador contando lo que el test acaba de provocar a propósito para simular que no hay
+ * cobertura. Sin esta excepción, el único recorrido que prueba el modo sin conexión no podría existir.
+ *
+ * Está acotada a **ese dominio**, que en esta suite no es real y solo lo sirve el doble: cualquier
+ * otro fallo de red —un asset, la app, Sheets, Drive— sigue tumbando el test. Y lo que la app registre
+ * por su cuenta también, porque eso llega con la URL del documento, no con esta.
+ */
+function isCutByTest(url: string): boolean {
+  return url.startsWith(AUTH_API_URL);
+}
+
 export const test = base.extend<AppOptions & AppFixtures>({
   webgl: [false, { option: true }],
 
@@ -160,15 +175,18 @@ export const test = base.extend<AppOptions & AppFixtures>({
    * `warn` y `error` se ven siempre. **Los `warn` se ignoran a propósito** — son degradaciones
    * esperadas en algunos flujos (un insumo legacy, un fallback), no fallos.
    *
-   * **La única excepción son las tipografías** (ver {@link isFontResource}): una fuente que no carga la
-   * degrada el navegador solo, y esta suite no comprueba con qué letra se pinta nada. Todo lo demás
-   * —incluido el 404 de cualquier otro asset— sigue tumbando el test.
+   * **Dos excepciones, y solo dos.** Las tipografías (ver {@link isFontResource}): una fuente que no
+   * carga la degrada el navegador solo, y esta suite no comprueba con qué letra se pinta nada. Y las
+   * peticiones al servicio de sesión que el propio test corta para simular la falta de cobertura (ver
+   * {@link isCutByTest}). Todo lo demás —incluido el 404 de cualquier otro asset— sigue tumbando el
+   * test.
    */
   consoleErrors: [
     async ({ page }, use) => {
       const errors: string[] = [];
       page.on('console', (message) => {
-        if (message.type() === 'error' && !isFontResource(message.location().url)) {
+        const { url } = message.location();
+        if (message.type() === 'error' && !isFontResource(url) && !isCutByTest(url)) {
           errors.push(message.text());
         }
       });

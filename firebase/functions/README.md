@@ -101,17 +101,19 @@ dominio que la app. Eso tiene dos consecuencias que están en el código:
 
 La función acepta cualquiera de las dos y prefiere la cookie.
 
-> ### ⚠️ CORS: se refleja CUALQUIER origen, y es una decisión con coste
+> ### ⚠️ CORS: solo los orígenes de `ALLOWED_ORIGINS`
 >
 > Con `Access-Control-Allow-Credentials: true` la especificación prohíbe el comodín `*`, así que hay
-> que devolver el origen concreto. Aquí se devuelve **el que venga**.
+> que devolver el origen concreto. Y devolver **el que venga** —como se hacía antes— significaba que
+> cualquier web que visitara la persona podía hacer `POST /refresh` desde su navegador, recibir un
+> token de acceso válido y usarlo contra los ficheros que esta app creó en su Drive.
 >
-> Eso significa que **cualquier web que visite la persona puede hacer `POST /refresh` desde su
-> navegador, recibir un token de acceso válido y usarlo contra los ficheros que esta app creó en su
-> Drive.** Está aceptado a sabiendas, no es un descuido.
+> Ahora `allowedOrigin` (`src/auth/router.ts`) comprueba el origen contra la lista de
+> `ALLOWED_ORIGINS`. Un origen que no esté no recibe cabeceras de CORS, así que su navegador descarta
+> la respuesta; la función lo deja anotado con `warn` en su registro.
 >
-> Cerrarlo es un cambio de una función: que `allowedOrigin` (`src/auth/router.ts`) consulte una lista
-> en vez de devolver lo que le dan. Sus tests están en `router.test.ts`.
+> **La lista vacía no contesta a nadie**, y eso incluye a la app. Es la opción segura: un despliegue
+> a medias falla de forma visible en vez de reabrir el agujero. Sus tests están en `router.test.ts`.
 
 ## Qué se guarda, y qué no
 
@@ -124,7 +126,11 @@ sessions/{sid}  ← { sub, createdAt, expiresAt }. El `sid` es lo que ve el nave
   aparece en ningún mensaje de error.
 - **El id de la sesión no es el `sub` de Google.** El `sub` es adivinable, estable para siempre y
   compartido con cualquier otro sitio donde esa persona entre con Google. El `sid` es opaco,
-  aleatorio, caduca a los 180 días y se puede tirar sin tocar la concesión.
+  aleatorio, caduca y se puede tirar sin tocar la concesión.
+- **Los 180 días miden inactividad, no antigüedad.** Cada `/refresh` empuja `expiresAt` y reemite la
+  cookie, así que a quien usa la app no se le pide reconectar nunca; a quien la abandona medio año,
+  sí. Firestore no borra solo los documentos caducados: la política TTL está en
+  [`../../manual/firebase-deploy.md`](../../manual/firebase-deploy.md) → paso 6.
 - **`/logout` cierra solo esta sesión.** Borra `sessions/{sid}`, no `users/{sub}`: los otros
   dispositivos de esa persona siguen conectados y el permiso en Google no se retira. Quien quiera lo
   segundo lo hace desde su cuenta de Google.
@@ -134,12 +140,17 @@ sessions/{sid}  ← { sub, createdAt, expiresAt }. El `sid` es lo que ve el nave
 
 ## Configuración
 
-Dos variables, y las dos salen del **mismo** cliente de OAuth de Google:
+Tres variables. Las dos primeras salen del **mismo** cliente de OAuth de Google:
 
 | Valor | Secreto |
 |---|---|
 | `GOOGLE_OAUTH_CLIENT_ID` | No — viaja en cada petición del navegador, y también está en `config.json` |
 | `GOOGLE_OAUTH_CLIENT_SECRET` | **Sí** — solo vive aquí y en Google |
+| `ALLOWED_ORIGINS` | No — son direcciones públicas, pero **sin ellas la función no contesta a nadie** |
+
+`ALLOWED_ORIGINS` son los orígenes desde los que la app puede llamar, separados por comas, con
+esquema y sin barra final — el dominio de Hosting del proyecto y, para desarrollo,
+`http://localhost:4200`. Es lo que impide que otra web pida un token con la cookie del usuario.
 
 Van en **`firebase/functions/.env`, que NO se versiona** (lo ignora `firebase/.gitignore`) y lleva
 los valores de verdad. [`.env.example`](.env.example) sí se versiona y documenta las dos claves.

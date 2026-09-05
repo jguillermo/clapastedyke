@@ -18,28 +18,52 @@
     <migo-card-header>
       <migo-card-title>Cuenta</migo-card-title>
       <migo-card-subtitle>
-        @if (session().connected) {
-          Conectada. Todo se sincroniza con el Drive de esta cuenta.
-        } @else {
-          Sin conectar. Tus datos siguen guardados en este dispositivo.
+        @switch (session().phase) {
+          @case ('active') {
+            Conectada. Todo se sincroniza con el Drive de esta cuenta.
+          }
+          @case ('offline') {
+            Sesión activa · sin conexión. Tus datos siguen guardados en este dispositivo.
+          }
+          @default {
+            Sin conectar. Tus datos siguen guardados en este dispositivo.
+          }
         }
       </migo-card-subtitle>
     </migo-card-header>
 
     <migo-card-body>
       <div class="flex flex-col gap-4">
-        @if (session().connected) {
-          <div class="flex flex-col gap-0.5">
-            <p class="m-0 text-base font-semibold text-body">{{ session().displayName }}</p>
-            <p class="m-0 text-sm text-muted">{{ session().email }}</p>
-          </div>
-        } @else {
-          <p class="m-0 text-sm text-body">
-            Un botón: eliges tu cuenta de Google y aceptas los permisos. A partir de ahí la app crea
-            sola una hoja llamada «Clapastedyke — Recetario» en tu Drive y la mantiene al día en las
-            dos direcciones: lo que cambies aquí sube, y lo que cambies en la hoja baja. Solo
-            alcanza los archivos que ella misma crea, nada más de tu Drive.
-          </p>
+        @switch (session().phase) {
+          @case ('active') {
+            <div class="flex flex-col gap-0.5">
+              <p class="m-0 text-base font-semibold text-body">{{ session().displayName }}</p>
+              <p class="m-0 text-sm text-muted">{{ session().email }}</p>
+            </div>
+          }
+          <!-- Sin conexión no se dice de quién es la sesión: nombre y avatar los da el servidor, y
+               enseñar solo el correo parecería la sesión entera. -->
+          @case ('offline') {
+            <div class="flex flex-col gap-2">
+              <p class="m-0 text-sm text-body">
+                Tu sesión sigue abierta, pero ahora mismo no hay conexión con el servidor. Tus
+                recetas y tus insumos se guardan en este dispositivo como siempre, y se sincronizan
+                solos en cuanto vuelva internet.
+              </p>
+              <p class="m-0 text-sm text-muted">
+                Cerrar sesión necesita conexión: borra todos los datos de este dispositivo, y para
+                eso hay que poder avisar antes al servidor.
+              </p>
+            </div>
+          }
+          @default {
+            <p class="m-0 text-sm text-body">
+              Un botón: eliges tu cuenta de Google y aceptas los permisos. A partir de ahí la app
+              crea sola una hoja llamada «Clapastedyke — Recetario» en tu Drive y la mantiene al día
+              en las dos direcciones: lo que cambies aquí sube, y lo que cambies en la hoja baja.
+              Solo alcanza los archivos que ella misma crea, nada más de tu Drive.
+            </p>
+          }
         }
 
         @if (progress().length > 0) {
@@ -144,7 +168,7 @@
     <migo-card-footer>
       <!-- Reintentar NO vive aquí: cuando algo falla, el botón está dentro del aviso, junto a las
            instrucciones que hay que haber seguido antes de volver a pulsarlo. -->
-      @if (session().connected) {
+      @if (hasSession()) {
         @if (confirmingSignOut()) {
           <button migo-button type="button" variant="ghost" (click)="keepSession()">
             Cancelar
@@ -162,10 +186,13 @@
             Sí, cerrar sesión
           </button>
         } @else {
+          <!-- Sin conexión no se puede: cerrar borra el dispositivo entero y el servidor tiene que
+               enterarse antes. Se deshabilita en vez de dejar pulsar y fallar. -->
           <button
             migo-button
             type="button"
             variant="secondary"
+            [disabled]="!canOperate() || busy()"
             [loading]="busy()"
             (click)="askToDisconnect()"
           >
@@ -231,7 +258,7 @@
         migo-button
         type="button"
         variant="secondary"
-        [disabled]="!session().connected || busy()"
+        [disabled]="!canOperate() || busy()"
         [loading]="running() === 'check'"
         (click)="checkSheet()"
       >
@@ -241,7 +268,7 @@
         migo-button
         type="button"
         variant="primary"
-        [disabled]="!session().connected || busy()"
+        [disabled]="!canOperate() || busy()"
         [loading]="running() === 'sync'"
         (click)="syncAll()"
       >

@@ -75,8 +75,8 @@ gesto: la ventana se bloqueaba, el error se tragaba en un `catch` mudo y **cada 
 
 La única solución real es dejar de ser un cliente público. La función `auth` es un **cliente confidencial**:
 tiene el `client_secret`, obtiene un refresh token que no caduca y emite tokens de acceso frescos
-cuando la app se los pide. Reanudar pasa a ser **un POST de mismo origen**: sin ventana, sin gesto y
-sin depender de que la persona tenga su sesión de Google abierta.
+cuando la app se los pide. Reanudar pasa a ser **un POST**: sin ventana, sin gesto y sin depender de
+que la persona tenga su sesión de Google abierta.
 
 > **Lo que esto cuesta, y se acepta a sabiendas.** El proyecto nació queriendo no custodiar
 > credenciales de nadie, y ahora las custodia: en Firestore hay refresh tokens de larga vida con
@@ -372,7 +372,8 @@ Así que la pantalla de consentimiento tiene que estar **«En producción»**. P
 | `UNAUTHENTICATED` | El token de una hora caducó y el backend no ha podido emitir otro | Mirar la respuesta de `<authApiUrl>/refresh`: `401 revoked` = se retiró el acceso (reconectar); `502` = Google no contestó (se reintenta solo) |
 | Al recargar pide reconectar | El backend no tiene sesión para este navegador: no llegó ni la cookie `__session` ni el `session_token`, o la concesión ya no vale | Comprobar que `authApiUrl` del `config.json` publicado apunta a la función y que la pantalla de consentimiento está **En producción** (5.2) |
 | Al recargar pide reconectar **solo en Safari o iOS** | La cookie de terceros está bloqueada Y el `session_token` de respaldo no se guardó | Mirar en IndexedDB el store `auth_session_token`. Si está vacío tras conectar, el fallo está en `BackendAuthenticator`, no en el navegador |
-| La consola dice «blocked by CORS» o un error de red sin código | La petición murió en el preflight, o `authApiUrl` apunta a otro sitio | Mirar la respuesta del `OPTIONS` en la pestaña de red |
+| La consola dice «blocked by CORS» o un error de red sin código | El origen no está en `ALLOWED_ORIGINS`, la petición murió en el preflight, o `authApiUrl` apunta a otro sitio | Mirar la respuesta del `OPTIONS` en la pestaña de red, y buscar `origen no autorizado` en el registro de la función |
+| La app dice «sin conexión» habiendo internet | Casi siempre es lo de arriba: la función no contesta a este origen, y desde el navegador eso es indistinguible de no haber red | Revisar `ALLOWED_ORIGINS` en `firebase/functions/.env` y volver a desplegar la función |
 | `REJECTED` | El usuario no marcó la casilla de Drive, o revocó el acceso | Reconectar y marcarla |
 | `TARGET_GONE` | La hoja se borró o está en la papelera | Se recrea sola al reconectar; también **Crear una hoja nueva** |
 | `INTERNAL` con «*… API has not been used in project …*» | Falta habilitar Sheets o Drive API | *APIs & Services → Library* |

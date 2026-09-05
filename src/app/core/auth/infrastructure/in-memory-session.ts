@@ -23,6 +23,10 @@ export class InMemorySession extends Session {
     this.state.update((current) => ({ account, credential, epoch: current.epoch + 1 }));
   }
 
+  openOffline(account: Account): void {
+    this.state.update((current) => ({ account, credential: null, epoch: current.epoch + 1 }));
+  }
+
   renew(credential: Credential): void {
     // Sin cuenta no hay sesión que renovar; y el `epoch` se conserva a propósito (ver el puerto).
     this.state.update((current) => (current.account ? { ...current, credential } : current));

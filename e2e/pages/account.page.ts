@@ -81,6 +81,17 @@ export class AccountPage {
   /** Vuelve a `/home` **sin recargar** (es un `routerLink`), para no pagar otro arranque. */
   readonly backToKitchen = this.root.getByRole('link', { name: 'Volver a la cocina' });
 
+  /**
+   * Recarga el documento y espera a que la vista vuelva a estar montada.
+   *
+   * Es el gesto que prueba de verdad la reanudación: la credencial vive solo en memoria, así que una
+   * recarga la borra y obliga a la app a recuperar la sesión contra el servicio.
+   */
+  async reload(): Promise<void> {
+    await this.page.reload();
+    await expect(this.root).toBeVisible();
+  }
+
   /** Valor de un dato de la lista de definición de la tarjeta de sincronización. */
   private field(term: string): Locator {
     return this.root.locator('dl > div').filter({ hasText: term }).locator('dd');

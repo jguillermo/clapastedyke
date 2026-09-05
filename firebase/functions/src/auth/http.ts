@@ -67,6 +67,36 @@ export function oauthClient(): OAuthClient {
   return {clientId, clientSecret};
 }
 
+/**
+ * Los orígenes a los que esta función contesta, de `ALLOWED_ORIGINS` en el mismo `.env`.
+ *
+ * ## Por qué hace falta una lista
+ *
+ * Esta función responde con `Access-Control-Allow-Credentials: true`, así que el navegador manda la
+ * cookie de sesión en peticiones de origen cruzado. Reflejando cualquier origen —como se hacía antes—
+ * **cualquier web que visitara el usuario podía hacer `POST /refresh` desde su navegador y recibir un
+ * token de acceso a su Drive**. La lista es lo único que lo impide: con `Allow-Credentials` la
+ * especificación prohíbe el comodín, así que hay que nombrar los orígenes uno a uno.
+ *
+ * ## Vacía significa «no contestar a nadie»
+ *
+ * Es la opción segura de las dos, y falla de forma visible: la app no puede reanudar sesión y la
+ * función deja dicho en su registro qué origen rechazó. Lo contrario —abrir cuando no está
+ * configurada— convertiría un despliegue a medias en el agujero que esto viene a cerrar.
+ *
+ * Formato: orígenes separados por comas, con esquema y sin barra final.
+ * `https://mi-app.web.app,http://localhost:4200`
+ */
+export function allowedOrigins(): ReadonlySet<string> {
+  const configured = process.env["ALLOWED_ORIGINS"] ?? "";
+  return new Set(
+    configured
+      .split(",")
+      .map((origin) => origin.trim())
+      .filter((origin) => origin.length > 0),
+  );
+}
+
 // ─── La respuesta que ve el navegador ────────────────────────────────────────────────────────────
 
 /**

@@ -89,7 +89,14 @@ describe('SessionCredentialsProvider', () => {
 
   it('si la renovación no sale, entonces sí es «no hay sesión»', async () => {
     session.open(cuenta(), Credential.of('t-viejo', 1, drive, 0));
-    authenticator.canResume = false;
+    authenticator.resumesWith = 'invalid';
+
+    expect(await credentials.current()).toBeNull();
+  });
+
+  it('sin conexión tampoco hay credencial, aunque la sesión siga en pie', async () => {
+    session.open(cuenta(), Credential.of('t-viejo', 1, drive, 0));
+    authenticator.resumesWith = 'unreachable';
 
     expect(await credentials.current()).toBeNull();
   });

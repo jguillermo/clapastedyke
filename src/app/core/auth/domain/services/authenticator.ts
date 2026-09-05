@@ -8,6 +8,24 @@ export interface Authentication {
 }
 
 /**
+ * Cómo acaba un intento de reanudar.
+ *
+ * Los tres casos se resuelven de forma distinta, y por eso son tres y no un `Authentication | null`:
+ * con ese `null` «no se ha podido preguntar» y «la respuesta es que no» eran indistinguibles, así que
+ * quedarse sin cobertura echaba al usuario igual que si le hubieran retirado el acceso.
+ *
+ * - `authenticated` — hay sesión y credencial nueva.
+ * - `unreachable` — no se ha podido hablar con el proveedor. **No dice nada sobre la sesión**: sigue
+ *   siendo válida hasta que alguien pueda preguntar.
+ * - `invalid` — el proveedor ha contestado que esta sesión ya no vale. Es lo único que autoriza a
+ *   olvidarla.
+ */
+export type ResumeOutcome =
+  | { kind: 'authenticated'; authentication: Authentication }
+  | { kind: 'unreachable' }
+  | { kind: 'invalid' };
+
+/**
  * Inicia y termina la sesión del usuario contra un proveedor de identidad.
  *
  * **Un solo puerto para todo el proceso.** Quién sea el proveedor, cómo se pida el consentimiento y
@@ -27,19 +45,21 @@ export abstract class Authenticator {
   abstract authenticate(clientId: string): Promise<Authentication>;
 
   /**
-   * Vuelve a entrar **sin interrumpir al usuario**, si el proveedor lo permite.
+   * Vuelve a entrar **sin interrumpir al usuario**.
    *
-   * Es lo que hace que recargar la página no eche a nadie. No es un `authenticate` silencioso: solo
-   * puede salir bien si esa persona ya dio su consentimiento antes y sigue con su sesión abierta en
-   * el proveedor. Cuando no se puede, **devuelve `null` en vez de lanzar** — no es un error, es que
-   * hay que pedirlo a mano, que es el estado normal de quien entra por primera vez.
+   * Es lo que hace que recargar la página no eche a nadie. Nunca debe enseñar una ventana ni pedir
+   * nada: si hiciera falta interacción, la respuesta es `invalid`.
    *
-   * Nunca debe enseñar una ventana ni pedir nada: si hiciera falta interacción, `null`.
-   *
-   * @param hint con qué cuenta se estaba, para que el proveedor no dude entre varias abiertas.
+   * No recibe con qué cuenta se estaba: quién es lo pone la propia sesión que el proveedor custodia.
    */
-  abstract resume(clientId: string, hint: string): Promise<Authentication | null>;
+  abstract resume(): Promise<ResumeOutcome>;
 
-  /** Retira la autorización concedida. */
-  abstract revoke(credential: Credential): Promise<void>;
+  /**
+   * Termina la sesión de **este** navegador en el proveedor. Las demás sesiones de esa persona no se
+   * enteran, y su autorización sigue en pie.
+   *
+   * Devuelve el resultado en vez de lanzar porque quien llama tiene que poder distinguirlos: sin
+   * conexión no se puede dar por cerrada una sesión que quizá siga viva al otro lado.
+   */
+  abstract closeRemoteSession(): Promise<'closed' | 'unreachable'>;
 }

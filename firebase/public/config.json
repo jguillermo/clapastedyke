@@ -1,6 +1,0 @@
-{
-  "debug": "DEBUG",
-  "googleClientId": "GOOGLE_OAUTH_CLIENT_ID",
-  "authApiUrl": "AUTH_API_URL",
-  "syncPollSeconds": 120
-}

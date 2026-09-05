@@ -56,7 +56,7 @@ const CLIENT_ID = 'e2e-client-id.apps.googleusercontent.com';
  * cookie de sesión es `Secure` y un `http://` en producción no podría guardarla. Nadie llega a este
  * dominio: las tres rutas están interceptadas.
  */
-const AUTH_API_URL = 'https://auth.e2e.example';
+export const AUTH_API_URL = 'https://auth.e2e.example';
 
 const TOKEN = 'e2e-access-token';
 
@@ -345,6 +345,9 @@ export class GoogleDouble {
   private gate: Promise<void> | null = null;
   private release: (() => void) | null = null;
 
+  /** Si el servicio de sesión está al alcance. Ver {@link cutSessionService}. */
+  private sessionServiceReachable = true;
+
   /** La hoja viva más reciente. Es la que la app está usando. */
   get sheet(): FakeSpreadsheet {
     const live = this.files.filter((file) => !file.trashed);
@@ -386,6 +389,36 @@ export class GoogleDouble {
     this.release?.();
     this.gate = null;
     this.release = null;
+  }
+
+  /**
+   * **No hay cobertura**: las peticiones al servicio de sesión mueren en la red.
+   *
+   * Es distinto de {@link hold}, que las deja esperando. Aquí la promesa del `fetch` **se rompe**, que
+   * es lo único que la app puede leer como «no te oigo» sin quedarse quince segundos colgada de su
+   * propio plazo de espera. Y es distinto de {@link expireSession}, que es el servicio contestando que
+   * la sesión ya no vale: eso sí echa al usuario, y esto no debe.
+   *
+   * El navegador anota en consola cada petición que muere así. La guarda de errores de la suite lo
+   * tolera **solo para este dominio** y solo porque lo provoca el test; ver `isCutByTest` en
+   * `fixtures/app-fixture.ts`.
+   */
+  cutSessionService(): void {
+    this.sessionServiceReachable = false;
+  }
+
+  /** Vuelve la cobertura. La sesión del servicio sigue siendo la que era. */
+  restoreSessionService(): void {
+    this.sessionServiceReachable = true;
+  }
+
+  /**
+   * El servicio ya no reconoce la sesión: caducó, o el usuario retiró el acceso desde su cuenta de
+   * Google. A partir de aquí `/refresh` contesta `401`, que es lo único que autoriza a la app a
+   * olvidar su sesión.
+   */
+  expireSession(): void {
+    this.session = false;
   }
 
   /**
@@ -457,6 +490,10 @@ export class GoogleDouble {
    * la sesión también se queda esperando, que es lo que pasaría de verdad.
    */
   private async answerAuth(route: Route, handle: () => AuthReply): Promise<void> {
+    if (!this.sessionServiceReachable) {
+      await route.abort('connectionfailed').catch(ignore);
+      return;
+    }
     if (this.gate) {
       await this.gate;
     }

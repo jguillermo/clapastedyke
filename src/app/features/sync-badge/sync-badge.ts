@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/c
 import { Router } from '@angular/router';
 import { SyncIndicator, SyncIndicatorState } from '@components/sync-indicator/sync-indicator';
 import { Logger } from '@core/_common/logger/logger';
+import { WatchSession } from '@core/auth/application/use-cases/watch-session.use-case';
 import { WatchSyncStatus } from '@core/external-sync/application/use-cases/watch-sync-status.use-case';
 
 /**
@@ -28,6 +29,7 @@ import { WatchSyncStatus } from '@core/external-sync/application/use-cases/watch
  * | caducó la sesión | «Reconectar» |
  * | falló | el aviso en rojo |
  * | sin cuenta conectada | **nada** |
+ * | con sesión pero sin conexión | el número, o **nada** si no queda nada pendiente |
  *
  * Las dos filas de «nada» son las que lo hacen discreto. Sin la segunda, cada dos minutos aparecería un
  * aviso girando para decir que todo va bien: eso enseña a no mirarlo. Y sin la última, alguien que solo
@@ -43,10 +45,19 @@ import { WatchSyncStatus } from '@core/external-sync/application/use-cases/watch
 })
 export class SyncBadge {
   private readonly watchStatus = inject(WatchSyncStatus);
+  private readonly watchSession = inject(WatchSession);
   private readonly router = inject(Router);
   private readonly log = inject(Logger).scoped('ui/sync-badge');
 
   protected readonly status = this.watchStatus.state;
+
+  /**
+   * La sincronización no sabe distinguir «sin cuenta» de «sin cobertura»: pregunta por credenciales y
+   * las dos le contestan que no hay. Quien sí lo sabe es la sesión, así que las dos vistas se componen
+   * **aquí**, en la feature, en vez de inventar un estado de sincronización que tendría que llegar
+   * cruzando contextos.
+   */
+  private readonly session = this.watchSession.state;
 
   protected readonly state = computed<SyncIndicatorState>(() => {
     const { phase, pending, upToDate } = this.status();
@@ -54,6 +65,12 @@ export class SyncBadge {
     // el aviso y la pantalla de cuenta acabarían diciendo cosas distintas del mismo estado.
     if (upToDate) {
       return 'hidden';
+    }
+    // Sin conexión no hay nada que reconectar, y pedirlo sería mandar al usuario a pulsar un botón
+    // que no puede funcionar. Se cuenta lo que queda sin subir, que es lo único cierto mientras
+    // tanto. Por qué no sale nada lo explica la pantalla de cuenta.
+    if (this.session().phase === 'offline') {
+      return pending > 0 ? 'pending' : 'hidden';
     }
     switch (phase) {
       case 'error':

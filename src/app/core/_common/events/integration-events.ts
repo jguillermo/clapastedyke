@@ -36,8 +36,11 @@ export const IntegrationEventName = {
    */
   SESSION_RESUMED: 'SessionResumed',
   AUTHENTICATION_FAILED: 'AuthenticationFailed',
+  /**
+   * El único final de salir. No hay `SignOutFailed`: la sesión local solo se cierra cuando el
+   * servicio de sesión ha confirmado que cerró la suya, así que «salió a medias» no existe.
+   */
   SIGN_OUT_SUCCEEDED: 'SignOutSucceeded',
-  SIGN_OUT_FAILED: 'SignOutFailed',
 
   // ── Publica: external-sync ───────────────────────────────────────────────────
   DATA_SYNCED: 'DataSynced',

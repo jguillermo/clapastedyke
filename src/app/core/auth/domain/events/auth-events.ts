@@ -27,13 +27,11 @@ export const AuthEvents = {
   authenticationFailed: (reason: string): DomainEvent =>
     domainEvent(IntegrationEventName.AUTHENTICATION_FAILED, ANONYMOUS, { reason }),
 
+  /**
+   * Único evento de salida, porque salir solo tiene un final: o se cierra la sesión en el servicio
+   * y aquí, o no se cierra en ninguno de los dos. `SignOut` se niega a cerrar en local lo que no ha
+   * podido cerrar fuera.
+   */
   signOutSucceeded: (accountId: string, epoch: number): DomainEvent =>
     domainEvent(IntegrationEventName.SIGN_OUT_SUCCEEDED, accountId, { epoch }),
-
-  /**
-   * La sesión local **siempre** queda cerrada; esto solo dice que no se pudo retirar la
-   * autorización en el proveedor. Quien limpie estado al salir tiene que escuchar los dos.
-   */
-  signOutFailed: (accountId: string, epoch: number, reason: string): DomainEvent =>
-    domainEvent(IntegrationEventName.SIGN_OUT_FAILED, accountId, { epoch, reason }),
 };

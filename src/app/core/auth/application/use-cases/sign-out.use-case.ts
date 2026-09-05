@@ -5,16 +5,30 @@ import { LocalData } from '../../../_common/local-data/local-data';
 import { Logger } from '../../../_common/logger/logger';
 import { AuthEvents } from '../../domain/events/auth-events';
 import { SessionHintRepository } from '../../domain/repositories/session-hint.repository';
+import { SessionTokenRepository } from '../../domain/repositories/session-token.repository';
 import { Authenticator } from '../../domain/services/authenticator';
 import { Session } from '../../domain/services/session';
 
+/** Lo que se le dice a quien pulsó el botón cuando no hay forma de cerrar la sesión de verdad. */
+const OFFLINE_MESSAGE =
+  'No se puede cerrar sesión sin conexión: hay que avisar al servidor para que la olvide, ' +
+  'y cerrar aquí borra todos los datos de este dispositivo sin vuelta atrás. ' +
+  'Inténtalo cuando vuelvas a tener internet.';
+
 /**
- * Cierra la sesión y deja el navegador **como recién instalado**.
+ * Cierra la sesión de **este** navegador y deja el aparato **como recién instalado**.
  *
- * **La sesión local se cierra pase lo que pase.** Si falla retirar la autorización en el proveedor
- * (típicamente, sin red), no se deja al usuario atrapado en su cuenta: se cierra igual y se publica
- * `SignOutFailed` en vez de `SignOutSucceeded`. Por eso quien limpie estado al salir tiene que
- * escuchar los dos eventos.
+ * ## Qué se cierra, y qué no
+ *
+ * Muere la sesión de este navegador y nada más. Los demás dispositivos de esa persona siguen dentro,
+ * y en el proveedor no se retira ninguna autorización: eso lo hace ella desde su cuenta de Google, y
+ * ni siquiera se podría acotar a un dispositivo (revocar tumba la concesión entera).
+ *
+ * ## Sin conexión no se cierra, y no es una limitación técnica
+ *
+ * Es la consecuencia de lo de abajo: esto **borra todo lo local**, y borrar sin poder avisar al
+ * servidor dejaría lo peor de los dos mundos — el usuario sin sus datos y la sesión viva al otro
+ * lado. Así que si no se puede avisar, no se toca nada y se lo decimos.
  *
  * ## Salir borra TODO lo local, no solo la sesión
  *
@@ -37,52 +51,43 @@ import { Session } from '../../domain/services/session';
  * Mientras haya sesión, la sincronización puede arrancar en cualquier momento; un ciclo que leyera
  * la base local ya vaciada no concluiría «no hay nada que subir», concluiría que el usuario ha
  * borrado su recetario entero, y escribiría esas bajas en la hoja. Por eso `session.close()` va
- * **antes** de tocar nada local —y antes incluso de retirar la autorización, que es red y tarda—:
- * cerrar quita la credencial (el ciclo se niega a arrancar) y cambia el número de sesión (lo que ya
- * estuviera en vuelo tira su resultado al volver).
+ * **antes** de tocar nada local: cerrar quita la credencial (el ciclo se niega a arrancar) y cambia
+ * el número de sesión (lo que ya estuviera en vuelo tira su resultado al volver).
  *
  * ## Por qué se borra ANTES de publicar
  *
  * El evento anuncia un hecho consumado, así que lo que cuenta ya tiene que ser cierto. Y al revés
  * sería directamente incorrecto: publicar deja el evento **en la cola**, que vive en IndexedDB, y el
  * borrado se lo llevaría por delante sin que nadie llegara a recibirlo.
- *
- * ## Las credenciales no se borran aquí porque nunca estuvieron aquí
- *
- * El token vive solo en memoria y muere con `session.close()`. El permiso duradero lo custodia el
- * backend, y `revoke` es lo que lo retira **y** vacía la cookie `HttpOnly` de este navegador: sin
- * ella, la próxima carga no tiene con qué reanudar y hay que volver a autorizar desde cero.
  */
 @Injectable({ providedIn: 'root' })
 export class SignOut extends UseCase<void, void> {
   private readonly authenticator = inject(Authenticator);
   private readonly session = inject(Session);
   private readonly hints = inject(SessionHintRepository);
+  private readonly sessionTokens = inject(SessionTokenRepository);
   private readonly local = inject(LocalData);
   private readonly bus = inject(EventBus);
   private readonly log = inject(Logger).scoped('auth/sign-out');
 
   async execute(): Promise<void> {
-    const { account, credential } = this.session.snapshot();
+    const { account } = this.session.snapshot();
     if (!account) {
-      this.log.debug('no había sesión abierta, no se hace nada');
+      // No había de quién cerrar, pero puede quedar rastro con el que la próxima carga intentaría
+      // reanudar una sesión que ya no existe.
+      await this.forgetHowToComeBack();
+      this.log.debug('no había sesión abierta, solo se limpia el rastro');
       return;
     }
-    this.log.debug('cerrando sesión', { accountId: account.id.value, conCredencial: !!credential });
+    this.log.debug('cerrando sesión', { accountId: account.id.value });
 
-    // 1 · La pista, antes que nada: si sobreviviera a un fallo a mitad de camino, la próxima carga
-    //     volvería a entrar sola y cerrar sesión no habría servido de nada.
-    await this.hints.clear();
+    if ((await this.authenticator.closeRemoteSession()) === 'unreachable') {
+      this.log.debug('sin conexión: no se cierra nada, los datos se quedan donde están');
+      throw new Error(OFFLINE_MESSAGE);
+    }
 
-    // 2 · Se pierde la conexión AQUÍ, y todavía no se ha tocado ni un dato local. El orden es la
-    //     salvaguarda del paso 4: mientras haya sesión, la sincronización puede correr, y un ciclo
-    //     que leyera la base ya vaciada no vería «no hay nada que subir» — vería que **se ha
-    //     borrado todo**, y escribiría esa matanza en la hoja del usuario.
-    //
-    //     Cerrar es instantáneo y hace dos cosas a la vez: deja de haber credencial (el ciclo se
-    //     niega a arrancar) y cambia el número de sesión (lo que ya estuviera en vuelo descarta su
-    //     resultado al volver). Por eso va antes de retirar la autorización, que es una llamada de
-    //     red y podría tardar: durante esa espera ya no queda nada que pueda sincronizar.
+    await this.forgetHowToComeBack();
+
     this.session.close();
     const { epoch } = this.session.snapshot();
     this.log.debug('sesión cerrada, ya no puede sincronizar nada', {
@@ -90,47 +95,29 @@ export class SignOut extends UseCase<void, void> {
       epoch,
     });
 
-    // 3 · Retirar la autorización en el proveedor. Con esto se va también la cookie con la que este
-    //     navegador podía pedir tokens: sin ella, volver a entrar exige autorizar desde cero.
-    let failure: string | null = null;
-    if (credential) {
-      try {
-        await this.authenticator.revoke(credential);
-        this.log.debug('autorización retirada en el proveedor');
-      } catch (error) {
-        failure = error instanceof Error ? error.message : 'Motivo desconocido.';
-        // Nadie más va a contar esto: no se relanza (la sesión local ya está cerrada) y el usuario
-        // se cree desconectado del todo cuando el proveedor aún tiene la autorización.
-        this.log.warn(
-          'no se pudo retirar la autorización: la sesión local se cierra igual',
-          error,
-          {
-            accountId: account.id.value,
-          },
-        );
-      }
-    }
+    await this.wipeEverything(account.id.value);
 
-    // 4 · Y solo ahora, sin sesión y sin nadie que pueda sincronizar, se borra lo local.
+    await this.bus.publish([AuthEvents.signOutSucceeded(account.id.value, epoch)]);
+  }
+
+  /** Las dos cosas con las que este navegador podría volver a entrar solo. */
+  private async forgetHowToComeBack(): Promise<void> {
+    await this.hints.clear();
+    await this.sessionTokens.clear();
+  }
+
+  /**
+   * Sin relanzar: la sesión ya está cerrada y devolver un error aquí haría creer que sigue abierta.
+   * Se registra una sola vez, con la cadena entera.
+   */
+  private async wipeEverything(accountId: string): Promise<void> {
     try {
       await this.local.wipe();
+      this.log.debug('datos locales borrados', { accountId });
     } catch (error) {
-      // No se relanza: la sesión ya está cerrada y devolver un error aquí haría creer que sigue
-      // abierta. Se registra una sola vez, con la cadena entera — el adaptador solo traduce.
       this.log.error('no se han podido borrar los datos locales al cerrar sesión', error, {
-        accountId: account.id.value,
+        accountId,
       });
     }
-    this.log.debug('cierre de sesión completado', {
-      accountId: account.id.value,
-      epoch,
-      revocada: !failure,
-    });
-
-    await this.bus.publish([
-      failure === null
-        ? AuthEvents.signOutSucceeded(account.id.value, epoch)
-        : AuthEvents.signOutFailed(account.id.value, epoch, failure),
-    ]);
   }
 }

@@ -22,9 +22,8 @@ const SUBSCRIBER = 'external-sync:auth-changed';
  * antes de tener cuenta — nada de eso pasó nunca por la cola.
  *
  * **Al salir** se borra la cola y se reinicia el estado, así que no queda ni el enlace a la hoja de
- * la cuenta que se acaba de cerrar. Se escuchan los DOS eventos de salida: la sesión local se cierra
- * también cuando no se pudo retirar la autorización en el proveedor, y en ese caso hay que limpiar
- * igual.
+ * la cuenta que se acaba de cerrar. Hay un solo evento de salida porque salir tiene un solo final:
+ * `SignOut` se niega a cerrar en local lo que no ha podido cerrar en el servicio de sesión.
  *
  * No espera a la red dentro del handler: entrar y salir responden al instante y el progreso se ve
  * en el estado.
@@ -83,22 +82,17 @@ export class AuthChangedSubscriber {
       this.scheduler.syncNow('sesión reanudada');
     });
 
-    for (const eventName of [
-      IntegrationEventName.SIGN_OUT_SUCCEEDED,
-      IntegrationEventName.SIGN_OUT_FAILED,
-    ]) {
-      this.bus.subscribe(SUBSCRIBER, eventName, async (event) => {
-        if (this.isStale(event.occurredOn)) {
-          this.log.debug('evento de una sesión anterior, se ignora', { event: event.name });
-          return;
-        }
-        // Al salir se olvidan las dos cosas por cuenta: lo pendiente y la base de comparación.
-        await this.outbox.clear();
-        await this.shadow.clear();
-        this.status.markDisconnected();
-        this.log.debug('cuenta desconectada: cola y base vaciadas', { event: event.name });
-      });
-    }
+    this.bus.subscribe(SUBSCRIBER, IntegrationEventName.SIGN_OUT_SUCCEEDED, async (event) => {
+      if (this.isStale(event.occurredOn)) {
+        this.log.debug('evento de una sesión anterior, se ignora', { event: event.name });
+        return;
+      }
+      // Al salir se olvidan las dos cosas por cuenta: lo pendiente y la base de comparación.
+      await this.outbox.clear();
+      await this.shadow.clear();
+      this.status.markDisconnected();
+      this.log.debug('cuenta desconectada: cola y base vaciadas');
+    });
   }
 
   /** `true` si el evento es de una sesión anterior a la de este suscriptor. */
