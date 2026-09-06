@@ -25,17 +25,11 @@ export interface AppOptions {
 
 /** Page objects y helpers disponibles en cada test. */
 /**
- * **Un segundo aparato**: otro navegador, con su propia base de datos, contra la MISMA hoja.
- *
- * Es la única forma de probar de verdad que sincronizar sirve para algo. Todo lo demás se puede fingir
- * desde un solo navegador —editar la hoja a mano imita al otro aparato—, pero hay dos cosas que no:
- * que cada aparato tiene **su propia identidad** y **su propio catálogo sembrado**, y es justo del
- * cruce de esas dos de donde salió la pérdida de datos que motivó este fixture.
- *
- * El contexto es nuevo, así que su IndexedDB está vacía y la app arranca como en un móvil recién
- * estrenado: siembra, conecta, y se encuentra una hoja que ya tiene el trabajo del otro.
+ * Los page objects de una página que no es la principal. La comparten {@link SecondDevice} y
+ * {@link SecondTab}, que se distinguen por **dónde** vive esa página, no por lo que se puede hacer
+ * en ella.
  */
-export interface SecondDevice {
+export interface AppSurface {
   readonly page: Page;
   readonly account: AccountPage;
   readonly home: HomePage;
@@ -46,9 +40,43 @@ export interface SecondDevice {
   readonly grid: SupplyGridPage;
 }
 
+/**
+ * **Un segundo aparato**: otro navegador, con su propia base de datos, contra la MISMA hoja.
+ *
+ * Es la única forma de probar de verdad que sincronizar sirve para algo. Todo lo demás se puede fingir
+ * desde un solo navegador —editar la hoja a mano imita al otro aparato—, pero hay dos cosas que no:
+ * que cada aparato tiene **su propia identidad** y **su propio catálogo sembrado**, y es justo del
+ * cruce de esas dos de donde salió la pérdida de datos que motivó este fixture.
+ *
+ * El contexto es nuevo, así que su IndexedDB está vacía y la app arranca como en un móvil recién
+ * estrenado: siembra, conecta, y se encuentra una hoja que ya tiene el trabajo del otro.
+ */
+export type SecondDevice = AppSurface;
+
+/**
+ * **Otra pestaña del MISMO navegador.** No confundir con {@link SecondDevice}: la diferencia es toda
+ * la gracia.
+ *
+ * | | `secondDevice` | `secondTab` |
+ * |---|---|---|
+ * | Contexto de navegador | nuevo | **el mismo** |
+ * | IndexedDB | propia y vacía | **la misma, compartida** |
+ * | Sesión del servicio (`sid`) | la suya | **la misma** |
+ * | `Session` en memoria | la suya | **la suya** (vive en el runtime de cada pestaña) |
+ *
+ * Esa última fila es la que hace falta probar. La sesión de la app vive en memoria (`InMemorySession`)
+ * y `auth` **no tiene ningún canal entre pestañas**: lo que pasa en una no se ve en la otra hasta que
+ * la otra recarga o le caduca el token. Todo lo que se cruce por debajo —el `sid`, la pista, el
+ * catálogo, la cola de sincronización— sí es común, porque es la misma base de datos.
+ */
+export type SecondTab = AppSurface;
+
 export interface AppFixtures {
   /** Otro navegador, con su propia base local, contra la misma hoja. Ver {@link SecondDevice}. */
   secondDevice: SecondDevice;
+
+  /** Otra pestaña del mismo navegador: misma base, otra sesión en memoria. Ver {@link SecondTab}. */
+  secondTab: SecondTab;
 
   /** Errores no capturados de la página; el test falla si hay alguno. */
   pageErrors: Error[];
@@ -247,6 +275,40 @@ export const test = base.extend<AppOptions & AppFixtures>({
 
     await context.close();
     expect(errors, 'el segundo aparato no debe registrar ningún error en consola').toEqual([]);
+  },
+
+  secondTab: async ({ page, google, webgl }, use) => {
+    // `page.context().newPage()` y NO `browser.newContext()`: eso es lo que la hace una pestaña del
+    // mismo navegador y no otro aparato. Comparte cookies, IndexedDB y `sid`; no comparte memoria.
+    const tab = await page.context().newPage();
+    if (!webgl) {
+      await tab.addInitScript(DISABLE_WEBGL_SCRIPT);
+    }
+    // Las rutas se enganchan por página, así que esta también necesita el doble — el mismo, porque
+    // al otro lado hay un solo Google.
+    await google.install(tab);
+
+    const errors: string[] = [];
+    tab.on('console', (message) => {
+      const { url } = message.location();
+      if (message.type() === 'error' && !isFontResource(url) && !isCutByTest(url)) {
+        errors.push(message.text());
+      }
+    });
+
+    await use({
+      page: tab,
+      account: new AccountPage(tab),
+      home: new HomePage(tab),
+      catalog: new RecipeBookFallbackPage(tab),
+      supplies: new SuppliesDialogPage(tab),
+      supplyList: new SupplyListPage(tab),
+      form: new RecipeFormPage(tab),
+      grid: new SupplyGridPage(tab),
+    });
+
+    await tab.close();
+    expect(errors, 'la segunda pestaña no debe registrar ningún error en consola').toEqual([]);
   },
 
   openHome: async ({ home }, use) => {

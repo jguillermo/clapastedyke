@@ -46,6 +46,17 @@ import type { Page, Route } from '@playwright/test';
 const DRIVE_FILE = 'https://www.googleapis.com/auth/drive.file';
 const SCOPES = `openid email profile ${DRIVE_FILE}`;
 
+/** Lo que concede Google si el usuario desmarca la casilla de Drive. Ver `refreshWithoutDrivePermission`. */
+const SCOPES_WITHOUT_DRIVE = 'openid email profile';
+
+/**
+ * Dónde deja el test su marca para que la ventana de Google se niegue a autorizar.
+ *
+ * Va en `window` y no en un módulo porque el sustituto de GIS se sirve como guion suelto: no importa
+ * nada, y esta es la única superficie que comparten él y el test. Ver `GoogleDouble.denyAuthorization`.
+ */
+const GIS_DENIAL_KEY = '__e2eAuthorizationDenial';
+
 /** El `client_id` que se le sirve a la app en `config.json`; sin uno, la integración está apagada. */
 const CLIENT_ID = 'e2e-client-id.apps.googleusercontent.com';
 
@@ -60,12 +71,80 @@ export const AUTH_API_URL = 'https://auth.e2e.example';
 
 const TOKEN = 'e2e-access-token';
 
+/**
+ * El token de acceso **lleva dentro de quién es**.
+ *
+ * Un token de Google pertenece a una persona, y es lo único que Drive y Sheets reciben para saber en
+ * qué cuenta están trabajando. Aquí hace falta por lo mismo: sin ello, el doble no puede separar el
+ * Drive de una cuenta del de otra y la hoja de la primera le aparecería a la segunda — que es
+ * justamente lo que `drive.file` impide en la realidad. Ver {@link GoogleDouble.ownerOf}.
+ */
+function accessTokenFor(account: FakeAccount): string {
+  return `${TOKEN}-${account.sub}`;
+}
+
+/** Cuánto dura un token de acceso, si nadie lo cambia. Es lo que dura de verdad. */
+const DEFAULT_TOKEN_LIFETIME_SECONDS = 3600;
+
+/** Una cuenta de Google, tal como la identifica el servicio de sesión. */
+export interface FakeAccount {
+  readonly sub: string;
+  readonly email: string;
+  readonly name: string;
+}
+
 /** La cuenta que el doble dice que ha entrado. `sub` es lo que la app usa como id de cuenta. */
-export const E2E_ACCOUNT = {
+export const E2E_ACCOUNT: FakeAccount = {
   sub: 'e2e-account-1',
   email: 'cocina.e2e@example.com',
   name: 'Cocina E2E',
-} as const;
+};
+
+/**
+ * Otra persona con otra cuenta de Google. Su hoja es otra y no ve nada de la primera.
+ *
+ * Existe para poder probar **cambiar de cuenta** en el mismo navegador, que es donde se cruzan las
+ * dos cosas que más daño hacen si fallan: la cola de sincronización de quien salió y el catálogo que
+ * ya estaba en disco. Se elige con {@link GoogleDouble.signInAs}.
+ */
+export const E2E_ACCOUNT_2: FakeAccount = {
+  sub: 'e2e-account-2',
+  email: 'reposteria.e2e@example.com',
+  name: 'Repostería E2E',
+};
+
+/** Cómo puede negarse una autorización en la ventana de Google. */
+export type AuthorizationDenial = 'popup_closed' | 'access_denied' | 'popup_failed_to_open';
+
+/** Cómo puede negarse el canje del código en el servicio de sesión. */
+export type ExchangeFailure = 'missing_permission' | 'no_refresh_token' | 'unavailable';
+
+/**
+ * Los tres rechazos de `/exchange`, con el estado y el texto que devuelve el backend de verdad
+ * (`firebase/functions/src/auth/routes.ts`). El mensaje importa: la app lo pinta tal cual.
+ */
+const EXCHANGE_FAILURES: Readonly<Record<ExchangeFailure, AuthReply>> = {
+  missing_permission: {
+    status: 403,
+    body: {
+      error: 'missing_permission',
+      message:
+        'No has concedido el permiso para crear la hoja en tu Drive. Vuelve a conectar y acepta la casilla.',
+    },
+  },
+  no_refresh_token: {
+    status: 409,
+    body: {
+      error: 'no_refresh_token',
+      message:
+        'Google no ha entregado un permiso duradero. Retira el acceso de esta app en tu cuenta de Google y vuelve a conectar.',
+    },
+  },
+  unavailable: {
+    status: 502,
+    body: { error: 'invalid_grant', message: 'Google ha rechazado la autorización.' },
+  },
+};
 
 /**
  * Cuántas filas ocupa la cabecera. Vale también como índice (0-based) de la primera fila de datos, que
@@ -250,6 +329,11 @@ export class FakeSpreadsheet {
   constructor(
     readonly id: string,
     readonly title: string,
+    /**
+     * El `sub` de la cuenta en cuyo Drive vive. Nadie más la ve: es lo que hace `drive.file`, y sin
+     * ello dos cuentas distintas compartirían hoja dentro del doble.
+     */
+    readonly owner: string,
   ) {}
 
   get url(): string {
@@ -316,15 +400,42 @@ export class GoogleDouble {
   private nextSheetId = 1;
 
   /**
-   * Si el backend de la sesión tiene una sesión abierta.
+   * Las sesiones abiertas en el servicio, **una por navegador**, igual que `sessions/{sid}` en
+   * Firestore. La clave es el `sid`; el valor, de quién es.
    *
    * **Vive aquí y no en una cookie del navegador, a propósito.** Lo que un E2E tiene que poder
    * demostrar es que *recargar no echa a nadie* y que *cerrar sesión sí*, y eso es exactamente lo que
-   * modela este booleano: sobrevive a un `reload()` porque el estado es del servidor, no de la página.
+   * modela este mapa: sobrevive a un `reload()` porque el estado es del servidor, no de la página.
    * La mecánica de la cookie `HttpOnly` es plomería entre el navegador y Cloud Functions —no la
    * escribe esta app— y se comprueba en los tests de la función y a mano.
+   *
+   * **Por qué un mapa y no un booleano.** Con un solo booleano, cerrar sesión en un aparato echaba
+   * también al otro y reanudar en dos pestañas era indistinguible de reanudar en una. El backend de
+   * verdad guarda una sesión por navegador sobre una única concesión (`users/{sub}`), y cerrar una
+   * no toca las demás: sin modelarlo, la mitad de los recorridos de sesión no se podían escribir.
+   *
+   * Quién pregunta se sabe por el `sid` que trae la petición ({@link readSessionId}).
    */
-  private session = false;
+  private readonly sessions = new Map<string, FakeAccount>();
+
+  private nextSessionId = 1;
+
+  /** Cuántas sesiones siguen abiertas en el servicio. */
+  get openSessionCount(): number {
+    return this.sessions.size;
+  }
+
+  /** Con qué cuenta responderá el siguiente `/exchange`. Ver {@link signInAs}. */
+  private account: FakeAccount = E2E_ACCOUNT;
+
+  /** Lo que dura un token de acceso recién emitido. Ver {@link tokenLifetime}. */
+  private lifetimeSeconds = DEFAULT_TOKEN_LIFETIME_SECONDS;
+
+  /** Rechazo pendiente para el siguiente `/exchange`. Ver {@link failNextExchange}. */
+  private exchangeFailure: ExchangeFailure | null = null;
+
+  /** Si el siguiente `/refresh` devuelve un token sin el permiso de Drive. */
+  private refreshWithoutDrive = false;
 
   /**
    * Cuántas veces se le ha pedido un token al backend (`POST <authApiUrl>/refresh`).
@@ -348,6 +459,43 @@ export class GoogleDouble {
   /** Si el servicio de sesión está al alcance. Ver {@link cutSessionService}. */
   private sessionServiceReachable = true;
 
+  /**
+   * Las páginas enganchadas a este doble. El aparato principal y, si el test lo pide, el segundo o
+   * una segunda pestaña. Hace falta para poder cambiar el comportamiento de la ventana de Google a
+   * mitad de un test; ver {@link denyAuthorization}.
+   */
+  private readonly pages: Page[] = [];
+
+  /**
+   * Cuántas veces se ha pedido el script de Google Identity Services.
+   *
+   * Es lo que distingue «la sesión volvió sola» de «la sesión volvió abriendo Google otra vez».
+   * Reanudar **no** debe tocar `accounts.google.com`: si algún día volviera a hacerlo, la sesión
+   * dependería de nuevo de una ventana emergente que el navegador bloquea al arrancar la página.
+   */
+  private gisScriptRequests = 0;
+
+  /** @see gisScriptRequests */
+  get gisScriptRequestCount(): number {
+    return this.gisScriptRequests;
+  }
+
+  /**
+   * La última petición al servicio de sesión, tal como salió del navegador.
+   *
+   * Existe por una sola razón: comprobar que la app manda `Authorization: Bearer <session_token>`.
+   * Esa cabecera es el respaldo de la cookie `__session`, y **es lo único que sostiene la sesión en
+   * Safari y en iOS**, que bloquean las cookies de terceros. Sin poder mirarla, un E2E no puede
+   * distinguir un navegador que reanuda por la cookie de uno que reanuda por el respaldo — y aquí no
+   * hay cookie que valga, porque el estado del servicio vive en el proceso del test.
+   */
+  private lastAuth: AuthRequest | null = null;
+
+  /** @see lastAuth */
+  get lastAuthRequest(): AuthRequest | null {
+    return this.lastAuth;
+  }
+
   /** La hoja viva más reciente. Es la que la app está usando. */
   get sheet(): FakeSpreadsheet {
     const live = this.files.filter((file) => !file.trashed);
@@ -360,9 +508,22 @@ export class GoogleDouble {
     return last;
   }
 
-  /** Todas las hojas creadas, incluidas las que están en la papelera. */
+  /** Todas las hojas creadas, de cualquier cuenta e incluidas las que están en la papelera. */
   get sheets(): readonly FakeSpreadsheet[] {
     return this.files;
+  }
+
+  /**
+   * La hoja viva de **una cuenta concreta**. Hace falta en cuanto un test usa dos: {@link sheet}
+   * devuelve la última que se creara, sea de quien sea, y ahí deja de ser útil.
+   */
+  sheetOf(account: FakeAccount): FakeSpreadsheet {
+    const live = this.files.filter((file) => !file.trashed && file.owner === account.sub);
+    const last = live[live.length - 1];
+    if (!last) {
+      throw new Error(`La cuenta «${account.email}» todavía no tiene ninguna hoja.`);
+    }
+    return last;
   }
 
   /** Manda la hoja a la papelera, como haría el usuario desde su Drive. */
@@ -413,12 +574,93 @@ export class GoogleDouble {
   }
 
   /**
-   * El servicio ya no reconoce la sesión: caducó, o el usuario retiró el acceso desde su cuenta de
+   * El servicio ya no reconoce **ninguna** sesión: el usuario retiró el acceso desde su cuenta de
    * Google. A partir de aquí `/refresh` contesta `401`, que es lo único que autoriza a la app a
    * olvidar su sesión.
+   *
+   * Se van todas y no una, porque eso es lo que pasa de verdad: retirar el acceso invalida el
+   * refresh token, y el backend responde borrando la concesión entera con sus sesiones
+   * (`forgetGrant`). Cerrar **una** sesión es otra cosa y la hace `/logout`.
    */
   expireSession(): void {
-    this.session = false;
+    this.sessions.clear();
+  }
+
+  /**
+   * Cuánto dura el token de acceso que emite el servicio, en segundos.
+   *
+   * **Ojo con el margen.** `Credential.isExpired` da por caducado todo lo que venza dentro del minuto
+   * siguiente, así que **una vida menor que 60 s nace ya caducada**: la app no la usa ni una vez y se
+   * comporta como si no tuviera sesión. Eso sirve para probar el desenlace «no hay credencial
+   * utilizable», no la renovación.
+   *
+   * Para probar que un token **vigente** caduca y se renueva, esto se combina con `page.clock`: una
+   * vida corta pero por encima del margen y un adelanto del reloj que la cruce. Ver
+   * `specs/account/token-renewal.spec.ts`, que hace lo mismo con la vida real de una hora.
+   */
+  tokenLifetime(seconds: number): void {
+    this.lifetimeSeconds = seconds;
+  }
+
+  /** Con qué cuenta responderá el siguiente `/exchange`. Por defecto, {@link E2E_ACCOUNT}. */
+  signInAs(account: FakeAccount): void {
+    this.account = account;
+  }
+
+  /**
+   * El siguiente `/exchange` se rechaza. **Solo el siguiente**: el intento posterior vuelve a ir
+   * bien, que es lo que permite escribir el recorrido entero —falla, se explica, se reintenta,
+   * conecta— sin tener que acordarse de restaurar nada.
+   */
+  failNextExchange(failure: ExchangeFailure): void {
+    this.exchangeFailure = failure;
+  }
+
+  /**
+   * El siguiente `/refresh` devuelve un token **sin el permiso de Drive**.
+   *
+   * La app lo descarta y trata la sesión como inválida (`BackendAuthenticator.resume`): un token que
+   * no alcanza la hoja no sirve para lo único que esta app hace con Google, y seguir con él daría un
+   * fallo mucho más tarde y sin relación visible con la causa.
+   */
+  refreshWithoutDrivePermission(): void {
+    this.refreshWithoutDrive = true;
+  }
+
+  /**
+   * La ventana de Google se negará a autorizar, y dirá por qué.
+   *
+   * Es `async` y no un simple interruptor porque el sustituto de GIS **ya está cargado en la
+   * página**: la app lo memoriza al montar `/cuenta`, así que cambiar el guion servido no tendría
+   * ningún efecto. Lo que se cambia es una marca dentro de cada página enganchada, que el sustituto
+   * lee en el momento de abrir la ventana.
+   */
+  async denyAuthorization(denial: AuthorizationDenial): Promise<void> {
+    await this.setDenial(denial);
+  }
+
+  /** Vuelve a conceder la autorización. Ver {@link denyAuthorization}. */
+  async allowAuthorization(): Promise<void> {
+    await this.setDenial(null);
+  }
+
+  private async setDenial(denial: AuthorizationDenial | null): Promise<void> {
+    await Promise.all(
+      this.pages.map((page) =>
+        page
+          // La clave viaja como argumento: el cuerpo corre en el navegador y no ve las constantes
+          // de este módulo.
+          .evaluate(
+            ({ key, value }) => {
+              (window as unknown as Record<string, unknown>)[key] = value;
+            },
+            { key: GIS_DENIAL_KEY, value: denial },
+          )
+          // Una página que ya se cerró (el segundo aparato al terminar su tramo) no es un fallo del
+          // test: simplemente no hay a quién decírselo.
+          .catch(ignore),
+      ),
+    );
   }
 
   /**
@@ -426,6 +668,8 @@ export class GoogleDouble {
    * resuelve `google` antes de que el test pueda llamar a un `goto`.
    */
   async install(page: Page): Promise<void> {
+    this.pages.push(page);
+
     // 1 · La configuración del despliegue. Sin `googleClientId` la integración está apagada y el
     //     botón de conectar no puede hacer nada, así que se sirve uno.
     await page.route('**/config.json*', (route) =>
@@ -437,33 +681,25 @@ export class GoogleDouble {
     );
 
     // 2 · Google Identity Services. La app inyecta este script y usa `window.google`.
-    await page.route('https://accounts.google.com/gsi/client', (route) =>
-      route.fulfill({
+    await page.route('https://accounts.google.com/gsi/client', (route) => {
+      this.gisScriptRequests += 1;
+      return route.fulfill({
         status: 200,
         contentType: 'text/javascript; charset=utf-8',
         body: GIS_STUB,
-      }),
-    );
+      });
+    });
 
     // 3 · El backend de la sesión (`firebase/functions`). Es quien identifica la cuenta y emite los tokens;
     //     la app ya no le pregunta el perfil a Google.
     await page.route(`${AUTH_API_URL}/exchange`, (route) =>
-      this.answerAuth(route, () => {
-        this.session = true;
-        return sessionPayload();
-      }),
+      this.answerAuth(route, () => this.exchange()),
     );
     await page.route(`${AUTH_API_URL}/refresh`, (route) =>
-      this.answerAuth(route, () => {
-        this.tokenRequests += 1;
-        return this.session ? sessionPayload() : UNAUTHORIZED;
-      }),
+      this.answerAuth(route, () => this.refresh(route)),
     );
     await page.route(`${AUTH_API_URL}/logout`, (route) =>
-      this.answerAuth(route, () => {
-        this.session = false;
-        return NO_CONTENT;
-      }),
+      this.answerAuth(route, () => this.logout(route)),
     );
 
     // 4 · Drive: buscar la hoja de la cuenta (la colección) y preguntar si una sigue viva (un fichero).
@@ -483,6 +719,77 @@ export class GoogleDouble {
   }
 
   /**
+   * `POST /exchange` — canjea el código y **abre una sesión nueva**, con su propio `sid`.
+   *
+   * El `sid` es distinto en cada canje, igual que en el backend (`randomUUID`). Es lo que hace que
+   * dos aparatos con la misma cuenta tengan dos sesiones y que cerrar una no toque la otra.
+   */
+  private exchange(): AuthReply {
+    const failure = this.exchangeFailure;
+    if (failure) {
+      this.exchangeFailure = null;
+      return EXCHANGE_FAILURES[failure];
+    }
+
+    const sid = `e2e-session-${this.nextSessionId++}`;
+    this.sessions.set(sid, this.account);
+    return this.sessionPayload(sid, this.account, SCOPES);
+  }
+
+  /**
+   * `POST /refresh` — un token nuevo para la sesión que traiga la petición.
+   *
+   * `401` es la única respuesta que autoriza a la app a olvidar su sesión, y aquí solo sale cuando la
+   * sesión de verdad no está: ni la abrió nadie, ni la cerró `/logout`, ni la borró
+   * {@link expireSession}.
+   */
+  private refresh(route: Route): AuthReply {
+    this.tokenRequests += 1;
+
+    const sid = readSessionId(route);
+    const account = sid ? this.sessions.get(sid) : undefined;
+    if (!sid || !account) {
+      return UNAUTHORIZED;
+    }
+
+    // Un token sin el permiso de Drive: la app lo descarta y se da por desconectada.
+    const scope = this.refreshWithoutDrive ? SCOPES_WITHOUT_DRIVE : SCOPES;
+    this.refreshWithoutDrive = false;
+
+    return this.sessionPayload(sid, account, scope);
+  }
+
+  /** `POST /logout` — cierra **solo** la sesión de quien pregunta. Siempre 204, como el backend. */
+  private logout(route: Route): AuthReply {
+    const sid = readSessionId(route);
+    if (sid) {
+      this.sessions.delete(sid);
+    }
+    return NO_CONTENT;
+  }
+
+  /**
+   * La forma que devuelven `/exchange` y `/refresh`: nombres de OAuth.
+   *
+   * `session_token` es el respaldo de la cookie `__session` para los navegadores que bloquean las
+   * cookies de terceros — y aquí es **la única** vía, porque este doble no modela cookies. Repetirlo
+   * al renovar es lo que hace el backend, para que un navegador que lo hubiera perdido lo recupere.
+   */
+  private sessionPayload(sid: string, account: FakeAccount, scope: string): AuthReply {
+    return {
+      status: 200,
+      body: {
+        access_token: accessTokenFor(account),
+        expires_in: this.lifetimeSeconds,
+        scope,
+        token_type: 'Bearer',
+        session_token: sid,
+        account: { sub: account.sub, email: account.email, name: account.name, picture: null },
+      },
+    };
+  }
+
+  /**
    * Las respuestas del backend de la sesión, que **no** hablan el idioma de Google: llevan su propio
    * estado y su propia forma de error (`{ error, message }`), igual que el backend.
    *
@@ -494,6 +801,11 @@ export class GoogleDouble {
       await route.abort('connectionfailed').catch(ignore);
       return;
     }
+    this.lastAuth = {
+      url: route.request().url(),
+      method: route.request().method(),
+      headers: route.request().headers(),
+    };
     if (this.gate) {
       await this.gate;
     }
@@ -551,8 +863,10 @@ export class GoogleDouble {
   private driveSearch(route: Route): unknown {
     const query = new URL(route.request().url()).searchParams.get('q') ?? '';
     const name = /name\s*=\s*'((?:[^']|\\')*)'/.exec(query)?.[1]?.replace(/\\'/g, "'");
+    const owner = this.ownerOf(route);
 
     const files = this.files
+      .filter((file) => file.owner === owner)
       .filter((file) => !file.trashed)
       .filter((file) => name === undefined || file.title === name)
       .map((file) => ({ id: file.id, webViewLink: file.url }));
@@ -562,11 +876,31 @@ export class GoogleDouble {
 
   private drive(route: Route): unknown {
     const id = decodeURIComponent(new URL(route.request().url()).pathname.split('/').pop() ?? '');
-    const file = this.files.find((candidate) => candidate.id === id);
+    const file = this.fileFor(id, this.ownerOf(route));
+    return { id: file.id, trashed: file.trashed };
+  }
+
+  /**
+   * De quién es el token con el que llega la petición.
+   *
+   * Sin token no hay a quién atribuirle nada: Google contesta `401`, y aquí basta con un `404` sobre
+   * cualquier fichero, porque el efecto que interesa —no ver nada de nadie— es el mismo.
+   */
+  private ownerOf(route: Route): string | null {
+    const token = readBearer(route.request().headers()['authorization']);
+    return token?.startsWith(`${TOKEN}-`) ? token.slice(TOKEN.length + 1) : null;
+  }
+
+  /**
+   * Un fichero **del que pregunta**. Que exista pero sea de otra cuenta se contesta igual que si no
+   * existiera: con `drive.file`, la hoja de otra persona no es que esté prohibida, es que no está.
+   */
+  private fileFor(id: string, owner: string | null): FakeSpreadsheet {
+    const file = this.files.find((candidate) => candidate.id === id && candidate.owner === owner);
     if (!file) {
       throw notFound(`No existe el fichero ${id}.`);
     }
-    return { id: file.id, trashed: file.trashed };
+    return file;
   }
 
   /** El enrutado de Sheets, por la forma de la ruta. */
@@ -579,13 +913,13 @@ export class GoogleDouble {
       if (method !== 'POST') {
         throw badRequest('Solo se puede crear con POST.');
       }
-      return this.create(json(route));
+      return this.create(json(route), this.ownerOf(route));
     }
 
     // `{id}:batchUpdate` — la llamada estructural (crear pestaña, ampliar, borrar filas).
     const [head, ...rest] = path.split('/');
     const [rawId, structural] = head.split(':');
-    const file = this.fileOf(decodeURIComponent(rawId));
+    const file = this.fileFor(decodeURIComponent(rawId), this.ownerOf(route));
 
     if (structural === 'batchUpdate') {
       return this.structural(file, json(route));
@@ -619,11 +953,15 @@ export class GoogleDouble {
     return { range, values: readRange(file, range) };
   }
 
-  private create(body: Record<string, unknown>): unknown {
+  private create(body: Record<string, unknown>, owner: string | null): unknown {
+    if (!owner) {
+      throw notFound('Sin token no hay Drive en el que crear nada.');
+    }
     const properties = (body['properties'] ?? {}) as { title?: string };
     const file = new FakeSpreadsheet(
       `e2e-sheet-${this.nextFileId++}`,
       properties.title ?? 'Sin título',
+      owner,
     );
 
     const sheets = (body['sheets'] ?? []) as SheetSpec[];
@@ -720,13 +1058,6 @@ export class GoogleDouble {
     return { spreadsheetId: file.id, replies };
   }
 
-  private fileOf(id: string): FakeSpreadsheet {
-    const file = this.files.find((candidate) => candidate.id === id);
-    if (!file) {
-      throw notFound(`No existe la hoja ${id}.`);
-    }
-    return file;
-  }
 }
 
 // ── Rangos ─────────────────────────────────────────────────────────────────────────────────────
@@ -918,6 +1249,11 @@ interface StructuralRequest {
  * Un detalle que importa: el modelo de código solo entra en juego al **conectar**, así que si algún
  * día la app volviera a necesitar a Google para reanudar, este stub no la salvaría — el spec de
  * recarga fallaría, que es justo lo que se quiere.
+ *
+ * La marca de rechazo se lee **en el momento de abrir la ventana**, no al cargarse el guion: la app
+ * memoriza el cliente, así que un test tiene que poder cambiar de opinión después. Se distingue
+ * `access_denied` del resto porque Google también lo distingue — llega por el `callback` normal con
+ * un `error` dentro, y no por el `error_callback`.
  */
 const GIS_STUB = `
 (() => {
@@ -925,10 +1261,18 @@ const GIS_STUB = `
     accounts: {
       oauth2: {
         initCodeClient: (config) => ({
-          requestCode: () => setTimeout(() => config.callback({
-            code: 'e2e-authorization-code',
-            scope: '${SCOPES}',
-          }), 0),
+          requestCode: () => setTimeout(() => {
+            const denial = window['${GIS_DENIAL_KEY}'];
+            if (denial === 'access_denied') {
+              config.callback({ error: 'access_denied' });
+              return;
+            }
+            if (denial) {
+              config.error_callback({ type: denial });
+              return;
+            }
+            config.callback({ code: 'e2e-authorization-code', scope: '${SCOPES}' });
+          }, 0),
         }),
       },
     },
@@ -949,28 +1293,42 @@ const UNAUTHORIZED: AuthReply = {
 
 const NO_CONTENT: AuthReply = { status: 204, body: null };
 
+/** Una petición al servicio de sesión, tal como salió del navegador. */
+export interface AuthRequest {
+  url: string;
+  method: string;
+  headers: Record<string, string>;
+}
+
 /**
- * La misma forma que devuelven `<authApiUrl>/exchange` y `/refresh`: nombres de OAuth.
+ * Qué sesión dice traer la petición.
  *
- * `session_token` es el respaldo de la cookie `__session` para los navegadores que bloquean las
- * cookies de terceros. Aquí es una constante porque el doble no distingue sesiones: lo que un E2E
- * comprueba es que la app lo guarda y lo devuelve, no cuál es su valor.
+ * El backend de verdad mira **primero la cookie `__session` y luego `Authorization`**
+ * (`readSessionId` en `firebase/functions/src/auth/sessions.ts`). Aquí solo hay cabecera: este doble
+ * no modela cookies a propósito —el estado de las sesiones vive en el proceso del test, no en el
+ * navegador— y eso tiene una ventaja, no solo un coste: si la app dejara de mandar el respaldo,
+ * todos los recorridos de sesión se caerían. En un navegador de verdad el fallo solo se vería en
+ * Safari y en iOS, que es donde nadie mira hasta que es tarde.
  */
-function sessionPayload(): AuthReply {
-  return {
-    status: 200,
-    body: {
-      access_token: TOKEN,
-      expires_in: 3600,
-      scope: SCOPES,
-      token_type: 'Bearer',
-      session_token: 'e2e-session-token',
-      account: {
-        sub: E2E_ACCOUNT.sub,
-        email: E2E_ACCOUNT.email,
-        name: E2E_ACCOUNT.name,
-        picture: null,
-      },
-    },
-  };
+function readSessionId(route: Route): string | null {
+  return readBearer(route.request().headers()['authorization']);
+}
+
+/**
+ * El valor de `Authorization: Bearer <token>`, o `null`.
+ *
+ * Lo usan las dos mitades del doble, y significan cosas distintas: para el servicio de sesión el
+ * token es el `sid`; para Drive y Sheets, el token de acceso, que lleva dentro de quién es (ver
+ * {@link accessTokenFor}). El esquema no distingue mayúsculas, igual que en el backend.
+ */
+function readBearer(header: string | undefined): string | null {
+  if (!header) {
+    return null;
+  }
+  const [scheme, ...rest] = header.trim().split(/\s+/);
+  if (scheme?.toLowerCase() !== 'bearer') {
+    return null;
+  }
+  const token = rest.join(' ').trim();
+  return token.length > 0 ? token : null;
 }
