@@ -61,7 +61,8 @@
               "buildTarget": "misaevol:build:production"
             },
             "development": {
-              "buildTarget": "misaevol:build:development"
+              "buildTarget": "misaevol:build:development",
+              "proxyConfig": "firebase/proxy.config.mjs"
             }
           },
           "defaultConfiguration": "development"

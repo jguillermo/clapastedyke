@@ -24,7 +24,7 @@
     "test:e2e:debug": "playwright test --config e2e/playwright.config.ts --debug",
     "test:e2e:report": "playwright show-report playwright-report",
     "e2e:serve": "node e2e/support/static-server.mjs",
-    "emulators": "npm --prefix firebase/functions run build && cd firebase && npx --yes firebase-tools@latest emulators:start --only functions,firestore",
+    "emulators": "npm --prefix firebase/functions run build && cd firebase && firebase emulators:start --only functions,firestore",
     "fn:install": "npm --prefix firebase/functions ci",
     "fn:lint": "npm --prefix firebase/functions run lint",
     "fn:build": "npm --prefix firebase/functions run build",

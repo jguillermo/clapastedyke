@@ -61,7 +61,7 @@ npm run typecheck   # tsc over app + stories, unit specs, and the E2E suite
 **Publishing is not a command.** There is no deploy script in the repo: it is
 `Actions → Desplegar (Firebase) → Run workflow` — one workflow, one command: `firebase deploy` with
 no `--only` always ships firestore + functions + hosting together. See
-[`firebase/README.md`](firebase/README.md).
+[`manual/firebase-deploy.md`](manual/firebase-deploy.md).
 
 - **Three tsconfigs, three type-checks** — `tsconfig.stories.json` (app + stories, `typecheck:src`), `tsconfig.spec.json` (unit specs, with vitest globals), `e2e/tsconfig.json` (the E2E suite, standalone). **Angular templates are checked only by `ng build`**, so the build job is not optional. Do **not** point `tsc` at `.storybook/tsconfig.json`: that is Storybook's *build* config — `preview.ts` imports `documentation.json` (compodoc-generated, gitignored) and `src/styles.css` (bundler-only), and its `files` entry makes TS infer `rootDir` as `.storybook/` (`TS6059`).
 - **Lint = ESLint flat config** (`eslint.config.mjs`, `angular-eslint` + `typescript-eslint`): Angular rules (signals over decorators, native control flow, OnPush), template **a11y**, and the **layer boundaries** as `no-restricted-imports` (`components/` with no app imports, `core/` isolated, features without `infrastructure/`, the E2E suite without `src/`). Not type-aware on purpose — `ng build` and the `tsc -p …` steps already type-check. What is not AST-analysable (real mobile-first at 375px, arbitrary Tailwind values inside a class string, specs living in `core/<ctx>/testing/`, one `Playground` with `play` per component) is still code review.
@@ -85,7 +85,7 @@ firebase/
 ├── firebase.json                 ← deploy AND emulator config (paths relative to firebase/)
 ├── .firebaserc                   ← default project — emulator and by-hand commands only
 ├── firestore.rules               ← + firestore.indexes.json
-├── proxy.config.json             ← `ng serve` → emulator, versioned
+├── proxy.config.mjs              ← DEV ONLY: `ng serve` /api/auth/** → the emulator, same origin
 ├── functions/                    ← THE BACKEND: its own npm package (deps, tsc, ESLint)
 │   ├── .env                      ← NOT versioned: real values, copied by hand
 │   ├── .env.example              ← versioned: documents the two keys, no values
@@ -142,17 +142,27 @@ If a deploy would DELETE an already-published function, `--non-interactive` stop
 `--force` instead of doing it silently.
 
 Full procedure — publishing step by step, what to check afterwards, and how to reproduce the
-substitution locally — in [`firebase/README.md`](firebase/README.md).
+substitution locally — in [`manual/firebase-deploy.md`](manual/firebase-deploy.md).
 
 ## What this app is
 
 A 3D in-browser cooking game (`misaevol` / "clapastedyke"). The user navigates a three.js kitchen world (`/#/home`); the real data-entry forms are the screens reached from it. `/#/ui` is the living component showcase. **Routing is hash-based** (`withHashLocation()` in `app.config.ts`): everything after `#` never reaches the server, so `/` is the **only** server route the app has and no app route can collide with `/api/**` or with a static file. There is deliberately **no SPA fallback rewrite** — see the comment on `provideRouter` and `manual/firebase-deploy.md`. State is persisted locally in IndexedDB — **that is the source of truth, and no server ever holds the user's data**.
 
-The one network integration is **optional and additive**: from `/cuenta` a user can connect a Google account and mirror recipes and supplies into a spreadsheet in their own Drive. The app creates that spreadsheet and writes it **itself**, with the Sheets and Drive REST APIs and the user's own token — no Apps Script, nothing deployed into anyone's account, one consent checkbox (`drive.file`, which only reaches files the app created). The one-time setup for whoever publishes the app (Cloud project, consent screen, Client ID **and client secret**) is in [`firebase/README.md`](firebase/README.md) — the **only** place that procedure is documented; the design reasoning, the platform constraints and the alternatives that were measured and rejected are in [`manual/google-integration.md`](manual/google-integration.md). Nothing about local persistence changes when it is off — and it is off wherever `googleClientId` or `authApiUrl` is missing. Neither value is in any file of this repository: `public/config.json` carries the placeholders `GOOGLE_OAUTH_CLIENT_ID` and `AUTH_API_URL`, substituted on the runner. The `client_secret` never touches the repo either — it lives only in `firebase/functions/.env`, which is **not versioned**. Both halves of the client must come from the **same** downloaded JSON: pairing the `client_id` of one client with the `client_secret` of another is what Google answers with an unexplained `invalid_client`. Locally the placeholders simply stay, and the app runs with the integration off.
+The one network integration is **optional and additive**: from `/cuenta` a user can connect a Google account and mirror recipes and supplies into a spreadsheet in their own Drive. The app creates that spreadsheet and writes it **itself**, with the Sheets and Drive REST APIs and the user's own token — no Apps Script, nothing deployed into anyone's account, one consent checkbox (`drive.file`, which only reaches files the app created). ⚠️ The one-time setup for whoever publishes the app (Cloud project, consent screen, Client ID **and client secret**) is **not documented anywhere**: it lived in `firebase/README.md`, a file that no longer exists (`manual/README.md` and `manual/firebase-deploy.md` still link to it). What survives is the OAuth detail in [`firebase/functions/README.md`](firebase/functions/README.md) — including that the consent screen must be «In production», or Google expires every refresh token after 7 days — and where each origin has to be registered, in [`manual/firebase-deploy.md`](manual/firebase-deploy.md); the design reasoning, the platform constraints and the alternatives that were measured and rejected are in [`manual/google-integration.md`](manual/google-integration.md). Nothing about local persistence changes when it is off — and it is off wherever `googleClientId` or `authApiUrl` is missing. Neither value is in any file of this repository: `public/config.json` carries the placeholders `GOOGLE_OAUTH_CLIENT_ID` and `AUTH_API_URL`, substituted on the runner. The `client_secret` never touches the repo either — it lives only in `firebase/functions/.env`, which is **not versioned**. Both halves of the client must come from the **same** downloaded JSON: pairing the `client_id` of one client with the `client_secret` of another is what Google answers with an unexplained `invalid_client`. Locally the placeholders simply stay, and the app runs with the integration off.
 
 **There is exactly one piece of backend, and it is about identity — never data.** A browser client cannot hold a `client_secret`, so Google gives it no refresh token: its access tokens die in an hour and the only way to get another is a popup, which the browser blocks when it isn't triggered by a click. That is why reloading the page used to sign you out. [`firebase/functions`](firebase/functions/) — a Cloud Function named `auth`, with three routes (`POST /exchange`, `/refresh`, `/logout`) — is the confidential OAuth client that custodies the long-lived grant and mints fresh access tokens on demand. The recipe data never passes through it: the whole sync engine still runs in the browser. Its contract is in [`firebase/functions/README.md`](firebase/functions/README.md); the folder rule (**one npm package, fully separate from the Angular app — its own deps, its own `tsc`, its own ESLint — deployed by hand; a new function is another `export` from `src/index.ts`, not another folder**) is in [`manual/functions.md`](manual/functions.md).
 
-⚠️ **The app reaches it by its direct URL, with CORS — Hosting is not involved.** There is no rewrite: the function's address lives in `authApiUrl` (`public/config.json`), because a Cloud Function URL carries the project and region inside it. Two consequences, both documented in that README: **CORS answers only the origins listed in `ALLOWED_ORIGINS`** (`firebase/functions/.env`) — with `Allow-Credentials: true` the spec forbids the wildcard, and reflecting whatever came let any site the user visited mint a token for their Drive; an empty list answers nobody, app included. And the session travels **both** in an `HttpOnly` `__session` cookie **and** in a `session_token` the app stores in IndexedDB — the cookie is third-party, so Safari and iOS block it, and without that fallback the session would not survive a reload on mobile.
+⚠️ **In local development it is reached through a same-origin proxy, not by its URL.** The functions
+emulator hardcodes `FIREBASE_DEBUG_FEATURES={"enableCors":true}`, which makes `firebase-functions`
+wrap the handler in its own `cors({origin:true})` middleware. That middleware answers the preflight
+**before `router.ts`** and omits `Access-Control-Allow-Credentials: true`, so the browser rejects
+every call the app makes (they all use `credentials: 'include'`). It cannot be switched off from
+`firebase.json`. Hence `firebase/proxy.config.mjs` + `authApiUrl: "http://localhost:4200/api/auth"`:
+same origin means no preflight at all, and the cookie is first-party. **Open the app on `localhost`,
+never `127.0.0.1`** — they are different hosts, and the cross-site path is the broken one. None of
+this applies to a deployment: without that debug flag the preflight is answered by `router.ts`.
+
+⚠️ **Published, the app reaches it by its direct URL, with CORS — Hosting is not involved.** There is no rewrite: the function's address lives in `authApiUrl` (`public/config.json`), because a Cloud Function URL carries the project and region inside it. Two consequences, both documented in that README: **CORS answers only the origins listed in `ALLOWED_ORIGINS`** (`firebase/functions/.env`) — with `Allow-Credentials: true` the spec forbids the wildcard, and reflecting whatever came let any site the user visited mint a token for their Drive; an empty list answers nobody, app included. And the session travels **both** in an `HttpOnly` `__session` cookie **and** in a `session_token` the app stores in IndexedDB — the cookie is third-party, so Safari and iOS block it, and without that fallback the session would not survive a reload on mobile.
 
 ## Architecture: four layers under `src/app/`
 
@@ -253,8 +263,11 @@ abre una grieta explícita para `@core/_common/logger` en el bloque de `platform
 | `debug` | si `public/config.json` dice `"debug": true` |
 
 **`info`, `warn` y `error` no se pueden apagar**: no hay configuración que los toque, así que si algo
-falla en la máquina de alguien deja rastro con su pila. **`debug`** viene encendido en el repo, así
-que `ng serve` y ya se ve todo.
+falla en la máquina de alguien deja rastro con su pila. **`debug`, en cambio, viene APAGADO en un
+clon limpio**: el `config.json` versionado lleva el marcador `"debug": "DEBUG"`, y el código compara
+`document?.debug === true`, así que cualquier cosa que no sea el booleano `true` lo apaga. Para verlo
+en local se pone `"debug": true` a mano en `public/config.json` — y se restauran los marcadores antes
+de commitear, porque ese fichero está versionado.
 
 Todo lo que nadie captura acaba en `GlobalErrorHandler` (`platform/error/`), que lo saca por el
 puerto con scope `[uncaught]` y su traza completa. El fallo de arranque, que ocurre antes de que
@@ -266,13 +279,19 @@ Un booleano en el fichero de configuración que ya existe, y **nada más**: ni `
 umbral de nivel, ni interruptor en `window`, ni estado en `localStorage`.
 
 ```jsonc
-// public/config.json — el MISMO build lo lee en todos los entornos
+// public/config.json — TAL COMO ESTÁ VERSIONADO. El MISMO build lo lee en todos los entornos, y lo
+// que cambia de uno a otro es este fichero: el pipeline sustituye cada marcador al publicar.
 {
-  "debug": true,          // ¿se ve el detalle del flujo? Ausente = false
-  "googleClientId": "",   // identidad de la app ante Google
-  "authApiUrl": ""        // URL de la función `auth`; sin ella no hay sesión que reanudar
+  "debug": "DEBUG",                           // ¿se ve el detalle? SOLO el booleano `true` lo enciende
+  "googleClientId": "GOOGLE_OAUTH_CLIENT_ID", // identidad de la app ante Google
+  "authApiUrl": "AUTH_API_URL",               // URL de la función `auth`; sin ella no hay sesión
+  "syncPollSeconds": 120                      // cada cuánto se mira el destino. Ausente = 120
 }
 ```
+
+En local se editan a mano —`"debug": true` y `authApiUrl` apuntando al emulador
+(`http://127.0.0.1:5001/<projectId>/us-central1/auth`)— y se **restauran los marcadores antes de
+commitear**. El detalle está en [`manual/functions.md`](manual/functions.md) → «Desarrollo local».
 
 **El build es uno solo**: no hay `src/environments/` ni `fileReplacements`. Compilar dos veces la
 misma app para cambiarle un booleano obliga a republicar por cada ajuste y hace que lo que corre en
@@ -293,7 +312,7 @@ publicó» y «no lo escucha nadie» se ven igual. Para distinguirlos, `provideE
 Published Language:
 
 ```js
-// con `ng serve` ya salen; solo hay que usar la app
+// con `"debug": true` en public/config.json ya salen; solo hay que usar la app
 // [events] SupplySaved          { aggregateId: 'ing-manjar', occurredOn: '…', data: { name: 'Manjar blanco', … } }
 // [events] RecipeSaved          { aggregateId: 'rec-bano-manjar', occurredOn: '…', data: { name: 'Baño de Manjar', ingredients: […], … } }
 // [events] RecipeCapacitySaved  { aggregateId: 'RC-1', occurredOn: '…', data: { group: 'portions', label: '33', factor: 33 } }

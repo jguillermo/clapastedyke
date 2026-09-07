@@ -133,18 +133,80 @@ npm run emulators       # compila la función y arranca functions + firestore
 npm start               # ng serve, en otra terminal
 ```
 
-**No hay proxy, y ya no hace falta.** La app llama al emulador por su URL directa, que se le dice en
-la clave `authApiUrl` de tu `public/config.json` local:
+### Requisito que no es de npm: un JDK 21+
 
-```jsonc
-{ "authApiUrl": "http://127.0.0.1:5001/<projectId>/us-central1/auth" }
+El emulador de Firestore es un binario Java, y `firebase-tools` 15 **rechaza cualquier Java anterior
+al 21** con este mensaje, antes de arrancar nada:
+
+```
+Error: firebase-tools no longer supports Java version before 21.
 ```
 
-`http://` solo se acepta sobre `localhost` o `127.0.0.1`; en cualquier otro sitio la app exige
-`https:`. Es lo que evita publicar por error una configuración con la que la cookie `Secure` nunca
-podría guardarse. (Antes había un `firebase/proxy.config.json` referenciado desde `angular.json`,
-porque la cookie `SameSite=Lax` de entonces exigía mismo origen; hoy la cookie es `SameSite=None` y
-tiene además el respaldo del `session_token`, así que esa línea se quitó de `angular.json`.)
+El Java que trae macOS de serie (el del plugin de applets, 1.8) no sirve. Con Homebrew:
+
+```bash
+brew install openjdk@21
+export JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home
+export PATH="$JAVA_HOME/bin:$PATH"        # en ~/.zshrc para no repetirlo
+```
+
+`java -version` tiene que decir 21 o más **en la terminal donde corras `npm run emulators`**;
+`/usr/libexec/java_home -V` lista los JDK que hay instalados.
+
+> **El script usa el `firebase` instalado, no `npx`.** `npm run emulators` invoca el CLI del `PATH`
+> a propósito: con `npx --yes firebase-tools@latest` cada arranque iba al registro de npm, y en una
+> máquina apuntada a un registro privado con el token caducado eso falla con `E401` sin que el
+> emulador tenga nada que ver. Si no tienes el CLI: `npm i -g firebase-tools`.
+
+### El proxy: por qué la app NO llama al emulador por su URL
+
+En local la app llama a **su propio origen** y el servidor de desarrollo reenvía:
+`firebase/proxy.config.mjs` mapea `/api/auth/**` → `http://127.0.0.1:5001/<projectId>/us-central1/auth`,
+y va enganchado en `angular.json` (`serve.configurations.development.proxyConfig`). En tu
+`public/config.json` local:
+
+```jsonc
+{ "authApiUrl": "http://localhost:4200/api/auth" }
+```
+
+**No es una preferencia: apuntar al emulador en directo no funciona.** El emulador de funciones
+arranca el runtime con `FIREBASE_DEBUG_FEATURES={"enableCors":true}` —hardcodeado en
+`firebase-tools/lib/emulator/functionsEmulator.js`—, y con ese flag `firebase-functions` envuelve el
+manejador en su propio middleware `cors({origin:true})`. Ese middleware **contesta el preflight antes
+que `router.ts`** y no pone `Access-Control-Allow-Credentials: true`, así que Chrome rechaza todas las
+peticiones de la app, que usan `credentials: 'include'`:
+
+```
+Response to preflight request doesn't pass access control check: The value of the
+'Access-Control-Allow-Credentials' header in the response is '' which must be 'true'
+when the request's credentials mode is 'include'.
+```
+
+No se puede desactivar desde `firebase.json`. Con el mismo origen no hay CORS que pasar, y además la
+cookie deja de ser de terceros. **En un despliegue no pasa nada de esto**: sin el flag de depuración,
+el preflight lo contesta `router.ts` con `Allow-Credentials: true`.
+
+> ⚠️ **Abre la app en `http://localhost:4200`, no en `127.0.0.1:4200`.** Para el navegador son hosts
+> distintos, así que desde `127.0.0.1` la llamada a `localhost:4200/api/auth` vuelve a ser de otro
+> sitio — y con ella vuelve el fallo de arriba.
+
+Sobre el esquema: `http://` solo se acepta sobre `localhost` o `127.0.0.1`; en cualquier otro sitio la
+app exige `https:`. Es lo que evita publicar por error una configuración con la que la cookie `Secure`
+nunca podría guardarse. Por el proxy la petición llega sin `x-forwarded-proto`, así que `isSecure()`
+da `false` y la cookie sale como `SameSite=Lax` **sin** `Secure` — la rama que existe justo para el
+emulador (`auth/sessions.ts`).
+
+### Lo que hay que poner a mano, y no está en el repo
+
+| Qué | Dónde | Sin ello |
+|---|---|---|
+| `client_id` **y** `client_secret` del MISMO cliente de OAuth | `firebase/functions/.env` | Las rutas contestan 500 «La función auth no está configurada» |
+| el mismo `client_id` | `public/config.json` → `googleClientId` | La app apaga la integración con un `warn` (solo acepta un id que acabe en `.apps.googleusercontent.com`) |
+| `ALLOWED_ORIGINS=http://localhost:4200,http://127.0.0.1:4200` | `firebase/functions/.env` | La función no contesta a nadie; en el navegador se ve como un fallo de red sin explicación |
+| `http://localhost:4200` como **origen de JavaScript autorizado** del cliente | consola de Google Cloud | `Error 400: origin_mismatch` al abrir el diálogo de Google |
+
+**Y restaura los marcadores de `public/config.json` antes de commitear** (`git checkout --
+public/config.json`): ese fichero está versionado.
 
 Los valores de verdad van en `firebase/functions/.env`, que está en el `.gitignore` y **no lo escribe
 ningún script**: se copian a mano del JSON del cliente (`cp .env.example .env`). Sin ellos, el
@@ -416,7 +478,7 @@ cp firebase/functions/.env.example firebase/functions/.env
 | `Al environment '<amb>' le falta: secret:GOOGLE_OAUTH_CLIENT` | El *environment* de GitHub no declara el cliente | Requisito 5 |
 | El deploy se planta pidiendo `--force` para borrar funciones | `src/index.ts` no exporta lo que sí está publicado en el proyecto | `--non-interactive` te está evitando borrarlas sin querer. Revisa qué exporta antes de forzar nada |
 | La función responde 500 con «La función auth no está configurada» | Está desplegada, pero el `.env` no viajó (o llegó vacío) | Requisito 5 |
-| `El secret GOOGLE_OAUTH_CLIENT no trae .web.client_secret` | El secret está, pero no es el JSON completo del cliente | [`firebase/README.md`](../firebase/README.md) → «El fichero del cliente» |
+| `El secret GOOGLE_OAUTH_CLIENT no trae .web.client_secret` | El secret está, pero no es el JSON completo del cliente | [`firebase-deploy.md`](firebase-deploy.md) → la tabla de secrets: se pega el JSON **entero** que descarga Cloud Console, no un campo suelto |
 | La app dice que no puede conectar y en la consola hay un error de red sin código | La petición murió en el CORS, o `authApiUrl` apunta a otro sitio | Mira la respuesta del `OPTIONS` en la pestaña de red; comprueba `authApiUrl` en el `config.json` publicado |
 | `POST <authApiUrl>/refresh` da **404** | La función no está desplegada, o la URL no es la suya | `firebase deploy`; la URL correcta sale en la salida del deploy |
 

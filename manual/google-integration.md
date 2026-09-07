@@ -1,8 +1,9 @@
 # Integración con Google — modelo mental y decisiones
 
-Este documento es el **por qué**. El paso a paso para ponerlo en marcha está en
-[`firebase/README.md`](../firebase/README.md); aquí está lo que hay que entender antes de tocarlo, las
-alternativas que se evaluaron y los datos medidos que respaldan cada decisión.
+Este documento es el **por qué**. Publicar y declarar cada valor está en
+[`firebase-deploy.md`](firebase-deploy.md) — el alta del cliente de Google en sí ya no está
+documentada (ver [5 · Puesta en marcha](#5--puesta-en-marcha)); aquí está lo que hay que entender
+antes de tocarlo, las alternativas que se evaluaron y los datos medidos que respaldan cada decisión.
 
 Se escribió después de una investigación con pruebas reales contra la API de Google (agosto 2026).
 Los resultados del [Anexo A](#anexo-a--el-botón-«desplegar-sincronizador»-investigado-y-archivado)
@@ -327,10 +328,10 @@ completo está en `e2e/specs/account/sign-out.spec.ts`.
 
 ## 5 · Puesta en marcha
 
-**Este documento no explica cómo montarlo.** Los pasos —proyecto de Cloud, consentimiento, Client ID,
-client secret y orígenes, y dónde acaba cada valor— viven **solo** en
-[`firebase/README.md`](../firebase/README.md), junto al fichero de ambientes donde
-acaba el Client ID. La **infraestructura** que necesita la función para existir (proyecto de Firebase,
+**Este documento no explica cómo montarlo.** Dónde acaba cada valor y cómo se publica está en
+[`firebase-deploy.md`](firebase-deploy.md). Los pasos de la consola de Google —proyecto de Cloud,
+pantalla de consentimiento, Client ID, client secret y orígenes—: ⚠️ **ese procedimiento ya no está documentado en ningún sitio**: vivía en `firebase/README.md`, un fichero que se borró y no se sustituyó (ver el aviso en
+[`README.md`](README.md)). La **infraestructura** que necesita la función para existir (proyecto de Firebase,
 Blaze, Firestore, la cuenta de despliegue) es otra cosa y está en [`functions.md`](functions.md): el permiso que
 concede el usuario sobre su cuenta y el permiso para desplegar lo tuyo no se mezclan. Lo que falla al
 usarlo está en [6 · Diagnóstico](#6--diagnóstico).
@@ -359,8 +360,9 @@ refresh tokens a los 7 días**. Con el backend custodiando esos tokens, eso sign
 original —«se pierde la sesión»— volvería cada semana, y sin ninguna pista de por qué.
 
 Así que la pantalla de consentimiento tiene que estar **«En producción»**. Publicarla no cuesta nada:
-`drive.file` no es un permiso sensible y no hay verificación de Google que pasar (2.6). El trámite, en
-[`firebase/README.md`](../firebase/README.md) §2.
+`drive.file` no es un permiso sensible y no hay verificación de Google que pasar (2.6). El trámite se
+hace en la consola de Google Cloud, en la propia pantalla de consentimiento; **el paso a paso no está
+documentado en el repo** (5 · Puesta en marcha).
 
 ---
 
@@ -368,7 +370,7 @@ Así que la pantalla de consentimiento tiene que estar **«En producción»**. P
 
 | Síntoma | Causa | Arreglo |
 |---|---|---|
-| `Error 400: origin_mismatch` | El origen no está registrado, o es `127.0.0.1` vs `localhost`, o el puerto cambió | [`firebase/README.md`](../firebase/README.md) §3 |
+| `Error 400: origin_mismatch` | El origen no está registrado, o es `127.0.0.1` vs `localhost`, o el puerto cambió | Dar de alta ese origen exacto en los orígenes autorizados del Client ID — qué dominios son, en [`firebase-deploy.md`](firebase-deploy.md) |
 | `UNAUTHENTICATED` | El token de una hora caducó y el backend no ha podido emitir otro | Mirar la respuesta de `<authApiUrl>/refresh`: `401 revoked` = se retiró el acceso (reconectar); `502` = Google no contestó (se reintenta solo) |
 | Al recargar pide reconectar | El backend no tiene sesión para este navegador: no llegó ni la cookie `__session` ni el `session_token`, o la concesión ya no vale | Comprobar que `authApiUrl` del `config.json` publicado apunta a la función y que la pantalla de consentimiento está **En producción** (5.2) |
 | Al recargar pide reconectar **solo en Safari o iOS** | La cookie de terceros está bloqueada Y el `session_token` de respaldo no se guardó | Mirar en IndexedDB el store `auth_session_token`. Si está vacío tras conectar, el fallo está en `BackendAuthenticator`, no en el navegador |

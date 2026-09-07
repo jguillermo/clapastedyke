@@ -3,7 +3,7 @@
 Cómo la app y la hoja del usuario se mantienen iguales, **por qué está hecho así**, qué límites tiene
 aceptados y cómo se diagnostica cuando algo no cuadra.
 
-El «cómo se configura» está en [`firebase/README.md`](../firebase/README.md); el «por qué Google Sheets y no otra
+El «cómo se configura» está en [`firebase-deploy.md`](firebase-deploy.md); el «por qué Google Sheets y no otra
 cosa» y las alternativas medidas y descartadas, en
 [google-integration.md](google-integration.md).
 

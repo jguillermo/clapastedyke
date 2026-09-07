@@ -37,9 +37,15 @@ dentro del workflow.
 | **Environments de GitHub**, uno por ambiente | Los secrets `GOOGLE_OAUTH_CLIENT` (el JSON del cliente de Google, entero) y `FIREBASE_SERVICE_ACCOUNT`. **Ninguna variable** | Sí, los dos |
 | `public/config.json` y `firebase/functions/.env` | **Marcadores**, versionados: `GOOGLE_OAUTH_CLIENT_ID`, `"DEBUG"`. El pipeline los sustituye en el artefacto | No |
 
-En el repositorio **no hay ningún valor de ambiente**: hay marcadores. La forma de los marcadores y
-cómo se sustituyen está documentada junto a los ficheros, en
-[`firebase/README.md`](../firebase/README.md). No se repite aquí para que no puedan contradecirse.
+En el repositorio **no hay ningún valor de ambiente**: hay marcadores. Quién los sustituye y con qué
+está en el propio paso «Sustituir marcadores de config.json» de
+[`.github/workflows/deploy-hosting.yml`](../.github/workflows/deploy-hosting.yml), que es la única
+autoridad; el resumen vive en [`CLAUDE.md`](../CLAUDE.md) → «Deployment: placeholders in the repo».
+
+> ⚠️ Ese paso sustituye **`debug` y `googleClientId`, y nada más**. El marcador `AUTH_API_URL` de
+> `public/config.json` **sobrevive al despliegue** (la guarda que corta el job solo busca
+> `GOOGLE_OAUTH_CLIENT_ID` y `"DEBUG"`), así que hoy lo publicado se queda sin `authApiUrl` válido y
+> **la sesión de Google no se reanuda en producción**.
 
 El nombre del ambiente es la bisagra: **lo que se teclea al lanzar el workflow y el nombre del
 *environment* de GitHub tienen que ser el mismo, en minúsculas.** Eso es lo que hace que `secrets.*` resuelva a
@@ -123,7 +129,7 @@ Dentro de **cada** environment, `Add environment secret`. Son dos:
 | Secret | Valor | Quién lo usa |
 |---|---|---|
 | `FIREBASE_SERVICE_ACCOUNT` | El **contenido íntegro** del JSON del paso 3 — ábrelo con un editor y pega todo, desde la `{` hasta la `}`. **Uno distinto por ambiente**: cada JSON abre su proyecto | El workflow de despliegue |
-| `GOOGLE_OAUTH_CLIENT` | El **fichero de cliente de Google entero**, tal cual lo descarga la consola ([`firebase/README.md`](../firebase/README.md)) | Las dos mitades: el build le saca el `client_id`; el backend, además, el `client_secret` para el `.env` de la función |
+| `GOOGLE_OAUTH_CLIENT` | El **fichero de cliente de Google entero**, tal cual lo descarga Cloud Console (Credentials → el cliente «Web application» → Download JSON) | Las dos mitades: el build le saca el `client_id`; el backend, además, el `client_secret` para el `.env` de la función |
 
 Los dos se pegan a mano: el JSON de la cuenta de servicio del paso 3, y el JSON del cliente que te
 enseña [`create-google-client-id.sh`](../create-google-client-id.sh). Que estén aquí y no en
@@ -159,8 +165,8 @@ orígenes distintos: los dos tienen que estar en los orígenes autorizados del C
 el que falte da `Error 400: origin_mismatch`. Con dos ambientes son cuatro entradas; con cuatro,
 ocho.
 
-**Cómo se crea ese Client ID y dónde se registran sus orígenes está en
-[`firebase/README.md`](../firebase/README.md)** — es el único sitio con ese procedimiento.
+**Los orígenes se registran en el propio Client ID**, desde Cloud Console. Cómo se **crea** ese
+cliente es otra cosa: ⚠️ **ese procedimiento ya no está documentado en ningún sitio**: vivía en `firebase/README.md`, un fichero que se borró y no se sustituyó (ver el aviso en [`README.md`](README.md)).
 
 Esos **mismos dos dominios** van además en `ALLOWED_ORIGINS`, dentro de
 [`firebase/functions/.env`](../firebase/functions/.env.example): son dos listas distintas y las dos
@@ -206,8 +212,10 @@ contra el *environment* de GitHub, así que la lista de ambientes que existen es
 
 Ya está: `Run workflow` escribiendo `stage` despliega.
 
-Detalle completo del diseño (por qué es una caja de texto y no un desplegable, y por qué la
-validación va en un job aparte) en [`firebase/README.md`](../firebase/README.md).
+Detalle del diseño (por qué es una caja de texto y no un desplegable, y por qué la validación va en
+un job aparte): en el propio
+[`deploy-hosting.yml`](../.github/workflows/deploy-hosting.yml), que lleva la razón comentada junto a
+cada paso. El documento que lo explicaba de corrido (`firebase/README.md`) se borró.
 
 ---
 
@@ -286,7 +294,6 @@ se salga de ella**: mientras la salida era `dist/misaevol/browser`, el fichero t
 raíz del repo. Ahora todas las rutas (`public`, `functions`, `firestore.rules`) quedan dentro de
 `firebase/`, y por eso Firebase no aparece en ningún otro sitio del repositorio. Los workflows hacen
 `cd firebase` en vez de usar `--config`, para que el CLI no tenga margen de deducir otra raíz.
-Detalle en [`firebase/README.md`](../firebase/README.md).
 
 | Clave | Por qué |
 |---|---|
@@ -313,7 +320,7 @@ Detalle en [`firebase/README.md`](../firebase/README.md).
 | El deploy a prod se queda «Waiting» | Está pidiendo aprobación (protección del environment) | Apruébalo desde la propia ejecución en Actions |
 | Desplegué a dev y se actualizó prod | El secret está como secret de repositorio, no de environment | Paso 4 |
 | El sitio se publica con un marcador dentro | No debería poder pasar: el workflow falla si alguno sobrevive | Mira el paso «Sustituir los marcadores» de la ejecución |
-| En local, conectar con Google dice «Falta el identificador de cliente» | Correcto: el `config.json` versionado lleva el marcador y la app lo ignora | Ver `firebase/README.md` → «Si de verdad necesitas probar el login en local» |
+| En local, conectar con Google dice «Falta el identificador de cliente» | Correcto: el `config.json` versionado lleva el marcador y la app lo ignora | [`functions.md`](functions.md) → «Desarrollo local»: pon el `googleClientId` de verdad y `authApiUrl` apuntando al emulador, y **restaura los marcadores antes de commitear** |
 | Una ruta da 404 | La URL va **sin `#`** (`/home` en vez de `/#/home`) | No es un fallo del despliegue: esa ruta no existe en el servidor. Todas las rutas de la app llevan hash |
 | `Failed to fetch dynamically imported module: …/chunk-XXXX.js` al navegar | La pestaña lleva abierta desde un despliegue anterior: pide un chunk con el hash de aquel build, que la publicación nueva borró | Recargar (`Cmd`/`Ctrl`+`Shift`+`R`). La app se recarga sola desde `platform/stale-build/`; si aun así se repite **después** de recargar, el fallo es otro (sin red, o una publicación a medias) y queda un `error` en consola |
 | `… is outside of project directory` | Se invocó el CLI desde otro sitio, o una ruta de `firebase.json` salió de `firebase/` | Haz `cd firebase` antes: todas las rutas del fichero son relativas a esa carpeta |

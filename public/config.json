@@ -1,6 +1,6 @@
 {
-  "debug": "DEBUG",
+  "debug": true,
   "googleClientId": "GOOGLE_OAUTH_CLIENT_ID",
-  "authApiUrl": "AUTH_API_URL",
+  "authApiUrl": "http://localhost:4200/api/auth",
   "syncPollSeconds": 120
 }

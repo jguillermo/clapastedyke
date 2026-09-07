@@ -236,13 +236,24 @@ imposible de doblar en un test.
 
 ## La única configuración: `"debug"` en `public/config.json`
 
-`ng serve` y ya se ve todo: el arranque, el seed, los eventos y cada paso de cada flujo. **No hay que
-encender nada**, ni en un navegador nuevo ni en un perfil nuevo — el repo trae `"debug": true`.
+**En un clon limpio `debug` viene APAGADO, y hay que encenderlo a mano.** El `config.json`
+versionado no lleva un booleano: lleva el **marcador** `"debug": "DEBUG"`, que el pipeline sustituye
+al publicar. El adaptador compara `document?.debug === true`, así que cualquier cosa que no sea ese
+booleano lo apaga — el marcador incluido.
 
 ```jsonc
-// public/config.json — el MISMO build lo lee en todos los entornos
-{ "debug": true, "appsScriptUrl": "", "googleClientId": "" }
+// public/config.json — TAL COMO ESTÁ VERSIONADO. El MISMO build lo lee en todos los entornos.
+{
+  "debug": "DEBUG",                           // marcador; SOLO el booleano `true` enciende el detalle
+  "googleClientId": "GOOGLE_OAUTH_CLIENT_ID",
+  "authApiUrl": "AUTH_API_URL",
+  "syncPollSeconds": 120
+}
 ```
+
+Para desarrollar se pone `"debug": true` a mano y **se restauran los marcadores antes de commitear**
+(`git checkout -- public/config.json`), porque ese fichero está versionado. Con eso ya se ve todo: el
+arranque, el seed, los eventos y cada paso de cada flujo.
 
 **No hay nada más que configurar**: ni `environment.ts`, ni umbral de nivel, ni interruptor en
 `window`, ni estado en `localStorage`. Y **el build es uno solo**: para callar el detalle del flujo en

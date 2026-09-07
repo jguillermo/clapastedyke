@@ -20,11 +20,27 @@ condena a desactualizarse, porque nadie la ve al tocar el fichero de al lado.
 
 | Documento | Qué cubre |
 |---|---|
-| [`firebase/README.md`](../firebase/README.md) | **La carpeta que publica.** El mapa de `firebase/` (el único sitio del repo que conoce Firebase, y sin lógica de despliegue dentro), por qué `ng build` compila **dentro de `firebase/public`**, los **marcadores** que llevan los ficheros versionados y cómo los sustituye el pipeline, qué configura cada *environment* de GitHub, publicar paso a paso, y las tres cosas que parecen errores y no lo son. Incluye **los pasos para crear el Client ID y el client secret de Google**, el **único** sitio con ese procedimiento. |
 | [`src/app/components/README.md`](../src/app/components/README.md) | Catálogo vivo de la librería de componentes: qué existe, cómo se usa cada pieza y qué falta por construir. Se actualiza en el mismo commit que añade un componente. |
 | [`src/app/core/_common/eventbus/README.md`](../src/app/core/_common/eventbus/README.md) | Especificación del bus de eventos: cola persistente, entrega *at-least-once*, y por qué los manejadores tienen que tolerar ejecutarse dos veces. |
 | [`src/app/core/_common/logger/README.md`](../src/app/core/_common/logger/README.md) | El puerto de registro y su configuración. |
 | [`firebase/functions/README.md`](../firebase/functions/README.md) | El contrato de la función `auth`: sus tres rutas, los códigos de error, cómo viaja la sesión (cookie + `session_token`), qué guarda en Firestore y los detalles de OAuth que cuesta deducir del código. |
+
+> ### ⚠️ Falta un documento: el alta del cliente de Google
+>
+> Había un `firebase/README.md` con el mapa de la carpeta `firebase/` y, sobre todo, con **los pasos
+> para crear el Client ID y el client secret** (proyecto de Cloud, pantalla de consentimiento,
+> orígenes autorizados). **Ese fichero se borró y no se sustituyó**, así que ese procedimiento hoy no
+> está escrito en ninguna parte. Lo que sobrevive, repartido:
+>
+> | Lo que sí está | Dónde |
+> |---|---|
+> | Dónde acaba cada mitad del cliente y en qué *environment* se declara | [`firebase-deploy.md`](firebase-deploy.md) |
+> | Qué orígenes hay que registrar, y por qué son dos listas distintas | [`firebase-deploy.md`](firebase-deploy.md) |
+> | Los detalles de OAuth que muerden (consentimiento «En producción», `invalid_grant`, `redirect_uri: postmessage`) | [`firebase/functions/README.md`](../firebase/functions/README.md) |
+> | El porqué de la integración y las alternativas descartadas | [`google-integration.md`](google-integration.md) |
+>
+> Si alguien rehace ese procedimiento, este es el sitio: un documento nuevo en `manual/`, enlazado
+> desde la tabla de arriba. Mientras no exista, **no enlaces `firebase/README.md`**.
 
 Las **convenciones de código** son otra categoría y viven en
 [`.claude/rules/`](../.claude/rules/), una por área (componentes, core/DDD, features, plataforma,
